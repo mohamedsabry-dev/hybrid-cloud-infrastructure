@@ -1,0 +1,67 @@
+Infrastructure planning for the re-establish phase. 
+
+In the first phase of stablish the infra, many points done manually , so we planning to freez current production env. and re-establish it from the template phase again  to solidate the understanding and validate the full automation prcess. 
+
+## 
+Stage 1 : 
+Install new VM rocky linux 10 , set IP to dhcp , perform update and upgrade for packages. 
+Perform the needed mesurments to preepare it to be taken as template ensure when it come online it will get dhcp ip from GW pfsese
+Create gandalf user local with sudo privilage and set default password to Change_Me
+
+Stage2: Deploy 9 VMs from the template
+for the VM 1 we had eariler , run the intialization script which should do "
+1 install ansible and its related modules "vault hashicorp-ipa-prom-graf-python" 
+2- run the script which should create key local , gather the vms ip ,  , push the key into them  , ask u for the password for all of them at once and also the user , u will use for loop and gandalf user 
+3 now u have the ansible can access all vms , 
+set ansible inventory 
+4- run ansible playbook which will do basic config "install ipa client , set dns ip , set hostname " 
+5- now run the playbook which intializa agains ipa vm and install the freeipa and configure it, this playbook.
+6- you will then run the playbook of user set and groups and host and groups and rules and sudoers using the ipa admin user . 
+7- now u have super_ansible user live again , 
+8- run the playbook which will install ipa client and add the mentioned vms to the ipa domain 
+9- now test the ssh and no sudoers password re for the domain user super_ansible 
+10- once confirm it give output sudo -i or something, if it return change , then go and clean the key from authorised files on all vms , and reboot them if needed 
+11- then run the playbook of ipa to configure ntp and dns , 
+12 - run playbook to create keytab and configure the kerbros ticket duration 
+13- run the playbook to install the service one by one , vault setup , monitor pro and graf , k8s install and setup , basic os service , needed fw global setting , jenkins service 
+
+## stage 3 # 
+1. run the related playbooks to configure the service , on jenkins we need to add secrets and agent and rules, on vault we need to add secrets, and create users and roles , on ansible vm we need to create jenkins agent user 
+2- how the secret push to vault phase will done ? manualy or over playbook or what 
+
+## Stage 4 ## resume the infra , ensure stablity , delete the old production vms and follow the clean automated one , document the flow
+
+
+
+
+1. Template Optimization (Stage 1)
+Machine ID Reset: You must truncate /etc/machine-id and remove /var/lib/dbus/machine-id. If you don't, all 9 clones will report the same ID to logs and monitoring, causing data collisions.
+
+Cloud-Init Integration: Instead of a manual gandalf user, consider installing cloud-init. This allows you to inject keys and network configs via the hypervisor metadata rather than hardcoding credentials in the template.
+
+Cleanup: You missed a "Sanitization" step—clearing bash history, removing temporary /tmp files, and cleaning dnf cache to keep the template slim.
+
+2. Networking & Resolution (Stage 2)
+Reverse DNS (PTR) Records: While you mentioned setting hostnames and DNS IPs, FreeIPA strictly requires functional forward and reverse DNS. Ensure your automation accounts for PTR record creation in PfSense or FreeIPA.
+
+DHCP Reservations: Since these are servers (Vault, K8s, IPA), relying on dynamic DHCP is risky. You should include a step to bind MAC addresses to Static DHCP leases in PfSense to ensure IPs don't change after a reboot.
+
+3. Security & Secret Management (Stage 3)
+Answer to your Secret Question: Do not push secrets manually. Use a "Seed Script" or an Ansible Playbook that leverages Ansible Vault (encrypted files) to push the initial root tokens and keys to HashiCorp Vault.
+
+Vault Unsealing: Your plan mentions installing Vault, but not the Unseal process. In a re-establish phase, you need a plan for who holds the unseal keys or how to automate auto-unseal (e.g., using a Transit engine or KMS).
+
+SSH Hardening: After super_ansible is confirmed, your automation should disable password authentication and root login across all VMs via an Ansible task.
+
+4. Kubernetes (K8s) Specifics (Stage 2/3)
+Load Balancing: For your K8s cluster, how is traffic hitting the API server? You are missing a Load Balancer (like HAProxy or Keepalived) if you plan on having more than one Control Plane node.
+
+CNI and Storage: Your plan skips the installation of the Container Network Interface (e.g., Calico, Flannel) and the Storage Class (e.g., Longhorn or NFS provisioner), which are required for Jenkins agents to run on K8s.
+
+5. Validation & Recovery (Stage 4)
+The "State" Problem: You are deleting old VMs, but you didn't mention Data Migration. You need a step to back up databases or configuration files from the "old" production and restore them to the "new" automated services (especially for Vault and Jenkins).
+
+Connectivity Matrix: A step to run a "Health Check" playbook that pings every service from every other service to ensure the PfSense firewall rules are actually correct for the new IPs.
+
+6. Logging & Observability
+Centralized Logging: You mentioned Grafana/Prometheus (metrics), but you are missing log aggregation (e.g., Loki or ELK). Without this, debugging why a "re-establish" failed becomes very difficult.
