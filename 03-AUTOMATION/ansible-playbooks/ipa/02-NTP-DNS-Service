@@ -1,0 +1,103 @@
+- name: Onboard Rocky Linux VMs to Solid Land
+  hosts: all:!ipa
+  become: yes
+  tags: phase2
+  vars:
+
+
+  tasks:
+    - name: Configure DNS via nmcli (IPA Primary, pfSense Secondary)
+      community.general.nmcli:
+        conn_name: "ens33"
+        type: ethernet
+        dns4:                     # Use dns4 for IPv4
+          - "{{ ipa_primary }}"
+          - "{{ pfsense_gw }}"
+        dns4_search:              # Use dns4_search
+          - "{{ domain }}"
+        state: present
+        conn_reload: yes          # Tells NetworkManager to reload the config
+
+#   - name: Force connection up to apply DNS
+#     ansible.builtin.shell: nmcli connection up ens33
+
+
+    - name: Read /etc/resolv.conf for verification
+      ansible.builtin.command: cat /etc/resolv.conf
+      register: dns_output
+      changed_when: false
+
+
+    - name: Display DNS Resolution on each Host
+      ansible.builtin.debug:
+        msg: "{{ dns_output.stdout_lines }}"
+
+
+
+### Play 2 Drafted
+
+---
+- name: Configure All VMs to Use IPA as NTP Server
+  hosts: all:!ipa
+  become: yes
+  vars:
+    ipa_server: "ipa.home.lab"
+
+  tasks:
+    - name: Backup current chrony configuration
+      copy:
+        src: /etc/chrony.conf
+        dest: /etc/chrony.conf.backup
+        remote_src: yes
+
+    - name: Remove all existing NTP server entries
+      lineinfile:
+        path: /etc/chrony.conf
+        regexp: '^(server|pool)\s+'
+        state: absent
+
+    - name: Configure IPA as the primary NTP server
+      lineinfile:
+        path: /etc/chrony.conf
+        line: "server {{ ipa_server }} iburst"
+        insertafter: "^# Use public servers"
+        state: present
+
+    - name: Restart chronyd service
+      service:
+        name: chronyd
+        state: restarted
+        enabled: yes
+
+    - name: Wait for chrony to sync
+      wait_for:
+        timeout: 10
+
+    - name: Force chrony to sync immediately
+      command: chronyc makestep
+      ignore_errors: yes
+
+    - name: Verify new NTP configuration
+      command: chronyc sources
+      register: new_sources
+      changed_when: false
+
+    - name: Display new NTP sources
+      debug:
+        msg: "{{ new_sources.stdout_lines }}"
+
+- name: Verify IPA Server NTP Configuration
+  hosts: ipa
+  become: yes
+
+  tasks:
+    - name: Check IPA NTP sources (should use external)
+      command: chronyc sources
+      register: ipa_sources
+      changed_when: false
+
+    - name: Display IPA NTP sources
+      debug:
+        msg:
+          - "IPA server should sync to external sources:"
+          - "{{ ipa_sources.stdout_lines }}"

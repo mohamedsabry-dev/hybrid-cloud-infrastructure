@@ -1,0 +1,46 @@
+---
+- name: Create Vault SSH Role for Ansible
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vault_addr: "http://10.0.20.192:8200" # Your Vault Address
+    
+  vars_prompt:
+    - name: admin_user
+      prompt: "Enter Vault Admin Username"
+      private: no
+    - name: admin_password
+      prompt: "Enter Vault Admin Password"
+      private: yes
+
+  tasks:
+    - name: Authenticate to Vault
+      community.hashi_vault.vault_login:
+        url: "{{ vault_addr }}"
+        auth_method: userpass
+        username: "{{ admin_user }}"
+        password: "{{ admin_password }}"
+      register: vault_auth_result
+
+    - name: Create the SSH Role 'ansible-role'
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "ssh-client-signer/roles/ansible-role"
+        data:
+          key_type: "ca"
+          algorithm_signer: "rsa-sha2-256"
+          allow_user_certificates: true
+          # IMPORTANT: This limits the key so it works ONLY for 'super_ansible'
+          allowed_users: "super_ansible"
+          default_user: "super_ansible"
+          # Extensions required for a normal SSH shell session
+          default_extensions: 
+            permit-pty: ""
+            permit-port-forwarding: ""
+          ttl: "1h"
+          max_ttl: "1h"
+
+    - name: Success Message
+      debug:
+        msg: "Role 'ansible-role' created! It allows signing keys for 'super_ansible' only."

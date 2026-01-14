@@ -1,0 +1,64 @@
+# ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault status"
+## ansible-playbook -i ../inventory 02-setup_vault_ssh_signer.yml
+# We should set vault add to value from above commmand if not using localhost
+---
+- name: Configure Vault SSH Client Signer
+  hosts: localhost
+  gather_facts: no
+  vars:
+    # Use your Load Balancer URL if you have one, or ANY single node IP.
+    # The cluster will forward requests if needed.
+    vault_addr: "http://10.0.20.192:8200" 
+    
+  vars_prompt:
+    - name: admin_user
+      prompt: "Enter Vault Admin Username"
+      private: no
+    - name: admin_password
+      prompt: "Enter Vault Admin Password"
+      private: yes
+
+  tasks:
+    - name: 00-Authenticate to Vault
+      community.hashi_vault.vault_login:
+        url: "{{ vault_addr }}"
+        auth_method: userpass
+        username: "{{ admin_user }}"
+        password: "{{ admin_password }}"
+      register: vault_auth_result
+
+    - name: 01-Enable SSH Secrets Engine
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}" # Use the token we just got
+        path: "sys/mounts/ssh-client-signer"
+        data:
+          type: "ssh"
+          description: "SSH Client Signer for Jenkins Agents"
+      ignore_errors: yes
+
+    - name: 02-Generate the CA Signing Key
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "ssh-client-signer/config/ca"
+        data:
+          generate_signing_key: true
+
+    - name: 03-Fetch the CA Public Key
+      community.hashi_vault.vault_read:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "ssh-client-signer/config/ca"
+      register: ca_result
+
+    - name: 04-Save CA Public Key to a file
+      copy:
+        content: "{{ ca_result.data.data.public_key }}"
+        dest: "./vault-ca.pub"
+        mode: '0644'
+      when: ca_result.data.data.public_key is defined
+
+    - name: Success
+      debug:
+        msg: "Public Key saved to ./vault-ca.pub. Ready for next step!"
