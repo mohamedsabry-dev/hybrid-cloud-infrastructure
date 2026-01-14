@@ -48,11 +48,11 @@ jobs:
       - name: "Terraform Init"
         run: terraform init
 
-      - name: "Import Existing Resources"
-        continue-on-error: true
-        run: |
-          terraform import -var-file="dev.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-dev-terraform-state || true
-          terraform import -var-file="dev.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-dev || true
+      # - name: "Import Existing Resources"
+      #   continue-on-error: true
+      #   run: |
+      #     terraform import -var-file="dev.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-dev-terraform-state || true
+      #     terraform import -var-file="dev.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-dev || true
 
       - name: "Terraform Validate"
         run: terraform validate
@@ -95,11 +95,11 @@ jobs:
       - name: "Terraform Init"
         run: terraform init
 
-      - name: "Import Existing Resources"
-        continue-on-error: true
-        run: |
-          terraform import -var-file="prod.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-prod-terraform-state || true
-          terraform import -var-file="prod.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-prod || true
+      # - name: "Import Existing Resources"
+      #   continue-on-error: true
+      #   run: |
+      #     terraform import -var-file="prod.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-prod-terraform-state || true
+      #     terraform import -var-file="prod.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-prod || true
 
       - name: "Terraform Validate"
         run: terraform validate
