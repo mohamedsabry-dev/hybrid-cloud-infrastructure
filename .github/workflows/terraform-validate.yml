@@ -17,8 +17,8 @@ jobs:
 
 
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.IAM_AWS_ACCESS_KEY }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.IAM_AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.LEGACY_ADMIN_AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LEGACY_ADMIN_AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: eu-west-2
 
     steps:
