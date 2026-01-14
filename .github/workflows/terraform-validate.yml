@@ -10,6 +10,7 @@ jobs:
   validate-aws:
     name: "Validate AWS Handshake"
     runs-on: self-hosted
+    if: contains(github.event.head_commit.message, 'runtf')
 
     defaults:
       run:
