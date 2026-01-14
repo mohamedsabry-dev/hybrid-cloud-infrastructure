@@ -26,6 +26,12 @@ jobs:
       - name: "Checkout Code"
         uses: actions/checkout@v4
 
+      - name: "Who am I?"
+        run: |
+          whoami
+          echo "Home is: $HOME"
+          ls -la ~/.terraformrc
+
 
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
