@@ -3,3 +3,11 @@ i would prefer to have s3 and dynmodb via tf and also other rules for easy edit 
 i see that i will manually create iam users 3 of them, one as admin for iam, 1 as s3 and dynmo privilage but not delete 
 , just add, edit, get , and 1 user for aws secrets but later not now . and may have one admin later also
 
+Cearte Access and Secret key for IAM AWS 
+Save in giuthub secrets 
+IAM_AWS_ACCESS_KEY
+IAM_AWS_SECRET_ACCESS_KEY
+
+set mac mini as local runner 
+deploy tf code to create 3 AWS users 
+You can chose beteern enable the dynamic cli keys or not manual based on late check 

@@ -1,0 +1,33 @@
+name: "Terraform Connection Validation"
+
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-aws:
+    name: "Validate AWS Handshake"
+    runs-on: self-hosted
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.IAM_AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.IAM_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-west-2
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "setup terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      - name: "Terraform Plan"
+        # This will show you who the runner 'is' in AWS
+        run: terraform plan
