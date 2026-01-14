@@ -1,0 +1,35 @@
+---
+- name: Phase 4 - Retire Legacy 'ansible' User
+  # ⚠️ SAFETY: Strictly target K8s and Controllers. NEVER target 'ipa'.
+  hosts: k8s, controllers
+  become: yes
+
+  tasks:
+    # ========================================
+    # 1. Delete the user
+    # This removes them from /etc/passwd and /etc/shadow
+    # Manual equivalent:
+    #   userdel -r -f ansible
+    #   # -r removes home directory
+    #   # -f forces removal even if user is logged in
+    # ========================================
+    - name: Remove legacy 'ansible' user
+      ansible.builtin.user:
+        name: ansible
+        state: absent
+        # FORCE REMOVAL: Delete the home directory (/home/ansible)
+        remove: yes
+        force: yes
+
+    # ========================================
+    # 2. Double Check Directory Removal
+    # (Just in case the user was already gone but the folder remained)
+    # Manual equivalent:
+    #   rm -rf /home/ansible
+    # To verify:
+    #   ls -la /home/
+    # ========================================
+    - name: Ensure home directory is completely gone
+      ansible.builtin.file:
+        path: /home/ansible
+        state: absent

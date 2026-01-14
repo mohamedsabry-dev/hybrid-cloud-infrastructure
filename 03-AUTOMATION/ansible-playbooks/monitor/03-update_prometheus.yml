@@ -1,0 +1,25 @@
+---
+- name: Configure Prometheus Targets (Fixed Indentation)
+  hosts: monitor.home.lab
+  become: yes
+
+  tasks:
+  - name: Deploy Prometheus configuration from template
+    template:
+            src: prometheus.yml.j2
+            dest: /etc/prometheus/prometheus.yml
+            owner: prometheus
+            group: prometheus
+            mode: '0644'
+    notify: Restart Prometheus
+
+  - name: Validate Prometheus Config
+    # Using the full path as discovered
+    command: /usr/local/bin/promtool check config /etc/prometheus/prometheus.yml
+    changed_when: false
+
+  handlers:
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted
