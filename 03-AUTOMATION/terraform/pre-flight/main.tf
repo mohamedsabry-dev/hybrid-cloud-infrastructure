@@ -7,16 +7,13 @@ terraform {
     }
   }
 
-  # PHASE 2: Uncomment the backend block below AFTER the S3 bucket and DynamoDB table are created
-  # Then run: terraform init -migrate-state -force-copy
-  #
-  # backend "s3" {
-  #   bucket         = "hybrid-cloud-dev-terraform-state"   # or hybrid-cloud-prod-terraform-state
-  #   key            = "pre-flight/terraform.tfstate"
-  #   region         = "eu-west-2"
-  #   dynamodb_table = "terraform-state-lock-dev"          # or terraform-state-lock-prod
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "hybrid-cloud-dev-terraform-state"
+    key            = "pre-flight/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "terraform-state-lock-dev"
+    encrypt        = true
+  }
 }
 
 provider "aws" {

@@ -48,6 +48,12 @@ jobs:
       - name: "Terraform Init"
         run: terraform init
 
+      - name: "Import Existing Resources"
+        continue-on-error: true
+        run: |
+          terraform import -var-file="dev.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-dev-terraform-state || true
+          terraform import -var-file="dev.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-dev || true
+
       - name: "Terraform Validate"
         run: terraform validate
 
@@ -56,10 +62,6 @@ jobs:
 
       - name: "Terraform Apply"
         run: terraform apply -var-file="dev.tfvars" -auto-approve
-
-      # PHASE 2: Uncomment after backend is configured in main.tf
-      # - name: "Terraform Migrate State"
-      #   run: terraform init -migrate-state -force-copy
 
   preflight-prod:
     name: "Pre-Flight Prod"
@@ -93,6 +95,12 @@ jobs:
       - name: "Terraform Init"
         run: terraform init
 
+      - name: "Import Existing Resources"
+        continue-on-error: true
+        run: |
+          terraform import -var-file="prod.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-prod-terraform-state || true
+          terraform import -var-file="prod.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-prod || true
+
       - name: "Terraform Validate"
         run: terraform validate
 
@@ -101,7 +109,3 @@ jobs:
 
       - name: "Terraform Apply"
         run: terraform apply -var-file="prod.tfvars" -auto-approve
-
-      # PHASE 2: Uncomment after backend is configured in main.tf
-      # - name: "Terraform Migrate State"
-      #   run: terraform init -migrate-state -force-copy
