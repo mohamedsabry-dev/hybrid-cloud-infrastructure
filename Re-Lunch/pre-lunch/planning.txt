@@ -11,3 +11,7 @@ IAM_AWS_SECRET_ACCESS_KEY
 set mac mini as local runner 
 deploy tf code to create 3 AWS users 
 You can chose beteern enable the dynamic cli keys or not manual based on late check 
+
+
+to avoid keep download the aws modules, use this 
+mkdir -p ~/.terraform.d/plugin-cache

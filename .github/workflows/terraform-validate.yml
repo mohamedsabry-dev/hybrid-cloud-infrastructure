@@ -20,6 +20,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.LEGACY_ADMIN_AWS_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.LEGACY_ADMIN_AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: eu-west-2
+      TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
 
     steps:
       - name: "Checkout Code"
