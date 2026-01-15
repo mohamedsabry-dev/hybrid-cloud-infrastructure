@@ -29,3 +29,15 @@ variable "enable_encryption" {
   type        = bool
   default     = true
 }
+
+variable "tf_state_admin" {
+  description = "IAM user for managing Terraform state"
+  type        = string
+  default     = "terraform_state_admin"
+}
+
+variable "console_admin" {
+  description = "IAM user for console administration"
+  type        = string
+  default     = "console_admin"
+}
