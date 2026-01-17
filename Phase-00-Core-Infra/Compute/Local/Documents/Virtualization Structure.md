@@ -1,1 +1,0 @@
-## Platform Setup (vSphere & ESXI)

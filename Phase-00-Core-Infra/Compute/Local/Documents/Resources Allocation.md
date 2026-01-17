@@ -1,1 +1,0 @@
-## Laptop Resourtces & Internal Resourcs planning
