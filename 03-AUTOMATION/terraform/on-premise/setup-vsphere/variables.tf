@@ -35,3 +35,9 @@ variable "datacenter_name" {
   type        = string
   default     = "Datacenter"
 }
+
+variable "cluster_names" {
+  description = "List of vSphere cluster names"
+  type        = list(string)
+  default     = ["Core-Env", "Production-Env"]
+}

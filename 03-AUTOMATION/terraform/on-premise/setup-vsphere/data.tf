@@ -9,8 +9,8 @@ data "vsphere_datacenter" "dc" {
 
 # All Clusters in the Datacenter
 data "vsphere_compute_cluster" "clusters" {
-  for_each      = toset(data.vsphere_datacenter.dc.id != "" ? ["cluster"] : [])
-  name          = "cluster"
+  for_each      = toset(var.cluster_names)
+  name          = each.key
   datacenter_id = data.vsphere_datacenter.dc.id
 }
 

@@ -18,6 +18,17 @@ output "datacenter_name" {
 }
 
 # =============================================================================
+# Cluster Information
+# =============================================================================
+
+output "clusters" {
+  description = "Map of cluster names to their IDs"
+  value = {
+    for name, cluster in data.vsphere_compute_cluster.clusters : name => cluster.id
+  }
+}
+
+# =============================================================================
 # Infrastructure Summary
 # =============================================================================
 
@@ -26,5 +37,6 @@ output "vsphere_info" {
   value = {
     server     = var.vsphere_server
     datacenter = data.vsphere_datacenter.dc.name
+    clusters   = keys(data.vsphere_compute_cluster.clusters)
   }
 }
