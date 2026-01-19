@@ -1,0 +1,81 @@
+PHASE 1: DevOps Foundation (Must Complete First)
+Team: DevOps Engineer
+Blocker: Infrastructure team needs this before ANY Terraform work
+Tasks:
+
+GitHub Repository Setup
+
+Create repo structure (infra/, terraform/, ansible/, docs/)
+Branch protection rules (main, develop)
+README with project overview
+.gitignore for secrets
+
+
+GitHub Actions Self-Hosted Runner
+
+Deploy runner VM (Ubuntu/RHEL)
+Install prerequisites:
+
+Terraform
+Ansible
+Node.js
+AWS CLI
+Python3 + pip
+
+
+Configure runner with IP in infrastructure network range
+Register runner to GitHub repo
+Test workflow execution
+
+
+AWS Account Foundation
+
+Create/configure AWS account
+Enable MFA on root account
+Set up billing alerts
+
+
+AWS IAM Users & Policies
+
+Create Terraform automation user
+Create DevOps team user
+Create Infrastructure team user
+Configure least-privilege IAM policies
+Generate access keys
+Store credentials in GitHub secrets
+
+
+AWS S3 Backend for Terraform State
+
+Create S3 bucket: <project>-terraform-state
+Enable versioning
+Enable encryption (AES-256 or KMS)
+Configure bucket policy (restrict access)
+Set up lifecycle rules
+
+
+AWS DynamoDB for State Locking
+
+Create table: terraform-state-lock
+Configure read/write capacity
+Test state locking
+
+
+AWS Network Planning (Documentation Phase)
+
+VPC CIDR blocks
+Subnet design (public/private)
+Route tables planning
+ACL rules design
+Security groups planning
+VPN connectivity planning (for Phase 5)
+
+
+
+Deliverables:
+
+GitHub repo with runner configured
+AWS account with S3/DynamoDB ready
+Terraform backend configuration documented
+Network architecture diagram for AWS
+
