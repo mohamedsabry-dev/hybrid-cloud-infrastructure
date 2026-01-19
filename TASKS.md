@@ -1,3 +1,13 @@
+Project Re-Lunch 20 Jan/2026
+
+# Project will plan to simulate full infrastructure deployment across all layers involving integration with Cloud and Following Devops & Least Privilage and Security Best Practice 
+
+# Dimentale my role into 2 Teams + 1 SRE/TL/PM
+# Infrastrucre Enginner    
+# Devops/Cloud Engineer 
+# Manager/Decisions
+## Later i may need to organize by role but while it good idea, but there tech we not go indeep inside . so keep it general like what we see in local market 
+
 # Phase 1 # 
 
 ### Team DevOps ###
@@ -35,8 +45,17 @@
 Devops Team & Infrastructure Team
 # Deploy OpenVPN - EIP on AWS 
 # Deploy VPN Client on PFsense 
-# Secure the connetions 
+
+## Phase 5 
+ ## Intrnal ENv Setup 
+
+# Integrations 
+# K8s Cluster 
+# Application build 
+# Internal CICD and internal Vault 
+## Get Help from Python Scripts if need , not just bash , maybe replace bash or know the difference when to use which 
+
+# 6 Cloud Deployemnt , S3 - AWS K8s Nodes , ELB , IAM Integration , Secret Integration 
 
 
-# Phase 5 ## 
-Internal ENv Setup 
+
