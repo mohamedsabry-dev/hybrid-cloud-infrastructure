@@ -27,7 +27,7 @@ jobs:
               # VMware vSphere Provider
               vsphere = {
                 source = "vmware/vsphere"
-                version = "2.6.1"
+                version = "~> 2.12"
               }
               # HashiCorp Vault
               vault = {
