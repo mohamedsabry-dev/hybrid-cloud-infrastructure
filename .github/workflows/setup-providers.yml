@@ -42,9 +42,15 @@ jobs:
             }
           }' > main.tf
 
+      - name: Check Cache Before Init
+        run: |
+          echo "Cache contents BEFORE init:"
+          du -sh $TF_PLUGIN_CACHE_DIR 2>/dev/null || echo "Cache empty"
+          ls $TF_PLUGIN_CACHE_DIR 2>/dev/null || true
+
       - name: Terraform Init
         # The first time you run this, it will take a while (approx 600MB download).
-        # The second time, it should be instant.
+        # The second time, it should be instant (reads from cache).
         run: terraform init
 
       - name: Verify Cache Content
