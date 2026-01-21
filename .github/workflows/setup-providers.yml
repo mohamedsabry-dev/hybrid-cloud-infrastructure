@@ -1,19 +1,35 @@
-name: Test Full Provider Cache
+# ON LOCAL RUNNER (one-time setup):
+#   mkdir -p ~/.terraform.d/providers-mirror
+#   # Then run this workflow once to populate the mirror
+
+name: Setup Provider Mirror
 
 on: workflow_dispatch
 
 env:
-  TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
+  TF_MIRROR_DIR: /Users/sabry/.terraform.d/providers-mirror
 
 jobs:
-  debug-cache:
+  setup-mirror:
     runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Cache Directory
-        run: mkdir -p $TF_PLUGIN_CACHE_DIR
+      - name: Setup Mirror Directory and Terraformrc
+        run: |
+          mkdir -p $TF_MIRROR_DIR
+          cat > ~/.terraformrc << 'EOF'
+          provider_installation {
+            filesystem_mirror {
+              path    = "/Users/sabry/.terraform.d/providers-mirror"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+          EOF
 
       - name: Create Heavy Terraform File
         run: |
@@ -47,19 +63,23 @@ jobs:
             }
           }' > main.tf
 
-      - name: Check Cache Before Init
+      - name: Check Mirror Before Init
         run: |
-          echo "Cache contents BEFORE init:"
-          du -sh $TF_PLUGIN_CACHE_DIR 2>/dev/null || echo "Cache empty"
-          ls $TF_PLUGIN_CACHE_DIR 2>/dev/null || true
+          echo "Mirror contents BEFORE init:"
+          du -sh $TF_MIRROR_DIR 2>/dev/null || echo "Mirror empty"
+          find $TF_MIRROR_DIR -name "terraform-provider-*" -type f 2>/dev/null | head -20
 
-      - name: Terraform Init
-        # The first time you run this, it will take a while (approx 600MB download).
-        # The second time, it should be instant (reads from cache).
-        run: terraform init
-
-      - name: Verify Cache Content
-        # This will list the folders to prove they are saved on your Mac
+      - name: Terraform Init (uses mirror)
         run: |
-          echo "Listing all cached providers in $TF_PLUGIN_CACHE_DIR..."
-          ls -R $TF_PLUGIN_CACHE_DIR | grep "provider"
+          echo "Terraformrc config:"
+          cat ~/.terraformrc
+          echo "---"
+          time terraform init -input=false
+
+      - name: Verify Mirror Content
+        run: |
+          echo "Mirror size:"
+          du -sh $TF_MIRROR_DIR
+          echo "---"
+          echo "Cached providers:"
+          find $TF_MIRROR_DIR -name "terraform-provider-*" -type f -exec ls -lh {} \;
