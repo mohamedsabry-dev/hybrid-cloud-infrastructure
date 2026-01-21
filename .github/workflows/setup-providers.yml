@@ -1,0 +1,59 @@
+name: Test Full Provider Cache
+
+on: workflow_dispatch
+
+env:
+  TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
+
+jobs:
+  debug-cache:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Cache Directory
+        run: mkdir -p $TF_PLUGIN_CACHE_DIR
+
+      - name: Create Heavy Terraform File
+        run: |
+          echo 'terraform {
+            required_providers {
+              # AWS Provider (Very large, ~400MB)
+              aws = {
+                source = "hashicorp/aws"
+                version = "5.31.0"
+              }
+              # VMware vSphere Provider
+              vsphere = {
+                source = "vmware/vsphere"
+                version = "2.6.1"
+              }
+              # HashiCorp Vault
+              vault = {
+                source = "hashicorp/vault"
+                version = "3.24.0"
+              }
+              # Kubernetes Provider
+              kubernetes = {
+                source = "hashicorp/kubernetes"
+                version = "2.25.2"
+              }
+              # Ansible Provider (Used to link TF to Ansible inventories)
+              ansible = {
+                source = "ansible/ansible"
+                version = "1.1.0"
+              }
+            }
+          }' > main.tf
+
+      - name: Terraform Init
+        # The first time you run this, it will take a while (approx 600MB download).
+        # The second time, it should be instant.
+        run: terraform init
+
+      - name: Verify Cache Content
+        # This will list the folders to prove they are saved on your Mac
+        run: |
+          echo "Listing all cached providers in $TF_PLUGIN_CACHE_DIR..."
+          ls -R $TF_PLUGIN_CACHE_DIR | grep "provider"
