@@ -19,25 +19,30 @@ jobs:
         run: |
           echo 'terraform {
             required_providers {
-              # AWS Provider (Very large, ~400MB)
+              # AWS Provider (~650MB)
               aws = {
-                source = "hashicorp/aws"
-                version = "5.31.0"
+                source  = "hashicorp/aws"
+                version = "6.28.0"
               }
-              # VMware vSphere Provider
+              # Azure Provider (~500MB)
+              azurerm = {
+                source  = "hashicorp/azurerm"
+                version = "4.57.0"
+              }
+              # VMware vSphere Provider (maintained by VMware/Broadcom)
               vsphere = {
-                source = "vmware/vsphere"
-                version = "~> 2.12"
+                source  = "vmware/vsphere"
+                version = "2.15.0"
               }
-              # HashiCorp Vault
+              # HashiCorp Vault (requires Terraform >= 1.11)
               vault = {
-                source = "hashicorp/vault"
-                version = "3.24.0"
+                source  = "hashicorp/vault"
+                version = "5.6.0"
               }
               # Kubernetes Provider
               kubernetes = {
-                source = "hashicorp/kubernetes"
-                version = "2.25.2"
+                source  = "hashicorp/kubernetes"
+                version = "3.0.1"
               }
             }
           }' > main.tf
