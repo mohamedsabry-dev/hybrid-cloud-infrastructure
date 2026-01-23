@@ -1,4 +1,0 @@
-vault_server_url: "http://10.0.20.192:8200"
-ipa_primary: "10.0.20.184"
-pfsense_gw: "10.0.20.170"
-domain: "home.lab"
