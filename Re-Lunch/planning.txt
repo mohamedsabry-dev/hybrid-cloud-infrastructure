@@ -1,2 +1,0 @@
-1- Create New AWS Account >> To get free 12 year quota
-2- Create IAM User with privilages (S3 - DynmoDB - IAM)

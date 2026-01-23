@@ -1,0 +1,53 @@
+name: "Terraform Connection Validation"
+
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-aws:
+    name: "Validate AWS Handshake"
+    runs-on: self-hosted
+    if: contains(github.event.head_commit.message, 'runtf.validate')
+
+    defaults:
+      run:
+        working-directory: ./Re-Lunch/pre-lunch
+
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.LEGACY_ADMIN_AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LEGACY_ADMIN_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-west-2
+      TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Who am I?"
+        run: |
+          whoami
+          echo "Home is: $HOME"
+          ls -la ~/.terraformrc
+
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+
+      - name: "setup terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      - name: "Terraform Plan"
+        # This will show you who the runner 'is' in AWS
+        run: terraform plan

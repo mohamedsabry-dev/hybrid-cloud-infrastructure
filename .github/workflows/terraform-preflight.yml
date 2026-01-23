@@ -1,0 +1,111 @@
+name: "Terraform Pre-Flight"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  preflight-dev:
+    name: "Pre-Flight Dev"
+    runs-on: self-hosted
+    if: contains(github.event.head_commit.message, 'runtf.dev') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+
+    defaults:
+      run:
+        working-directory: ./03-AUTOMATION/terraform/pre-flight
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.LEGACY_ADMIN_AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LEGACY_ADMIN_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-west-2
+      TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      # - name: "Import Existing Resources"
+      #   continue-on-error: true
+      #   run: |
+      #     terraform import -var-file="dev.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-dev-terraform-state || true
+      #     terraform import -var-file="dev.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-dev || true
+
+      - name: "Terraform Validate"
+        run: terraform validate
+
+      - name: "Terraform Plan"
+        run: terraform plan -var-file="dev.tfvars"
+
+      - name: "Terraform Apply"
+        run: terraform apply -var-file="dev.tfvars" -auto-approve
+
+  preflight-prod:
+    name: "Pre-Flight Prod"
+    runs-on: self-hosted
+    if: contains(github.event.head_commit.message, 'runtf.prod') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+
+    defaults:
+      run:
+        working-directory: ./03-AUTOMATION/terraform/pre-flight
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.LEGACY_ADMIN_AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.LEGACY_ADMIN_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-west-2
+      TF_PLUGIN_CACHE_DIR: /Users/sabry/.terraform.d/plugin-cache
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.3"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      # - name: "Import Existing Resources"
+      #   continue-on-error: true
+      #   run: |
+      #     terraform import -var-file="prod.tfvars" aws_s3_bucket.terraform_state hybrid-cloud-prod-terraform-state || true
+      #     terraform import -var-file="prod.tfvars" aws_dynamodb_table.terraform_state_lock terraform-state-lock-prod || true
+
+      - name: "Terraform Validate"
+        run: terraform validate
+
+      - name: "Terraform Plan"
+        run: terraform plan -var-file="prod.tfvars"
+
+      - name: "Terraform Apply"
+        run: terraform apply -var-file="prod.tfvars" -auto-approve
