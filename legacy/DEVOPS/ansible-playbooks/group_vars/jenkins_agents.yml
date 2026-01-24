@@ -1,0 +1,9 @@
+---
+# The user that runs the Jenkins Agent process
+jenkins_agent_user: "jenkins_agent"
+jenkins_agent_group: "jenkins_agent"
+jenkins_secret_path: "cicd/jenkins-agent"
+
+# The directories
+jenkins_agent_dir: "/var/lib/jenkins_agent"
+jenkins_home_dir: "/var/lib/jenkins"

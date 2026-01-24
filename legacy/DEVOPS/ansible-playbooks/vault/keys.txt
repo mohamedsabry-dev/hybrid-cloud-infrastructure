@@ -1,0 +1,22 @@
+Unseal Key 1: 4tH8tkeHuQbJd79042Jytg1o4EztooT/QJH3JOV893qf
+Unseal Key 2: 7BDSds90kG4+11wQXeK2nFT4aMfjjCqvSrLOcl9pCS+l
+Unseal Key 3: S+zQ4ZqNZphAoge5Rst4CB4NelD928LB07HHdL6TuNge
+Unseal Key 4: LHCY/djg7UUft7yT1qLJN181/L4w2TjkLMwnO1DsXvSv
+Unseal Key 5: u55KzHY1D8zYql/sEEt6vqXr9eobfYxdFcfhkx18un3d
+
+Initial Root Token: hvs.cSASUfKokgsX3ildmijjBDnQ
+
+Vault initialized with 5 key shares and a key threshold of 3. Please securely
+distribute the key shares printed above. When the Vault is re-sealed,
+restarted, or stopped, you must supply at least 3 of these keys to unseal it
+before it can start servicing requests.
+
+Vault does not store the generated root key. Without at least 3 keys to
+reconstruct the root key, Vault will remain permanently sealed!
+
+It is possible to generate new unseal keys, provided you have a quorum of
+existing unseal keys shares. See "vault operator rekey" for more information.
+
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal 4tH8tkeHuQbJd79042Jytg1o4EztooT/QJH3JOV893qf"
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal 7BDSds90kG4+11wQXeK2nFT4aMfjjCqvSrLOcl9pCS+l"
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal S+zQ4ZqNZphAoge5Rst4CB4NelD928LB07HHdL6TuNge"

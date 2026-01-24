@@ -1,0 +1,21 @@
+---
+- name: Step 3 - Wipe Root Keys
+  hosts: k8s, ansible
+  become: yes
+    
+  tasks:
+    # ========================================
+    # Remove root's SSH authorized_keys file to prevent SSH key-based root login
+    # Manual equivalent:
+    #   # Backup first (optional):
+    #   cp /root/.ssh/authorized_keys /root/.ssh/authorized_keys.backup
+    #   # Remove keys:
+    #   rm -f /root/.ssh/authorized_keys
+    #   rm -f /root/.ssh/id_rsa*
+    #   # Verify:
+    #   ls -la /root/.ssh/
+    # ========================================
+    - name: Delete Root Auth Keys
+      ansible.builtin.file:
+        path: /root/.ssh/authorized_keys
+        state: absent

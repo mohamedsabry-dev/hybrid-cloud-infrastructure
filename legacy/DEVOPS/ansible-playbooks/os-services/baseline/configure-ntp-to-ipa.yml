@@ -1,0 +1,51 @@
+---
+- name: Configure K8s Nodes to Sync Time from IPA
+  hosts: k8s
+  become: yes
+
+  tasks:
+    - name: Backup current chrony configuration
+      copy:
+        src: /etc/chrony.conf
+        dest: /etc/chrony.conf.backup-{{ ansible_date_time.epoch }}
+        remote_src: yes
+
+    - name: Comment out existing server/pool entries
+      replace:
+        path: /etc/chrony.conf
+        regexp: '^(server|pool)\s+'
+        replace: '# \1'
+        backup: no
+
+    - name: Add IPA as NTP server
+      lineinfile:
+        path: /etc/chrony.conf
+        line: "server ipa.home.lab iburst"
+        insertafter: "^# Use public servers"
+        state: present
+
+    - name: Restart chronyd service
+      systemd:
+        name: chronyd
+        state: restarted
+        enabled: yes
+
+    - name: Wait for chrony to stabilize
+      pause:
+        seconds: 5
+
+    - name: Force immediate time sync
+      command: chronyc makestep
+      ignore_errors: yes
+
+    - name: Verify new NTP sources
+      command: chronyc sources
+      register: verify_sources
+      changed_when: false
+
+    - name: Display verification
+      debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "New NTP Sources:"
+          - "{{ verify_sources.stdout_lines }}"
