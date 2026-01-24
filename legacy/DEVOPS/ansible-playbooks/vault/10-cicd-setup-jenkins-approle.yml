@@ -1,0 +1,230 @@
+---
+# ============================================================================
+# Playbook: Setup Jenkins AppRole in HashiCorp Vault
+# ============================================================================
+# Purpose: Create AppRole authentication for Jenkins to access Vault
+# Target: localhost (Vault API calls)
+# Security: AppRole provides secure machine-to-machine authentication
+# ============================================================================
+
+- name: Setup AppRole for Jenkins
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    vault_addr: "http://10.0.20.192:8200"
+
+  vars_prompt:
+    - name: admin_user
+      prompt: "Enter Vault Admin Username"
+      private: no
+    - name: admin_password
+      prompt: "Enter Vault Admin Password"
+      private: yes
+
+  tasks:
+    # ========================================================================
+    # Vault Authentication
+    # ========================================================================
+    - name: Authenticate to Vault using userpass
+      community.hashi_vault.vault_login:
+        url: "{{ vault_addr }}"
+        auth_method: userpass
+        username: "{{ admin_user }}"
+        password: "{{ admin_password }}"
+      register: vault_auth_result
+      tags: [vault, auth]
+
+    - name: Display Vault authentication status
+      debug:
+        msg:
+          - "✅ Vault authentication successful"
+          - "Token received and will be used for all operations"
+      tags: [vault, auth]
+
+    # ========================================================================
+    # Step 1: Create Jenkins Policy
+    # ========================================================================
+    - name: 01-Create Jenkins policy with required permissions
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "sys/policy/jenkins-policy"
+        data:
+          policy: |
+            # SSH Certificate Signing
+            path "ssh-client-signer/sign/ansible-role" {
+              capabilities = ["update"]
+            }
+
+            # Kerberos Keytab Access (Read-Only)
+            path "secret/data/cicd/kerberos/*" {
+              capabilities = ["read"]
+            }
+
+            # Metadata access for KV v2
+            path "secret/metadata/cicd/kerberos/*" {
+              capabilities = ["list", "read"]
+            }
+      register: policy_result
+      tags: [policy]
+
+    - name: 01a-Display policy creation result
+      debug:
+        msg:
+          - "✅ Jenkins policy created successfully"
+          - "Permissions granted:"
+          - "  - SSH certificate signing via ansible-role"
+          - "  - Read access to Kerberos keytabs"
+      tags: [policy]
+
+    # ========================================================================
+    # Step 2: Enable AppRole Auth Method
+    # ========================================================================
+    - name: 02-Enable AppRole authentication method
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "sys/auth/approle"
+        data:
+          type: "approle"
+          description: "AppRole authentication for Jenkins CI/CD"
+      register: approle_enable
+      ignore_errors: yes
+      tags: [approle, auth]
+
+    - name: 02a-Display AppRole enablement status
+      debug:
+        msg: "{{ 'ℹ️  AppRole already enabled (skipped)' if approle_enable.failed else '✅ AppRole authentication enabled' }}"
+      tags: [approle, auth]
+
+    # ========================================================================
+    # Step 3: Create Jenkins AppRole
+    # ========================================================================
+    - name: 03-Create Jenkins AppRole with policy binding
+      community.hashi_vault.vault_write:
+        url: "{{ vault_addr }}"
+        token: "{{ vault_auth_result.login.auth.client_token }}"
+        path: "auth/approle/role/jenkins-approle"
+        data:
+          token_policies: "jenkins-policy"
+          token_ttl: "1h"
+          token_max_ttl: "4h"
+          bind_secret_id: true
+          secret_id_ttl: "0"  # Never expires (suitable for long-running Jenkins)
+          secret_id_num_uses: "0"  # Unlimited uses
+      register: approle_result
+      tags: [approle, create]
+
+    - name: 03a-Display AppRole creation result
+      debug:
+        msg:
+          - "✅ Jenkins AppRole created successfully"
+          - "AppRole name: jenkins-approle"
+          - "Token TTL: 1 hour"
+          - "Max Token TTL: 4 hours"
+          - "Policy: jenkins-policy"
+      tags: [approle, create]
+
+    # ========================================================================
+    # Step 4: Retrieve Role ID (needed for Jenkins configuration)
+    # ========================================================================
+    - name: 04-Retrieve AppRole Role ID
+      uri:
+        url: "{{ vault_addr }}/v1/auth/approle/role/jenkins-approle/role-id"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_auth_result.login.auth.client_token }}"
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: role_id_response
+      tags: [approle, retrieve]
+
+    - name: 04a-Extract Role ID
+      set_fact:
+        jenkins_role_id: "{{ role_id_response.json.data.role_id }}"
+      tags: [approle, retrieve]
+
+    # ========================================================================
+    # Step 5: Generate Secret ID (needed for Jenkins configuration)
+    # ========================================================================
+    - name: 05-Generate AppRole Secret ID
+      uri:
+        url: "{{ vault_addr }}/v1/auth/approle/role/jenkins-approle/secret-id"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ vault_auth_result.login.auth.client_token }}"
+        body_format: json
+        body: {}
+        return_content: yes
+        status_code: 200
+        validate_certs: no
+      register: secret_id_response
+      tags: [approle, retrieve]
+
+    - name: 05a-Extract Secret ID
+      set_fact:
+        jenkins_secret_id: "{{ secret_id_response.json.data.secret_id }}"
+      tags: [approle, retrieve]
+
+    # ========================================================================
+    # Step 6: Display Configuration Summary
+    # ========================================================================
+    - name: 06-Display Jenkins AppRole configuration summary
+      debug:
+        msg:
+          - "════════════════════════════════════════════════════════════"
+          - "✅ JENKINS APPROLE SETUP COMPLETED SUCCESSFULLY"
+          - "════════════════════════════════════════════════════════════"
+          - ""
+          - "AppRole Configuration:"
+          - "  Name: jenkins-approle"
+          - "  Policy: jenkins-policy"
+          - "  Token TTL: 1 hour"
+          - "  Token Max TTL: 4 hours"
+          - ""
+          - "Credentials for Jenkins (SAVE THESE SECURELY):"
+          - "  Role ID: {{ jenkins_role_id }}"
+          - "  Secret ID: {{ jenkins_secret_id }}"
+          - ""
+          - "Permissions Granted:"
+          - "  ✅ SSH certificate signing (ssh-client-signer/sign/ansible-role)"
+          - "  ✅ Kerberos keytab read access (secret/data/cicd/kerberos/*)"
+          - ""
+          - "Next Steps:"
+          - "  1. Store Role ID and Secret ID in Jenkins credentials"
+          - "  2. Configure Jenkins Vault plugin with AppRole authentication"
+          - "  3. Use these credentials in your Jenkinsfile"
+          - ""
+          - "⚠️  SECURITY REMINDER:"
+          - "  - Store Secret ID securely in Jenkins credentials store"
+          - "  - Never commit these values to source control"
+          - "  - Rotate Secret ID periodically for security"
+          - ""
+          - "════════════════════════════════════════════════════════════"
+      tags: [always]
+
+# ============================================================================
+# End of Playbook
+# ============================================================================
+# Usage:
+#   ansible-playbook 06-setup-jenkins-approle.yml -i ../inventory
+#
+# Prerequisites:
+#   - Vault is unsealed and accessible
+#   - Valid Vault admin credentials with policy management permissions
+#   - SSH engine and secret engine already configured
+#
+# Security Notes:
+#   - AppRole provides machine-to-machine authentication
+#   - Role ID can be less protected (like a username)
+#   - Secret ID must be protected like a password
+#   - Tokens are short-lived (1 hour) and auto-renewed by Jenkins
+#
+# Jenkins Configuration:
+#   1. Install HashiCorp Vault plugin in Jenkins
+#   2. Add Role ID as Jenkins credential (secret text)
+#   3. Add Secret ID as Jenkins credential (secret text)
+#   4. Configure Vault plugin with AppRole auth method
+# ============================================================================

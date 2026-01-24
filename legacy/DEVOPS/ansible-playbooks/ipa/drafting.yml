@@ -1,0 +1,14 @@
+## Task 1 ## 
+## Planning Phase. 
+
+while intialize: the plan is Initialize IPA users , and groups , assign users to group 
+then add hosts , assign hosts to host groups , 
+then add hbac rules and sudoers , 
+then add configuration for the the kerbros and keytab time and generation 
+Also what about first time configuration? 
+the server start empty , we need to copy the ssh key of anible into authorised file then
+we need to install ipa on it , and create the super_ansible user 
+and give it the privilage needed manually
+
+
+by the way for vauklt , it was setting more sec on thiose vms of ports, 
