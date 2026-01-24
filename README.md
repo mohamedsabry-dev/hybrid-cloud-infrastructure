@@ -20,7 +20,8 @@ hybrid-cloud-infrastructure/
 │   ├── manifests/          # Raw YAML manifests (onprem, eks)
 │   └── helm-charts/        # Helm chart definitions
 ├── scripts/                # All scripts by language
-│   ├── bash/               # Bash scripts (bootstrap, setup, utilities)
+│   ├── bash/               # Bash scripts (setup, utilities)
+│   ├── bootstrap/          # Bootstrap/initialization scripts
 │   ├── python/             # Python scripts (automation, API clients)
 │   └── powershell/         # PowerShell scripts (VMware, Veeam, DR)
 ├── docs/                   # Documentation
