@@ -1,0 +1,166 @@
+---
+- name: Vault Node Base Configuration (Storage & Security)
+  hosts: vault  # Ensure your inventory group is named 'vault'
+  become: yes
+
+  tasks:
+      # --- SECURITY PHILOSOPHY ---
+      # All services restricted to 10.0.20.0/24 (Lab internal network)
+      # This prevents access from:
+      #   - External networks (internet via pfSense WAN)
+      #   - Home network (192.168.x.x) except via pfSense NAT (10.0.20.222)
+      # Access allowed from:
+      #   - All lab VMs (10.0.20.x)
+      #   - Mac Mini via NAT appears as 10.0.20.222 (included in subnet)
+      #   - Future AWS VPN will require explicit CIDR addition
+
+      # --- 1. CLEANUP: Remove Default Permissive Rules ---
+      - name: Remove insecure generic rules (8200 & 8201)
+        firewalld:
+          port: "{{ item }}"
+          permanent: yes
+          state: disabled
+          immediate: yes
+        loop:
+          - 8200/tcp
+          - 8201/tcp
+        ignore_errors: yes
+        # Ignore errors if rules were never configured
+
+      - name: Remove default SSH service (we'll add restricted version)
+        firewalld:
+          service: ssh
+          permanent: yes
+          state: disabled
+          immediate: yes
+        ignore_errors: yes
+
+      # --- 2. SECURE: Restrict SSH to Lab Network Only ---
+      - name: Allow SSH (22) ONLY from Lab Network (10.0.20.0/24)
+        firewalld:
+          rich_rule: 'rule family="ipv4" source address="10.0.20.0/24" service name="ssh" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+        # This allows:
+        #   - Ansible (10.0.20.185)
+        #   - Admin workstations on lab network
+        #   - Mac Mini via pfSense NAT (appears as 10.0.20.222)
+        # This blocks:
+        #   - External SSH brute force attempts
+        #   - Unauthorized home network devices
+
+      # --- 3. SECURE: Restrict ICMP to Lab Network Only ---
+      - name: Remove default ICMP blocks/allows
+        firewalld:
+          icmp_block: "{{ item }}"
+          permanent: yes
+          state: disabled
+          immediate: yes
+        loop:
+          - echo-request
+          - echo-reply
+        ignore_errors: yes
+
+      - name: Allow ICMP Echo Request (ping) from Lab Network
+        firewalld:
+          rich_rule: 'rule family="ipv4" source address="10.0.20.0/24" icmp-type name="echo-request" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+        # Allows troubleshooting with ping from lab network only
+
+      - name: Allow ICMP Echo Reply (ping responses)
+        firewalld:
+          rich_rule: 'rule family="ipv4" icmp-type name="echo-reply" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+        # Allow responses to our outbound pings
+
+      - name: Allow critical ICMP types (needed for proper networking)
+        firewalld:
+          icmp_block: "{{ item }}"
+          permanent: yes
+          state: disabled
+          immediate: yes
+        loop:
+          - destination-unreachable  # Path MTU discovery, routing errors
+          - time-exceeded            # Traceroute functionality
+          - parameter-problem        # IP header issues
+        # These ICMP types are essential for:
+        #   - Path MTU Discovery (prevents packet fragmentation issues)
+        #   - Network troubleshooting (traceroute)
+        #   - Proper TCP/IP stack behavior
+
+      # --- 4. SECURE: Open Vault API (8200) only to Lab Subnet ---
+      - name: Allow Vault API (8200) from Lab Network
+        firewalld:
+          rich_rule: 'rule family="ipv4" source address="10.0.20.0/24" port port="8200" protocol="tcp" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+
+      # NOTE: In sha Allah, in the future we will add K8s workers on AWS,
+      # so we'll need to add their CIDR here as well (e.g., 172.31.0.0/16 or specific /24)
+
+      # --- 5. SECURE: Open Node Exporter (9100) only to Monitoring VM ---
+      - name: Allow Node Exporter (9100) from Monitoring VM
+        firewalld:
+          rich_rule: 'rule family="ipv4" source address="10.0.20.186" port port="9100" protocol="tcp" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+        # This allows:
+        #   - Prometheus on Grafana VM (10.0.20.186) to scrape metrics
+        # This blocks:
+        #   - All other VMs and external networks from accessing metrics
+
+      # --- 6. SECURE: Open Vault Raft (8201) only to Cluster Peers ---
+      - name: Allow Raft Traffic (8201) ONLY from Vault Nodes
+        firewalld:
+          rich_rule: 'rule family="ipv4" source address="{{ item }}" port port="8201" protocol="tcp" accept'
+          permanent: yes
+          state: enabled
+          immediate: yes
+        loop:
+          - "10.0.20.191"  # vault-01.home.lab
+          - "10.0.20.192"  # vault-02.home.lab
+          - "10.0.20.193"  # vault-03.home.lab
+        # NOTE: The 03-vault_mesh_check.yml playbook tests connectivity.
+        # Ansible cannot test port 8201 from controller (not in allowed list),
+        # but node-to-node mesh connectivity is verified.
+
+      # --- 7. APPLY CHANGES ---
+      - name: Reload Firewall to apply all changes
+        service:
+          name: firewalld
+          state: reloaded
+
+      # --- 8. VERIFICATION OUTPUT ---
+      - name: Display current firewall rules for verification
+        shell: |
+          echo "======================================"
+          echo "FIREWALL CONFIGURATION FOR $(hostname)"
+          echo "======================================"
+          echo ""
+          echo "=== RICH RULES (Restrictive Rules) ==="
+          firewall-cmd --list-rich-rules
+          echo ""
+          echo "=== ALLOWED SERVICES (Should be minimal) ==="
+          firewall-cmd --list-services
+          echo ""
+          echo "=== ALLOWED PORTS (Should be empty) ==="
+          firewall-cmd --list-ports
+          echo ""
+          echo "=== ICMP BLOCKS (Should show which are blocked) ==="
+          firewall-cmd --list-icmp-blocks
+          echo ""
+          echo "=== COMPLETE ZONE CONFIGURATION ==="
+          firewall-cmd --list-all
+        register: firewall_status
+        changed_when: false
+
+      - name: Show firewall configuration
+        debug:
+          var: firewall_status.stdout_lines

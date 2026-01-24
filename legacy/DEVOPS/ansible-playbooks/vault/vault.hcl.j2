@@ -1,0 +1,29 @@
+ui = true
+disable_mlock = false # SRE Standard: Force memory locking
+
+# 1. The Storage Backend (RAID 1)
+storage "raft" {
+  path    = "/var/lib/vault"
+  node_id = "{{ inventory_hostname }}"
+
+  # --- FIXED LOOP SYNTAX ---
+{% for host in groups['vault'] %}
+{% if host != inventory_hostname %}
+  retry_join {
+    # Notice the brackets are split: ['ansible_default_ipv4']['address']
+    leader_api_addr = "http://{{ hostvars[host]['ansible_default_ipv4']['address'] }}:8200"
+  }
+{% endif %}
+{% endfor %}
+}
+
+# 2. The Listener (API)
+listener "tcp" {
+  address       = "0.0.0.0:8200"
+  tls_disable   = 1           # Enabled only for the lab setup phase
+}
+
+# 3. Identity
+# These are correct because they access local vars, not hostvars
+api_addr     = "http://{{ ansible_default_ipv4.address }}:8200"
+cluster_addr = "http://{{ ansible_default_ipv4.address }}:8201"

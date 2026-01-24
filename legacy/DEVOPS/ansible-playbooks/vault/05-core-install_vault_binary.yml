@@ -1,0 +1,51 @@
+---
+- name: Install Vault Binary & Configure System Security
+  hosts: vault
+  become: yes
+  vars:
+    vault_version: "latest" # Change to specific version like "1.15.4" if needed
+    data_dir: "/var/lib/vault"
+
+  tasks:
+    # --- PHASE 1: INSTALLATION ---
+    - name: 1. Install 'dnf-plugins-core'
+      dnf:
+        name: dnf-plugins-core
+        state: present
+
+    - name: 2. Add HashiCorp Official Repository
+      shell: dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+      args:
+        creates: /etc/yum.repos.d/hashicorp.repo
+
+    - name: 3. Install Vault Enterprise/OSS
+      dnf:
+        name: vault
+        state: "{{ vault_version }}"
+
+    # --- PHASE 2: INTEGRATION FIX (The "Ownership Trap") ---
+    - name: 4. Transfer Storage Ownership to Vault User
+      file:
+        path: "{{ data_dir }}"
+        state: directory
+        owner: vault
+        group: vault
+        mode: '0750'
+        recurse: yes
+      # This fixes the root:root permission set by the storage playbook
+
+    # --- PHASE 3: SRE SECURITY HARDENING (mlock) ---
+    - name: 5. Grant IPC_LOCK Capability (Enable mlock)
+      capabilities:
+        path: /usr/bin/vault
+        capability: cap_ipc_lock+ep
+        state: present
+      # Allows Vault to lock memory without being root
+
+    - name: 6. Verify Installation
+      shell: vault version
+      register: vault_ver
+      changed_when: false
+
+    - debug:
+        msg: "Installed: {{ vault_ver.stdout }}"

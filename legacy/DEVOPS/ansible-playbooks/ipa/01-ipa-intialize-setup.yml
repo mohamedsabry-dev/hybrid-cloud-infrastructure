@@ -1,0 +1,111 @@
+---
+- name: Phase 1 - Identity Structure (Users & Groups)
+  hosts: ipa
+  become: yes
+  tags: phase1
+  vars_prompt:
+    - name: "ipaadmin_password"
+      prompt: "Enter IPA Admin Password"
+      private: yes
+
+  tasks:
+    - name: 01-Validate group and users existence 
+      block: 
+        - name: Ensure Groups Exist
+          freeipa.ansible_freeipa.ipagroup:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item.name }}"
+            description: "{{ item.desc }}"
+            state: present
+          loop: "{{ my_groups }}"
+
+        - name: Ensure Users exist
+          freeipa.ansible_freeipa.ipauser:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item.uid }}"
+            first: "{{ item.first }}"
+            last: "{{ item.last }}"
+            password: "{{ default_pass }}"
+            update_password: on_create
+            state: present
+          loop: "{{ my_users }}"
+      tags: [users, groups, validate]
+
+    - name: 02-Assign Users to Groups
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.group }}"
+        user:
+          - "{{ item.uid }}"
+        action: member
+      loop: "{{ my_users }}"
+      tags: assign
+
+
+    - name: 03-Ensure Host Groups Structure exists
+      freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        description: "{{ item.desc }}"
+        state: present
+      loop: "{{ my_hostgroups }}"
+      tags: hostgroups
+
+    - name: 04-Assign Hosts to Groups
+      freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.key }}"
+        host: "{{ item.value }}"
+        action: member
+      loop: "{{ host_group_assignments | dict2items }}"
+      tags: assign_hosts
+
+
+    - name: 05-Ensure HBAC Rules are defined
+      freeipa.ansible_freeipa.ipahbacrule:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item.name }}"
+            description: "{{ item.desc }}"
+            # Change 'usergroup' or 'usergroups' to 'group'
+            group: "{{ item.usergroups }}" 
+            hostgroup: "{{ item.hostgroups }}"
+            hbacsvc: "{{ item.services }}"
+            state: present
+      loop: "{{ my_hbac_rules }}"
+      tags: hbac
+
+
+
+## Set up Sudo Rules 
+
+    - name: 01-Ensure Sudo Commands Exist
+      freeipa.ansible_freeipa.ipasudocmd:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item }}"
+            state: present
+      loop: "{{ my_sudocmds }}"
+
+    - name: 02-Ensure Sudo Command Groups Exist
+      freeipa.ansible_freeipa.ipasudocmdgroup:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item.name }}"
+            description: "{{ item.desc }}"
+            sudocmd: "{{ item.cmds }}"
+            state: present
+      loop: "{{ my_sudocmdgroups }}"
+
+    - name: 03-Ensure Sudo Rules Exist
+      freeipa.ansible_freeipa.ipasudorule:
+            ipaadmin_password: "{{ ipaadmin_password }}"
+            name: "{{ item.name }}"
+            description: "{{ item.desc }}"
+            group: "{{ item.usergroups | default(omit) }}"
+            hostgroup: "{{ item.hostgroups | default(omit) }}"
+            cmdcategory: "{{ item.category | default(omit) }}"
+            allow_sudocmdgroup: "{{ item.cmdgroups | default(omit) }}"
+            sudooption: "{{ item.options | default(omit) }}"
+            state: present
+      loop: "{{ my_sudorules }}"
+
+
+## Play 2 : Onboard Rocky Linux VMs to Solid Land NTP/DNS

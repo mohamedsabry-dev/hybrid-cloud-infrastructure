@@ -1,0 +1,214 @@
+# inventories/group_vars/ipa.yml
+default_pass: "Change_Me"
+## Note: password is plain text , need to be encrypted and live here or enc and save in ansible vault , and u will need ansible vault password each time run this , actually it seems more logic and eaiser 
+## Add it into vault and use api calls 
+
+
+my_groups:
+  - { name: "operators", desc: "K8s Operators (Restricted Sudo)"}
+  - { name: "monitors", desc: "Monitoring Service Accounts" }
+  - { name: "k8s_admins", desc: "Full K8s Cluster Admins" }
+  - { name: "ansible_admins", desc: "Ansible Controller Admins" }
+  - { name: "super_users", desc: "Admins with super privilages" }
+  - { name: "backup_admins", desc: "Backup Administrators" }
+  - { name: "vault_admins", desc: "Vault Access admins" }
+  - { name: "cicd_admins", desc: "Standard Login admins" }
+  - { name: "monitor_admins", desc: "Monitoring Admins" }
+
+my_users:
+
+      # The Standasrd Users (Login Only)
+      - { uid: cicd_admin1, first: cicd, last: admin1, group: cicd_admins }
+      - { uid: cicd_admin2, first: cicd, last: admin2, group: cicd_admins }
+
+      # The Operators (Restricted Sudo)
+      - { uid: operator1, first: Op, last: One, group: operators }
+      - { uid: operator2, first: Op, last: Two, group: operators }
+
+      
+        # The Monitors (No Shell/API only later)
+      - { uid: monitor1, first: Mon, last: One, group: monitors }
+      - { uid: monitor2, first: Mon, last: Two, group: monitors }
+
+      # The Admins K8s & Ansible
+      - { uid: admin1, first: Admin, last: One, group: k8s_admins }
+      - { uid: admin2, first: Admin, last: Two, group: k8s_admins }
+      - { uid: ansible_admin, first: Ansible, last: Admin, group: ansible_admins }
+      
+      # Super User Automation
+      - { uid: super_ansible, first: super, last: ansible, group: super_users }
+
+      # Backup Users
+      - { uid: veeam, first: Backup, last: veeam, group: backup_admins }
+
+      # Vault Users
+      - { uid: vault_admin1, first: Vault, last: Admin1, group: vault_admins }
+      - { uid: vault_admin2, first: Vault, last: Admin2, group: vault_admins }
+      
+      # Monitoring Admins
+      - { uid: mon_admin1, first: Mon, last: Admin1, group: monitor_admins }
+      - { uid: mon_admin2, first: Mon, last: Admin2, group: monitor_admins }
+
+## ipa.yml
+my_hostgroups:
+       - { name: "management", desc: "General Infrastructure (Legacy)" }
+       - { name: "k8s", desc: "Kubernetes Cluster Nodes" }
+       - { name: "controllers", desc: "Ansible Automation Controllers" }
+       - { name: 'backup_servers', desc: "Backup Servers Group" }
+       - { name: 'monitors', desc: "Monitoring Servers Group" }
+       - { name: 'vault_servers', desc: "Vault Servers Group" }
+       - { name: 'cicd_servers', desc: "CI/CD Servers Group" }
+
+# This structure maps group names to a list of hostnames
+host_group_assignments:
+  controllers:
+    - ansible.home.lab
+  k8s:
+    - k8s-master.home.lab
+    - k8s-worker1.home.lab
+    - k8s-worker2.home.lab
+    - k8s-worker3.home.lab
+  management:
+    - ipa.home.lab
+    - ansible.home.lab
+  monitors:
+    - monitor.home.lab
+  vault_servers:
+    - vault-01.home.lab
+    - vault-02.home.lab
+    - vault-03.home.lab
+  cicd_servers:
+    - jenkins-master.home.lab
+  backup_servers: # You can use a YAML anchor or just list them
+    - ipa.home.lab
+    - ansible.home.lab
+    - k8s-master.home.lab
+    - k8s-worker1.home.lab
+    - k8s-worker2.home.lab
+    - k8s-worker3.home.lab
+    - monitor.home.lab
+    - vault-01.home.lab
+    - vault-02.home.lab
+    - vault-03.home.lab
+    - jenkins-master.home.lab
+
+
+my_hbac_rules:
+  - name: allow_k8s_ssh
+    desc: "Allow Standard, Ops, and admin SSH to K8s"
+    usergroups: ["operators", "k8s_admins"]
+    hostgroups: ["k8s"]
+    services: ["sshd"]
+
+  - name: allow_controller_ssh
+    desc: "Allow Ansible Admins to SSH into Controllers"
+    usergroups: ["ansible_admins"]
+    hostgroups: ["controllers"]
+    services: ["sshd"]
+
+  - name: allow_automation_ssh
+    desc: "Allow Super Ansible to SSH everywhere"
+    usergroups: ["super_users"]
+    hostgroups: ["k8s", "controllers", "management", "backup_servers", "vault_servers", "cicd_servers"]
+    services: ["sshd"]
+
+  - name: allow_backup_ssh
+    desc: "Allow Backup Users to SSH into Backup Servers"
+    usergroups: ["backup_admins"]
+    hostgroups: ["backup_servers"]
+    services: ["sshd"]
+
+  - name: allow_vault_ssh
+    desc: "Allow Vault Admins to SSH into Vault Servers"
+    usergroups: ["vault_admins"]
+    hostgroups: ["vault_servers"]
+    services: ["sshd"]
+
+  - name: allow_cicd_ssh
+    desc: "Allow CI/CD Admins to SSH into CI/CD Servers"
+    usergroups: ["cicd_admins"]
+    hostgroups: ["cicd_servers"]
+    services: ["sshd"]
+
+  - name: allow_monitoring_ssh
+    desc: "Allow Monitoring Admins to SSH into Monitoring Servers"
+    usergroups: ["monitor_admins"]
+    hostgroups: ["monitors"]
+    services: ["sshd"]
+
+
+
+
+
+# Section 1: Raw Sudo Commands
+my_sudocmds:
+  - "/usr/sbin/ip a"
+  - "/usr/sbin/ip route"
+  - "/usr/bin/ping"
+  - "/usr/sbin/ss -tulpn"
+  - "/usr/bin/tail"
+  - "/usr/bin/grep"
+  - "/usr/bin/less"
+  - "/usr/bin/cat /var/log/messages"
+  - "/usr/bin/cat /var/log/syslog"
+
+# Section 2: Command Groups (Grouping the commands above)
+my_sudocmdgroups:
+  - name: ops_network
+    desc: "Network Troubleshooting Commands"
+    cmds: ["/usr/sbin/ip a", "/usr/sbin/ip route", "/usr/bin/ping", "/usr/sbin/ss -tulpn"]
+  
+  - name: ops_logs
+    desc: "Log Reading Commands"
+    cmds: ["/usr/bin/tail", "/usr/bin/grep", "/usr/bin/less", "/usr/bin/cat /var/log/messages", "/usr/bin/cat /var/log/syslog"]
+
+# Section 3: The Sudo Rules (Linking Who, Where, and What)
+my_sudorules:
+  - name: admin_k8s_full
+    desc: "Full Root Access for K8s Admins"
+    usergroups: ["k8s_admins"]
+    hostgroups: ["k8s"]
+    category: all
+
+  - name: admin_ansible_full
+    desc: "Full Root Access for Ansible Controllers"
+    usergroups: ["ansible_admins"]
+    hostgroups: ["controllers"]
+    category: all
+
+  - name: ops_k8s_restricted
+    desc: "Restricted Network & Log Access"
+    usergroups: ["operators"]
+    hostgroups: ["k8s", "controllers"]
+    cmdgroups: ["ops_network", "ops_logs"]
+
+  - name: super_automation_nopass
+    desc: "Unlimited Access for Robots No password"
+    usergroups: ["super_users"]
+    hostgroups: ["k8s", "controllers", "management", "backup_servers", "vault_servers", "cicd_servers"]
+    category: all
+    options: ["!authenticate"]
+
+  - name: backup_users_full
+    desc: "Full Backup Access"
+    usergroups: ["backup_admins"]
+    hostgroups: ["backup_servers"]
+    category: all
+
+  - name: vault_users_full
+    desc: "Full Vault Access"
+    usergroups: ["vault_admins"]
+    hostgroups: ["vault_servers"]
+    category: all
+
+  - name: cicd_users_full
+    desc: "Full CICD Access"
+    usergroups: ["cicd_admins"]
+    hostgroups: ["cicd_servers"]
+    category: all
+
+  - name: monitor_admins_restricted
+    desc: "Restricted Access for Monitoring"
+    usergroups: ["monitor_admins"]
+    hostgroups: ["monitors"]
+    category: all
