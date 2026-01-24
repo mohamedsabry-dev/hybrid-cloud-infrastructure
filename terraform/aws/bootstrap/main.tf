@@ -22,14 +22,14 @@ output "bootstrap_user_arn" {
 # List S3 buckets to verify read access (using region check as alternative)
 data "aws_region" "current" {}
 output "aws_region" {
-  value = data.aws_region.current.name
+  value = data.aws_region.current.region
 }
 # List EC2 instances to verify read access
 data "aws_instances" "all" {
-    filter {
-        name   = "instance-state-name"
-        values = ["running", "stopped", "pending", "stopping"]
-    }
+  filter {
+    name   = "instance-state-name"
+    values = ["running", "stopped", "pending", "stopping"]
+  }
 }
 output "ec2_instance_ids" {
   value = data.aws_instances.all.ids
