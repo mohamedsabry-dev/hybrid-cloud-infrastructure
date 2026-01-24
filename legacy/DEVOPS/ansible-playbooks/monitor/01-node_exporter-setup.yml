@@ -1,0 +1,86 @@
+---
+- name: Install and Secure Node Exporter
+  hosts: all
+  become: yes
+  vars:
+    node_exporter_version: "1.7.0"
+    prometheus_ip: "10.0.20.186"
+    arch: "linux-amd64"
+
+  tasks:
+    # --- 1. PREPARATION ---
+    - name: Create 'node_exporter' system user
+      user:
+        name: node_exporter
+        shell: /bin/false
+        create_home: no
+
+    - name: Download and unarchive Node Exporter
+      unarchive:
+        src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.{{ arch }}.tar.gz"
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Move binary to /usr/local/bin
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.{{ arch }}/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        remote_src: yes
+        owner: node_exporter
+        group: node_exporter
+        mode: '0755'
+
+    # --- 2. SERVICE CREATION ---
+    - name: Create Systemd Service file
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=node_exporter
+          Group=node_exporter
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart Node Exporter
+
+    # --- 3. FIREWALL SECURITY (Only allows 10.0.20.186) 
+    
+    # # For Ubuntu / Debian (UFW)
+    # - name: Allow Prometheus IP on Port 9100 (UFW)
+    #   community.general.ufw:
+    #     rule: allow
+    #     proto: tcp
+    #     port: '9100'
+    #     from_ip: "{{ prometheus_ip }}"
+    #     comment: "Allow Prometheus Scraper"
+    #   when: ansible_os_family == 'Debian'
+
+    # For CentOS / RHEL (Firewalld)
+    - name: Allow Prometheus IP on Port 9100 (Firewalld)
+      ansible.posix.firewalld:
+        rich_rule: 'rule family="ipv4" source address="{{ prometheus_ip }}" port port="9100" protocol="tcp" accept'
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ansible_os_family == 'RedHat'
+
+    # --- 4. START SERVICE ---
+    - name: Ensure Node Exporter is running and enabled
+      systemd:
+        name: node_exporter
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Node Exporter
+      systemd:
+        name: node_exporter
+        state: restarted
+        daemon_reload: yes
