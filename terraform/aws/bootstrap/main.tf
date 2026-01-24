@@ -35,23 +35,30 @@ output "aws_region" {
 #   value = data.aws_instances.all.ids
 # }
 
-# List IAM users to verify read access (requires iam:ListUsers)
+# List IAM users to verify read access (requires iam:ListUsers on all users)
 # data "aws_iam_users" "all" {}
 # output "iam_user_names" {
 #   value = data.aws_iam_users.all.names
 # }
 
-# Get current user info
-data "aws_iam_user" "current" {
-  user_name = "terraform-bootstrap"
+# Test IAM permissions - can only access terraform-network and terraform-application users
+# These will fail if users don't exist yet (expected on first run)
+data "aws_iam_user" "terraform_network" {
+  count     = 0 # Set to 1 after creating terraform-network user
+  user_name = "terraform-network"
 }
 
-output "bootstrap_user_id" {
-  value = data.aws_iam_user.current.user_id
+data "aws_iam_user" "terraform_application" {
+  count     = 0 # Set to 1 after creating terraform-application user
+  user_name = "terraform-application"
 }
 
-output "bootstrap_user_path" {
-  value = data.aws_iam_user.current.path
+output "terraform_network_user_arn" {
+  value = length(data.aws_iam_user.terraform_network) > 0 ? data.aws_iam_user.terraform_network[0].arn : "user not created yet"
+}
+
+output "terraform_application_user_arn" {
+  value = length(data.aws_iam_user.terraform_application) > 0 ? data.aws_iam_user.terraform_application[0].arn : "user not created yet"
 }
 # List DynamoDB tables to verify read access
 data "aws_dynamodb_tables" "all" {}
