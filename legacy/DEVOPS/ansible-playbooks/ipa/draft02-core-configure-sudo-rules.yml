@@ -1,0 +1,194 @@
+---
+- name: Phase 3 - Configure Sudo Rules (Privileges)
+  hosts: ipa
+  become: yes
+
+  vars_prompt:
+    - name: "ipaadmin_password"
+      prompt: "Enter IPA Admin Password"
+      private: yes
+
+  tasks:
+    # ========================================
+    # SECTION 1: CREATE SUDO COMMANDS
+
+    - name: Ensure specific Sudo Commands exist
+      freeipa.ansible_freeipa.ipasudocmd:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item }}"
+        state: present
+      loop:
+        # Network Tools
+        - "/usr/sbin/ip a"
+        - "/usr/sbin/ip route"
+        - "/usr/bin/ping"
+        - "/usr/sbin/ss -tulpn"
+        # Log & File Readers (Safe-ish)
+        - "/usr/bin/tail"
+        - "/usr/bin/grep"
+        - "/usr/bin/less"
+        # The Dangerous one (Restricted)
+        # Note: IPA allows wildcards depending on OS sudo version,
+        # but exact paths are safest for this lab demo.
+        - "/usr/bin/cat /var/log/messages"
+        - "/usr/bin/cat /var/log/syslog"
+
+    # -------------------------------------------------------------
+    #   ipa sudocmdgroup-show ops_network
+    # -------------------------------------------------------------
+    - name: Create Command Group 'ops_network'
+      freeipa.ansible_freeipa.ipasudocmdgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: ops_network
+        description: "Network Troubleshooting Commands"
+        sudocmd:
+          - "/usr/sbin/ip a"
+          - "/usr/sbin/ip route"
+          - "/usr/bin/ping"
+          - "/usr/sbin/ss -tulpn"
+        state: present
+
+    # -------------------------------------------------------------
+    #   ipa sudocmdgroup-show ops_logs
+    # -------------------------------------------------------------
+    - name: Create Command Group 'ops_logs'
+      freeipa.ansible_freeipa.ipasudocmdgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: ops_logs
+        description: "Log Reading Commands"
+        sudocmd:
+          - "/usr/bin/tail"
+          - "/usr/bin/grep"
+          - "/usr/bin/less"
+          - "/usr/bin/cat /var/log/messages"
+          - "/usr/bin/cat /var/log/syslog"
+        state: present
+
+    # -------------------------------------------------------------
+    # SECTION 2: CREATE SUDO RULES
+    #----------------------------------------------------------
+
+    # Rule A: K8s Admins (Full Power on K8s)
+    - name: Sudo Rule - K8s Admins (ALL)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_k8s_full
+        description: "Full Root Access for K8s Admins"
+        group:
+          - k8s_admins
+        hostgroup:
+          - k8s
+        cmdcategory: all   # This enables 'ALL'
+        state: present
+
+    # Rule B: Ansible Admins (Full Power on Controllers)
+    - name: Sudo Rule - Ansible Admins (ALL)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_ansible_full
+        description: "Full Root Access for Ansible Controllers"
+        group:
+          - ansible_admins
+        hostgroup:
+          - controllers
+        cmdcategory: all   # This enables 'ALL'
+        state: present
+
+
+    # Rule C: K8s Operators (Restricted Access)
+    - name: Sudo Rule - K8s Operators (Restricted)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: ops_k8s_restricted
+        description: "Restricted Network & Log Access"
+        group:
+          - operators
+        hostgroup:
+          - k8s
+          - controllers
+        # Link the Command Groups we made above
+        allow_sudocmdgroup:
+          - ops_network
+          - ops_logs
+        state: present
+
+    # ========================================
+    # Rule D: Super Users Automation (No Password)
+    # 
+    - name: Sudo Rule - Super Automation
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: super_automation_nopass
+        description: "Unlimited Access for Robots No password"
+        group: 
+          - super_users
+        hostgroup:
+          - k8s
+          - controllers
+          - management
+          - backup_servers
+          - vault_servers
+          - cicd_servers
+        cmdcategory: all
+        sudooption: '!authenticate'
+        state: present
+
+    # ========================================
+    # Rule E: Backup Users (Full Access to Backup Servers)
+
+    - name: Sudo Rule - Backup Users (Full)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: backup_users_full
+        description: "Full Backup Access"
+        group:
+          - backup_admins
+        hostgroup:
+          - backup_servers
+        cmdcategory: all
+        state: present
+
+    # ========================================
+    # Rule F: Vault Users (All Access to Vault Servers)
+    - name: Sudo Rule - Vault Users (Full)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: vault_users_full
+        description: "Full Vault Access"
+        group:
+          - vault_admins
+        hostgroup:
+          - vault_servers
+        cmdcategory: all
+        state: present
+    
+# ========================================
+
+  # CICD Users (All Access to CICD Servers)
+    - name: Sudo Rule - CICD Users (Full)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: cicd_users_full
+        description: "Full CICD Access"
+        group:
+          - cicd_admins
+        hostgroup:
+          - cicd_servers
+        cmdcategory: all
+        state: present
+        
+    # ========================================
+    # Rule G: Monitoring Admins (Restricted Access)
+    - name: Sudo Rule - Monitoring Admins (Restricted)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: monitor_admins_restricted
+        description: "Restricted Network & Log Access for Monitoring Admins"
+        group:
+          - monitor_admins
+        hostgroup:
+          - monitors
+        cmdcategory: all
+        state: present
+        
+# END OF PLAYBOOK

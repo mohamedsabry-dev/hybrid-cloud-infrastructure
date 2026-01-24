@@ -1,0 +1,18 @@
+# Global Configuration
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Monitor Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Monitor All Linux Nodes (Including this one!)
+  - job_name: 'linux_nodes'
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+{% for host in groups['all'] %}
+        - '{{ hostvars[host]["ansible_host"] | default(host) }}:9100'
+{% endfor %}

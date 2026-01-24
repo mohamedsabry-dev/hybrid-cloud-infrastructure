@@ -1,0 +1,246 @@
+---
+# ============================================================================
+# Playbook: Generate Kerberos Keytab for super_ansible User
+# ============================================================================
+# Purpose: Create a Kerberos keytab file for automated authentication
+# Target: Ansible VM (where Jenkins agent runs)
+# Security: Keytab will be stored in Vault (next playbook)
+# ============================================================================
+
+- name: Generate Kerberos Keytab for CI/CD Automation
+  hosts: localhost
+  become: yes
+  gather_facts: yes
+
+  vars_prompt:
+    - name: ipa_admin_password
+      prompt: "Enter FreeIPA admin password"
+      private: yes
+
+  vars:
+    keytab_dir: /etc/security/keytabs
+    keytab_file: "{{ keytab_dir }}/super_ansible.keytab"
+    keytab_principal: super_ansible
+    keytab_realm: HOME.LAB
+    ipa_server: ipa.home.lab
+
+  tasks:
+    # ========================================================================
+    # Step 0: Create Keytab Directory
+    # ========================================================================
+    - name: 00-Create keytab directory
+      file:
+        path: "{{ keytab_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [setup, directory]
+
+    # ========================================================================
+    # Step 1: Authenticate as IPA Admin
+    # ========================================================================
+    - name: 01-Authenticate to FreeIPA as admin
+      shell: |
+        echo "{{ ipa_admin_password }}" | kinit admin
+      no_log: true
+      changed_when: true
+      tags: [auth]
+
+    - name: 01a-Verify admin authentication
+      command: klist
+      register: klist_result
+      changed_when: false
+      tags: [auth, verify]
+
+    - name: 01b-Display Kerberos ticket info
+      debug:
+        msg: "{{ klist_result.stdout_lines }}"
+      tags: [auth, verify]
+
+    # ========================================================================
+    # Step 2: Check if Keytab Already Exists
+    # ========================================================================
+    - name: 02-Check if keytab already exists
+      stat:
+        path: "{{ keytab_file }}"
+      register: existing_keytab
+      tags: [keytab, check]
+
+    - name: 02a-Display existing keytab status
+      debug:
+        msg:
+          - "Keytab file check:"
+          - "  Path: {{ keytab_file }}"
+          - "  Exists: {{ existing_keytab.stat.exists }}"
+          - "  Size: {{ existing_keytab.stat.size | default('N/A') }} bytes"
+          - "  Modified: {{ existing_keytab.stat.mtime | default('N/A') }}"
+      tags: [keytab, check]
+
+    # ========================================================================
+    # Step 3: Generate Keytab for super_ansible (if not exists)
+    # ========================================================================
+    - name: 03-Generate keytab for super_ansible principal
+      command: >
+        ipa-getkeytab
+        -s {{ ipa_server }}
+        -p {{ keytab_principal }}
+        -k {{ keytab_file }}
+        -P
+      environment:
+        KRB5CCNAME: /tmp/krb5cc_0
+      register: keytab_generation
+      when: not existing_keytab.stat.exists
+      changed_when: "'Keytab successfully retrieved' in keytab_generation.stdout or keytab_generation.rc == 0"
+      failed_when: keytab_generation.rc != 0
+      tags: [keytab, generate]
+
+    - name: 03a-Display keytab generation result
+      debug:
+        msg: "{{ keytab_generation.stdout_lines | default(['Keytab generated successfully']) }}"
+      when: not existing_keytab.stat.exists
+      tags: [keytab, generate]
+
+    - name: 03b-Skip keytab generation if already exists
+      debug:
+        msg:
+          - "⚠️  Keytab already exists at {{ keytab_file }}"
+          - "Skipping generation to preserve existing keytab"
+          - "To force regeneration, delete the existing keytab first or use --tags regenerate"
+      when: existing_keytab.stat.exists
+      tags: [keytab, generate]
+
+    # ========================================================================
+    # Step 3c: Force Regenerate Keytab (only with --tags regenerate)
+    # ========================================================================
+    - name: 03c-FORCE regenerate keytab (overwrites existing)
+      command: >
+        ipa-getkeytab
+        -s {{ ipa_server }}
+        -p {{ keytab_principal }}
+        -k {{ keytab_file }}
+        -P
+      environment:
+        KRB5CCNAME: /tmp/krb5cc_0
+      register: keytab_regeneration
+      when: existing_keytab.stat.exists
+      changed_when: true
+      tags: [never, regenerate]  # Only runs with explicit --tags regenerate
+
+    - name: 03d-Display regeneration warning
+      debug:
+        msg:
+          - "⚠️  WARNING: Keytab has been REGENERATED!"
+          - "The old keytab is no longer valid"
+          - "You must re-store this keytab in Vault (run 05-store-keytab-to-vault.yml)"
+      when: existing_keytab.stat.exists and keytab_regeneration is changed
+      tags: [never, regenerate]
+
+    # ========================================================================
+    # Step 4: Set Ownership
+    # ========================================================================
+    - name: 04-Set keytab file ownership
+      file:
+        path: "{{ keytab_file }}"
+        owner: super_ansible
+        group: super_ansible
+        mode: '0400'
+      tags: [keytab, permissions]
+
+    - name: 04a-Verify keytab file exists and has correct permissions
+      stat:
+        path: "{{ keytab_file }}"
+      register: keytab_stat
+      tags: [keytab, verify]
+
+    - name: 04b-Display keytab file information
+      debug:
+        msg:
+          - "Keytab file: {{ keytab_file }}"
+          - "Owner: {{ keytab_stat.stat.pw_name }}"
+          - "Group: {{ keytab_stat.stat.gr_name }}"
+          - "Permissions: {{ keytab_stat.stat.mode }}"
+          - "Size: {{ keytab_stat.stat.size }} bytes"
+      when: keytab_stat.stat.exists
+      tags: [keytab, verify]
+
+    # ========================================================================
+    # Step 5: Test Keytab (as super_ansible user)
+    # ========================================================================
+    - name: 05-Test keytab - Destroy existing tickets
+      become_user: super_ansible
+      command: kdestroy -A
+      failed_when: false
+      changed_when: false
+      tags: [test]
+
+    - name: 05a-Test keytab - Get ticket using keytab
+      become_user: super_ansible
+      command: >
+        kinit -kt {{ keytab_file }} {{ keytab_principal }}@{{ keytab_realm }}
+      register: kinit_test
+      changed_when: true
+      tags: [test]
+
+    - name: 05b-Test keytab - Verify ticket created
+      become_user: super_ansible
+      command: klist
+      register: klist_test
+      changed_when: false
+      tags: [test, verify]
+
+    - name: 05c-Display Kerberos ticket verification
+      debug:
+        msg:
+          - "✅ Keytab test SUCCESSFUL!"
+          - "Kerberos ticket information:"
+          - "{{ klist_test.stdout_lines }}"
+      tags: [test, verify]
+
+    # ========================================================================
+    # Step 6: Verify Keytab Contents
+    # ========================================================================
+    - name: 06-List keytab entries
+      command: klist -kt {{ keytab_file }}
+      register: keytab_entries
+      changed_when: false
+      tags: [verify]
+
+    - name: 06a-Display keytab entries
+      debug:
+        msg:
+          - "Keytab entries for {{ keytab_file }}:"
+          - "{{ keytab_entries.stdout_lines }}"
+      tags: [verify]
+
+    # ========================================================================
+    # Step 7: Security Warning
+    # ========================================================================
+    - name: 07-Display security warning
+      debug:
+        msg:
+          - "⚠️  SECURITY WARNING ⚠️"
+          - "The keytab file {{ keytab_file }} provides permanent authentication!"
+          - "Next step: Run playbook 05-store-keytab-to-vault.yml to secure it."
+          - "The keytab will be stored in Vault and deleted from this VM."
+      tags: [always]
+
+  handlers:
+    - name: Destroy admin Kerberos ticket
+      command: kdestroy -A
+      failed_when: false
+
+# ============================================================================
+# End of Playbook
+# ============================================================================
+# Usage:
+#   ansible-playbook 04-generate-kerberos-keytab.yml -i ../inventory
+#
+# Prerequisites:
+#   - FreeIPA server running and accessible
+#   - super_ansible user exists in FreeIPA
+#   - Ansible VM has ipa-client configured
+#
+# Next Steps:
+#   - Run 05-store-keytab-to-vault.yml to secure the keytab
+# ============================================================================

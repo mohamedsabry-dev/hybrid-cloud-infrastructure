@@ -1,0 +1,3 @@
+---
+# This file holds settings specific to your Jenkins servers
+allowed_subnet: "10.0.20.0/24"
