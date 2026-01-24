@@ -1,0 +1,101 @@
+---
+- name: Set Up Jenkins VM pre-requirement "Java & Docker & Security"
+  hosts: jenkins_master
+  become: yes
+
+  tasks:
+    # --- TOOLS & JAVA SECTION ---
+    - name: Install Base Tools and Java
+      block:
+        - name: 00-Install basic tools
+          dnf:
+            name: [wget, git, epel-release]
+            state: present
+            update_cache: yes
+
+        - name: 01-Install Java 21 OpenJDK
+          dnf:
+            name: java-21-openjdk
+            state: present
+
+        - name: 08-Verify Java version
+          command: java -version
+          register: java_check
+          changed_when: false
+      tags: java
+
+    # --- DOCKER SECTION ---
+    - name: Install and Configure Docker
+      block:
+        - name: 02-Configure Docker Repository
+          yum_repository:
+            name: docker-ce-stable
+            description: Docker CE Stable - $basearch
+            baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+            enabled: yes
+            gpgcheck: yes
+            gpgkey: https://download.docker.com/linux/centos/gpg
+
+        - name: 03-Install Docker
+          dnf:
+            name: [docker-ce, docker-ce-cli, containerd.io]
+            state: present
+
+        - name: 04-Start Docker
+          systemd:
+            name: docker
+            state: started
+            enabled: yes
+            daemon_reload: yes
+
+        - name: 09-Verify Docker is responding
+          command: docker info
+          register: docker_check
+          changed_when: false
+      tags: docker
+
+    # --- SECURITY SECTION ---
+    - name: Configure Firewall Security
+      block:
+        - name: 05-Ensure Firewalld is running
+          systemd:
+            name: firewalld
+            state: started
+            enabled: yes
+
+        - name: 06-Allow Jenkins (8080) ONLY from {{ allowed_subnet }}
+          firewalld:
+            rich_rule: 'rule family="ipv4" source address="{{ allowed_subnet }}" port port="8080" protocol="tcp" accept'
+            permanent: yes
+            state: enabled
+          notify: reload firewalld
+      tags: security, firewall
+
+    # --- FINAL DEBUG OUTPUT ---
+    - name: Show Verification results
+      debug:
+        msg:
+          - "=== Setup Verification ==="
+          - "Java: {{ java_check.stderr_lines[0] | default('Not checked') }}"
+          - "Docker: Running ({{ docker_check.stdout_lines | length }} info lines retrieved)"
+      tags: always  # Use 'always' so this runs regardless of tags used
+
+  handlers:
+    - name: reload firewalld
+      systemd:
+        name: firewalld
+        state: reloaded
+
+#### Notes: 
+
+## Run Everything
+## ## ansible-playbook -i ../inventory 01-core-setup_jenkins_vm.yml
+
+## Run both Java and Docker tasks, but nothing else
+## ansible-playbook -i inventory.ini playbook.yml --tags "java,docker"
+
+## Run everything EXCEPT the Java installation
+## ansible-playbook -i inventory.ini playbook.yml --skip-tags java
+
+## Useful for maintenance: Run everything EXCEPT tasks that trigger reboots or restarts
+## ansible-playbook -i inventory.ini playbook.yml --skip-tags "restart,reboot"

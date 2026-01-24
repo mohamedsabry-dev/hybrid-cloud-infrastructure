@@ -1,0 +1,22 @@
+Unseal Key 1: VAULT_UNSEAL_KEY_REDACTED
+Unseal Key 2: VAULT_UNSEAL_KEY_REDACTED
+Unseal Key 3: VAULT_UNSEAL_KEY_REDACTED
+Unseal Key 4: VAULT_UNSEAL_KEY_REDACTED
+Unseal Key 5: VAULT_UNSEAL_KEY_REDACTED
+
+Initial Root Token: hvs.REDACTED
+
+Vault initialized with 5 key shares and a key threshold of 3. Please securely
+distribute the key shares printed above. When the Vault is re-sealed,
+restarted, or stopped, you must supply at least 3 of these keys to unseal it
+before it can start servicing requests.
+
+Vault does not store the generated root key. Without at least 3 keys to
+reconstruct the root key, Vault will remain permanently sealed!
+
+It is possible to generate new unseal keys, provided you have a quorum of
+existing unseal keys shares. See "vault operator rekey" for more information.
+
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal VAULT_UNSEAL_KEY_REDACTED"
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal VAULT_UNSEAL_KEY_REDACTED"
+ ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator unseal VAULT_UNSEAL_KEY_REDACTED"
