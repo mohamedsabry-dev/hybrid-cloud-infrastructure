@@ -24,20 +24,34 @@ data "aws_region" "current" {}
 output "aws_region" {
   value = data.aws_region.current.region
 }
-# List EC2 instances to verify read access
-data "aws_instances" "all" {
-  filter {
-    name   = "instance-state-name"
-    values = ["running", "stopped", "pending", "stopping"]
-  }
+# List EC2 instances to verify read access (requires ec2:DescribeInstances)
+# data "aws_instances" "all" {
+#   filter {
+#     name   = "instance-state-name"
+#     values = ["running", "stopped", "pending", "stopping"]
+#   }
+# }
+# output "ec2_instance_ids" {
+#   value = data.aws_instances.all.ids
+# }
+
+# List IAM users to verify read access (requires iam:ListUsers)
+# data "aws_iam_users" "all" {}
+# output "iam_user_names" {
+#   value = data.aws_iam_users.all.names
+# }
+
+# Get current user info
+data "aws_iam_user" "current" {
+  user_name = "terraform-bootstrap"
 }
-output "ec2_instance_ids" {
-  value = data.aws_instances.all.ids
+
+output "bootstrap_user_id" {
+  value = data.aws_iam_user.current.user_id
 }
-# List IAM users to verify read access
-data "aws_iam_users" "all" {}
-output "iam_user_names" {
-  value = data.aws_iam_users.all.names
+
+output "bootstrap_user_path" {
+  value = data.aws_iam_user.current.path
 }
 # List DynamoDB tables to verify read access
 data "aws_dynamodb_tables" "all" {}
