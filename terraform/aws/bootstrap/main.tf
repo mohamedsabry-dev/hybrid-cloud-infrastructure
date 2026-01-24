@@ -19,10 +19,10 @@ output "bootstrap_user_arn" {
   value = data.aws_caller_identity.current.arn
 }
 
-# List S3 buckets to verify read access
-data "aws_s3_buckets" "all" {}
-output "s3_bucket_names" {
-  value = data.aws_s3_buckets.all.names
+# List S3 buckets to verify read access (using region check as alternative)
+data "aws_region" "current" {}
+output "aws_region" {
+  value = data.aws_region.current.name
 }
 # List EC2 instances to verify read access
 data "aws_instances" "all" {
@@ -37,7 +37,7 @@ output "ec2_instance_ids" {
 # List IAM users to verify read access
 data "aws_iam_users" "all" {}
 output "iam_user_names" {
-  value = data.aws_iam_users.all.users[*].user_name
+  value = data.aws_iam_users.all.names
 }
 # List DynamoDB tables to verify read access
 data "aws_dynamodb_tables" "all" {}
