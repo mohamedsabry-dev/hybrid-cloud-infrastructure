@@ -1,0 +1,40 @@
+name: Terraform Bootstrap
+
+on:
+  push:
+    branches:
+      - mohamedsabrydev/infra-245-phase-1-devops-foundation
+
+jobs:
+  terraform-bootstrap:
+    name: Run Terraform Bootstrap
+    runs-on: mac-mini
+    if: contains(github.event.head_commit.message, 'runtf-bootstrap')
+
+    defaults:
+      run:
+        working-directory: terraform/aws/bootstrap
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TF_BOOTSTRAP_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TF_BOOTSTRAP_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
