@@ -12,3 +12,9 @@
 # //    - List EC2 Instances (to verify no access)
 # //    - List IAM Users (to verify no access)
 # // 4. Output Results
+# // 5. Configure S3 bucket for remote state storage
+# // 6. Configure DynamoDB table for state locking
+# // 7. Configure the 2 IAM Users
+# // 8. Create the Policy Structures 
+
+#### Code ####

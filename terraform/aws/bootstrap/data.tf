@@ -8,38 +8,33 @@
 # // 7. Failures expected IAM Users (no permissions)
 
 
-data "aws_caller_identity" "current" {
-}
+#### Code ####
 
-data "aws_s3_bucket" "terraform_state" {
-  count  = 0 # Set to 1 after creating the bucket
-  bucket = "hybrid-cloud-terraform-state-bucket"
-}
-
-data "aws_iam_user" "terraform_network" {
-  count     = 0 # Set to 1 after creating terraform-network user
-  user_name = "terraform-network"
-}
-
-data "aws_iam_user" "terraform_application" {
-  count     = 0 # Set to 1 after creating terraform-application user
-  user_name = "terraform-application"
-}
-
-data "aws_dynamodb_tables" "all" {
-}
-
-data "aws_region" "current" {
-}
-
-data "aws_instances" "all" {
-  count = 0 # No permissions expected, set to 1 if permissions are granted
-  filter {
-    name   = "instance-state-name"
-    values = ["running", "stopped", "pending", "stopping"]
+  data "aws_caller_identity" "current" {
   }
-}
-
-data "aws_iam_users" "all" {
-  count = 0 # No permissions expected, set to 1 if permissions are granted
-}
+  data "aws_s3_bucket" "terraform_state" {
+    count  = 0 # Set to 1 after creating the bucket
+    bucket = "hybrid-cloud-terraform-state-bucket"
+  }
+  data "aws_iam_user" "terraform_network" {
+    count     = 0 # Set to 1 after creating terraform-network user
+    user_name = "terraform-network"
+  }
+  data "aws_iam_user" "terraform_application" {
+    count     = 0 # Set to 1 after creating terraform-application user
+    user_name = "terraform-application"
+  }
+  data "aws_dynamodb_tables" "all" {
+  }
+  data "aws_region" "current" {
+  }
+  data "aws_instances" "all" {
+    count = 0 # No permissions expected, set to 1 if permissions are granted
+    filter {
+      name   = "instance-state-name"
+      values = ["running", "stopped", "pending", "stopping"]
+    }
+  }
+  data "aws_iam_users" "all" {
+    count = 0 # No permissions expected, set to 1 if permissions are granted
+  }
