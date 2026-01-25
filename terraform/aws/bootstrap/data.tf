@@ -14,7 +14,7 @@
   }
   data "aws_s3_bucket" "terraform_state" {
     count  = 0 # Set to 1 after creating the bucket
-    bucket = "hybrid-cloud-terraform-state-bucket"
+    bucket = "hybrid-cloud-terraform-state-bucket-synimp"
   }
   data "aws_iam_user" "terraform_network" {
     count     = 0 # Set to 1 after creating terraform-network user
