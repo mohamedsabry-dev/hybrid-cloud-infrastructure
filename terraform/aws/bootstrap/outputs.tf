@@ -36,3 +36,16 @@
   output "iam_user_names" {
     value = length(data.aws_iam_users.all) > 0 ? data.aws_iam_users.all[0].names : "no permissions to list IAM users"
   }
+
+
+output "state_bucket_name" {
+  value = aws_s3_bucket.state_bucket.id
+}
+
+output "state_bucket_arn" {
+  value = aws_s3_bucket.state_bucket.arn
+}
+
+output "lock_table_name" {
+  value = aws_dynamodb_table.state_lock_table.name
+}
