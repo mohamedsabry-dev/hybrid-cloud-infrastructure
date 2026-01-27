@@ -1,23 +1,12 @@
-terraform {
-  required_version = ">= 1.1.0"
+# The file is set to ensure you can List S3 bucket objects in the specified bucket.
+# Also ensure Backend Setup working (S3 & DynamoDB)
 
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version =  "6.28.0"
-    }
-  }
+# Get current AWS account info
+data "aws_caller_identity" "current" {}
 
-  # Configure S3 backend for state storage
-  backend "s3" {
-    bucket         = "hybrid-cloud-infrastructure-terraform-state"
-    key            = "bootstrap/terraform.tfstate"
-    region         = "eu-west-2"
-    dynamodb_table = "hybrid-cloud-infrastructure-terraform-state-lock"
-    encrypt        = true
-  }
+# Get S3 bucket info
+data "aws_s3_bucket" "terraform_state" {
+  bucket = "hybrid-cloud-infrastructure-terraform-state"
 }
 
-  provider "aws" {
-    region = "eu-west-2"
-  }
+# runtf-bootstrap
