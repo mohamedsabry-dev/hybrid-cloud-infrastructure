@@ -24,18 +24,3 @@ output "s3_bucket_region" {
   description = "S3 bucket region"
   value       = data.aws_s3_bucket.terraform_state.region
 }
-
-output "dynamodb_table_name" {
-  description = "State lock table name"
-  value       = data.aws_dynamodb_table.state_lock.name
-}
-
-output "dynamodb_table_arn" {
-  description = "State lock table ARN"
-  value       = data.aws_dynamodb_table.state_lock.arn
-}
-
-output "dynamodb_billing_mode" {
-  description = "DynamoDB billing mode"
-  value       = data.aws_dynamodb_table.state_lock.billing_mode
-}
