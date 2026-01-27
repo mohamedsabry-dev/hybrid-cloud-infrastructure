@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - mohamedsabrydev/infra-245-phase-1-devops-foundation
+      - main
+
+# IMPORTANT: Required for OIDC authentication
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   terraform-bootstrap:
@@ -13,23 +19,26 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/aws/bootstrap
+        working-directory: terraform/aws/test
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Check Terraform Version
+        run: terraform version    
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.0"
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.TF_BOOTSTRAP_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TF_BOOTSTRAP_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Bootstrap
           aws-region: eu-west-2
+
       - name: Terraform Init
         run: terraform init
 
