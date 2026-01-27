@@ -1,3 +1,5 @@
+# File: terraform/aws/test/outputs.tf
+
 output "account_id" {
   description = "Current AWS Account ID"
   value       = data.aws_caller_identity.current.account_id
