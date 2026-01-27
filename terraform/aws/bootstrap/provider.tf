@@ -1,5 +1,3 @@
-# File: terraform/aws/test/provider.tf
-
 terraform {
   required_version = ">= 1.1.0"
 
