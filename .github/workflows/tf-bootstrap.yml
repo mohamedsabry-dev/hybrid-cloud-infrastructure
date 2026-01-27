@@ -12,9 +12,44 @@ permissions:
   contents: read
 
 jobs:
+  # Job 1: Audit AWS Resources
+  audit:
+    name: Audit AWS Setup
+    runs-on: mac-mini
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS (ReadOnly Role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-ReadOnly
+          aws-region: eu-west-2
+
+      - name: Verify S3 Bucket
+        run: |
+          echo "=== S3 Bucket Info ==="
+          aws s3api get-bucket-versioning --bucket hybrid-cloud-infrastructure-terraform-state
+          aws s3api get-bucket-encryption --bucket hybrid-cloud-infrastructure-terraform-state
+
+      - name: Verify DynamoDB Table
+        run: |
+          echo "=== DynamoDB Table Info ==="
+          aws dynamodb describe-table --table-name hybrid-cloud-infrastructure-terraform-state-lock
+
+      - name: List IAM Roles
+        run: |
+          echo "=== GitHub Actions Roles ==="
+          aws iam get-role --role-name GitHubActions-Bootstrap
+          aws iam get-role --role-name GitHubActions-Network
+          aws iam get-role --role-name GitHubActions-Application
+
+  # Job 2: Terraform Bootstrap
   terraform-bootstrap:
     name: Run Terraform Bootstrap
     runs-on: mac-mini
+    needs: audit
     if: contains(github.event.head_commit.message, 'runtf-bootstrap')
 
     defaults:
