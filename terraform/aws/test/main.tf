@@ -12,3 +12,4 @@ data "aws_s3_bucket" "terraform_state" {
 data "aws_dynamodb_table" "state_lock" {
   name = "hybrid-cloud-infrastructure-terraform-state-lock"
 }
+# runtf-bootstrap
