@@ -54,7 +54,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/aws/test
+        working-directory: terraform/aws/bootstrap
 
     steps:
       - name: Checkout code
