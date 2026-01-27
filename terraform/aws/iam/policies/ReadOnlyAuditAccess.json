@@ -1,0 +1,31 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ReadOnlyAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetBucketVersioning",
+                "s3:GetBucketTagging",
+                "s3:GetBucketLocation",
+                "s3:GetEncryptionConfiguration",
+                "s3:ListBucket",
+                "s3:GetObject",
+                "dynamodb:DescribeTable",
+                "dynamodb:DescribeContinuousBackups",
+                "dynamodb:DescribeTimeToLive",
+                "iam:GetRole",
+                "iam:ListRoles",
+                "iam:ListRolePolicies",
+                "iam:GetRolePolicy",
+                "iam:GetOpenIDConnectProvider",
+                "ec2:Describe*",
+                "eks:Describe*",
+                "eks:List*",
+                "ecr:Describe*",
+                "elasticloadbalancing:Describe*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
