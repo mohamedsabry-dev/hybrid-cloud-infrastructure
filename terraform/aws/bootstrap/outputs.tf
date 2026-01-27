@@ -1,51 +1,24 @@
-## Outputs for AWS Bootstrap Module
-# // 1. AWS Caller Identity
-# // 2. List S3 Buckets
-# // 3. List IAM Users Permissions
-# // 4. List DynamoDB Tables
-# // 5. Current AWS Region
-
-#### Code ####
-  output "bootstrap_user_arn" {
-    value = data.aws_caller_identity.current.arn
-  }
-
-  output "s3_bucket_arn" {
-    value = length(data.aws_s3_bucket.terraform_state) > 0 ? data.aws_s3_bucket.terraform_state[0].arn : "bucket not created yet"
-  }
-
-  output "terraform_users_arns" {
-    value = {
-      network     = length(data.aws_iam_user.terraform_network) > 0 ? data.aws_iam_user.terraform_network[0].arn : "user not created yet"
-      application = length(data.aws_iam_user.terraform_application) > 0 ? data.aws_iam_user.terraform_application[0].arn : "user not created yet"
-    }
-  }
-
-  output "dynamodb_table_names" {
-    value = data.aws_dynamodb_tables.all.names
-  }
-
-  output "aws_region" {
-    value = data.aws_region.current.region
-  }
-
-  output "ec2_instance_ids" {
-    value = length(data.aws_instances.all) > 0 ? data.aws_instances.all[0].ids : "no permissions to list EC2 instances"
-  }
-
-  output "iam_user_names" {
-    value = length(data.aws_iam_users.all) > 0 ? data.aws_iam_users.all[0].names : "no permissions to list IAM users"
-  }
-
-
-output "state_bucket_name" {
-  value = aws_s3_bucket.state_bucket.id
+output "account_id" {
+  description = "Current AWS Account ID"
+  value       = data.aws_caller_identity.current.account_id
 }
 
-output "state_bucket_arn" {
-  value = aws_s3_bucket.state_bucket.arn
+output "assumed_role_arn" {
+  description = "ARN of the role assumed by GitHub Actions"
+  value       = data.aws_caller_identity.current.arn
 }
 
-output "lock_table_name" {
-  value = aws_dynamodb_table.state_lock_table.name
+output "s3_bucket_name" {
+  description = "Terraform state bucket name"
+  value       = data.aws_s3_bucket.terraform_state.bucket
+}
+
+output "s3_bucket_arn" {
+  description = "Terraform state bucket ARN"
+  value       = data.aws_s3_bucket.terraform_state.arn
+}
+
+output "s3_bucket_region" {
+  description = "S3 bucket region"
+  value       = data.aws_s3_bucket.terraform_state.region
 }
