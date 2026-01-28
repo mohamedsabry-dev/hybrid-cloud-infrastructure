@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Stack 1: Foundation (OIDC Provider + Terraform Backend)'
+
+Resources:
+  # ============================================================================
+  # 1. GitHub OIDC Provider (Identity)
+  # ============================================================================
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [1c58a3a8518e8759bf075b76b750d4f2df264fcd]
+
+  # ============================================================================
+  # 2. Terraform State Bucket (Storage)
+  # ============================================================================
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: hybrid-cloud-infrastructure-terraform-state
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Purpose
+          Value: TerraformState
+
+  # ============================================================================
+  # 3. State Lock Table (Locking)
+  # ============================================================================
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: hybrid-cloud-infrastructure-terraform-state-lock
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      Tags:
+        - Key: Purpose
+          Value: TerraformStateLock
+
+Outputs:
+  OIDCProviderArn:
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: GitHubOIDCProviderArn
+  StateBucketName:
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: TerraformStateBucketName
+  LockTableName:
+    Value: !Ref TerraformLockTable
+    Export:
+      Name: TerraformLockTableName
