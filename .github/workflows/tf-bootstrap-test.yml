@@ -3,10 +3,8 @@ name: "Terraform Apply (Auto-Trigger)"
 on:
   push:
     branches:
-      - 'mohamedsabrydev/**'
+      - mohamedsabrydev/infra-245-phase-1-devops-foundation
       - main
-    paths:
-      - 'terraform/aws/bootstrap-test/**'
 
 permissions:
   id-token: write
