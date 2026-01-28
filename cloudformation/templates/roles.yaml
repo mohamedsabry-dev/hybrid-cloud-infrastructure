@@ -17,8 +17,15 @@ Resources:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
+              StringEquals:
+                # The Audience is always exact
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
+                # The Subject uses wildcards (*) so it MUST be StringLike
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
       
       ManagedPolicyArns:
         # 1. Access to S3 State (Read/Write State file)
@@ -41,9 +48,17 @@ Resources:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
+              StringEquals:
+                # The Audience is always exact
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
-      
+                # The Subject uses wildcards (*) so it MUST be StringLike
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
+
+
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn
@@ -100,8 +115,15 @@ Resources:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
+              StringEquals:
+                # The Audience is always exact
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
+                # The Subject uses wildcards (*) so it MUST be StringLike
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
 
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
