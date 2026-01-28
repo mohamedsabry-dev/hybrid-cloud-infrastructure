@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Shared Managed Policies for Hybrid Infrastructure'
+
+Resources:
+  # This policy allows Terraform to Read/Write State and Lock DB
+  TerraformStatePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-TerraformState-Common
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3TerraformStateAccess
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state
+              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state/*
+          - Sid: DynamoDBStateLocking
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+            Resource: arn:aws:dynamodb:eu-west-2:969041180300:table/hybrid-cloud-infrastructure-terraform-state-lock
+
+Outputs:
+  # We export this ARN so the Roles stack can grab it
+  TerraformStatePolicyArn:
+    Value: !Ref TerraformStatePolicy
+    Export:
+      Name: HybridCloud-TerraformStatePolicy-Arn

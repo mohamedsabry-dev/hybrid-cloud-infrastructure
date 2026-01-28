@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'GitHub Actions IAM Roles (Imports OIDC & Policies)'
+
+Resources:
+  # ==========================================
+  # 1. Bootstrap Role
+  # ==========================================
+  GitHubActionsBootstrapRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Bootstrap
+      Description: Bootstrap role for Terraform state management
+      # Connects to the Shared Policy from File 1
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !ImportValue GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/infra-245-phase-1-devops-foundation
+
+  # ==========================================
+  # 2. Network Role
+  # ==========================================
+  GitHubActionsNetworkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Network
+      Description: Network management role
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !ImportValue GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+      Policies:
+        - PolicyName: NetworkFullManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                  - elasticloadbalancing:*
+                Resource: '*'
+
+  # ==========================================
+  # 3. Application Role
+  # ==========================================
+  GitHubActionsApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Application
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !ImportValue GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+      Policies:
+        - PolicyName: ApplicationFullManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:RunInstances
+                  - ec2:TerminateInstances
+                  - eks:*
+                  - ecr:*
+                Resource: '*'
+
+  # ==========================================
+  # 4. ReadOnly Role
+  # ==========================================
+  GitHubActionsReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-ReadOnly
+      ManagedPolicyArns:
+        # Even Audit roles need to READ the state file to validate it
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !ImportValue GitHubOIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/infra-245-phase-1-devops-foundation
+      Policies:
+        - PolicyName: ReadOnlyAuditAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:List*
+                  - dynamodb:Describe*
+                  - ec2:Describe*
+                  - eks:Describe*
+                  - ecr:Describe*
+                Resource: '*'
+
+Outputs:
+  NetworkRoleArn:
+    Value: !GetAtt GitHubActionsNetworkRole.Arn
+    Export:
+      Name: GitHubActionsNetworkRoleArn
