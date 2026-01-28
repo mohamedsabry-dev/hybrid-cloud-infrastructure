@@ -1,17 +1,12 @@
-name: "Terraform Manager (Apply/Destroy)"
+name: "Terraform Apply (Auto-Trigger)"
 
 on:
-  # 1. Manual Trigger with Options
-  workflow_dispatch:
-    inputs:
-      terraform_action:
-        description: 'Action to perform'
-        required: true
-        default: 'apply'
-        type: choice
-        options:
-          - apply
-          - destroy
+  push:
+    branches:
+      - 'mohamedsabrydev/**'
+      - main
+    paths:
+      - 'terraform/aws/bootstrap-test/**'
 
 permissions:
   id-token: write
@@ -19,120 +14,82 @@ permissions:
 
 jobs:
   # =========================================================
-  # 🟢 GREEN LANE: APPLY (Create Infrastructure)
-  # Order: Network -> App -> Audit
+  # JOB 1: NETWORK (The Foundation)
   # =========================================================
-
   apply-network:
-    name: "1. [Apply] Network"
-    if: github.event.inputs.terraform_action == 'apply'
+    name: "1. Network Apply"
+    # 👇 GLOBAL GATEKEEPER: Only runs if 'tfrun' is in the commit message
+    if: contains(github.event.head_commit.message, 'tfrun')
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/aws/bootstrap-test/network
+
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+      
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Network
           aws-region: eu-west-2
+
       - run: terraform init
       - run: terraform apply -auto-approve
 
+  # =========================================================
+  # JOB 2: APPLICATION (The House)
+  # =========================================================
   apply-app:
-    name: "2. [Apply] Application"
-    needs: apply-network
-    if: github.event.inputs.terraform_action == 'apply'
+    name: "2. App Apply"
+    needs: apply-network # Waits for Network
+    if: contains(github.event.head_commit.message, 'tfrun')
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/aws/bootstrap-test/app
+
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Application
           aws-region: eu-west-2
+
       - run: terraform init
       - run: terraform apply -auto-approve
 
-  apply-audit:
-    name: "3. [Apply] Audit Check"
-    needs: apply-app
-    if: github.event.inputs.terraform_action == 'apply'
+  # =========================================================
+  # JOB 3: AUDIT (The Inspector)
+  # =========================================================
+  audit-check:
+    name: "3. Audit Verification"
+    needs: apply-app # Waits for App
+    if: contains(github.event.head_commit.message, 'tfrun')
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: terraform/aws/bootstrap-test/audit
+
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-ReadOnly
           aws-region: eu-west-2
+
       - run: terraform init
+      
+      # We use PLAN here because ReadOnly users shouldn't change state.
+      # If this passes, it proves the Auditor can see the infrastructure.
       - run: terraform plan -no-color
-
-  # =========================================================
-  # 🔴 RED LANE: DESTROY (Tear Down)
-  # Order: Audit -> App -> Network (REVERSE ORDER!)
-  # =========================================================
-
-  destroy-audit:
-    name: "1. [Destroy] Audit State"
-    if: github.event.inputs.terraform_action == 'destroy'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform/aws/bootstrap-test/audit
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          # Note: ReadOnly Role CANNOT destroy. We must use Network or App role to clean state 
-          # OR just skip this if it's only data sources. 
-          # For strictness, we use Network Role here just to clean the .tfstate file in S3
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Network
-          aws-region: eu-west-2
-      - run: terraform init
-      - run: terraform destroy -auto-approve
-
-  destroy-app:
-    name: "2. [Destroy] Application"
-    needs: destroy-audit
-    if: github.event.inputs.terraform_action == 'destroy'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform/aws/bootstrap-test/app
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Application
-          aws-region: eu-west-2
-      - run: terraform init
-      - run: terraform destroy -auto-approve
-
-  destroy-network:
-    name: "3. [Destroy] Network"
-    needs: destroy-app # MUST wait for App to finish
-    if: github.event.inputs.terraform_action == 'destroy'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform/aws/bootstrap-test/network
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Network
-          aws-region: eu-west-2
-      - run: terraform init
-      - run: terraform destroy -auto-approve
