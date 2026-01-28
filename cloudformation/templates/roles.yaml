@@ -1,33 +1,54 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'GitHub Actions IAM Roles (Imports OIDC & Policies)'
+Description: "Phase 1: Component Roles (Cleaned & Optimized)"
 
 Resources:
-  
-  # ==========================================
-  # 1. Network Role
-  # ==========================================
-  GitHubActionsNetworkRole:
+  # =========================================================
+  # 1. READ ONLY ROLE (The Auditor)
+  # =========================================================
+  GitHubActionsReadOnlyRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: GitHubActions-Network
-      Description: Network management role
-      ManagedPolicyArns:
-        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn 
+      RoleName: GitHubActions-ReadOnly
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !ImportValue GitHubOIDCProviderArn
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub:
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
+      
+      ManagedPolicyArns:
+        # 1. Access to S3 State (Read/Write State file)
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        # 2. Access to VIEW everything in AWS (The "Global ReadOnly")
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  # =========================================================
+  # 2. NETWORK ROLE (The Infrastructure Architect)
+  # =========================================================
+  GitHubActionsNetworkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Network
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringLike:
+                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
+      
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
       Policies:
         - PolicyName: NetworkFullManagement
           PolicyDocument:
@@ -35,34 +56,57 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - ec2:*
-                  - elasticloadbalancing:*
+                  # ONLY WRITE ACTIONS (Create/Delete/Modify)
+                  # No need for Describe* anymore!
+                  - ec2:CreateVpc
+                  - ec2:DeleteVpc
+                  - ec2:ModifyVpcAttribute
+                  - ec2:CreateSubnet
+                  - ec2:DeleteSubnet
+                  - ec2:ModifySubnetAttribute
+                  - ec2:CreateInternetGateway
+                  - ec2:AttachInternetGateway
+                  - ec2:DetachInternetGateway
+                  - ec2:DeleteInternetGateway
+                  - ec2:CreateRouteTable
+                  - ec2:DeleteRouteTable
+                  - ec2:AssociateRouteTable
+                  - ec2:DisassociateRouteTable
+                  - ec2:CreateRoute
+                  - ec2:DeleteRoute
+                  - ec2:CreateTags
+                  - ec2:DeleteTags
+                  # Security Groups
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupEgress
                 Resource: '*'
 
-  # ==========================================
-  # 2. Application Role
-  # ==========================================
+  # =========================================================
+  # 3. APPLICATION ROLE (The Builder)
+  # =========================================================
   GitHubActionsApplicationRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: GitHubActions-Application
-      ManagedPolicyArns:
-        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !ImportValue GitHubOIDCProviderArn
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub:
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+                token.actions.githubusercontent.com:sub: "repo:mohamedsabrydev/infra-245-phase-1-devops-foundation:*"
+
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
       Policies:
         - PolicyName: ApplicationFullManagement
           PolicyDocument:
@@ -70,58 +114,21 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  # ONLY WRITE ACTIONS (Compute & K8s)
+                  # No need for Describe* anymore!
                   - ec2:RunInstances
                   - ec2:TerminateInstances
-                  - ec2:Describe*
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                  - ec2:CreateTags
+                  - ec2:DeleteTags
+                  - ec2:AllocateAddress
+                  - ec2:AssociateAddress
+                  - ec2:ReleaseAddress
+                  - ec2:AttachVolume
+                  - ec2:DetachVolume
+                  - ec2:CreateVolume
+                  - ec2:DeleteVolume
                   - eks:*
                   - ecr:*
                 Resource: '*'
-
-  # ==========================================
-  # 3. ReadOnly Role (Does NOT need PassRole)
-  # ==========================================
-  GitHubActionsReadOnlyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: GitHubActions-ReadOnly
-      ManagedPolicyArns:
-        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !ImportValue GitHubOIDCProviderArn
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                token.actions.githubusercontent.com:sub:
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
-      Policies:
-        - PolicyName: ReadOnlyAuditAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:List*
-                  - dynamodb:Describe*
-                  - ec2:Describe*
-                  - eks:Describe*
-                  - ecr:Describe*
-                Resource: '*'
-
-Outputs:
-  NetworkRoleArn:
-    Value: !GetAtt GitHubActionsNetworkRole.Arn
-    Export:
-      Name: GitHubActionsNetworkRoleArn
-  # RECOMMENDATION: Export the other ARNs too so you can use them!
-  ApplicationRoleArn:
-    Value: !GetAtt GitHubActionsApplicationRole.Arn
-    Export:
-      Name: GitHubActionsApplicationRoleArn
