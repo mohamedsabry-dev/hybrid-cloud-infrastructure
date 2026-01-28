@@ -72,6 +72,7 @@ Resources:
                 Action:
                   - ec2:RunInstances
                   - ec2:TerminateInstances
+                  - ec2:Describe*
                   - eks:*
                   - ecr:*
                 Resource: '*'
