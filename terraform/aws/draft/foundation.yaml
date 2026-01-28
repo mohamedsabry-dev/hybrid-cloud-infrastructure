@@ -1,0 +1,3 @@
+template-file-path: terraform/aws/draft/foundation.yaml
+parameters: {}
+tags: {}
