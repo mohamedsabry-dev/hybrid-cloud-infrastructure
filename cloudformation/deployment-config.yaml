@@ -1,4 +1,4 @@
-template-file-path: cloudformation/foundation.yaml
+template-file-path: cloudformation/templates/foundation.yaml
 parameters: {}
 tags:
   ManagedBy: CloudFormationGitSync
