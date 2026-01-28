@@ -2,7 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Shared Managed Policies for Hybrid Infrastructure'
 
 Resources:
-  # This policy allows Terraform to Read/Write State and Lock DB
+  # ============================================================================
+  # 1. Terraform State Policy (S3 & DynamoDB Access)
+  # ============================================================================
   TerraformStatePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -27,19 +29,9 @@ Resources:
               - dynamodb:DeleteItem
             Resource: arn:aws:dynamodb:eu-west-2:969041180300:table/hybrid-cloud-infrastructure-terraform-state-lock
 
-Outputs:
-  # We export this ARN so the Roles stack can grab it
-  TerraformStatePolicyArn:
-    Value: !Ref TerraformStatePolicy
-    Export:
-      Name: HybridCloud-TerraformStatePolicy-Arn
-
-
-
-# ... (Your existing S3/DynamoDB Policy is above here) ...
-
   # ============================================================================
-  # NEW: The "Separation of Duties" Security Policy
+  # 2. Terraform Security Boundary (The Separation of Duties)
+  #    MOVED UP: This must be inside the Resources block!
   # ============================================================================
   TerraformSecurityBoundaryPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -50,7 +42,6 @@ Outputs:
         Version: '2012-10-17'
         Statement:
           # Rule 1: Allow Passing Roles (so Terraform can launch EC2/EKS)
-          # Note: We use '*' for now (Phase 1). Later, you list specific roles here.
           - Sid: AllowPassRole
             Effect: Allow
             Action: 'iam:PassRole'
@@ -60,7 +51,6 @@ Outputs:
                 'iam:PassedToService': 'ec2.amazonaws.com'
 
           # Rule 2: STRICTLY FORBID creating/deleting IAM resources
-          # This prevents a hacker from creating a "Super Admin" backdoor.
           - Sid: BlockIAMMutation
             Effect: Deny
             Action:
@@ -75,9 +65,14 @@ Outputs:
             Resource: '*'
 
 Outputs:
-  # ... (Your existing exports) ...
+  # ============================================================================
+  # All Exports go here at the bottom
+  # ============================================================================
+  TerraformStatePolicyArn:
+    Value: !Ref TerraformStatePolicy
+    Export:
+      Name: HybridCloud-TerraformStatePolicy-Arn
 
-  # EXPORT the new policy so the Roles stack can find it
   TerraformSecurityBoundaryPolicyArn:
     Value: !Ref TerraformSecurityBoundaryPolicy
     Export:
