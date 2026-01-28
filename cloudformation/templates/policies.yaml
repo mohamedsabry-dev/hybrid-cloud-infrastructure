@@ -33,3 +33,52 @@ Outputs:
     Value: !Ref TerraformStatePolicy
     Export:
       Name: HybridCloud-TerraformStatePolicy-Arn
+
+
+
+# ... (Your existing S3/DynamoDB Policy is above here) ...
+
+  # ============================================================================
+  # NEW: The "Separation of Duties" Security Policy
+  # ============================================================================
+  TerraformSecurityBoundaryPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-Terraform-SecurityBoundary
+      Description: "Prevents Terraform from modifying IAM but allows passing roles to Compute"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Rule 1: Allow Passing Roles (so Terraform can launch EC2/EKS)
+          # Note: We use '*' for now (Phase 1). Later, you list specific roles here.
+          - Sid: AllowPassRole
+            Effect: Allow
+            Action: 'iam:PassRole'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'iam:PassedToService': 'ec2.amazonaws.com'
+
+          # Rule 2: STRICTLY FORBID creating/deleting IAM resources
+          # This prevents a hacker from creating a "Super Admin" backdoor.
+          - Sid: BlockIAMMutation
+            Effect: Deny
+            Action:
+              - 'iam:CreateUser'
+              - 'iam:CreateRole'
+              - 'iam:CreatePolicy'
+              - 'iam:DeleteUser'
+              - 'iam:DeleteRole'
+              - 'iam:DeletePolicy'
+              - 'iam:AttachRolePolicy'
+              - 'iam:PutRolePolicy'
+            Resource: '*'
+
+Outputs:
+  # ... (Your existing exports) ...
+
+  # EXPORT the new policy so the Roles stack can find it
+  TerraformSecurityBoundaryPolicyArn:
+    Value: !Ref TerraformSecurityBoundaryPolicy
+    Export:
+      Name: HybridCloud-TerraformSecurityBoundary-Arn
