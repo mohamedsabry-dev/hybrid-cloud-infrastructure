@@ -2,33 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'GitHub Actions IAM Roles (Imports OIDC & Policies)'
 
 Resources:
+  
   # ==========================================
-  # 1. Bootstrap Role
-  # ==========================================
-  GitHubActionsBootstrapRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: GitHubActions-Bootstrap
-      Description: Bootstrap role for Terraform state management
-      # Connects to the Shared Policy from File 1
-      ManagedPolicyArns:
-        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !ImportValue GitHubOIDCProviderArn
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub:
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/infra-245-phase-1-devops-foundation
-
-  # ==========================================
-  # 2. Network Role
+  # 1. Network Role
   # ==========================================
   GitHubActionsNetworkRole:
     Type: AWS::IAM::Role
@@ -37,6 +13,7 @@ Resources:
       Description: Network management role
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -63,7 +40,7 @@ Resources:
                 Resource: '*'
 
   # ==========================================
-  # 3. Application Role
+  # 2. Application Role
   # ==========================================
   GitHubActionsApplicationRole:
     Type: AWS::IAM::Role
@@ -71,6 +48,7 @@ Resources:
       RoleName: GitHubActions-Application
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn 
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -99,14 +77,13 @@ Resources:
                 Resource: '*'
 
   # ==========================================
-  # 4. ReadOnly Role
+  # 3. ReadOnly Role (Does NOT need PassRole)
   # ==========================================
   GitHubActionsReadOnlyRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: GitHubActions-ReadOnly
       ManagedPolicyArns:
-        # Even Audit roles need to READ the state file to validate it
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -121,7 +98,7 @@ Resources:
               StringLike:
                 token.actions.githubusercontent.com:sub:
                   - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/infra-245-phase-1-devops-foundation
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
       Policies:
         - PolicyName: ReadOnlyAuditAccess
           PolicyDocument:
@@ -142,3 +119,8 @@ Outputs:
     Value: !GetAtt GitHubActionsNetworkRole.Arn
     Export:
       Name: GitHubActionsNetworkRoleArn
+  # RECOMMENDATION: Export the other ARNs too so you can use them!
+  ApplicationRoleArn:
+    Value: !GetAtt GitHubActionsApplicationRole.Arn
+    Export:
+      Name: GitHubActionsApplicationRoleArn
