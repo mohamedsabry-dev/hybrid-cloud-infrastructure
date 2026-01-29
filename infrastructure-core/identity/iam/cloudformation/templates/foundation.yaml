@@ -34,6 +34,30 @@ Resources:
         - Key: Purpose
           Value: TerraformState
 
+## 
+  AuditBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: hybrid-cloud-infrastructure-audit-logs
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveLogs
+            Status: Enabled
+            ExpirationInDays: 365  # Keep logs for 1 year
+
+
   # ============================================================================
   # 3. State Lock Table (Locking)
   # ============================================================================
@@ -65,3 +89,10 @@ Outputs:
     Value: !Ref TerraformLockTable
     Export:
       Name: TerraformLockTableName
+
+
+  # NEW: Export the Audit Bucket ARN
+  AuditBucketArn:
+    Value: !GetAtt AuditBucket.Arn
+    Export:
+      Name: HybridCloud-AuditBucket-Arn
