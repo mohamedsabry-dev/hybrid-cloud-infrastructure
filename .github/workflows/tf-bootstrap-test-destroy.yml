@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/aws/bootstrap-test/audit
+        working-directory: tests/bootstrap-test/audit
 
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/aws/bootstrap-test/app
+        working-directory: tests/bootstrap-test/app
 
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/aws/bootstrap-test/network
+        working-directory: tests/bootstrap-test/network
 
     steps:
       - uses: actions/checkout@v4
