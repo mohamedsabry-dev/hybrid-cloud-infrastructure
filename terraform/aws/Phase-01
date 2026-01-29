@@ -1,7 +1,0 @@
-1- setup trusted connection from aws to github account the target repo 
-GitHub-Account
-GitHub
-Available
-arn:aws:codeconnections:us-east-1:969041180300:connection/9f7c2cde-397a-4895-8e4b-72ec6d60f3e0
-
-2- Create Cloud formation stack Linked to github
