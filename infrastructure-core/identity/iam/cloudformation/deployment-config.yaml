@@ -1,0 +1,4 @@
+template-file-path: infrastructure-core/identity/iam/cloudformation/templates/foundation.yaml
+parameters: {}
+tags:
+  ManagedBy: CloudFormationGitSync
