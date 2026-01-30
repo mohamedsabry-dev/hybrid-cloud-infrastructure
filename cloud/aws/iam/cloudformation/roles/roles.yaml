@@ -96,12 +96,12 @@ Resources:
         - arn:aws:iam::aws:policy/ReadOnlyAccess
 
   # =========================================================
-  # 4. SECURITY ROLE (The Fix Applied)
+  # 4. AUDIT ROLE (Security, Monitoring & Observability)
   # =========================================================
-  GitHubActionsSecurityRole:
+  GitHubActionsAuditRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: GitHubActions-Security
+      RoleName: GitHubActions-Audit
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
