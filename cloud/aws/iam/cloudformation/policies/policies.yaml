@@ -136,13 +136,13 @@ Resources:
             Resource: '*'
 
   # ============================================================================
-  # 5. Security Audit Control (CloudTrail, Audit Bucket, CloudWatch Logs)
+  # 5. Security Audit Control (CloudTrail, Audit Bucket, CloudWatch, EventBridge)
   # ============================================================================
   SecurityAuditControlPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-SecurityAuditControl
-      Description: "Security and audit infrastructure management"
+      Description: "Security, audit, and monitoring infrastructure management"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -182,9 +182,47 @@ Resources:
           - Sid: ManageCloudWatchLogs
             Effect: Allow
             Action:
-              - logs:CreateLogGroup
-              - logs:PutRetentionPolicy
-            Resource: "arn:aws:logs:*:*:log-group:aws-cloudtrail-logs*"
+              - logs:*
+            Resource: '*'
+          - Sid: ManageCloudWatchAlarms
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricAlarm
+              - cloudwatch:DeleteAlarms
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:SetAlarmState
+              - cloudwatch:PutMetricData
+              - cloudwatch:GetMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:ListMetrics
+              - cloudwatch:PutDashboard
+              - cloudwatch:DeleteDashboards
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
+            Resource: '*'
+          - Sid: ManageEventBridge
+            Effect: Allow
+            Action:
+              - events:PutRule
+              - events:DeleteRule
+              - events:PutTargets
+              - events:RemoveTargets
+              - events:DescribeRule
+              - events:ListRules
+              - events:ListTargetsByRule
+            Resource: '*'
+          - Sid: ManageSNSForAlarms
+            Effect: Allow
+            Action:
+              - sns:CreateTopic
+              - sns:DeleteTopic
+              - sns:Subscribe
+              - sns:Unsubscribe
+              - sns:Publish
+              - sns:GetTopicAttributes
+              - sns:SetTopicAttributes
+              - sns:ListTopics
+            Resource: '*'
           - Sid: AllowPassRoleToCloudTrail
             Effect: Allow
             Action:
