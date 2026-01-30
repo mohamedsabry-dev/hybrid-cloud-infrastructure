@@ -142,7 +142,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-SecurityAuditControl
-      Description: "Security, audit, and monitoring infrastructure management"
+      Description: "Security and audit infrastructure management"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
