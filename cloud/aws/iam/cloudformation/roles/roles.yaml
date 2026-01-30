@@ -116,4 +116,5 @@ Resources:
                 "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
 
       ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-SecurityAuditControl-Arn
