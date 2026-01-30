@@ -222,6 +222,9 @@ Resources:
               - sns:GetTopicAttributes
               - sns:SetTopicAttributes
               - sns:ListTopics
+              - sns:TagResource
+              - sns:UntagResource
+              - sns:ListTagsForResource
             Resource: '*'
           - Sid: AllowPassRoleToCloudTrail
             Effect: Allow
