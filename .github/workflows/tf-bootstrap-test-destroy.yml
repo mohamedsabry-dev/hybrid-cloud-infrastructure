@@ -3,7 +3,6 @@ name: "Terraform Destroy (Auto-Trigger)"
 on:
   push:
     branches:
-      # 👇 Keeping your exact branches
       - mohamedsabrydev/infra-245-phase-1-devops-foundation
       - main
 
@@ -13,7 +12,7 @@ permissions:
 
 jobs:
   # =========================================================
-  # JOB 1: AUDIT CLEANUP (First)
+  # JOB 1: AUDIT DESTROY (First)
   # =========================================================
   destroy-audit:
     name: "1. Audit Destroy"
@@ -31,8 +30,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          # ⚠️ Use Network Role here. ReadOnly cannot write to State file during destroy.
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Network
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Audit
           aws-region: eu-west-2
 
       - run: terraform init
@@ -43,7 +41,7 @@ jobs:
   # =========================================================
   destroy-app:
     name: "2. App Destroy"
-    needs: destroy-audit # 👇 Waits for Audit to finish
+    needs: destroy-audit
     if: contains(github.event.head_commit.message, 'tfdestroy')
     runs-on: ubuntu-latest
     defaults:
@@ -69,7 +67,7 @@ jobs:
   # =========================================================
   destroy-network:
     name: "3. Network Destroy"
-    needs: destroy-app # 👇 Waits for App to finish
+    needs: destroy-app
     if: contains(github.event.head_commit.message, 'tfdestroy')
     runs-on: ubuntu-latest
     defaults:
