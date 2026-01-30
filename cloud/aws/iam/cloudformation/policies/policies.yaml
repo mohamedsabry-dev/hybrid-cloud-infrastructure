@@ -199,6 +199,9 @@ Resources:
               - cloudwatch:DeleteDashboards
               - cloudwatch:GetDashboard
               - cloudwatch:ListDashboards
+              - cloudwatch:TagResource
+              - cloudwatch:UntagResource
+              - cloudwatch:ListTagsForResource
             Resource: '*'
           - Sid: ManageEventBridge
             Effect: Allow
