@@ -1,0 +1,223 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Shared Managed Policies for Hybrid Infrastructure'
+
+Resources:
+  # ============================================================================
+  # 1. Terraform State Policy (S3 & DynamoDB Access)
+  # ============================================================================
+  TerraformStatePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-TerraformState-Common
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3TerraformStateAccess
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state
+              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state/*
+          - Sid: DynamoDBStateLocking
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+            Resource: arn:aws:dynamodb:eu-west-2:REDACTED_AWS_PROD:table/hybrid-cloud-infrastructure-terraform-state-lock
+
+  # ============================================================================
+  # 2. Terraform Security Boundary (The Separation of Duties)
+  #    MOVED UP: This must be inside the Resources block!
+  # ============================================================================
+  TerraformSecurityBoundaryPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-Terraform-SecurityBoundary
+      Description: "Prevents Terraform from modifying IAM but allows passing roles to Compute"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Rule 1: Allow Passing Roles (so Terraform can launch EC2/EKS)
+          - Sid: AllowPassRole
+            Effect: Allow
+            Action: 'iam:PassRole'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'iam:PassedToService': 'ec2.amazonaws.com'
+
+          # Rule 2: STRICTLY FORBID creating/deleting IAM resources
+          - Sid: BlockIAMMutation
+            Effect: Deny
+            Action:
+              - 'iam:CreateUser'
+              - 'iam:CreateRole'
+              - 'iam:CreatePolicy'
+              - 'iam:DeleteUser'
+              - 'iam:DeleteRole'
+              - 'iam:DeletePolicy'
+              - 'iam:AttachRolePolicy'
+              - 'iam:PutRolePolicy'
+            Resource: '*'
+
+  # ============================================================================
+  # 3. Network Full Management (VPC, Subnets, Gateways, Routes, SGs)
+  # ============================================================================
+  NetworkFullManagementPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-NetworkFullManagement
+      Description: "Full network infrastructure management for Terraform"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: NetworkWriteActions
+            Effect: Allow
+            Action:
+              - ec2:CreateVpc
+              - ec2:DeleteVpc
+              - ec2:ModifyVpcAttribute
+              - ec2:CreateSubnet
+              - ec2:DeleteSubnet
+              - ec2:ModifySubnetAttribute
+              - ec2:CreateInternetGateway
+              - ec2:AttachInternetGateway
+              - ec2:DetachInternetGateway
+              - ec2:DeleteInternetGateway
+              - ec2:CreateRouteTable
+              - ec2:DeleteRouteTable
+              - ec2:AssociateRouteTable
+              - ec2:DisassociateRouteTable
+              - ec2:CreateRoute
+              - ec2:DeleteRoute
+              - ec2:CreateTags
+              - ec2:DeleteTags
+              - ec2:CreateSecurityGroup
+              - ec2:DeleteSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:RevokeSecurityGroupIngress
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:RevokeSecurityGroupEgress
+            Resource: '*'
+
+  # ============================================================================
+  # 4. Application Full Management (EC2, EKS, ECR)
+  # ============================================================================
+  ApplicationFullManagementPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-ApplicationFullManagement
+      Description: "Full compute and container management for Terraform"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ComputeWriteActions
+            Effect: Allow
+            Action:
+              - ec2:RunInstances
+              - ec2:TerminateInstances
+              - ec2:StartInstances
+              - ec2:StopInstances
+              - ec2:CreateTags
+              - ec2:DeleteTags
+              - ec2:AllocateAddress
+              - ec2:AssociateAddress
+              - ec2:ReleaseAddress
+              - ec2:AttachVolume
+              - ec2:DetachVolume
+              - ec2:CreateVolume
+              - ec2:DeleteVolume
+              - eks:*
+              - ecr:*
+            Resource: '*'
+
+  # ============================================================================
+  # 5. Security Audit Control (CloudTrail, Audit Bucket, CloudWatch Logs)
+  # ============================================================================
+  SecurityAuditControlPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-SecurityAuditControl
+      Description: "Security and audit infrastructure management"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ManageCloudTrailResource
+            Effect: Allow
+            Action:
+              - cloudtrail:CreateTrail
+              - cloudtrail:UpdateTrail
+              - cloudtrail:DeleteTrail
+              - cloudtrail:StartLogging
+              - cloudtrail:StopLogging
+              - cloudtrail:GetTrailStatus
+              - cloudtrail:DescribeTrails
+              - cloudtrail:PutEventSelectors
+              - cloudtrail:ListTags
+              - cloudtrail:AddTags
+            Resource: '*'
+          - Sid: ConfigureAuditBucket
+            Effect: Allow
+            Action:
+              - s3:PutBucketPolicy
+              - s3:GetBucketPolicy
+              - s3:PutEncryptionConfiguration
+              - s3:PutLifecycleConfiguration
+              - s3:ListBucket
+            Resource:
+              - !ImportValue HybridCloud-AuditBucket-Arn
+              - !Sub
+                  - "${BucketArn}/*"
+                  - BucketArn: !ImportValue HybridCloud-AuditBucket-Arn
+          - Sid: ExplicitlyDenyBucketDestruction
+            Effect: Deny
+            Action:
+              - s3:DeleteBucket
+            Resource:
+              - !ImportValue HybridCloud-AuditBucket-Arn
+          - Sid: ManageCloudWatchLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:PutRetentionPolicy
+            Resource: "arn:aws:logs:*:*:log-group:aws-cloudtrail-logs*"
+          - Sid: AllowPassRoleToCloudTrail
+            Effect: Allow
+            Action:
+              - iam:PassRole
+              - iam:CreateRole
+              - iam:PutRolePolicy
+            Resource: "arn:aws:iam::*:role/service-role/CloudTrailWritesToCloudWatchRole"
+
+Outputs:
+  # ============================================================================
+  # All Exports go here at the bottom
+  # ============================================================================
+  TerraformStatePolicyArn:
+    Value: !Ref TerraformStatePolicy
+    Export:
+      Name: HybridCloud-TerraformStatePolicy-Arn
+
+  TerraformSecurityBoundaryPolicyArn:
+    Value: !Ref TerraformSecurityBoundaryPolicy
+    Export:
+      Name: HybridCloud-TerraformSecurityBoundary-Arn
+
+  NetworkFullManagementPolicyArn:
+    Value: !Ref NetworkFullManagementPolicy
+    Export:
+      Name: HybridCloud-NetworkFullManagement-Arn
+
+  ApplicationFullManagementPolicyArn:
+    Value: !Ref ApplicationFullManagementPolicy
+    Export:
+      Name: HybridCloud-ApplicationFullManagement-Arn
+
+  SecurityAuditControlPolicyArn:
+    Value: !Ref SecurityAuditControlPolicy
+    Export:
+      Name: HybridCloud-SecurityAuditControl-Arn
