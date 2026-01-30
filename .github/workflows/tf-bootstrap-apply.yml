@@ -64,11 +64,40 @@ jobs:
       - run: terraform apply -auto-approve
 
   # =========================================================
-  # JOB 3: AUDIT (The Inspector)
+  # JOB 3: QUERY (The Inspector)
   # =========================================================
-  audit-check:
-    name: "3. Audit Verification"
+  query-check:
+    name: "3. query Verification"
     needs: apply-app # Waits for App
+    if: contains(github.event.head_commit.message, 'tfrun')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/bootstrap-test/query
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-ReadOnly
+          aws-region: eu-west-2
+
+      - run: terraform init
+
+      # We use PLAN here because ReadOnly users shouldn't change state.
+      # If this passes, it proves the Auditor can see the infrastructure.
+      - run: terraform plan -no-color
+
+  # =========================================================
+  # JOB 4: AUDIT (Security & Monitoring)
+  # =========================================================
+  apply-audit:
+    name: "4. Audit Apply"
+    needs: query-check
     if: contains(github.event.head_commit.message, 'tfrun')
     runs-on: ubuntu-latest
     defaults:
@@ -83,11 +112,10 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-ReadOnly
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-Audit
           aws-region: eu-west-2
 
       - run: terraform init
-      
-      # We use PLAN here because ReadOnly users shouldn't change state.
-      # If this passes, it proves the Auditor can see the infrastructure.
-      - run: terraform plan -no-color
+      - run: terraform apply -auto-approve
+
+  # =========================================================
