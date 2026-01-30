@@ -13,7 +13,7 @@ terraform {
     key            = "audit/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "hybrid-cloud-infrastructure-terraform-locks"
+    dynamodb_table = "hybrid-cloud-infrastructure-terraform-state-lock"
   }
 }
 
