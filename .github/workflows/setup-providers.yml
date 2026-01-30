@@ -5,6 +5,11 @@
 name: Setup Provider Mirror
 
 on:
+  push:
+    branches:
+      - mohamedsabrydev/infra-245-phase-1-devops-foundation
+    paths:
+      - '.github/workflows/setup-providers.yml'
   workflow_dispatch:
     inputs:
       branch:
@@ -23,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Mirror Directory and Terraformrc
         run: |
