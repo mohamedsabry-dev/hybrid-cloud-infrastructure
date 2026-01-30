@@ -18,9 +18,6 @@ on:
         default: 'main'
         type: string
 
-env:
-  TF_MIRROR_DIR: $HOME/.terraform.d/providers-mirror
-
 jobs:
   setup-mirror:
     runs-on: production
@@ -32,6 +29,8 @@ jobs:
 
       - name: Setup Mirror Directory and Terraformrc
         run: |
+          TF_MIRROR_DIR="$HOME/.terraform.d/providers-mirror"
+          echo "TF_MIRROR_DIR=$TF_MIRROR_DIR" >> $GITHUB_ENV
           mkdir -p $TF_MIRROR_DIR
           cat > ~/.terraformrc << EOF
           provider_installation {
