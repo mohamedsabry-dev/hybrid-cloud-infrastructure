@@ -1,8 +1,0 @@
-# This points to where your ACTUAL template lives in the repo
-template-file-path: infrastructure-core/identity/iam/cloudformation/templates/roles.yaml
-
-# No parameters needed because your template doesn't ask for any
-parameters: {}
-
-tags:
-  Stack: roles
