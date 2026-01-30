@@ -1,6 +1,12 @@
 name: "Terraform Apply"
 
 on:
+  push:
+    branches:
+      - mohamedsabrydev/infra-245-phase-1-devops-foundation
+    paths:
+      - '.github/workflows/tf-bootstrap.yml'
+      - 'cloud/aws/bootstrap/terraform/**'
   workflow_dispatch:
     inputs:
       branch:
@@ -23,7 +29,8 @@ jobs:
   # =========================================================
   apply-cloudtrail:
     name: "1. Cloudtrail Apply"
-    if: inputs.confirm == 'deploy'
+    # Push: runs automatically | workflow_dispatch: requires typing "deploy"
+    if: github.event_name == 'push' || inputs.confirm == 'deploy'
     runs-on: production
     defaults:
       run:
@@ -32,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ inputs.branch || github.ref }}
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.0"
