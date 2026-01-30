@@ -14,6 +14,7 @@ terraform {
     region         = "eu-west-2"
     encrypt        = true
     dynamodb_table = "hybrid-cloud-infrastructure-terraform-locks"
+  }
 }
 
 provider "aws" {
