@@ -1,0 +1,5 @@
+template-file-path: cloud/aws/iam/cloudformation/roles/roles.yaml
+parameters: {}
+tags:
+  Phase: Identity
+  Stack: Roles

@@ -1,5 +1,0 @@
-template-file-path: cloud/aws/iam/cloudformation/templates/policies.yaml
-parameters: {}
-tags:
-  Phase: Identity
-  Stack: Policies
