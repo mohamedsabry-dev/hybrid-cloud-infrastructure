@@ -1,0 +1,89 @@
+name: "Terraform Destroy (Auto-Trigger)"
+
+on:
+  push:
+    branches:
+      - mohamedsabrydev/infra-245-phase-1-devops-foundation
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # =========================================================
+  # JOB 1: AUDIT DESTROY (First)
+  # =========================================================
+  destroy-audit:
+    name: "1. Audit Destroy"
+    if: contains(github.event.head_commit.message, 'tfdestroy')
+    runs-on: production
+    defaults:
+      run:
+        working-directory: tests/bootstrap-test/audit
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Audit
+          aws-region: eu-west-2
+
+      - run: terraform init
+      - run: terraform destroy -auto-approve
+
+  # =========================================================
+  # JOB 2: APPLICATION DESTROY (Second)
+  # =========================================================#
+  destroy-app:
+    name: "2. App Destroy"
+    needs: destroy-audit
+    if: contains(github.event.head_commit.message, 'tfdestroy')
+    runs-on: production
+    defaults:
+      run:
+        working-directory: tests/bootstrap-test/app
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Application
+          aws-region: eu-west-2
+
+      - run: terraform init
+      - run: terraform destroy -auto-approve
+
+  # =========================================================
+  # JOB 3: NETWORK DESTROY (Last)
+  # =========================================================
+  destroy-network:
+    name: "3. Network Destroy"
+    needs: destroy-app
+    if: contains(github.event.head_commit.message, 'tfdestroy')
+    runs-on: production
+    defaults:
+      run:
+        working-directory: tests/bootstrap-test/network
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Network
+          aws-region: eu-west-2
+
+      - run: terraform init
+      - run: terraform destroy -auto-approve

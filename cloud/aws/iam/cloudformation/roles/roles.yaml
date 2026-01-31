@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Phase 1: Component Roles (Cleaned & Optimized)"
+
+Resources:
+  # =========================================================
+  # 1. NETWORK ROLE (The Infrastructure Architect)
+  # =========================================================
+  GitHubActionsNetworkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Network
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                # The Audience is always exact
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                # The Subject uses wildcards (*) so it MUST be StringLike
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
+
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-NetworkFullManagement-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  # =========================================================
+  # 2. APPLICATION ROLE (The Builder)
+  # =========================================================
+  GitHubActionsApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Application
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                # The Audience is always exact
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                # The Subject uses wildcards (*) so it MUST be StringLike
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
+
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn
+        - !ImportValue HybridCloud-ApplicationFullManagement-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  # =========================================================
+  # 3. AUDIT ROLE (Security, Monitoring & Observability)
+  # =========================================================
+  GitHubActionsAuditRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-Audit
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: "sts:AssumeRoleWithWebIdentity"
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-SecurityAuditControl-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
