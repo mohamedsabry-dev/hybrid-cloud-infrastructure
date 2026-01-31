@@ -33,7 +33,7 @@ output "is_multi_region_trail" {
   value       = aws_cloudtrail.main_audit_trail.is_multi_region_trail
 }
 
-output "cloudtrail_enabled" {
+output "log_file_validation_enabled" {
   description = "Whether CloudTrail log file validation is enabled"
   value       = aws_cloudtrail.main_audit_trail.enable_log_file_validation
 }
