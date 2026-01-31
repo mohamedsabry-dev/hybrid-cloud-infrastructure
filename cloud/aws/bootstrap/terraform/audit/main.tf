@@ -15,30 +15,10 @@ resource "aws_cloudtrail" "main_audit_trail" {
 
   tags = local.tags
 
-  # advanced_event_selector is required for Secrets Manager data events
-  # (event_selector only supports S3, DynamoDB, Lambda)
-  advanced_event_selector {
-    name = "Log management events"
-
-    field_selector {
-      field  = "eventCategory"
-      equals = ["Management"]
-    }
-  }
-
-  advanced_event_selector {
-    name = "Log Secrets Manager data events"
-
-    field_selector {
-      field  = "eventCategory"
-      equals = ["Data"]
-    }
-
-    field_selector {
-      field  = "resources.type"
-      equals = ["AWS::SecretsManager::Secret"]
-    }
-  }
+  # Management events capture all control plane API calls including:
+  # - secretsmanager:CreateSecret, DeleteSecret, UpdateSecret, RotateSecret
+  # - All IAM, EC2, S3, etc. operations
+  # Data events (GetSecretValue) can be added later via CloudWatch/EventBridge if needed
 
   # No 'kms_key_id' argument means it uses default S3-managed keys.
 }
