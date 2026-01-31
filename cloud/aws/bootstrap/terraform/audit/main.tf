@@ -12,6 +12,17 @@ resource "aws_cloudtrail" "main_audit_trail" {
   include_global_service_events = true
   is_multi_region_trail         = true
   enable_log_file_validation    = true
-  
+
+  # Log all Secrets Manager data events (GetSecretValue, PutSecretValue, etc.)
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
+
+    data_resource {
+      type   = "AWS::SecretsManager::Secret"
+      values = ["arn:aws:secretsmanager"]
+    }
+  }
+
   # No 'kms_key_id' argument means it uses default S3-managed keys.
 }
