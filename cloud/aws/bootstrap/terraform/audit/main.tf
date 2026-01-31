@@ -13,14 +13,30 @@ resource "aws_cloudtrail" "main_audit_trail" {
   is_multi_region_trail         = true
   enable_log_file_validation    = true
 
-  # Log all Secrets Manager data events (GetSecretValue, PutSecretValue, etc.)
-  event_selector {
-    read_write_type           = "All"
-    include_management_events = true
+  tags = local.tags
 
-    data_resource {
-      type   = "AWS::SecretsManager::Secret"
-      values = ["arn:aws:secretsmanager"]
+  # advanced_event_selector is required for Secrets Manager data events
+  # (event_selector only supports S3, DynamoDB, Lambda)
+  advanced_event_selector {
+    name = "Log management events"
+
+    field_selector {
+      field  = "eventCategory"
+      equals = ["Management"]
+    }
+  }
+
+  advanced_event_selector {
+    name = "Log Secrets Manager data events"
+
+    field_selector {
+      field  = "eventCategory"
+      equals = ["Data"]
+    }
+
+    field_selector {
+      field  = "resources.type"
+      equals = ["AWS::SecretsManager::Secret"]
     }
   }
 
