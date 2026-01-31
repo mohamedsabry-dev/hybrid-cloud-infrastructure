@@ -15,10 +15,13 @@ resource "aws_cloudtrail" "main_audit_trail" {
 
   tags = local.tags
 
-  # Management events capture all control plane API calls including:
-  # - secretsmanager:CreateSecret, DeleteSecret, UpdateSecret, RotateSecret
-  # - All IAM, EC2, S3, etc. operations
-  # Data events (GetSecretValue) can be added later via CloudWatch/EventBridge if needed
+  # Log all management events (control plane API calls)
+  # Includes: CreateSecret, DeleteSecret, UpdateSecret, all IAM/EC2/S3 ops
+  # Data events (GetSecretValue) can be added via CloudWatch/EventBridge if needed
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
+  }
 
   # No 'kms_key_id' argument means it uses default S3-managed keys.
 }
