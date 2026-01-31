@@ -18,37 +18,45 @@ Resources:
               - s3:ListBucket
               - s3:GetObject
               - s3:PutObject
+              - s3:DeleteObject
             Resource:
-              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state
-              - arn:aws:s3:::hybrid-cloud-infrastructure-terraform-state/*
+              - !ImportValue TerraformStateBucketArn
+              - !Sub
+                  - "${BucketArn}/*"
+                  - BucketArn: !ImportValue TerraformStateBucketArn
           - Sid: DynamoDBStateLocking
             Effect: Allow
             Action:
               - dynamodb:GetItem
               - dynamodb:PutItem
               - dynamodb:DeleteItem
-            Resource: arn:aws:dynamodb:eu-west-2:969041180300:table/hybrid-cloud-infrastructure-terraform-state-lock
+            Resource: !Sub
+              - "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}"
+              - TableName: !ImportValue TerraformLockTableName
 
   # ============================================================================
   # 2. Terraform Security Boundary (The Separation of Duties)
-  #    MOVED UP: This must be inside the Resources block!
   # ============================================================================
   TerraformSecurityBoundaryPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-Terraform-SecurityBoundary
-      Description: "Prevents Terraform from modifying IAM but allows passing roles to Compute"
+      Description: "Prevents Terraform from modifying IAM but allows passing specific roles to Compute"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          # Rule 1: Allow Passing Roles (so Terraform can launch EC2/EKS)
+          # Rule 1: Allow Passing only EC2-* and EKS-* roles to compute services
           - Sid: AllowPassRole
             Effect: Allow
             Action: 'iam:PassRole'
-            Resource: '*'
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/EC2-*'
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/EKS-*'
             Condition:
               StringEquals:
-                'iam:PassedToService': 'ec2.amazonaws.com'
+                'iam:PassedToService':
+                  - 'ec2.amazonaws.com'
+                  - 'eks.amazonaws.com'
 
           # Rule 2: STRICTLY FORBID creating/deleting IAM resources
           - Sid: BlockIAMMutation
@@ -65,17 +73,17 @@ Resources:
             Resource: '*'
 
   # ============================================================================
-  # 3. Network Full Management (VPC, Subnets, Gateways, Routes, SGs)
+  # 3. Network Core Infrastructure (VPC, Subnets, Routes, VPN, Peering)
   # ============================================================================
   NetworkFullManagementPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-NetworkFullManagement
-      Description: "Full network infrastructure management for Terraform"
+      Description: "Core network fabric - VPC, subnets, routing, VPN, peering"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: NetworkWriteActions
+          - Sid: VPCManagement
             Effect: Allow
             Action:
               - ec2:CreateVpc
@@ -84,55 +92,158 @@ Resources:
               - ec2:CreateSubnet
               - ec2:DeleteSubnet
               - ec2:ModifySubnetAttribute
+            Resource: '*'
+          - Sid: InternetGatewayManagement
+            Effect: Allow
+            Action:
               - ec2:CreateInternetGateway
               - ec2:AttachInternetGateway
               - ec2:DetachInternetGateway
               - ec2:DeleteInternetGateway
+            Resource: '*'
+          - Sid: RouteManagement
+            Effect: Allow
+            Action:
               - ec2:CreateRouteTable
               - ec2:DeleteRouteTable
               - ec2:AssociateRouteTable
               - ec2:DisassociateRouteTable
               - ec2:CreateRoute
               - ec2:DeleteRoute
+              - ec2:ReplaceRoute
+            Resource: '*'
+          - Sid: NetworkACLManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateNetworkAcl
+              - ec2:DeleteNetworkAcl
+              - ec2:CreateNetworkAclEntry
+              - ec2:DeleteNetworkAclEntry
+              - ec2:ReplaceNetworkAclEntry
+              - ec2:ReplaceNetworkAclAssociation
+            Resource: '*'
+          - Sid: VPCPeeringManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateVpcPeeringConnection
+              - ec2:DeleteVpcPeeringConnection
+              - ec2:AcceptVpcPeeringConnection
+              - ec2:RejectVpcPeeringConnection
+              - ec2:ModifyVpcPeeringConnectionOptions
+            Resource: '*'
+          - Sid: VPNManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateVpnGateway
+              - ec2:DeleteVpnGateway
+              - ec2:AttachVpnGateway
+              - ec2:DetachVpnGateway
+              - ec2:CreateCustomerGateway
+              - ec2:DeleteCustomerGateway
+              - ec2:CreateVpnConnection
+              - ec2:DeleteVpnConnection
+              - ec2:ModifyVpnConnection
+              - ec2:ModifyVpnConnectionOptions
+            Resource: '*'
+          - Sid: VPCEndpointManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateVpcEndpoint
+              - ec2:DeleteVpcEndpoints
+              - ec2:ModifyVpcEndpoint
+              - ec2:CreateVpcEndpointServiceConfiguration
+              - ec2:DeleteVpcEndpointServiceConfigurations
+              - ec2:ModifyVpcEndpointServiceConfiguration
+            Resource: '*'
+          - Sid: TagManagement
+            Effect: Allow
+            Action:
               - ec2:CreateTags
               - ec2:DeleteTags
-              - ec2:CreateSecurityGroup
-              - ec2:DeleteSecurityGroup
-              - ec2:AuthorizeSecurityGroupIngress
-              - ec2:RevokeSecurityGroupIngress
-              - ec2:AuthorizeSecurityGroupEgress
-              - ec2:RevokeSecurityGroupEgress
             Resource: '*'
 
   # ============================================================================
-  # 4. Application Full Management (EC2, EKS, ECR)
+  # 4. Application Full Management (EC2, EKS, ECR, SG, ELB, NAT)
   # ============================================================================
   ApplicationFullManagementPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-ApplicationFullManagement
-      Description: "Full compute and container management for Terraform"
+      Description: "Compute, containers, and app-facing network resources"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: ComputeWriteActions
+          - Sid: EC2Management
             Effect: Allow
             Action:
               - ec2:RunInstances
               - ec2:TerminateInstances
               - ec2:StartInstances
               - ec2:StopInstances
-              - ec2:CreateTags
-              - ec2:DeleteTags
-              - ec2:AllocateAddress
-              - ec2:AssociateAddress
-              - ec2:ReleaseAddress
+              - ec2:RebootInstances
+              - ec2:ModifyInstanceAttribute
+            Resource: '*'
+          - Sid: VolumeManagement
+            Effect: Allow
+            Action:
               - ec2:AttachVolume
               - ec2:DetachVolume
               - ec2:CreateVolume
               - ec2:DeleteVolume
+              - ec2:ModifyVolume
+            Resource: '*'
+          - Sid: SecurityGroupManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateSecurityGroup
+              - ec2:DeleteSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:RevokeSecurityGroupIngress
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:RevokeSecurityGroupEgress
+              - ec2:ModifySecurityGroupRules
+              - ec2:UpdateSecurityGroupRuleDescriptionsIngress
+              - ec2:UpdateSecurityGroupRuleDescriptionsEgress
+            Resource: '*'
+          - Sid: NATGatewayManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateNatGateway
+              - ec2:DeleteNatGateway
+            Resource: '*'
+          - Sid: ElasticIPManagement
+            Effect: Allow
+            Action:
+              - ec2:AllocateAddress
+              - ec2:ReleaseAddress
+              - ec2:AssociateAddress
+              - ec2:DisassociateAddress
+            Resource: '*'
+          - Sid: NetworkInterfaceManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DeleteNetworkInterface
+              - ec2:AttachNetworkInterface
+              - ec2:DetachNetworkInterface
+              - ec2:ModifyNetworkInterfaceAttribute
+            Resource: '*'
+          - Sid: LoadBalancerManagement
+            Effect: Allow
+            Action:
+              - elasticloadbalancing:*
+            Resource: '*'
+          - Sid: ContainerServices
+            Effect: Allow
+            Action:
               - eks:*
               - ecr:*
+            Resource: '*'
+          - Sid: TagManagement
+            Effect: Allow
+            Action:
+              - ec2:CreateTags
+              - ec2:DeleteTags
             Resource: '*'
 
   # ============================================================================
@@ -154,11 +265,14 @@ Resources:
               - cloudtrail:DeleteTrail
               - cloudtrail:StartLogging
               - cloudtrail:StopLogging
+              - cloudtrail:GetTrail
               - cloudtrail:GetTrailStatus
               - cloudtrail:DescribeTrails
               - cloudtrail:PutEventSelectors
+              - cloudtrail:GetEventSelectors
               - cloudtrail:ListTags
               - cloudtrail:AddTags
+              - cloudtrail:RemoveTags
             Resource: '*'
           - Sid: ConfigureAuditBucket
             Effect: Allow
@@ -170,9 +284,6 @@ Resources:
               - s3:ListBucket
             Resource:
               - !ImportValue HybridCloud-AuditBucket-Arn
-              - !Sub
-                  - "${BucketArn}/*"
-                  - BucketArn: !ImportValue HybridCloud-AuditBucket-Arn
           - Sid: ExplicitlyDenyBucketDestruction
             Effect: Deny
             Action:
@@ -208,11 +319,16 @@ Resources:
             Action:
               - events:PutRule
               - events:DeleteRule
+              - events:EnableRule
+              - events:DisableRule
               - events:PutTargets
               - events:RemoveTargets
               - events:DescribeRule
               - events:ListRules
               - events:ListTargetsByRule
+              - events:TagResource
+              - events:UntagResource
+              - events:ListTagsForResource
             Resource: '*'
           - Sid: ManageSNSForAlarms
             Effect: Allow
@@ -233,8 +349,6 @@ Resources:
             Effect: Allow
             Action:
               - iam:PassRole
-              - iam:CreateRole
-              - iam:PutRolePolicy
             Resource: "arn:aws:iam::*:role/service-role/CloudTrailWritesToCloudWatchRole"
 
 Outputs:
