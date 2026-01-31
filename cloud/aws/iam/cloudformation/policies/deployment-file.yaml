@@ -1,5 +1,7 @@
+# yaml-language-server: $schema=
 template-file-path: cloud/aws/iam/cloudformation/policies/policies.yaml
 parameters: {}
 tags:
   Phase: Identity
-  Stack: Policies
+  Stack: hybrid-policies
+  ManagedBy: CloudFormation

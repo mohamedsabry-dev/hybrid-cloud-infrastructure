@@ -55,33 +55,54 @@
         Status: Available
         Arn: arn:aws:codeconnections:us-east-1:REDACTED_AWS_PROD:connection/9f7c2cde-397a-4895-8e4b-72ec6d60f3e0
 
-    - Create Stack for fundamental Setup [Enable GitSync on Phase branch]
+    - Create Stack for fundamental Setup [Enable GitSync on main branch]
 
         #   Resource Type               Resource Name                                       Purpose
         1   AWS::IAM::OIDCProvider      GitHub OIDC Provider                                Identity federation for GitHub Actions
         2   AWS::S3::Bucket             hybrid-cloud-infrastructure-terraform-state         Terraform state storage
         3   AWS::DynamoDB::Table        hybrid-cloud-infrastructure-terraform-state-lock    Terraform state locking
         4   AWS::S3::Bucket             hybrid-cloud-infrastructure-audit-logs              Audit/CloudTrail logs
-        5   AWS::S3::BucketPolicy       AuditBucketPolicy                                   Allow CloudTrail to write to audit bucket
+        5   AWS::S3::BucketPolicy       AuditBucketPolicy                                   Allow CloudTrail + Deny non-SSL
+
+        Security Features:
+        - S3 Buckets: Versioning, Encryption (AES256), Public Access Blocked
+        - Terraform State Bucket: Logging to AuditBucket, Lifecycle (90 days for old versions)
+        - DynamoDB: DeletionProtectionEnabled, SSESpecification enabled
+        - AuditBucket: Lifecycle (365 days expiration, 90 days for old versions)
+        - AuditBucketPolicy: DenyNonSSL statement (blocks non-HTTPS requests)
 
         Note: Resources 2, 3, 4 have DeletionPolicy: Retain - they won't be deleted if stack is deleted
+        Note: OIDC thumbprint is ignored by AWS for GitHub (since July 2023) but field is required
 
-    - Create Stack for Policies Setup [Enable GitSync on Phase branch]
+    - Create Stack for Policies Setup [Enable GitSync on main branch]
 
         #   Policy Name                             Purpose
-        1   HybridCloud-TerraformState-Common       S3 & DynamoDB access for Terraform state
-        2   HybridCloud-Terraform-SecurityBoundary  Prevents Terraform from modifying IAM (Deny iam:Create*, iam:Delete*)
-        3   HybridCloud-NetworkFullManagement       VPC, Subnets, Gateways, Security Groups
-        4   HybridCloud-ApplicationFullManagement   EC2, EKS, ECR management
-        5   HybridCloud-SecurityAuditControl        CloudTrail, CloudWatch, EventBridge, SNS
+        1   HybridCloud-TerraformState-Common       S3 & DynamoDB access for Terraform state (uses !ImportValue)
+        2   HybridCloud-Terraform-SecurityBoundary  PassRole for EC2-*/EKS-* only, Deny IAM mutations
+        3   HybridCloud-NetworkFullManagement       Core network fabric: VPC, Subnets, Routes, VPN, Peering, NACLs, Endpoints
+        4   HybridCloud-ApplicationFullManagement   App-facing: EC2, EKS, ECR, SG, NAT, ELB, EIP, ENI
+        5   HybridCloud-SecurityAuditControl        CloudTrail, CloudWatch, EventBridge, SNS, Audit Bucket config
 
-    - Create Stack for Assume Roles by Github [Enable GitSync on Phase branch]
+        Policy Details:
+        - TerraformStatePolicy: Uses !ImportValue for bucket/table ARNs (cross-stack reference)
+        - SecurityBoundary: PassRole limited to EC2-* and EKS-* role patterns only
+        - NetworkFullManagement: Core fabric only (VPC, subnets, routes, VPN, peering)
+        - ApplicationFullManagement: Includes SG, NAT, ELB, EIP, ENI (app-facing resources)
+        - SecurityAuditControl: PassRole for CloudTrail role, manages audit infrastructure
+
+    - Create Stack for Assume Roles by Github [Enable GitSync on main branch]
 
         #   Role Name                   Purpose                                 Attached Policies
-        1   GitHubActions-ReadOnly      The Auditor                             TerraformState, ReadOnlyAccess
-        2   GitHubActions-Network       The Infrastructure Architect            TerraformState, SecurityBoundary, NetworkFullManagement, ReadOnlyAccess
-        3   GitHubActions-Application   The Builder                             TerraformState, ApplicationFullManagement, ReadOnlyAccess
-        4   GitHubActions-Audit         Security, Monitoring & Observability    TerraformState, SecurityAuditControl
+        1   GitHubActions-Network       The Infrastructure Architect            TerraformState, NetworkFullManagement, ReadOnlyAccess
+        2   GitHubActions-Application   The Builder                             TerraformState, SecurityBoundary, ApplicationFullManagement, ReadOnlyAccess
+        3   GitHubActions-Audit         Security, Monitoring & Observability    TerraformState, SecurityAuditControl, ReadOnlyAccess
+
+        Role Details:
+        - ReadOnly role removed (redundant - all roles have ReadOnlyAccess)
+        - Network: Core network only, no PassRole needed (doesn't deploy compute)
+        - Application: Has SecurityBoundary for PassRole to EC2-*/EKS-* roles
+        - Audit: Added ReadOnlyAccess for consistency
+        - All roles: Restricted to main + mohamedsabrydev/* branches only
 
 ================================================================================
 ## 4. GITHUB WORKFLOWS
@@ -126,17 +147,24 @@
         - Global service events: true
         - Log file validation: enabled
         - S3 bucket: hybrid-cloud-infrastructure-audit-logs (created by CloudFormation)
+        - Event Selectors: Secrets Manager data events (GetSecretValue, PutSecretValue)
+
+    What's Logged:
+        - Management events: All API calls (CreateBucket, DeleteRole, etc.) - FREE
+        - Data events: Secrets Manager access (GetSecretValue) - $0.10/100k events
 
 ================================================================================
-## 6. SECURITY CONTROLS (CODEOWNERS)
+## 6. SECURITY CONTROLS (CODEOWNERS + Branch Protection)
 ================================================================================
 
-    After bootstrap complete, disconnect GitSync and add code review requirements
+    After Phase 1: Bootstrap disconnected from GitSync, Policies/Roles on GitSync (main only)
 
     Why:
-        - GitSync auto-deploys on push = no approval gate = security risk
-        - IAM changes should require human review
-        - Prevents accidental or malicious IAM modifications
+        - Bootstrap: Too critical for auto-deploy, manual control by console admin
+        - Policies/Roles: GitSync on main, but PR + review required before merge
+        - Branch protection: Requires PR approval before merge to main
+        - CODEOWNERS: /cloud/aws/iam/ requires @mohamedsabrydev approval
+        - Code review is the security gate for IAM changes
 
     Protected Paths (require @mohamedsabrydev approval):
 
@@ -158,30 +186,39 @@
 ## 7. DEPLOYMENT MODEL
 ================================================================================
 
-    Two-layer approach:
+    DURING PHASE 1 (Testing):
+    ─────────────────────────
+    GitSync configured on feature branch (mohamedsabrydev/infra-245-phase-1-devops-foundation)
+    for testing all 3 stacks before merge to main.
 
-    Layer 1: Foundation (MANUAL DEPLOY ONLY)
-        - IAM Roles & Policies
-        - OIDC Provider
-        - Permission Boundaries
-        - CloudTrail / Audit config
+    AFTER PHASE 1 (Production):
+    ───────────────────────────
+    Stack 1: Bootstrap (MANUAL ONLY - Disconnect GitSync)
+        - OIDC Provider, S3 State Bucket, DynamoDB Lock, Audit Bucket
+        - Deployment file: cloud/aws/bootstrap/cloudformation/bootstrap/deployment-file.yaml
+        - Reason: Rarely changes, critical infrastructure, manual control preferred
 
-        Tool: CloudFormation via Console/CLI
-        GitSync: DISCONNECTED
-        Templates: In Git for version control (not auto-deployed)
+    Stack 2: Policies (GitSync on main branch)
+        - IAM Managed Policies (5 policies)
+        - Deployment file: cloud/aws/iam/cloudformation/policies/deployment-file.yaml
+        - Auto-deploys when PR merged to main (after review)
 
-    Layer 2: Infrastructure (AUTOMATED)
-        - S3 Buckets, DynamoDB
-        - VPCs, Subnets, EC2
+    Stack 3: Roles (GitSync on main branch)
+        - IAM Roles for GitHub Actions (3 roles)
+        - Deployment file: cloud/aws/iam/cloudformation/roles/deployment-file.yaml
+        - Depends on: Policies stack (uses !ImportValue)
+        - Auto-deploys when PR merged to main (after review)
+
+    Layer 2: Infrastructure (Terraform + GitHub Actions)
+        - VPCs, Subnets, EC2, EKS
         - Application services
 
-        Tool: Terraform + GitHub Actions
-
-    Why this separation:
-        - IAM too sensitive for automation
-        - Terraform role has NO iam:* permissions (security boundary)
-        - Human must review and execute IAM changes
-        - Version control + review process, but manual deployment
+    Security Controls:
+        - Branch protection on main (require PR + review)
+        - CODEOWNERS: /cloud/aws/iam/ requires @mohamedsabrydev approval
+        - SecurityBoundary policy denies IAM mutations from Terraform roles
+        - GitSync only triggers on merge to main (not on feature branches)
+        - Bootstrap stack manually deployed by console admin only
 
 ================================================================================
 ## 8. DOCUMENTATION
@@ -220,9 +257,14 @@
 ================================================================================
 
     #   Issue                                       Resolution
-    1   CloudFormation resource recreation          Recorded in TS Case (policy edit caused recreation)
-    2   GitSync auto-deploy security risk           Disconnected GitSync, added CODEOWNERS
+    1   CloudFormation resource recreation          Don't change Description/Name (immutable) - see TROUBLESHOOTING.md
+    2   GitSync auto-deploy security risk           Branch protection + CODEOWNERS (review before merge)
     3   Provider download slow on runner            Created local provider mirror
+    4   ReadOnly role redundant                     Deleted - all roles have ReadOnlyAccess attached
+    5   PassRole too permissive (Resource: *)       Limited to EC2-* and EKS-* role patterns
+    6   Network/App policy overlap                  Separated: Network=fabric, App=compute+app-facing resources
+    7   S3 bucket missing SSL enforcement           Added DenyNonSSL statement to bucket policies
+    8   DynamoDB missing deletion protection        Added DeletionProtectionEnabled + SSESpecification
 
 ================================================================================
 ## PHASE 1 CHECKLIST
@@ -231,16 +273,23 @@
     [x] Local runner setup (mac-mini, production tags)
     [x] Provider mirror configured
     [x] OIDC Provider created
-    [x] Terraform state bucket + lock table created
-    [x] Audit bucket created
-    [x] IAM policies created (5 policies)
-    [x] IAM roles created (4 roles)
-    [x] CloudTrail deployed via Terraform
+    [x] Terraform state bucket + lock table created (with logging, lifecycle, deletion protection)
+    [x] Audit bucket created (with lifecycle rules)
+    [x] IAM policies created (5 policies with cross-stack references)
+    [x] IAM roles created (3 roles - ReadOnly removed as redundant)
+    [x] CloudTrail deployed via Terraform (with Secrets Manager data events)
     [x] GitHub workflows created
-    [x] CODEOWNERS configured
-    [x] GitSync disconnected from IAM stacks
+    [x] CODEOWNERS configured for /cloud/aws/iam/
+    [x] Branch protection on main (PR + review required)
     [x] Documentation created
     [x] Test artifacts archived
+
+    Phase 1 End Tasks:
+    [ ] Disconnect GitSync from Bootstrap stack (manual deploy only)
+    [ ] Configure GitSync for Policies stack (main branch)
+    [ ] Configure GitSync for Roles stack (main branch)
+    [ ] Verify branch protection rules on main
+    [ ] Verify CODEOWNERS working for IAM directory
 
 ================================================================================
 ## NEXT PHASE

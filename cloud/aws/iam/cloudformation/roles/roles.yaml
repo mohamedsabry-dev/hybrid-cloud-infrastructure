@@ -3,38 +3,7 @@ Description: "Phase 1: Component Roles (Cleaned & Optimized)"
 
 Resources:
   # =========================================================
-  # 1. READ ONLY ROLE (The Auditor)
-  # =========================================================
-  GitHubActionsReadOnlyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: GitHubActions-ReadOnly
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                # The Audience is always exact
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                # The Subject uses wildcards (*) so it MUST be StringLike
-                token.actions.githubusercontent.com:sub:
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
-                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
-
-      
-      ManagedPolicyArns:
-        # 1. Access to S3 State (Read/Write State file)
-        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-        # 2. Access to VIEW everything in AWS (The "Global ReadOnly")
-        - arn:aws:iam::aws:policy/ReadOnlyAccess
-
-  # =========================================================
-  # 2. NETWORK ROLE (The Infrastructure Architect)
+  # 1. NETWORK ROLE (The Infrastructure Architect)
   # =========================================================
   GitHubActionsNetworkRole:
     Type: AWS::IAM::Role
@@ -58,15 +27,13 @@ Resources:
                   - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
 
 
-
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
-        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn
         - !ImportValue HybridCloud-NetworkFullManagement-Arn
         - arn:aws:iam::aws:policy/ReadOnlyAccess
 
   # =========================================================
-  # 3. APPLICATION ROLE (The Builder)
+  # 2. APPLICATION ROLE (The Builder)
   # =========================================================
   GitHubActionsApplicationRole:
     Type: AWS::IAM::Role
@@ -92,11 +59,12 @@ Resources:
 
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-TerraformSecurityBoundary-Arn
         - !ImportValue HybridCloud-ApplicationFullManagement-Arn
         - arn:aws:iam::aws:policy/ReadOnlyAccess
 
   # =========================================================
-  # 4. AUDIT ROLE (Security, Monitoring & Observability)
+  # 3. AUDIT ROLE (Security, Monitoring & Observability)
   # =========================================================
   GitHubActionsAuditRole:
     Type: AWS::IAM::Role
@@ -110,11 +78,14 @@ Resources:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: "sts:AssumeRoleWithWebIdentity"
             Condition:
-              StringLike:
-                "token.actions.githubusercontent.com:sub": "repo:mohamedsabry-dev/hybrid-cloud-infrastructure:*"
               StringEquals:
-                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
 
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-SecurityAuditControl-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
