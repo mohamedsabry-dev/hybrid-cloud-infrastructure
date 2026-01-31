@@ -41,7 +41,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-Terraform-SecurityBoundary
-      Description: "Prevents Terraform from modifying IAM but allows passing specific roles to Compute"
+      Description: "Prevents Terraform from modifying IAM but allows passing roles to Compute"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -79,7 +79,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-NetworkFullManagement
-      Description: "Core network fabric - VPC, subnets, routing, VPN, peering"
+      Description: "Full network infrastructure management for Terraform"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -169,7 +169,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: HybridCloud-ApplicationFullManagement
-      Description: "Compute, containers, and app-facing network resources"
+      Description: "Full compute and container management for Terraform"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
