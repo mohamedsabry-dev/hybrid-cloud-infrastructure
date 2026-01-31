@@ -1,0 +1,5 @@
+template-file-path: 'cloud/aws/bootstrap/cloudformation/bootstrap/bootstrap.yaml '
+parameters: {}
+tags:
+  Phase: Bootstrap
+  ManagedBy: CloudFormation
