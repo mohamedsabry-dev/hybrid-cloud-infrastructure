@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=
+template-file-path: cloud/aws/bootstrap/cloudformation/bootstrap/bootstrap.yaml
+parameters: {}
+tags:
+  Phase: Bootstrap
+  Stack: hybrid-foundation
+  ManagedBy: CloudFormation
