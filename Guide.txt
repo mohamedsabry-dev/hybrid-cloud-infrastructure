@@ -27,6 +27,7 @@
     3   vmware/vsphere              2.15.0      -
     4   hashicorp/vault             5.6.0       -
     5   hashicorp/kubernetes        3.0.1       -
+    6   bpg/proxmox                 0.93.1     - 
 
     Why:
         - Speeds up terraform init (uses local cache instead of downloading)
