@@ -1,6 +1,6 @@
 # PROXMOX POST-INSTALLATION TROUBLESHOOTING GUIDE
 # Quick Reference for Common Issues
-# Date: February 1, 2026
+# Date: February 2, 2026
 
 ================================================================================
 ISSUE 1: LAPTOP SUSPENDS WHEN MONITOR TURNS OFF
@@ -145,6 +145,134 @@ FIREFOX:
    Recommendation: Alternative to Safari if preferred
 
 ================================================================================
+ISSUE 3: APT UPDATE FAILS WITH 401 UNAUTHORIZED
+================================================================================
+
+SYMPTOM:
+--------
+- Running "apt update" shows 401 Unauthorized error
+- Error message: "Failed to fetch https://enterprise.proxmox.com/debian/pve/..."
+- Repository is not signed warning
+
+ROOT CAUSE:
+-----------
+Proxmox enterprise repositories are enabled by default but require paid subscription
+
+SOLUTION:
+---------
+
+Step 1: Disable enterprise repositories
+   mv /etc/apt/sources.list.d/ceph.sources /etc/apt/sources.list.d/ceph.sources.disabled
+   mv /etc/apt/sources.list.d/pve-enterprise.list /etc/apt/sources.list.d/pve-enterprise.list.disabled
+   mv /etc/apt/sources.list.d/pve-enterprise.sources /etc/apt/sources.list.d/pve-enterprise.sources.disabled
+
+Step 2: Verify no-subscription repo exists
+   cat /etc/apt/sources.list.d/pve-install-repo.list
+
+   For Proxmox 8.x (Debian Bookworm):
+   deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription
+
+   For Proxmox 9.x (Debian Trixie):
+   deb http://download.proxmox.com/debian/pve trixie pve-no-subscription
+
+Step 3: If no-subscription repo missing or wrong version, create/fix it
+   Proxmox 8.x:
+   echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list
+
+   Proxmox 9.x:
+   echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+
+Step 4: Update package lists
+   apt update
+
+RESULT:
+-------
+✓ apt update completes without errors
+✓ Can install/upgrade packages
+✓ No subscription required
+
+================================================================================
+ISSUE 4: WARNING "OLD SUITE 'BOOKWORM' CONFIGURED" (PROXMOX 9.x)
+================================================================================
+
+SYMPTOM:
+--------
+- Warning in APT repositories: "old suite 'bookworm' configured!"
+- Yellow warning icon next to repository in web UI
+
+ROOT CAUSE:
+-----------
+Proxmox 9.x uses Debian Trixie but repository is configured for Bookworm
+
+SOLUTION:
+---------
+
+Update the no-subscription repository to use trixie:
+   echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+   apt update
+
+RESULT:
+-------
+✓ Warning disappears
+✓ Repository matches Proxmox version
+
+================================================================================
+ISSUE 5: PKGUPDATES FILE MISSING ERROR
+================================================================================
+
+SYMPTOM:
+--------
+- Error in logs: "can't open '/var/lib/pve-manager/pkgupdates' - No such file or directory"
+
+ROOT CAUSE:
+-----------
+File is created on first package update check, doesn't exist on fresh install
+
+SOLUTION:
+---------
+
+Simply run apt update:
+   apt update
+
+Or click "Refresh" in Proxmox web UI under Updates section.
+
+RESULT:
+-------
+✓ File gets created automatically
+✓ Error disappears
+
+================================================================================
+ISSUE 6: SUBSCRIPTION NAG POPUP IN WEB UI
+================================================================================
+
+SYMPTOM:
+--------
+- Popup appears on login: "No valid subscription"
+- Annoying for home lab use
+
+ROOT CAUSE:
+-----------
+Proxmox shows subscription reminder for users without paid subscription
+
+SOLUTION:
+---------
+
+Step 1: Remove the subscription nag
+   sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+
+Step 2: Restart web service
+   systemctl restart pveproxy
+
+Step 3: Clear browser cache and refresh
+
+NOTE: This patch needs to be reapplied after Proxmox updates.
+
+RESULT:
+-------
+✓ No more subscription popup on login
+✓ Full functionality retained
+
+================================================================================
 QUICK REFERENCE COMMANDS
 ================================================================================
 
@@ -168,6 +296,18 @@ systemctl status pveproxy
 ping 192.168.0.110
 curl -k https://192.168.0.110:8006
 
+# Disable enterprise repos (one-time fix)
+mv /etc/apt/sources.list.d/ceph.sources /etc/apt/sources.list.d/ceph.sources.disabled
+mv /etc/apt/sources.list.d/pve-enterprise.list /etc/apt/sources.list.d/pve-enterprise.list.disabled
+mv /etc/apt/sources.list.d/pve-enterprise.sources /etc/apt/sources.list.d/pve-enterprise.sources.disabled
+
+# Fix bookworm warning for Proxmox 9.x (use trixie)
+echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+
+# Remove subscription nag popup
+sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+systemctl restart pveproxy
+
 ================================================================================
 VERIFICATION CHECKLIST
 ================================================================================
@@ -180,6 +320,9 @@ After applying fixes:
 □ Can login to Proxmox web UI
 □ Can create VMs/containers
 □ System doesn't suspend during operations
+□ apt update runs without 401 errors
+□ No "old suite" warning in repositories (Proxmox 9.x uses trixie)
+□ No subscription nag popup on login
 
 If any of above fail:
 1. Verify HandleLidSwitch settings in /etc/systemd/logind.conf
