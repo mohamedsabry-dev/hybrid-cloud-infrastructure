@@ -26,12 +26,13 @@ pveum user token add terraform@pve terraform-token --privsep 0
 # -----------------------------------------------
 #  full-tokenid : terraform@pve!terraform-token
 #  privsep      : 0
-#  secret       : cdd6e612-6a9b-47a0-b44c-6d6e6aab3c6d
+#  secret       : <stored in AWS Secrets Manager: infra/proxmox/api-token>
 
 # -----------------------------------------------
 # 5. Test API Token (run from local machine, single line)
 # -----------------------------------------------
-curl -k -H 'Authorization: PVEAPIToken=terraform@pve!terraform-token=cdd6e612-6a9b-47a0-b44c-6d6e6aab3c6d' https://192.168.0.120:8006/api2/json/version
+# Replace <SECRET> with the token secret from AWS Secrets Manager
+curl -k -H 'Authorization: PVEAPIToken=terraform@pve!terraform-token=<SECRET>' https://192.168.0.120:8006/api2/json/version
 
 # Expected response: {"data":{"release":"9.1","version":"9.1.5","repoid":"..."}}
 
