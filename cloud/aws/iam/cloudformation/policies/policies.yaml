@@ -351,6 +351,37 @@ Resources:
               - iam:PassRole
             Resource: "arn:aws:iam::*:role/service-role/CloudTrailWritesToCloudWatchRole"
 
+  # ============================================================================
+  # 6. Secrets Management (Secrets Manager for infra tokens - Proxmox, Vault, etc.)
+  # ============================================================================
+  SecretsManagementPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-SecretsManagement
+      Description: "Secrets Manager access for infrastructure secrets (Proxmox, Vault, etc.)"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: SecretsManagerFullAccess
+            Effect: Allow
+            Action:
+              - secretsmanager:CreateSecret
+              - secretsmanager:GetSecretValue
+              - secretsmanager:PutSecretValue
+              - secretsmanager:DescribeSecret
+              - secretsmanager:DeleteSecret
+              - secretsmanager:UpdateSecret
+              - secretsmanager:ListSecrets
+              - secretsmanager:TagResource
+              - secretsmanager:UntagResource
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:infra/*"
+          - Sid: SecretsManagerList
+            Effect: Allow
+            Action:
+              - secretsmanager:ListSecrets
+            Resource: '*'
+
 Outputs:
   # ============================================================================
   # All Exports go here at the bottom
@@ -379,3 +410,8 @@ Outputs:
     Value: !Ref SecurityAuditControlPolicy
     Export:
       Name: HybridCloud-SecurityAuditControl-Arn
+
+  SecretsManagementPolicyArn:
+    Value: !Ref SecretsManagementPolicy
+    Export:
+      Name: HybridCloud-SecretsManagement-Arn

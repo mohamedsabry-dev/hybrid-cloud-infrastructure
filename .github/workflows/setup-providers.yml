@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - mohamedsabrydev/infra-245-phase-1-devops-foundation
+      - mohamedsabrydev/sre-8-phase-2-setup-proxmox-server  
     paths:
       - '.github/workflows/setup-providers.yml'
   workflow_dispatch:
