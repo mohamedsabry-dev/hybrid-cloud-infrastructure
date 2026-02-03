@@ -1,0 +1,61 @@
+name: "Terraform Proxmox"
+
+on:
+  push:
+    branches:
+      - mohamedsabrydev/sre-8-phase-2-setup-proxmox-server
+    paths:
+      - '.github/workflows/tf-proxmox.yml'
+      - 'on-premise/terraform/proxmox/**'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  apply-proxmox:
+    name: "Proxmox Apply"
+    if: github.event_name == 'push' || inputs.confirm == 'deploy'
+    runs-on: production
+    defaults:
+      run:
+        working-directory: on-premise/terraform/proxmox/prod
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-Secrets
+          aws-region: eu-west-2
+
+      - name: Fetch Proxmox Token from Secrets Manager
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value --secret-id infra/proxmox/api-token --query SecretString --output text)
+          echo "::add-mask::$SECRET"
+          TOKEN_ID=$(echo "$SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$SECRET" | jq -r '.token_secret')
+          echo "::add-mask::$TOKEN_ID"
+          echo "::add-mask::$TOKEN_SECRET"
+          echo "TF_VAR_proxmox_api_token_id=$TOKEN_ID" >> $GITHUB_ENV
+          echo "TF_VAR_proxmox_api_token_secret=$TOKEN_SECRET" >> $GITHUB_ENV
+
+      - run: terraform init
+      - run: terraform apply -auto-approve
