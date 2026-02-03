@@ -113,5 +113,6 @@ Resources:
                   - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
 
       ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-SecretsManagement-Arn
         - arn:aws:iam::aws:policy/ReadOnlyAccess
