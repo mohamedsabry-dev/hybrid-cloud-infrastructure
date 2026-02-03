@@ -5,16 +5,14 @@ output "nodes" {
 
 output "datastores" {
   description = "Available storage on node"
-  value       = data.proxmox_virtual_environment_datastores.storage.datastore_ids
-}
-
-output "networks" {
-  description = "Network interfaces on node"
   value = [
-    for iface in data.proxmox_virtual_environment_node_network.net.linux_bridges : {
-      name   = iface.name
-      cidr   = iface.cidr
-      active = iface.active
+    for ds in data.proxmox_virtual_environment_datastores.storage.datastores : {
+      id        = ds.id
+      type      = ds.type
+      active    = ds.active
+      shared    = ds.shared
+      available = "${floor(ds.space_available / 1073741824)} GB"
+      total     = "${floor(ds.space_total / 1073741824)} GB"
     }
   ]
 }

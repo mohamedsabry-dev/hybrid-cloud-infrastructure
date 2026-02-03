@@ -2,10 +2,6 @@
 
 data "proxmox_virtual_environment_nodes" "available" {}
 
-data "proxmox_virtual_environment_node_network" "net" {
-  node_name = var.proxmox_node
-}
-
 data "proxmox_virtual_environment_datastores" "storage" {
   node_name = var.proxmox_node
 }
