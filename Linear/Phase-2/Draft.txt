@@ -97,9 +97,9 @@ Sub-Issue 2: AWS IAM & Secrets Management
 - [x] Create Proxmox API token secret in AWS Secrets Manager
 - [x] Create IAM assume role and policy for secret access
 - [x] Merge IAM changes to main (trigger CloudFormation git sync)
-- [ ] Create minimal read-only IAM role for TF Proxmox provider
+- [x] Create minimal read-only IAM role for TF Proxmox provider
       (should only read the specific Proxmox API token secret, nothing else)
-- [ ] Review and audit all TF-related IAM rules and policies
+- [x] Review and audit all TF-related IAM rules and policies
 
 --------------------------------------------------------------------------------
 Sub-Issue 3: CI/CD & Git Workflow Organization
@@ -123,3 +123,17 @@ Sub-Issue 4: Terraform Proxmox Provider Setup
 - [x] Create terraform@pve user and API token (privsep=0)
 - [ ] Set up and validate Terraform provider connection to Proxmox
 - [ ] Define TF resource rules and provisioning policies
+
+
+--------------------------------------------------------------------------------
+Sub-Issue 5: LLD & Design Documentation
+--------------------------------------------------------------------------------
+
+- [ ] Document network topology (VLANs, subnets, firewall zones)
+- [ ] Document storage architecture (NFS shares, datastore layout)
+- [ ] Document VM/LXC provisioning design (templates, cloud-init)
+- [ ] Document IAM & secrets flow (AWS -> Proxmox API token lifecycle)
+- [ ] Document CI/CD pipeline architecture (GitHub Actions -> Terraform -> Proxmox)
+- [ ] Create resource dependency diagram (what depends on what)
+- [ ] Document naming conventions (hostnames, IPs, Terraform resources)
+- [ ] Document backup & recovery strategy
