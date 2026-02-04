@@ -43,7 +43,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Secrets
+          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-ProxmoxSecretRead
           aws-region: eu-west-2
 
       - name: Fetch Proxmox Token from Secrets Manager
