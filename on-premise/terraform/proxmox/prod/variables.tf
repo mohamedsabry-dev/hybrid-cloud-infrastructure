@@ -1,6 +1,6 @@
 variable "proxmox_api_url" {
   type        = string
-  default     = "https://pve.lab.local:8006"
+  default     = "https://pve-master.lab.local:8006"
   description = "Proxmox API URL"
 }
 
