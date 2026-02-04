@@ -18,6 +18,6 @@ variable "proxmox_api_token_secret" {
 
 variable "proxmox_node" {
   type        = string
-  default     = "pve"
+  default     = "pve-master"
   description = "Proxmox node name"
 }
