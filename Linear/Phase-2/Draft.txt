@@ -209,9 +209,15 @@ Open questions (needs thinking):
 
 Status: ON HOLD - let the idea settle before committing to an approach.
 
+Prerequisites (Proxmox host-level, manual or Ansible):
+  - [ ] Create isolated network bridge/VLAN on Proxmox for dev traffic
+  - [ ] Assign dev subnet (e.g., 10.x.x.x/24) to the new bridge
+  - [ ] Carve out storage for dev (ZFS dataset or directory from the 1.7 TB NVMe)
+  - [ ] Create nested dev VM (~6 GB RAM) attached to the isolated network
+  - [ ] Configure PfSense rules to isolate dev from prod traffic
+
 Tasks (draft, not final):
   - [ ] Design dev/prod network separation (VLANs, subnets, firewall rules)
-  - [ ] Determine resource budget for dev nested server (~6 GB)
   - [ ] Create dev-terraform@pve user on Proxmox with limited role
   - [ ] Create a dev resource pool on Proxmox with capped RAM/CPU
   - [ ] Store dev API token in AWS Secrets Manager (infra/proxmox/dev-api-token)
