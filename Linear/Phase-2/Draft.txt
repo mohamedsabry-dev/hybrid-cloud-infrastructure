@@ -33,38 +33,52 @@ Resource Plan
 
 ### Layer 1: Master Infrastructure (Zone C) - Runs on Physical Host
 
-| Component      | Type | RAM      | vCPUs | Role                                  |
-|----------------|------|----------|-------|---------------------------------------|
-| TrueNAS        | VM   | 12.00 GB | 4     | Core Storage (NFS)                    |
-| FreeIPA        | VM   |  2.75 GB | 2     | Identity (LDAP/DNS)                   |
-| PfSense        | VM   |  2.50 GB | 2     | Network (Routing/Firewall)            |
-| Gitea + Runner | LXC  |  2.00 GB | 2     | DevOps (Code Repo & CI/CD Builder)    |
-| Ansible        | LXC  |  1.25 GB | 2     | Mgmt (Automation Controller)          |
-| Nginx          | LXC  |  0.50 GB | 1     | Ingress (Config-only CLI)             |
-| SonarQube      | LXC  |  2.00 GB | 2     | RESERVED (Month 2 Deployment)         |
-| Spare Buffer   | -    |  0.50 GB | -     | Emergency Room                        |
-| **TOTAL**      |      | **23.5 GB** |    |                                       |
+| Component      | Type | RAM      | vCPUs | Role                                  | Change       |
+|----------------|------|----------|-------|---------------------------------------|--------------|
+| TrueNAS        | VM   | 12.00 GB | 4     | Core Storage (NFS)                    |              |
+| FreeIPA        | VM   |  2.50 GB | 2     | Identity (LDAP/DNS)                   | Was 2.75 GB  |
+| PfSense        | VM   |  2.50 GB | 2     | Network (Routing/Firewall)            |              |
+| Gitea + Runner | LXC  |  2.00 GB | 2     | DevOps (Code Repo & CI/CD Builder)    |              |
+| Ansible        | LXC  |  1.00 GB | 2     | Mgmt (Automation Controller)          | Was 1.25 GB  |
+| Nginx          | LXC  |  0.50 GB | 1     | Ingress (Config-only CLI)             |              |
+| ~~SonarQube~~  | ~~LXC~~ | ~~--~~ | ~~--~~| REMOVED (overkill for now)            | Freed 2.0 GB |
+| Spare Buffer   | -    |  0.50 GB | -     | Emergency Room                        |              |
+| **TOTAL**      |      | **21.0 GB** |    |                                       | Saved 2.5 GB |
 
-### Layer 2: Nested Proxmox Clusters (Zones A, B, C) - 12 GB x 3 Nodes
+### Layer 2: Nested Proxmox Clusters (Zones A, B, C) - 11 GB x 3 Nodes
+
+| Component   | Type   | RAM     | vCPUs | Role                            | Change       |
+|-------------|--------|---------|-------|---------------------------------|--------------|
+| Proxmox OS  | System | 2.25 GB | -     | System (incl. Backup Client)    |              |
+| K8s Worker  | VM     | 4.00 GB | 4     | Workload (Application Pods)     | Was 5.00 GB  |
+| K8s Master  | VM     | 3.00 GB | 2     | Control Plane                   |              |
+| Vault       | VM     | 1.50 GB | 2     | Security (Raft Consensus)       | Was 1.75 GB  |
+| Spare       | -      | 0.25 GB | -     | Per-node buffer                 | New          |
+| **TOTAL**   |        | **11.00 GB** | | **(Per Node)**                 | Saved 1 GB/node |
+
+### Layer 3: Dev Nested Server (Terraform Testing)
 
 | Component   | Type   | RAM     | vCPUs | Role                            |
 |-------------|--------|---------|-------|---------------------------------|
-| Proxmox OS  | System | 2.25 GB | -     | System (incl. Backup Client)    |
-| K8s Worker  | VM     | 5.00 GB | 4     | Workload (Application Pods)     |
-| K8s Master  | VM     | 3.00 GB | 2     | Control Plane                   |
-| Vault       | VM     | 1.75 GB | 2     | Security (Raft Consensus)       |
-| **TOTAL**   |        | **12.00 GB** | | **(Per Node)**                 |
+| Proxmox OS  | System | 1.50 GB | -     | Minimal OS                      |
+| Test VM     | VM     | 2.00 GB | 2     | Test VM provisioning            |
+| Test LXC    | LXC    | 2.00 GB | 2     | Test container/image builds     |
+| Spare       | -      | 0.50 GB | -     | Buffer                          |
+| **TOTAL**   |        | **6.00 GB** |  |                                 |
 
-### Global Resource Summary
+### Global Resource Summary (Revised)
 
-| Layer                | Allocation | Notes                    |
-|----------------------|------------|--------------------------|
-| Master Infrastructure| 23.5 GB    | Management & Storage     |
-| Nested Server 1      | 12.0 GB    | Zone A Node              |
-| Nested Server 2      | 12.0 GB    | Zone B Node              |
-| Nested Server 3      | 12.0 GB    | Zone C Node              |
-| Host OS Reserve      |  4.5 GB    | Physical Proxmox Buffer  |
-| **TOTAL**            | **64.0 GB**| **100% Utilized**        |
+| Layer                | Old     | New      | Saved   | Notes                    |
+|----------------------|---------|----------|---------|--------------------------|
+| Master Infrastructure| 23.5 GB | 21.0 GB  | 2.5 GB  | Dropped SonarQube, trimmed |
+| Nested Server 1      | 12.0 GB | 11.0 GB  | 1.0 GB  | Zone A Node              |
+| Nested Server 2      | 12.0 GB | 11.0 GB  | 1.0 GB  | Zone B Node              |
+| Nested Server 3      | 12.0 GB | 11.0 GB  | 1.0 GB  | Zone C Node              |
+| Dev Nested Server    |    -    |  6.0 GB  | -       | NEW - TF testing         |
+| Host OS Reserve      |  4.5 GB |  4.0 GB  | 0.5 GB  | Slightly reduced         |
+| **TOTAL**            | **64.0 GB** | **64.0 GB** | | **Balanced**          |
+
+Savings breakdown: 2.5 (master) + 3.0 (3 nodes) + 0.5 (host) = 6.0 GB -> Dev Server
 
 ================================================================================
 SUB-ISSUES
@@ -197,6 +211,43 @@ Planned approach:
   | API token secret   | infra/proxmox/dev-api-token  | infra/proxmox/api-token       |
   | TF state key       | proxmox/dev/terraform.tfstate| proxmox/prod/terraform.tfstate|
   | Used by            | plan.sh (local)              | tf-proxmox.yml (pipeline)     |
+
+Vision (brain dump, needs refinement):
+
+  The project has two bootstrap phases:
+    1. AWS + GitHub (done in Phase 1)
+    2. Proxmox (Phase 2, in progress)
+
+  Both need dev/prod separation. The dev-plan user should be able to:
+
+  | Action                                    | Target        | Access    |
+  |-------------------------------------------|---------------|-----------|
+  | terraform plan                            | AWS resources  | Read-only |
+  | terraform plan                            | Proxmox prod   | Read-only |
+  | terraform apply                           | Proxmox dev    | Full      |
+  | Push/pull test images                     | AWS ECR (dev)  | Read/Write|
+  | terraform state                           | Dev S3 bucket  | Read/Write|
+  | terraform lock                            | Dev DynamoDB   | Read/Write|
+
+  Key idea: dev and prod share the same S3 bucket and DynamoDB table,
+  separated by state key paths (proxmox/dev/* vs proxmox/prod/*).
+  DynamoDB locks per state file, not per table — so dev and prod
+  applies can run simultaneously without blocking each other.
+  No need for separate buckets or tables.
+
+  Everything else is separated: Proxmox users, network, ECR, tokens.
+
+  Infrastructure split:
+
+  | Component       | Dev                        | Prod                          |
+  |-----------------|----------------------------|-------------------------------|
+  | S3 state bucket | Same bucket                | Same bucket                   |
+  | DynamoDB lock   | Same table                 | Same table                    |
+  | TF state key    | proxmox/dev/*              | proxmox/prod/*                |
+  | Proxmox user    | dev-terraform@pve          | terraform@pve                 |
+  | Proxmox target  | Dev nested server (~6 GB)  | Full infrastructure           |
+  | ECR registry    | Dev repository             | Prod repository               |
+  | Network         | Isolated dev VLAN/subnet   | Prod network                  |
 
 Open questions (needs thinking):
   - Dev/prod separation cascades beyond Terraform:
