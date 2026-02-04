@@ -142,3 +142,18 @@ Resources:
       ManagedPolicyArns:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-ProxmoxSecretRead-Arn
+
+  # =========================================================
+  # 6. LOCAL DEV-PLAN USER (terraform plan only, no apply)
+  # =========================================================
+  # This IAM user provides local terraform plan capability.
+  # It reuses existing policies but has NO resource creation
+  # permissions, so it cannot apply any infrastructure changes.
+  DevPlanUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: dev-plan
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-ProxmoxSecretRead-Arn
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
