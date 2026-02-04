@@ -110,10 +110,115 @@ Sub-Issue 3: CI/CD & Git Workflow Organization
 - [ ] Configure CloudFormation git sync trigger
       (decide: listen on security-branch -> main merge only, or both?)
 - [ ] Organize GitHub workflows (currently becoming messy)
-- [ ] Evaluate offline/local testing strategy
-      (currently no way to test without pushing to GitHub since it is the
-       centralized communication channel with AWS for TF state and roles.
-       Options: treat entire env as test env, or find local testing approach)
+- [x] Evaluate offline/local testing strategy
+      (resolved: created local dev-plan IAM user for terraform plan)
+
+--------------------------------------------------------------------------------
+Sub-Issue 3a: Local Terraform Plan Setup (Dev Feedback Loop)
+--------------------------------------------------------------------------------
+
+Problem:
+  No way to test Terraform code without pushing to GitHub. Every typo or
+  missing variable required a full push -> workflow run -> read logs -> fix ->
+  push again cycle. This made development painfully slow.
+
+Solution:
+  Created a read-only IAM user (dev-plan) for local terraform plan/validate.
+  The pipeline still gates all applies. This matches how real teams work:
+  local plan for fast feedback, CI/CD for actual deployment.
+
+What was done:
+
+  1. Added IAM user to CloudFormation (roles.yaml)
+     - Resource: DevPlanUser (AWS::IAM::User, UserName: dev-plan)
+     - Location: cloud/aws/iam/cloudformation/roles/roles.yaml
+     - Three policies attached (all reused, nothing new):
+
+     | Policy                              | Why                              |
+     |-------------------------------------|----------------------------------|
+     | HybridCloud-TerraformStatePolicy-Arn| Read state from S3 + DynamoDB    |
+     | HybridCloud-ProxmoxSecretRead-Arn   | Fetch Proxmox API token          |
+     | arn:aws:iam::aws:policy/ReadOnlyAccess | Query existing resources during plan |
+
+     This user can read and plan but CANNOT create, modify, or destroy
+     any infrastructure.
+
+  2. Deployed the CloudFormation stack update
+     - Pushed roles.yaml change to branch
+     - Merged to main to trigger CloudFormation git sync
+     - Stack updated successfully, dev-plan user created
+
+  3. Created access keys in AWS Console
+     - IAM -> Users -> dev-plan -> Security credentials -> Create access key
+
+  4. Configured local AWS CLI profile
+     - Command: aws configure --profile dev-plan
+     - Region: eu-west-2
+     - Credentials stored in ~/.aws/credentials (local only, not in repo)
+
+  5. Created plan.sh script at repo root
+     - Sets AWS_PROFILE=dev-plan
+     - Fetches Proxmox API token from Secrets Manager automatically
+     - Runs terraform init + validate + plan
+     - Uses local provider mirror (~/.terraform.d/providers-mirror), no downloads
+     - Usage:
+         ./plan.sh on-premise/terraform/proxmox/prod
+         ./plan.sh cloud/aws/bootstrap/terraform/audit
+         ./plan.sh cloud/aws/bootstrap/terraform/secrets
+
+  6. Verified the setup
+     - Ran ./plan.sh on-premise/terraform/proxmox/prod
+     - Successfully: init from mirror, validated, planned, queried Proxmox
+     - No changes needed (infrastructure matches config)
+
+Workflow before vs after:
+
+  Before: Write code -> push -> wait for Actions -> read logs -> fix -> push
+  After:  Write code -> ./plan.sh -> see errors instantly -> fix -> push once
+
+--------------------------------------------------------------------------------
+Sub-Issue 3b: Dev/Prod Proxmox Separation (Future)
+--------------------------------------------------------------------------------
+
+Problem:
+  The dev-plan IAM user can read the Proxmox API token, and that token
+  (terraform@pve, privsep=0) has full access to Proxmox. This means local
+  terraform apply works against production. In a team setting, devs shouldn't
+  have unrestricted access to the production environment.
+
+Planned approach:
+  Create a dev environment on Proxmox with its own user, token, resource pool,
+  state file, and secret. Local development uses dev, pipeline uses prod.
+
+  | Component          | Dev                          | Prod                          |
+  |--------------------|------------------------------|-------------------------------|
+  | Proxmox user       | dev-terraform@pve            | terraform@pve                 |
+  | Resource pool      | Limited (~6 GB nested server)| Full infrastructure           |
+  | API token secret   | infra/proxmox/dev-api-token  | infra/proxmox/api-token       |
+  | TF state key       | proxmox/dev/terraform.tfstate| proxmox/prod/terraform.tfstate|
+  | Used by            | plan.sh (local)              | tf-proxmox.yml (pipeline)     |
+
+Open questions (needs thinking):
+  - Dev/prod separation cascades beyond Terraform:
+    - Separate VLAN/subnet for dev traffic vs prod traffic
+    - Separate PfSense firewall rules per environment
+    - DNS naming convention (*.dev.lab.local vs *.lab.local?)
+    - How does this fit into the existing network topology design?
+  - This is really a network architecture decision, not just a Terraform task.
+    Revisit after Sub-Issue 5 (network topology documentation) has some shape.
+
+Status: ON HOLD - let the idea settle before committing to an approach.
+
+Tasks (draft, not final):
+  - [ ] Design dev/prod network separation (VLANs, subnets, firewall rules)
+  - [ ] Determine resource budget for dev nested server (~6 GB)
+  - [ ] Create dev-terraform@pve user on Proxmox with limited role
+  - [ ] Create a dev resource pool on Proxmox with capped RAM/CPU
+  - [ ] Store dev API token in AWS Secrets Manager (infra/proxmox/dev-api-token)
+  - [ ] Add IAM policy for dev token read (or reuse ProxmoxSecretRead with wider scope)
+  - [ ] Create on-premise/terraform/proxmox/dev/ module with dev backend key
+  - [ ] Update plan.sh to point to dev environment by default
+  - [ ] Test: local apply creates VM in dev pool, does not touch prod
 
 --------------------------------------------------------------------------------
 Sub-Issue 4: Terraform Proxmox Provider Setup
