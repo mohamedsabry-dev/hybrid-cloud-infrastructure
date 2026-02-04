@@ -382,6 +382,25 @@ Resources:
               - secretsmanager:ListSecrets
             Resource: '*'
 
+  # ============================================================================
+  # 7. Proxmox API Token Read-Only (Single secret read access)
+  # ============================================================================
+  ProxmoxSecretReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: HybridCloud-ProxmoxSecretRead
+      Description: "Read-only access to the infra/proxmox/api-token secret"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ProxmoxSecretReadOnly
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:infra/proxmox/api-token-*"
+
 Outputs:
   # ============================================================================
   # All Exports go here at the bottom
@@ -415,3 +434,8 @@ Outputs:
     Value: !Ref SecretsManagementPolicy
     Export:
       Name: HybridCloud-SecretsManagement-Arn
+
+  ProxmoxSecretReadPolicyArn:
+    Value: !Ref ProxmoxSecretReadPolicy
+    Export:
+      Name: HybridCloud-ProxmoxSecretRead-Arn
