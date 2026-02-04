@@ -1,0 +1,125 @@
+================================================================================
+SRE-8 Phase 2 - Setup Proxmox Server & Infrastructure Foundation
+================================================================================
+
+## Description
+
+Phase 2 focuses on setting up the Proxmox physical host, configuring the
+foundational infrastructure services (Zone C - Master Infrastructure), and
+establishing the AWS IAM / CI/CD pipelines that support Terraform-driven
+provisioning.
+
+Key decision: Migrated from Proxmox 8.4 to 9.1 for container improvements,
+Terraform provider compatibility, and better performance. Shutdown the old
+environment completely and started fresh on a dedicated NVMe 2TB drive
+(dual-boot beside Windows, not on top of it). Boot issue on 8.4 was resolved
+by disabling the GPU before migration.
+
+--------------------------------------------------------------------------------
+ISOs Used
+--------------------------------------------------------------------------------
+
+| ISO                                        | Purpose                          |
+|--------------------------------------------|----------------------------------|
+| proxmox-ve_9.1-1.iso                       | Proxmox VE hypervisor            |
+| proxmox-backup-server_4.1-1.iso            | Proxmox Backup Server            |
+| netgate-installer-v1.1.1-RELEASE-amd64.iso | PfSense (routing/firewall)       |
+| TrueNAS-SCALE-25.04.2.6.iso               | TrueNAS SCALE (NFS storage)      |
+| Rocky-10.1-x86_64-minimal.iso             | Rocky Linux (FreeIPA / services) |
+
+--------------------------------------------------------------------------------
+Resource Plan
+--------------------------------------------------------------------------------
+
+### Layer 1: Master Infrastructure (Zone C) - Runs on Physical Host
+
+| Component      | Type | RAM      | vCPUs | Role                                  |
+|----------------|------|----------|-------|---------------------------------------|
+| TrueNAS        | VM   | 12.00 GB | 4     | Core Storage (NFS)                    |
+| FreeIPA        | VM   |  2.75 GB | 2     | Identity (LDAP/DNS)                   |
+| PfSense        | VM   |  2.50 GB | 2     | Network (Routing/Firewall)            |
+| Gitea + Runner | LXC  |  2.00 GB | 2     | DevOps (Code Repo & CI/CD Builder)    |
+| Ansible        | LXC  |  1.25 GB | 2     | Mgmt (Automation Controller)          |
+| Nginx          | LXC  |  0.50 GB | 1     | Ingress (Config-only CLI)             |
+| SonarQube      | LXC  |  2.00 GB | 2     | RESERVED (Month 2 Deployment)         |
+| Spare Buffer   | -    |  0.50 GB | -     | Emergency Room                        |
+| **TOTAL**      |      | **23.5 GB** |    |                                       |
+
+### Layer 2: Nested Proxmox Clusters (Zones A, B, C) - 12 GB x 3 Nodes
+
+| Component   | Type   | RAM     | vCPUs | Role                            |
+|-------------|--------|---------|-------|---------------------------------|
+| Proxmox OS  | System | 2.25 GB | -     | System (incl. Backup Client)    |
+| K8s Worker  | VM     | 5.00 GB | 4     | Workload (Application Pods)     |
+| K8s Master  | VM     | 3.00 GB | 2     | Control Plane                   |
+| Vault       | VM     | 1.75 GB | 2     | Security (Raft Consensus)       |
+| **TOTAL**   |        | **12.00 GB** | | **(Per Node)**                 |
+
+### Global Resource Summary
+
+| Layer                | Allocation | Notes                    |
+|----------------------|------------|--------------------------|
+| Master Infrastructure| 23.5 GB    | Management & Storage     |
+| Nested Server 1      | 12.0 GB    | Zone A Node              |
+| Nested Server 2      | 12.0 GB    | Zone B Node              |
+| Nested Server 3      | 12.0 GB    | Zone C Node              |
+| Host OS Reserve      |  4.5 GB    | Physical Proxmox Buffer  |
+| **TOTAL**            | **64.0 GB**| **100% Utilized**        |
+
+================================================================================
+SUB-ISSUES
+================================================================================
+
+--------------------------------------------------------------------------------
+Sub-Issue 1: Proxmox Host Setup & OS Configuration
+--------------------------------------------------------------------------------
+
+- [x] Plan environment design and resource allocation (64 GB layout)
+- [x] Choose Proxmox version (migrated 8.4 -> 9.1)
+- [x] Backup Proxmox images (4.1-1 and 9.1)
+- [x] Install Proxmox on dedicated NVMe 2TB (dual-boot beside Windows)
+- [x] Resolve boot issue on PVE 8.4 (disabled GPU)
+- [x] Configure static IP (192.168.0.120)
+- [x] Set domain name (pve-master.lab.local)
+- [x] Run apt update and community package repository setup
+- [x] Trust Proxmox self-signed CA certificate on macOS
+- [x] Document decision: shutdown old env, start fresh
+- [ ] Configure DNS
+- [ ] Configure NTP
+- [ ] Create local non-root user
+- [ ] Enable 2FA for root account
+
+
+--------------------------------------------------------------------------------
+Sub-Issue 2: AWS IAM & Secrets Management
+--------------------------------------------------------------------------------
+
+- [x] Create Proxmox API token secret in AWS Secrets Manager
+- [x] Create IAM assume role and policy for secret access
+- [x] Merge IAM changes to main (trigger CloudFormation git sync)
+- [ ] Create minimal read-only IAM role for TF Proxmox provider
+      (should only read the specific Proxmox API token secret, nothing else)
+- [ ] Review and audit all TF-related IAM rules and policies
+
+--------------------------------------------------------------------------------
+Sub-Issue 3: CI/CD & Git Workflow Organization
+--------------------------------------------------------------------------------
+
+- [ ] Create dedicated security branch for CloudFormation code
+- [ ] Set up branch protection rules on the security branch
+- [ ] Configure CloudFormation git sync trigger
+      (decide: listen on security-branch -> main merge only, or both?)
+- [ ] Organize GitHub workflows (currently becoming messy)
+- [ ] Evaluate offline/local testing strategy
+      (currently no way to test without pushing to GitHub since it is the
+       centralized communication channel with AWS for TF state and roles.
+       Options: treat entire env as test env, or find local testing approach)
+
+--------------------------------------------------------------------------------
+Sub-Issue 4: Terraform Proxmox Provider Setup
+--------------------------------------------------------------------------------
+
+- [x] Create TerraformFullRole on Proxmox (VM, CT, Storage, Network privs)
+- [x] Create terraform@pve user and API token (privsep=0)
+- [ ] Set up and validate Terraform provider connection to Proxmox
+- [ ] Define TF resource rules and provisioning policies

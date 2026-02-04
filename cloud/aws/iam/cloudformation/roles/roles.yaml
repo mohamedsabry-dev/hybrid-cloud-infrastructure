@@ -116,3 +116,29 @@ Resources:
         - !ImportValue HybridCloud-TerraformStatePolicy-Arn
         - !ImportValue HybridCloud-SecretsManagement-Arn
         - arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  # =========================================================
+  # 5. PROXMOX SECRET READ-ONLY ROLE
+  # =========================================================
+  GitHubActionsProxmoxSecretReadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActions-ProxmoxSecretRead
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                  - repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/mohamedsabrydev/*
+
+      ManagedPolicyArns:
+        - !ImportValue HybridCloud-TerraformStatePolicy-Arn
+        - !ImportValue HybridCloud-ProxmoxSecretRead-Arn
