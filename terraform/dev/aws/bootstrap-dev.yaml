@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Dev Account Bootstrap: OIDC + Admin Role with Permissions Boundary + Cross-Account State Access'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+
+  ProdAccountId:
+    Type: String
+    Default: '969041180300'
+    Description: Prod AWS Account ID (where state bucket lives)
+
+  StateBucketName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-terraform-state
+
+  LockTableName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-terraform-state-lock
+
+  ProdRegion:
+    Type: String
+    Default: eu-west-2
+
+Resources:
+  # ============================================================================
+  # 1. GitHub OIDC Provider
+  # ============================================================================
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [1c58a3a8518e8759bf075b76b750d4f2df264fcd]
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 2. Permissions Boundary (Limits ALL roles/users created by Terraform)
+  # ============================================================================
+  TerraformPermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: TerraformPermissionsBoundary
+      Description: Prevents modification of bootstrap resources - applied to all Terraform-created roles
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow everything by default
+          - Sid: AllowAllActions
+            Effect: Allow
+            Action: '*'
+            Resource: '*'
+          # Deny modifying OIDC Provider
+          - Sid: DenyModifyOIDC
+            Effect: Deny
+            Action:
+              - iam:DeleteOpenIDConnectProvider
+              - iam:UpdateOpenIDConnectProviderThumbprint
+              - iam:RemoveClientIDFromOpenIDConnectProvider
+            Resource: !Ref GitHubOIDCProvider
+          # Deny modifying this permissions boundary
+          - Sid: DenyModifyPermissionsBoundary
+            Effect: Deny
+            Action:
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:CreatePolicyVersion
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/TerraformPermissionsBoundary"
+          # Deny modifying the Terraform admin role
+          - Sid: DenyModifyTerraformRole
+            Effect: Deny
+            Action:
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+              - iam:DetachRolePolicy
+              - iam:AttachRolePolicy
+              - iam:UpdateAssumeRolePolicy
+              - iam:DeleteRolePermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-dev"
+
+  # ============================================================================
+  # 3. GitHub Actions Terraform Admin Role
+  # ============================================================================
+  GitHubActionsTerraformRole:
+    Type: AWS::IAM::Role
+    DependsOn: TerraformPermissionsBoundary
+    Properties:
+      RoleName: GitHubActions-TerraformAdmin-dev
+      Description: Full admin access with permissions boundary protecting bootstrap resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/dev
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+      PermissionsBoundary: !Ref TerraformPermissionsBoundary
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 4. Enforce Permissions Boundary on Created Roles/Users
+  # ============================================================================
+  EnforceBoundaryPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EnforcePermissionsBoundary
+      Roles:
+        - !Ref GitHubActionsTerraformRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Deny creating roles without the permissions boundary
+          - Sid: DenyCreateRoleWithoutBoundary
+            Effect: Deny
+            Action:
+              - iam:CreateRole
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
+          # Deny creating users without the permissions boundary
+          - Sid: DenyCreateUserWithoutBoundary
+            Effect: Deny
+            Action:
+              - iam:CreateUser
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
+          # Deny removing permissions boundary from any role/user
+          - Sid: DenyRemoveBoundary
+            Effect: Deny
+            Action:
+              - iam:DeleteRolePermissionsBoundary
+              - iam:DeleteUserPermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+              - iam:PutUserPermissionsBoundary
+            Resource: '*'
+            Condition:
+              StringNotEquals:
+                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
+
+  # ============================================================================
+  # 5. Cross-Account Access to Prod Terraform State (S3)
+  # ============================================================================
+  CrossAccountS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CrossAccount-TerraformState-S3
+      Roles:
+        - !Ref GitHubActionsTerraformRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ListProdStateBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+          - Sid: AccessDevStateFiles
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/dev/*"
+
+  # ============================================================================
+  # 6. Cross-Account Access to Prod Terraform Lock (DynamoDB)
+  # ============================================================================
+  CrossAccountDynamoDBPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CrossAccount-TerraformState-DynamoDB
+      Roles:
+        - !Ref GitHubActionsTerraformRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccessProdLockTable
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+            Resource: !Sub "arn:${AWS::Partition}:dynamodb:${ProdRegion}:${ProdAccountId}:table/${LockTableName}"
+
+# ============================================================================
+# Outputs
+# ============================================================================
+Outputs:
+  OIDCProviderArn:
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: dev-GitHubOIDCProviderArn
+
+  PermissionsBoundaryArn:
+    Value: !Ref TerraformPermissionsBoundary
+    Export:
+      Name: dev-TerraformPermissionsBoundaryArn
+
+  GitHubActionsRoleArn:
+    Value: !GetAtt GitHubActionsTerraformRole.Arn
+    Export:
+      Name: dev-GitHubActionsRoleArn
+
+  TerraformBackendConfig:
+    Value: !Sub |
+      terraform {
+        backend "s3" {
+          bucket         = "${StateBucketName}"
+          key            = "dev/<service>/terraform.tfstate"
+          region         = "${ProdRegion}"
+          dynamodb_table = "${LockTableName}"
+        }
+      }
