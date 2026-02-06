@@ -1,0 +1,132 @@
+================================================================================
+TROUBLESHOOTING LOG
+================================================================================
+
+Case #1: Apps unable to reach Proxmox server on local network
+Date: 2026-02-04
+Status: RESOLVED
+
+ENVIRONMENT:
+- Client: Mac Mini (192.168.0.##) connected via Ethernet to home router
+- Server: Proxmox (192.168.0.## / pve.lab.local) on same LAN
+- Mac used as: GitHub local runner, internal network config, development
+
+SYMPTOMS:
+- Native Terminal.app: ping to 192.168.0.## works
+- Safari: Proxmox web UI (port 8006) loads fine
+- Google Chrome: "unreachable address"
+- VS Code terminal: "no route to host"
+- GitHub Actions runner: "unreachable"
+
+ROOT CAUSE:
+macOS "Local Network" privacy permission (introduced in macOS Monterey).
+Third-party apps require explicit permission to access local network devices.
+Native system apps (Terminal.app, Safari) are automatically allowed, but
+apps like Chrome, VS Code, and Node.js (GitHub runner) are not.
+
+RESOLUTION:
+1. Open System Settings > Privacy & Security > Local Network
+2. Enable (toggle ON) the following apps:
+   - Google Chrome
+   - Visual Studio Code
+   - Node.js (covers GitHub Actions runner)
+3. Restart affected apps/services to pick up the new permissions
+
+KEY TAKEAWAY:
+When some apps can reach a local device but others cannot on macOS,
+check Local Network permissions first before investigating firewall
+or routing issues.
+================================================================================
+
+================================================================================
+Case #2: Rename Proxmox Node and Update Domain Name
+Date: 2026-02-04
+Status: RESOLVED
+
+ENVIRONMENT:
+- Proxmox VE 9.1.5, single node
+- Old hostname: pve
+- Old domain: pve.lab.local
+- New hostname: pve-master
+- New domain: pve-master.lab.local
+- IP: 192.168.0.120
+
+GOAL:
+Rename the Proxmox node from "pve" to "pve-master" and update the
+SSL certificate SANs to match, so the web UI is trusted under the
+new domain.
+
+WARNING:
+- Do this on a fresh node with NO VMs/CTs, or back up all configs first
+- Do NOT change the hostname before stopping pve-cluster, or the
+  cluster filesystem (pmxcfs) will fail to mount and the web UI breaks
+- The correct order matters — follow the steps exactly
+
+PROCEDURE (via SSH on the Proxmox host):
+
+Step 1: Stop PVE services
+  systemctl stop pvedaemon pveproxy pvestatd
+
+Step 2: Stop the cluster filesystem
+  systemctl stop pve-cluster
+
+Step 3: Rename the node in the SQLite database
+  sqlite3 /var/lib/pve-cluster/config.db \
+    "UPDATE tree SET name = 'pve-master' WHERE name = 'pve';"
+
+Step 4: Rename the node config directory on disk
+  mv /var/lib/pve-cluster/nodes/pve /var/lib/pve-cluster/nodes/pve-master 2>/dev/null; true
+
+Step 5: Set the new hostname
+  hostnamectl set-hostname pve-master
+
+Step 6: Update /etc/hosts
+  Edit /etc/hosts to read:
+    127.0.0.1       localhost.localdomain localhost
+    192.168.0.120   pve-master.lab.local pve-master
+
+Step 7: Reboot
+  reboot
+
+Step 8: After reboot — verify via SSH
+  hostname                    # should return: pve-master
+  ls /etc/pve/nodes/          # should show: pve-master (only)
+  systemctl status pve-cluster  # should be: active
+
+Step 9: Regenerate SSL certificates
+  rm /etc/pve/local/pve-ssl.pem /etc/pve/local/pve-ssl.key
+  pvecm updatecerts --force
+  systemctl restart pveproxy
+
+Step 10: Verify the new cert SANs
+  openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -text | grep -A1 "Subject Alternative Name"
+  # Expected: DNS:pve-master, DNS:pve-master.lab.local
+
+Step 11: Trust the certificate on macOS client
+  # Download the root CA
+  scp root@pve-master.lab.local:/etc/pve/pve-root-ca.pem ~/Desktop/pve-root-ca.pem
+
+  # Remove old trusted cert
+  sudo security delete-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
+
+  # Add the new one
+  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/Desktop/pve-root-ca.pem
+
+Step 12: Update /etc/hosts on macOS client
+  Add to /etc/hosts:
+    192.168.0.120   pve-master.lab.local
+
+Step 13: Restart Chrome and access https://pve-master.lab.local:8006
+
+WHAT WENT WRONG (first attempt):
+- Changed hostname with hostnamectl BEFORE stopping pve-cluster
+- This caused pmxcfs to fail mounting (/etc/pve/nodes/ disappeared)
+- Web UI became completely inaccessible
+- Fix: reverted hostname back to "pve", restarted pve-cluster,
+  then followed the correct order above
+
+KEY TAKEAWAY:
+Always stop pve-cluster BEFORE changing the hostname. The cluster
+filesystem matches the hostname to the node directory — if they
+mismatch, pmxcfs refuses to start and /etc/pve becomes unavailable.
+================================================================================
