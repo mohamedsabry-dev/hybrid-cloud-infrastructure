@@ -26,12 +26,13 @@ pveum user token add terraform@pve terraform-token --privsep 0
 # -----------------------------------------------
 #  full-tokenid : terraform@pve!terraform-token
 #  privsep      : 0
-#  secret       : cdd6e612-6a9b-47a0-b44c-6d6e6aab3c6d
+#  secret       : <stored in AWS Secrets Manager: infra/proxmox/api-token>
 
 # -----------------------------------------------
 # 5. Test API Token (run from local machine, single line)
 # -----------------------------------------------
-curl -k -H 'Authorization: PVEAPIToken=terraform@pve!terraform-token=cdd6e612-6a9b-47a0-b44c-6d6e6aab3c6d' https://192.168.0.120:8006/api2/json/version
+# Replace <SECRET> with the token secret from AWS Secrets Manager
+curl -k -H 'Authorization: PVEAPIToken=terraform@pve!terraform-token=<SECRET>' https://192.168.0.120:8006/api2/json/version
 
 # Expected response: {"data":{"release":"9.1","version":"9.1.5","repoid":"..."}}
 
@@ -41,3 +42,50 @@ curl -k -H 'Authorization: PVEAPIToken=terraform@pve!terraform-token=cdd6e612-6a
 # pveum user token remove terraform@pve terraform-token
 # pveum user token add terraform@pve terraform-token --privsep 0
 
+# -----------------------------------------------
+# 6. Trust Proxmox Self-Signed CA on macOS
+# -----------------------------------------------
+# Proxmox generates a self-signed root CA (pve-root-ca.pem) that signs
+# the server certificate (pve-ssl.pem). Trusting the root CA avoids
+# browser warnings and covers future certificate renewals automatically.
+
+# 6a. Copy the root CA from the Proxmox server to your Mac
+scp root@pve.lab.local:/etc/pve/pve-root-ca.pem ~/Desktop/pve-root-ca.pem
+
+# 6b. Add it to the macOS System Keychain as a trusted root
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/Desktop/pve-root-ca.pem
+
+# 6c. Restart Chrome (fully quit and reopen) for the change to take effect
+
+# Verify the certificate is trusted:
+# security find-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
+
+
+# 1. Create the Linux system user
+  useradd -m -s /bin/bash admin
+
+  # 2. Set password
+  passwd admin
+
+  # 3. Add the user to Proxmox with Administrator role on all resources
+  pveum user add admin@pam -comment "Admin UI user"
+  pveum aclmod / -user admin@pam -role Administrator
+
+  # 4. Verify
+  pveum user list
+
+  Login to the web UI with:
+  - Username: admin
+  - Realm: Linux PAM (select from dropdown)
+  - Password: the one you set with passwd
+
+
+# Generate a TOTP secret for root@pam                                                                           
+  Via Web UI (alternative)
+
+  1. Login as root@pam
+  2. Go to Datacenter > Permissions > Two Factor
+  3. Click Add > TOTP
+  4. Scan the QR code with Google Authenticator
+  5. Enter the verification code to confirm
+  6. Click Add
