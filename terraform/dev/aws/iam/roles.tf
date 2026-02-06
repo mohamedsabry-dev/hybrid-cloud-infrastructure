@@ -35,6 +35,24 @@ resource "aws_iam_user_policy_attachment" "plan_cross_readonly" {
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 
+# Policy to allow assuming prod read-only role for cross-account planning
+resource "aws_iam_user_policy" "plan_cross_assume_prod" {
+  name = "AssumeProdReadOnly"
+  user = aws_iam_user.plan_cross.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAssumeProdReadOnly"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Resource = "arn:aws:iam::${var.prod_account_id}:role/CrossAccount-ReadOnly-prod"
+      }
+    ]
+  })
+}
+
 # =============================================================================
 # 2. Infrastructure Role (for GitHub Actions - can apply infra, no IAM)
 # =============================================================================
