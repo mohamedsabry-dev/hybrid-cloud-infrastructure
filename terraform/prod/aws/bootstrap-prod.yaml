@@ -116,6 +116,13 @@ Resources:
               - s3:PutObject
               - s3:DeleteObject
             Resource: !Sub "${TerraformStateBucket.Arn}/dev/*"
+          - Sid: DevAccountReadProd
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${TerraformStateBucket.Arn}/prod/*"
 
   # ============================================================================
   # 4. Terraform State Lock Table (Shared)
