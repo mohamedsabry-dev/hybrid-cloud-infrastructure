@@ -1,11 +1,5 @@
 # Input variables
 
-variable "prod_account_id" {
-  description = "Prod AWS Account ID (where state bucket and lock table live)"
-  type        = string
-  default     = "REDACTED_AWS_PROD"
-}
-
 variable "github_repo" {
   description = "GitHub repository in format owner/repo"
   type        = string
