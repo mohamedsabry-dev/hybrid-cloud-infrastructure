@@ -30,7 +30,7 @@ provider "aws" {
 
 # Fetch Proxmox credentials from Secrets Manager
 data "aws_secretsmanager_secret_version" "proxmox" {
-  secret_id = "prod/proxmox/terraform-token"
+  secret_id = var.proxmox_secret_id
 }
 
 locals {
