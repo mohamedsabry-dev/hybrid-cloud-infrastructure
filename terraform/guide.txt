@@ -1,22 +1,13 @@
 Terraform Commands Quick Reference
 ===================================
 
-DEV MODULES (terraform/dev/*)
------------------------------
-# Plan
+cd /Users/sabry/WorkSpace/hybrid-cloud-infrastructure/terraform/dev/aws/
+AWS_PROFILE=plan-cross-dev terraform init
 AWS_PROFILE=plan-cross-dev terraform plan
 
-# Apply
-AWS_PROFILE=plan-cross-dev terraform apply
-
-
-PROD MODULES (terraform/prod/*)
--------------------------------
-# Plan (read-only, no state lock needed)
+cd /Users/sabry/WorkSpace/hybrid-cloud-infrastructure/terraform/prod/aws/
+AWS_PROFILE=prod-readonly terraform init
 AWS_PROFILE=prod-readonly terraform plan -lock=false
-
-# Apply (use CI/CD only - push to main branch)
-# Do NOT apply prod locally - use GitHub Actions workflow
 
 
 AWS PROFILES
@@ -25,8 +16,9 @@ plan-cross-dev   -> Dev account (REDACTED_AWS_DEV) - direct credentials
 prod-readonly    -> Prod account (REDACTED_AWS_PROD) - assumes CrossAccount-ReadOnly-prod role
 
 
-NOTES
------
-- prod-readonly is READ-ONLY, cannot apply changes
-- All prod changes go through GitHub Actions on main branch
-- Use -lock=false for prod plan (ReadOnly can't acquire locks)
+PROXMOX
+-------
+- scp terraform/prod/proxmox/bootstrap-prod.sh root@192.168.0.120:/root/
+- scp terraform/dev/proxmox/bootstrap-dev.sh root@192.168.0.120:/root/
+- cd /root/ && ./bootstrap-prod.sh
+- cd /root/ && ./bootstrap-dev.sh
