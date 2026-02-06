@@ -43,7 +43,7 @@ resource "aws_iam_policy" "terraform_state_prod" {
           "dynamodb:PutItem",
           "dynamodb:DeleteItem"
         ]
-        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.lock_table_name}"
+        Resource = "arn:aws:dynamodb:${var.region}:${var.prod_account_id}:table/${var.lock_table_name}"
       }
     ]
   })
