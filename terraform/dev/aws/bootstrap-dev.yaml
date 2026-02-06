@@ -189,6 +189,7 @@ Resources:
     Properties:
       TableName: !Ref LockTableName
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - AttributeName: LockID
           AttributeType: S
