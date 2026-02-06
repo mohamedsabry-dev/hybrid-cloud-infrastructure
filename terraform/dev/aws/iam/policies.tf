@@ -3,6 +3,7 @@
 # 1. TerraformState-Dev         - Read/write dev/* state in S3 + DynamoDB locking
 # 2. TerraformStatePlanOnly-Dev - Read-only dev/* and prod/* state (for plan-only user)
 # 3. SecurityBoundary-Dev       - DENY IAM, CloudTrail, Billing
+# 4. SecretsReadPlanOnly-Dev    - Read Proxmox plan-readonly secret
 #
 # Note: Infrastructure role uses AWS managed PowerUserAccess + SecurityBoundary-Dev
 
@@ -136,6 +137,31 @@ resource "aws_iam_policy" "security_boundary_dev" {
           "purchase-orders:*"
         ]
         Resource = "*"
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+# =============================================================================
+# 4. Secrets Manager Read Policy (for Proxmox plan-readonly token only)
+# =============================================================================
+resource "aws_iam_policy" "secrets_read_plan_only" {
+  name        = "SecretsReadPlanOnly-Dev"
+  description = "Read-only access to Proxmox plan-readonly secret in Secrets Manager"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowReadPlanReadonlySecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.region}:${var.dev_account_id}:secret:dev/proxmox/plan-readonly-token*"
       }
     ]
   })
