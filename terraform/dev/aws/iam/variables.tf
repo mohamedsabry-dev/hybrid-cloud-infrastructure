@@ -23,3 +23,9 @@ variable "region" {
   type        = string
   default     = "eu-west-2"
 }
+
+variable "dev_account_id" {
+  description = "Dev AWS Account ID"
+  type        = string
+  default     = "REDACTED_AWS_DEV"
+}

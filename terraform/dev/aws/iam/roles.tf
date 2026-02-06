@@ -7,14 +7,13 @@
 
 
 # =============================================================================
-# Data Sources
+# Locals
 # =============================================================================
 
-data "aws_caller_identity" "current" {}
-
-# Reference the existing OIDC provider (created by bootstrap-dev.yaml)
-data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+locals {
+  # Hardcoded to ensure resources are always created in dev account
+  # regardless of which credentials are used for planning
+  oidc_provider_arn = "arn:aws:iam::${var.dev_account_id}:oidc-provider/token.actions.githubusercontent.com"
 }
 
 # =============================================================================
@@ -22,7 +21,7 @@ data "aws_iam_openid_connect_provider" "github" {
 # =============================================================================
 resource "aws_iam_user" "plan_cross" {
   name                 = "plan-cross-dev"
-  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/TerraformPermissionsBoundary"
+  permissions_boundary = "arn:aws:iam::${var.dev_account_id}:policy/TerraformPermissionsBoundary"
   tags                 = local.tags
 }
 
@@ -42,7 +41,7 @@ resource "aws_iam_user_policy_attachment" "plan_cross_readonly" {
 resource "aws_iam_role" "github_actions_infrastructure" {
   name                 = "GitHubActions-Infrastructure-dev"
   description          = "Role for GitHub Actions to deploy infrastructure - no IAM mutation allowed"
-  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/TerraformPermissionsBoundary"
+  permissions_boundary = "arn:aws:iam::${var.dev_account_id}:policy/TerraformPermissionsBoundary"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -50,7 +49,7 @@ resource "aws_iam_role" "github_actions_infrastructure" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_iam_openid_connect_provider.github.arn
+          Federated = local.oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
