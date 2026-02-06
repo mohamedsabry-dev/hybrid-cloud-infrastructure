@@ -271,6 +271,17 @@ Resources:
                 sts:ExternalId: terraform-plan-prod
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/ReadOnlyAccess"
+      Policies:
+        - PolicyName: ReadPlanOnlySecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AllowReadPlanReadonlySecret
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/proxmox/plan-readonly-token*"
       Tags:
         - Key: Environment
           Value: !Ref Environment
