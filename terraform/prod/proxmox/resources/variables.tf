@@ -9,3 +9,9 @@ variable "proxmox_tls_insecure" {
   type        = bool
   default     = true
 }
+
+variable "proxmox_secret_id" {
+  description = "Secrets Manager secret ID for Proxmox credentials"
+  type        = string
+  default     = "prod/proxmox/terraform-token"
+}
