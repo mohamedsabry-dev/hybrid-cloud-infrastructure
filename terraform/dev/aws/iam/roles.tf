@@ -35,6 +35,11 @@ resource "aws_iam_user_policy_attachment" "plan_cross_readonly" {
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 
+resource "aws_iam_user_policy_attachment" "plan_cross_secrets" {
+  user       = aws_iam_user.plan_cross.name
+  policy_arn = aws_iam_policy.secrets_read_plan_only.arn
+}
+
 # Policy to allow assuming prod read-only role for cross-account planning
 resource "aws_iam_user_policy" "plan_cross_assume_prod" {
   name = "AssumeProdReadOnly"
