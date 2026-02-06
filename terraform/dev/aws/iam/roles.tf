@@ -1,6 +1,5 @@
 # IAM roles and users
 # IAM module for dev environment
-# - Creates plan-cross-dev user (ReadOnly + TerraformStatePlanOnly)
 # - Creates GitHubActions-Infrastructure-dev role (PowerUserAccess + SecurityBoundary)
 # - State stored in prod account S3 bucket under dev/*
 
@@ -17,49 +16,7 @@ locals {
 }
 
 # =============================================================================
-# 1. Plan-Only IAM User (for local terraform plan on dev + prod)
-# =============================================================================
-resource "aws_iam_user" "plan_cross" {
-  name                 = "plan-cross-dev"
-  permissions_boundary = "arn:aws:iam::${var.dev_account_id}:policy/TerraformPermissionsBoundary"
-  tags                 = local.tags
-}
-
-resource "aws_iam_user_policy_attachment" "plan_cross_state" {
-  user       = aws_iam_user.plan_cross.name
-  policy_arn = aws_iam_policy.terraform_state_plan_only.arn
-}
-
-resource "aws_iam_user_policy_attachment" "plan_cross_readonly" {
-  user       = aws_iam_user.plan_cross.name
-  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
-}
-
-resource "aws_iam_user_policy_attachment" "plan_cross_secrets" {
-  user       = aws_iam_user.plan_cross.name
-  policy_arn = aws_iam_policy.secrets_read_plan_only.arn
-}
-
-# Policy to allow assuming prod read-only role for cross-account planning
-resource "aws_iam_user_policy" "plan_cross_assume_prod" {
-  name = "AssumeProdReadOnly"
-  user = aws_iam_user.plan_cross.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowAssumeProdReadOnly"
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
-        Resource = "arn:aws:iam::${var.prod_account_id}:role/CrossAccount-ReadOnly-prod"
-      }
-    ]
-  })
-}
-
-# =============================================================================
-# 2. Infrastructure Role (for GitHub Actions - can apply infra, no IAM)
+# Infrastructure Role (for GitHub Actions - can apply infra, no IAM)
 # =============================================================================
 resource "aws_iam_role" "github_actions_infrastructure" {
   name                 = "GitHubActions-Infrastructure-dev"
