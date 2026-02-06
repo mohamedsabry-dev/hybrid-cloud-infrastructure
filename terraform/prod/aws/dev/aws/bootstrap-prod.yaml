@@ -57,7 +57,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: hybrid-cloud-infrastructure-terraform-state
+      BucketName: hybrid-cloud-infrastructure-tf-state-eu
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -125,7 +125,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: hybrid-cloud-infrastructure-terraform-state-lock
+      TableName: hybrid-cloud-infrastructure-tf-state-lock-eu
       BillingMode: PAY_PER_REQUEST
       DeletionProtectionEnabled: true
       AttributeDefinitions:
@@ -148,7 +148,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
-              Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/hybrid-cloud-infrastructure-terraform-state-lock"
+              Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/hybrid-cloud-infrastructure-tf-state-lock-eu"
       Tags:
         - Key: Environment
           Value: !Ref Environment
