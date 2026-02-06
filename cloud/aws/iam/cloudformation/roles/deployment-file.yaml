@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=
-template-file-path: cloud/aws/iam/cloudformation/roles/roles.yaml
-parameters: {}
-tags:
-  Phase: Identity
-  Stack: Hybrid-GitSync-ServiceRoles
-  ManagedBy: CloudFormation
