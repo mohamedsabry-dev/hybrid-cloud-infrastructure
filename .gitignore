@@ -28,3 +28,7 @@ Thumbs.db
 # Logs
 *.log
 terraform.tfvars
+
+# Keys
+key*
+Key*
