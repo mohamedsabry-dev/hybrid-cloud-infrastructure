@@ -29,3 +29,9 @@ variable "dev_account_id" {
   type        = string
   default     = "018571635409"
 }
+
+variable "prod_account_id" {
+  description = "Prod AWS Account ID (for cross-account role assumption)"
+  type        = string
+  default     = "969041180300"
+}

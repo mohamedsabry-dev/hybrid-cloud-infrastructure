@@ -219,7 +219,9 @@ Resources:
               - iam:UpdateAssumeRolePolicy
               - iam:DeleteRolePermissionsBoundary
               - iam:PutRolePermissionsBoundary
-            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
+              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/CrossAccount-ReadOnly-prod"
 
   # ============================================================================
   # 6. GitHub Actions Terraform Admin Role
@@ -250,7 +252,31 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 7. Enforce Permissions Boundary on Created Roles/Users
+  # 7. Cross-Account Read-Only Role (for dev account to plan prod)
+  # ============================================================================
+  CrossAccountReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CrossAccount-ReadOnly-prod
+      Description: Read-only access for dev account to plan prod infrastructure
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: terraform-plan-prod
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/ReadOnlyAccess"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 8. Enforce Permissions Boundary on Created Roles/Users
   # ============================================================================
   EnforceBoundaryPolicy:
     Type: AWS::IAM::Policy
@@ -330,3 +356,8 @@ Outputs:
     Value: !GetAtt GitHubActionsTerraformRole.Arn
     Export:
       Name: prod-GitHubActionsRoleArn
+
+  CrossAccountReadOnlyRoleArn:
+    Value: !GetAtt CrossAccountReadOnlyRole.Arn
+    Export:
+      Name: prod-CrossAccountReadOnlyRoleArn
