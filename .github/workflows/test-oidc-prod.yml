@@ -40,9 +40,9 @@ jobs:
       - name: Test S3 State Access
         run: |
           echo "=== Testing S3 state bucket access ==="
-          aws s3 ls s3://hybrid-cloud-infrastructure-terraform-state/
+          aws s3 ls s3://hybrid-cloud-infrastructure-tf-state-eu/
 
       - name: Test DynamoDB Lock Table
         run: |
           echo "=== Testing DynamoDB lock table access ==="
-          aws dynamodb describe-table --table-name hybrid-cloud-infrastructure-terraform-state-lock --query 'Table.TableName'
+          aws dynamodb describe-table --table-name hybrid-cloud-infrastructure-tf-state-lock-eu --query 'Table.TableName'
