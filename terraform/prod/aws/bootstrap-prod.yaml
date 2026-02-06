@@ -15,25 +15,17 @@ Metadata:
           default: "Deployment Configuration"
         Parameters:
           - Environment
-          - Region
-          - DevAccountId
 
 Parameters:
   Environment:
     Type: String
     Default: prod
 
-  Region:
-    Type: String
-    Default: eu-west-2
-    AllowedValues:
-      - eu-west-2
-    Description: "Deployment region - MUST be eu-west-2 (London)"
-
-  DevAccountId:
-    Type: String
-    Default: '018571635409'
-    Description: Dev AWS Account ID for cross-account access
+Rules:
+  RegionCheck:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", "eu-west-2"]
+        AssertDescription: "This stack must be deployed in eu-west-2 (London) only"
 
 Resources:
   # ============================================================================
@@ -50,14 +42,14 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 2. Terraform State Bucket (Shared: prod/* and dev/*)
+  # 2. Terraform State Bucket (Prod only)
   # ============================================================================
   TerraformStateBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: hybrid-cloud-infrastructure-tf-state-eu
+      BucketName: hybrid-cloud-infrastructure-tf-state-prod
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -99,40 +91,16 @@ Resources:
             Condition:
               Bool:
                 aws:SecureTransport: 'false'
-          - Sid: DevAccountListBucket
-            Effect: Allow
-            Principal:
-              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
-            Action:
-              - s3:ListBucket
-              - s3:GetBucketLocation
-            Resource: !GetAtt TerraformStateBucket.Arn
-          - Sid: DevAccountFullAccess
-            Effect: Allow
-            Principal:
-              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
-            Action:
-              - s3:GetObject
-              - s3:PutObject
-              - s3:DeleteObject
-            Resource: !Sub "${TerraformStateBucket.Arn}/dev/*"
-          - Sid: DevAccountReadProd
-            Effect: Allow
-            Principal:
-              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
-            Action:
-              - s3:GetObject
-            Resource: !Sub "${TerraformStateBucket.Arn}/prod/*"
 
   # ============================================================================
-  # 4. Terraform State Lock Table (Shared)
+  # 4. Terraform State Lock Table (Prod only)
   # ============================================================================
   TerraformLockTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: hybrid-cloud-infrastructure-tf-state-lock-eu
+      TableName: hybrid-cloud-infrastructure-tf-state-lock-prod
       BillingMode: PAY_PER_REQUEST
       DeletionProtectionEnabled: true
       AttributeDefinitions:
@@ -143,19 +111,6 @@ Resources:
           KeyType: HASH
       SSESpecification:
         SSEEnabled: true
-      ResourcePolicy:
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Sid: DevAccountLockAccess
-              Effect: Allow
-              Principal:
-                AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:DeleteItem
-              Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/hybrid-cloud-infrastructure-tf-state-lock-eu"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -219,9 +174,7 @@ Resources:
               - iam:UpdateAssumeRolePolicy
               - iam:DeleteRolePermissionsBoundary
               - iam:PutRolePermissionsBoundary
-            Resource:
-              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
-              - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/CrossAccount-ReadOnly-prod"
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
 
   # ============================================================================
   # 6. GitHub Actions Terraform Admin Role
@@ -250,84 +203,6 @@ Resources:
       Tags:
         - Key: Environment
           Value: !Ref Environment
-
-  # ============================================================================
-  # 7. Cross-Account Read-Only Role (for dev account to plan prod)
-  # ============================================================================
-  CrossAccountReadOnlyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: CrossAccount-ReadOnly-prod
-      Description: Read-only access for dev account to plan prod infrastructure
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !Sub "arn:${AWS::Partition}:iam::${DevAccountId}:root"
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                sts:ExternalId: terraform-plan-prod
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/ReadOnlyAccess"
-      Policies:
-        - PolicyName: ReadPlanOnlySecret
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: AllowReadPlanReadonlySecret
-                Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:prod/proxmox/plan-readonly-token*"
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ============================================================================
-  # 8. Enforce Permissions Boundary on Created Roles/Users
-  # ============================================================================
-  EnforceBoundaryPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: EnforcePermissionsBoundary
-      Roles:
-        - !Ref GitHubActionsTerraformRole
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          # Deny creating roles without the permissions boundary
-          - Sid: DenyCreateRoleWithoutBoundary
-            Effect: Deny
-            Action:
-              - iam:CreateRole
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
-          # Deny creating users without the permissions boundary
-          - Sid: DenyCreateUserWithoutBoundary
-            Effect: Deny
-            Action:
-              - iam:CreateUser
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
-          # Deny removing permissions boundary from any role/user
-          - Sid: DenyRemoveBoundary
-            Effect: Deny
-            Action:
-              - iam:DeleteRolePermissionsBoundary
-              - iam:DeleteUserPermissionsBoundary
-              - iam:PutRolePermissionsBoundary
-              - iam:PutUserPermissionsBoundary
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
 
 # ============================================================================
 # Outputs
@@ -367,8 +242,3 @@ Outputs:
     Value: !GetAtt GitHubActionsTerraformRole.Arn
     Export:
       Name: prod-GitHubActionsRoleArn
-
-  CrossAccountReadOnlyRoleArn:
-    Value: !GetAtt CrossAccountReadOnlyRole.Arn
-    Export:
-      Name: prod-CrossAccountReadOnlyRoleArn

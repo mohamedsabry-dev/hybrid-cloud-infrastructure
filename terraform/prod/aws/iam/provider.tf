@@ -13,11 +13,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "hybrid-cloud-infrastructure-tf-state-eu"
+    bucket         = "hybrid-cloud-infrastructure-tf-state-prod"
     key            = "prod/aws/iam/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-eu"
+    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-prod"
   }
 }
 
