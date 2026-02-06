@@ -38,11 +38,11 @@ Parameters:
 
   StateBucketName:
     Type: String
-    Default: hybrid-cloud-infrastructure-terraform-state
+    Default: hybrid-cloud-infrastructure-tf-state-eu
 
   LockTableName:
     Type: String
-    Default: hybrid-cloud-infrastructure-terraform-state-lock
+    Default: hybrid-cloud-infrastructure-tf-state-lock-eu
 
   ProdRegion:
     Type: String
