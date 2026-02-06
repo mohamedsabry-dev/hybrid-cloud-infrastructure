@@ -21,8 +21,9 @@ data "aws_iam_openid_connect_provider" "github" {
 # 1. Plan-Only IAM User (for local terraform plan on dev + prod)
 # =============================================================================
 resource "aws_iam_user" "plan_cross" {
-  name = "plan-cross-dev"
-  tags = local.tags
+  name                 = "plan-cross-dev"
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/TerraformPermissionsBoundary"
+  tags                 = local.tags
 }
 
 resource "aws_iam_user_policy_attachment" "plan_cross_state" {
@@ -39,8 +40,9 @@ resource "aws_iam_user_policy_attachment" "plan_cross_readonly" {
 # 2. Infrastructure Role (for GitHub Actions - can apply infra, no IAM)
 # =============================================================================
 resource "aws_iam_role" "github_actions_infrastructure" {
-  name        = "GitHubActions-Infrastructure-dev"
-  description = "Role for GitHub Actions to deploy infrastructure - no IAM mutation allowed"
+  name                 = "GitHubActions-Infrastructure-dev"
+  description          = "Role for GitHub Actions to deploy infrastructure - no IAM mutation allowed"
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/TerraformPermissionsBoundary"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
