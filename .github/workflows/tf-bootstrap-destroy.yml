@@ -1,0 +1,62 @@
+name: "Terraform Destroy"
+
+on:
+  push:
+    branches:
+      - mohamedsabrydev/sre-8-phase-2-setup-proxmox-server
+    paths:
+      - '.github/workflows/tf-bootstrap-destroy.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # =========================================================
+  # JOB 1: Secrets Manager (destroy first - reverse order)
+  # =========================================================
+  destroy-secrets:
+    name: "1. Secrets Destroy"
+    runs-on: production
+    defaults:
+      run:
+        working-directory: cloud/aws/bootstrap/terraform/secrets
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-Secrets
+          aws-region: eu-west-2
+
+      - run: terraform init
+      - run: terraform destroy -auto-approve
+
+  # =========================================================
+  # JOB 2: Cloudtrail (destroy last - foundation)
+  # =========================================================
+  destroy-cloudtrail:
+    name: "2. Cloudtrail Destroy"
+    needs: [destroy-secrets]
+    runs-on: production
+    defaults:
+      run:
+        working-directory: cloud/aws/bootstrap/terraform/audit
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-Audit
+          aws-region: eu-west-2
+
+      - run: terraform init
+      - run: terraform destroy -auto-approve
