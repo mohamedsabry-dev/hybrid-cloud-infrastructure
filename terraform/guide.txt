@@ -9,6 +9,8 @@ cd /Users/sabry/WorkSpace/hybrid-cloud-infrastructure/terraform/prod/aws/
 AWS_PROFILE=prod-readonly terraform init
 AWS_PROFILE=prod-readonly terraform plan -lock=false
 
+# Local plan: override to use read-only token                                                                
+AWS_PROFILE=prod-readonly TF_VAR_proxmox_secret_id=prod/proxmox/plan-readonly-token terraform plan -lock=false
 
 AWS PROFILES
 ------------
