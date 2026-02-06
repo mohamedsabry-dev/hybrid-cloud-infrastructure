@@ -40,4 +40,4 @@ jobs:
       - name: Test S3 State Access
         run: |
           echo "=== Testing cross-account S3 access to dev/* ==="
-          aws s3 ls s3://hybrid-cloud-infrastructure-terraform-state/dev/ || echo "No dev state files yet"
+          aws s3 ls s3://hybrid-cloud-infrastructure-tf-state-eu/dev/ || echo "No dev state files yet"
