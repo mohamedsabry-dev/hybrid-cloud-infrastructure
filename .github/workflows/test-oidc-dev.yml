@@ -1,0 +1,43 @@
+name: "Test OIDC - Dev Account"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "test" to confirm'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # =========================================================
+  # JOB: Test Dev Role Assumption
+  # =========================================================
+  test-dev-role:
+    name: "Test Dev Role Assumption"
+    if: github.ref == 'refs/heads/dev' && inputs.confirm == 'test'
+    runs-on: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-TerraformAdmin-dev
+          aws-region: eu-west-2
+
+      - name: Verify Identity
+        run: |
+          echo "=== AWS Identity ==="
+          aws sts get-caller-identity
+          echo "=== Success! Dev role assumed correctly ==="
+
+      - name: Test S3 State Access
+        run: |
+          echo "=== Testing cross-account S3 access to dev/* ==="
+          aws s3 ls s3://hybrid-cloud-infrastructure-tf-state-eu/dev/ || echo "No dev state files yet"
