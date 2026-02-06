@@ -8,27 +8,9 @@ output "terraform_state_policy_arn" {
   value       = aws_iam_policy.terraform_state_dev.arn
 }
 
-output "terraform_state_plan_only_policy_arn" {
-  description = "ARN of the Terraform State Plan-Only policy (read dev + prod)"
-  value       = aws_iam_policy.terraform_state_plan_only.arn
-}
-
 output "security_boundary_policy_arn" {
   description = "ARN of the Security Boundary policy"
   value       = aws_iam_policy.security_boundary_dev.arn
-}
-
-# =============================================================================
-# User Outputs
-# =============================================================================
-output "plan_cross_user_name" {
-  description = "Name of the plan-cross IAM user"
-  value       = aws_iam_user.plan_cross.name
-}
-
-output "plan_cross_user_arn" {
-  description = "ARN of the plan-cross IAM user"
-  value       = aws_iam_user.plan_cross.arn
 }
 
 # =============================================================================

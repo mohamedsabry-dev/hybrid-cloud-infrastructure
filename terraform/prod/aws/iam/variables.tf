@@ -9,13 +9,13 @@ variable "github_repo" {
 variable "state_bucket_name" {
   description = "S3 bucket name for Terraform state"
   type        = string
-  default     = "hybrid-cloud-infrastructure-tf-state-eu"
+  default     = "hybrid-cloud-infrastructure-tf-state-prod"
 }
 
 variable "lock_table_name" {
   description = "DynamoDB table name for state locking"
   type        = string
-  default     = "hybrid-cloud-infrastructure-tf-state-lock-eu"
+  default     = "hybrid-cloud-infrastructure-tf-state-lock-prod"
 }
 
 variable "region" {
