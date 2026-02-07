@@ -1,0 +1,43 @@
+# Dev Proxmox resources module deployment
+# Triggers on push to dev branch when Proxmox files change
+
+name: "Dev - Proxmox Resources"
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/resources/**'
+      - '.github/workflows/dev-proxmox-resources.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: "Plan & Apply"
+    runs-on: production
+
+    defaults:
+      run:
+        working-directory: terraform/dev/proxmox/resources
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-TerraformAdmin-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
