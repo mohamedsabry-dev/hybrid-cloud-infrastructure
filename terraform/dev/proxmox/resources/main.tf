@@ -79,7 +79,7 @@ output "network_interfaces" {
 
 output "datastores" {
   description = "Available datastores"
-  value       = data.proxmox_virtual_environment_datastores.all.datastore_ids
+  value       = data.proxmox_virtual_environment_datastores.all.datastores
 }
 
 output "vms" {
