@@ -1,6 +1,3 @@
-# Proxmox resources module for prod environment
-# Uses credentials from AWS Secrets Manager
-
 terraform {
   required_version = ">= 1.5.0"
 
@@ -12,6 +9,10 @@ terraform {
     proxmox = {
       source  = "bpg/proxmox"
       version = "0.93.1"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = "2.3.4"
     }
   }
 
@@ -42,3 +43,4 @@ provider "proxmox" {
   api_token = "${local.proxmox_creds.token_id}=${local.proxmox_creds.token_secret}"
   insecure  = var.proxmox_tls_insecure
 }
+
