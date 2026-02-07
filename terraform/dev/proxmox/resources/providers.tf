@@ -10,6 +10,10 @@ terraform {
       source  = "bpg/proxmox"
       version = "0.93.1"
     }
+    external = {
+      source  = "hashicorp/external"
+      version = "2.3.4"
+    }
   }
 
   backend "s3" {
@@ -39,3 +43,4 @@ provider "proxmox" {
   api_token = "${local.proxmox_creds.token_id}=${local.proxmox_creds.token_secret}"
   insecure  = var.proxmox_tls_insecure
 }
+
