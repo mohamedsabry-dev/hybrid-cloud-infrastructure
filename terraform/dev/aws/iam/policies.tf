@@ -1,9 +1,7 @@
 # IAM managed policies
 #
-# 1. TerraformState-Dev         - Read/write dev/* state in S3 + DynamoDB locking
-# 2. TerraformStatePlanOnly-Dev - Read-only dev/* and prod/* state (for plan-only user)
-# 3. SecurityBoundary-Dev       - DENY IAM, CloudTrail, Billing
-# 4. SecretsReadPlanOnly-Dev    - Read Proxmox plan-readonly secret
+# 1. TerraformState-Dev    - Read/write dev/* state in S3 + DynamoDB locking
+# 2. SecurityBoundary-Dev  - DENY IAM, CloudTrail, Billing
 #
 # Note: Infrastructure role uses AWS managed PowerUserAccess + SecurityBoundary-Dev
 
@@ -56,53 +54,7 @@ resource "aws_iam_policy" "terraform_state_dev" {
 }
 
 # =============================================================================
-# 2. Terraform State Plan-Only (read dev + prod, no apply)
-# =============================================================================
-resource "aws_iam_policy" "terraform_state_plan_only" {
-  name        = "TerraformStatePlanOnly-Dev"
-  description = "Read-only state access for terraform plan on both dev and prod (no apply)"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "S3ListBucket"
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket",
-          "s3:GetBucketLocation"
-        ]
-        Resource = "arn:aws:s3:::${var.state_bucket_name}"
-      },
-      {
-        Sid    = "S3ReadStateDevAndProd"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject"
-        ]
-        Resource = [
-          "arn:aws:s3:::${var.state_bucket_name}/dev/*",
-          "arn:aws:s3:::${var.state_bucket_name}/prod/*"
-        ]
-      },
-      {
-        Sid    = "DynamoDBStateLocking"
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:DeleteItem"
-        ]
-        Resource = "arn:aws:dynamodb:${var.region}:${var.dev_account_id}:table/${var.lock_table_name}"
-      }
-    ]
-  })
-
-  tags = local.tags
-}
-
-# =============================================================================
-# 3. Security Boundary Policy (DENY IAM, CloudTrail, Billing + bootstrap protection)
+# 2. Security Boundary Policy (DENY IAM, CloudTrail, Billing + bootstrap protection)
 # =============================================================================
 resource "aws_iam_policy" "security_boundary_dev" {
   name        = "SecurityBoundary-Dev"
@@ -137,31 +89,6 @@ resource "aws_iam_policy" "security_boundary_dev" {
           "purchase-orders:*"
         ]
         Resource = "*"
-      }
-    ]
-  })
-
-  tags = local.tags
-}
-
-# =============================================================================
-# 4. Secrets Manager Read Policy (for Proxmox plan-readonly token only)
-# =============================================================================
-resource "aws_iam_policy" "secrets_read_plan_only" {
-  name        = "SecretsReadPlanOnly-Dev"
-  description = "Read-only access to Proxmox plan-readonly secret in Secrets Manager"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowReadPlanReadonlySecret"
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-        Resource = "arn:aws:secretsmanager:${var.region}:${var.dev_account_id}:secret:dev/proxmox/plan-readonly-token*"
       }
     ]
   })
