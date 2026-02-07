@@ -1,50 +1,58 @@
 # Terraform Infrastructure
 
-## Directory Structure
+Hybrid cloud infrastructure managed via GitHub Actions CI/CD.
+
+## Structure
 
 ```
 terraform/
-├── dev/                 # Dev environment (018571635409)
+├── dev/                    # Dev environment
 │   ├── aws/
-│   │   └── iam/         # IAM roles and policies
-│   └── proxmox/         # (future)
-├── prod/                # Prod environment (969041180300)
-│   ├── aws/
-│   │   └── iam/         # IAM roles and policies
-│   └── proxmox/         # (future)
-└── guide.txt            # Quick command reference
+│   │   ├── bootstrap-dev.yaml   # CloudFormation bootstrap
+│   │   ├── iam/                 # IAM roles & policies
+│   │   └── secrets/             # Secrets Manager
+│   └── proxmox/
+│       ├── bootstrap-dev.sh     # Proxmox user setup
+│       └── resources/           # VMs & infrastructure
+│
+└── prod/                   # Prod environment
+    ├── aws/
+    │   ├── bootstrap-prod.yaml  # CloudFormation bootstrap
+    │   ├── iam/                 # IAM roles & policies
+    │   └── secrets/             # Secrets Manager
+    └── proxmox/
+        ├── bootstrap-prod.sh    # Proxmox user setup
+        └── resources/           # VMs & infrastructure
 ```
 
-## AWS Profiles
+## Workflow
 
-| Profile | Account | Purpose |
-|---------|---------|---------|
-| `plan-cross-dev` | Dev (018571635409) | Local plan/apply for dev |
-| `prod-readonly` | Prod (969041180300) | Local plan for prod (read-only) |
+| Branch | Environment | Trigger |
+|--------|-------------|---------|
+| `dev`  | Dev account + Dev Proxmox | Push to dev |
+| `main` | Prod account + Prod Proxmox | Push to main |
 
-## Commands
+## Deployment Order
 
-### Dev Modules
-```bash
-AWS_PROFILE=plan-cross-dev terraform plan
-AWS_PROFILE=plan-cross-dev terraform apply
-```
+1. **Bootstrap AWS** - Deploy CloudFormation stack manually (one-time)
+2. **Bootstrap Proxmox** - Run shell script on Proxmox host (one-time)
+3. **IAM Module** - Creates Infrastructure role (via CI/CD)
+4. **Secrets Module** - Creates Proxmox token secret (via CI/CD)
+5. **Proxmox Resources** - Manages VMs & infra (via CI/CD)
 
-### Prod Modules
-```bash
-# Plan only (read-only access)
-AWS_PROFILE=prod-readonly terraform plan -lock=false
+## Roles
 
-# Apply via CI/CD only (push to main branch)
-```
+| Role | Purpose | Managed By |
+|------|---------|------------|
+| `GitHubActions-TerraformAdmin-{env}` | Full admin, IAM changes | CloudFormation |
+| `GitHubActions-Infrastructure-{env}` | Infra only, no IAM | Terraform |
 
-## CI/CD
+## State Management
 
-- **Dev**: Push to `dev` branch triggers `dev-iam.yml` workflow
-- **Prod**: Push to `main` branch triggers `prod-iam.yml` workflow
+- Each environment has its own S3 bucket + DynamoDB table
+- Dev: `hybrid-cloud-infrastructure-tf-state-dev`
+- Prod: `hybrid-cloud-infrastructure-tf-state-prod`
 
-## Bootstrap
+## No Local Access
 
-CloudFormation stacks in each account:
-- `dev/aws/bootstrap-dev.yaml` → dev-bootstrap stack
-- `prod/aws/bootstrap-prod.yaml` → prod-bootstrap stack
+All plan/apply runs via GitHub Actions only. No local AWS credentials.
