@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Dev Account Bootstrap: OIDC + Admin Role with Permissions Boundary + Cross-Account State Access'
+Description: 'Dev Account Bootstrap: OIDC + Admin Role with Permissions Boundary + State Bucket'
 
 # ============================================================================
 # IMPORTANT: Deploy this stack to eu-west-2 (London) region ONLY
@@ -15,41 +15,25 @@ Metadata:
           default: "Deployment Configuration"
         Parameters:
           - Environment
-          - Region
-          - ProdAccountId
-          - ProdRegion
 
 Parameters:
   Environment:
     Type: String
     Default: dev
 
-  Region:
-    Type: String
-    Default: eu-west-2
-    AllowedValues:
-      - eu-west-2
-    Description: "Deployment region - MUST be eu-west-2 (London)"
-
-  ProdAccountId:
-    Type: String
-    Default: '969041180300'
-    Description: Prod AWS Account ID (where state bucket lives)
-
   StateBucketName:
     Type: String
-    Default: hybrid-cloud-infrastructure-tf-state-eu
+    Default: hybrid-cloud-infrastructure-tf-state-dev
 
   LockTableName:
     Type: String
-    Default: hybrid-cloud-infrastructure-tf-state-lock-eu
+    Default: hybrid-cloud-infrastructure-tf-state-lock-dev
 
-  ProdRegion:
-    Type: String
-    Default: eu-west-2
-    AllowedValues:
-      - eu-west-2
-    Description: "Region where prod resources (S3, DynamoDB) are deployed"
+Rules:
+  RegionCheck:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", "eu-west-2"]
+        AssertDescription: "This stack must be deployed in eu-west-2 (London) only"
 
 Resources:
   # ============================================================================
@@ -117,9 +101,58 @@ Resources:
               - dynamodb:DeleteTable
               - dynamodb:UpdateTable
             Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LockTableName}"
+          # Deny modifying State Bucket
+          - Sid: DenyModifyStateBucket
+            Effect: Deny
+            Action:
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
 
   # ============================================================================
-  # 3. GitHub Actions Terraform Admin Role
+  # 3. Terraform State Bucket (Dev Account)
+  # ============================================================================
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref StateBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TerraformStateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TerraformStateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ============================================================================
+  # 4. GitHub Actions Terraform Admin Role
   # ============================================================================
   GitHubActionsTerraformRole:
     Type: AWS::IAM::Role
@@ -147,76 +180,7 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 4. Enforce Permissions Boundary on Created Roles/Users
-  # ============================================================================
-  EnforceBoundaryPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: EnforcePermissionsBoundary
-      Roles:
-        - !Ref GitHubActionsTerraformRole
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          # Deny creating roles without the permissions boundary
-          - Sid: DenyCreateRoleWithoutBoundary
-            Effect: Deny
-            Action:
-              - iam:CreateRole
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
-          # Deny creating users without the permissions boundary
-          - Sid: DenyCreateUserWithoutBoundary
-            Effect: Deny
-            Action:
-              - iam:CreateUser
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
-          # Deny removing permissions boundary from any role/user
-          - Sid: DenyRemoveBoundary
-            Effect: Deny
-            Action:
-              - iam:DeleteRolePermissionsBoundary
-              - iam:DeleteUserPermissionsBoundary
-              - iam:PutRolePermissionsBoundary
-              - iam:PutUserPermissionsBoundary
-            Resource: '*'
-            Condition:
-              StringNotEquals:
-                iam:PermissionsBoundary: !Ref TerraformPermissionsBoundary
-
-  # ============================================================================
-  # 5. Cross-Account Access to Prod Terraform State (S3)
-  # ============================================================================
-  CrossAccountS3Policy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: CrossAccount-TerraformState-S3
-      Roles:
-        - !Ref GitHubActionsTerraformRole
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: ListProdStateBucket
-            Effect: Allow
-            Action:
-              - s3:ListBucket
-              - s3:GetBucketLocation
-            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
-          - Sid: AccessDevStateFiles
-            Effect: Allow
-            Action:
-              - s3:GetObject
-              - s3:PutObject
-              - s3:DeleteObject
-            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/dev/*"
-
-  # ============================================================================
-  # 6. Terraform State Lock Table (Local to Dev Account)
+  # 4. Terraform State Lock Table
   # ============================================================================
   TerraformLockTable:
     Type: AWS::DynamoDB::Table
@@ -225,6 +189,7 @@ Resources:
     Properties:
       TableName: !Ref LockTableName
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - AttributeName: LockID
           AttributeType: S
@@ -266,13 +231,13 @@ Outputs:
     Export:
       Name: dev-TerraformLockTableArn
 
-  TerraformBackendConfig:
-    Value: !Sub |
-      terraform {
-        backend "s3" {
-          bucket         = "${StateBucketName}"
-          key            = "dev/<service>/terraform.tfstate"
-          region         = "${ProdRegion}"
-          dynamodb_table = "${LockTableName}"
-        }
-      }
+  StateBucketName:
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: dev-TerraformStateBucketName
+
+  StateBucketArn:
+    Value: !GetAtt TerraformStateBucket.Arn
+    Export:
+      Name: dev-TerraformStateBucketArn
+
