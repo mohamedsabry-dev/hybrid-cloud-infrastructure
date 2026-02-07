@@ -1,17 +1,3 @@
-## Identify test for the whole resources of the proxmox server include [Network, Compute, Storage, Users]
-
-# Add provider block
-################################################################################################
-################################################################################################
-
-
-################################################################################################
-################################################################################################
-
-
-# Add the main block of Data source query
-################################################################################################
-
 # Node Info
 data "proxmox_virtual_environment_nodes" "all" {}
 
@@ -100,14 +86,4 @@ output "roles" {
 output "users" {
   description = "All users"
   value       = data.proxmox_virtual_environment_users.all.user_ids
-}
-
-################################################################################################
-# Add the variable block
-################################################################################################
-
-variable "node_name" {
-  description = "Proxmox node name"
-  type        = string
-  default     = "pve-dev"
 }

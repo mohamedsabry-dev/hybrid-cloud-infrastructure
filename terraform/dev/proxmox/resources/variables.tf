@@ -15,3 +15,9 @@ variable "proxmox_secret_id" {
   type        = string
   default     = "dev/proxmox/terraform-token"
 }
+
+variable "node_name" {
+  description = "Proxmox node name"
+  type        = string
+  default     = "pve-dev"
+}
