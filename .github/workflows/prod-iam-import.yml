@@ -22,15 +22,10 @@ jobs:
         working-directory: terraform/prod/aws/iam
 
     steps:
-      - name: Checkout
-        run: |
-          rm -rf * .[^.]* 2>/dev/null || true
-          git clone --depth 1 https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure.git .
-          git fetch origin ${{ github.sha }} --depth 1
-          git checkout ${{ github.sha }}
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
-        uses: ./.github/actions/configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-TerraformAdmin-prod
           aws-region: eu-west-2
@@ -40,27 +35,30 @@ jobs:
 
       - name: Import IAM Policies
         run: |
-          terraform import aws_iam_policy.terraform_state_prod \
-            arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod || true
-
-          terraform import aws_iam_policy.security_boundary_prod \
-            arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod || true
+          if ! terraform state show aws_iam_policy.terraform_state_prod 2>/dev/null; then
+            terraform import aws_iam_policy.terraform_state_prod arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod
+          fi
+          if ! terraform state show aws_iam_policy.security_boundary_prod 2>/dev/null; then
+            terraform import aws_iam_policy.security_boundary_prod arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod
+          fi
 
       - name: Import IAM Role
         run: |
-          terraform import aws_iam_role.github_actions_infrastructure \
-            GitHubActions-Infrastructure-prod || true
+          if ! terraform state show aws_iam_role.github_actions_infrastructure 2>/dev/null; then
+            terraform import aws_iam_role.github_actions_infrastructure GitHubActions-Infrastructure-prod
+          fi
 
       - name: Import Role Policy Attachments
         run: |
-          terraform import aws_iam_role_policy_attachment.infra_role_power_user \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::aws:policy/PowerUserAccess || true
-
-          terraform import aws_iam_role_policy_attachment.infra_role_security_boundary \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod || true
-
-          terraform import aws_iam_role_policy_attachment.infra_role_tf_state \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod || true
+          if ! terraform state show aws_iam_role_policy_attachment.infra_role_power_user 2>/dev/null; then
+            terraform import aws_iam_role_policy_attachment.infra_role_power_user GitHubActions-Infrastructure-prod/arn:aws:iam::aws:policy/PowerUserAccess
+          fi
+          if ! terraform state show aws_iam_role_policy_attachment.infra_role_security_boundary 2>/dev/null; then
+            terraform import aws_iam_role_policy_attachment.infra_role_security_boundary GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod
+          fi
+          if ! terraform state show aws_iam_role_policy_attachment.infra_role_tf_state 2>/dev/null; then
+            terraform import aws_iam_role_policy_attachment.infra_role_tf_state GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod
+          fi
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan
