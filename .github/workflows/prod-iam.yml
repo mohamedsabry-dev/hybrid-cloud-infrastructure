@@ -25,12 +25,12 @@ jobs:
         working-directory: terraform/prod/aws/iam
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: ./.github/actions/checkout
         with:
           fetch-depth: 1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: ./.github/actions/configure-aws-credentials
         with:
           role-to-assume: arn:aws:iam::969041180300:role/GitHubActions-TerraformAdmin-prod
           aws-region: eu-west-2
