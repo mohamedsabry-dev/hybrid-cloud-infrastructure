@@ -1,12 +1,12 @@
 # One-time workflow to import existing IAM resources into Terraform state
 # Delete this workflow after successful import
 
-name: "Prod - IAM Import"
+name: "Dev - IAM Import"
 
 on:
   push:
     branches:
-      - main
+      - dev
 
 permissions:
   id-token: write
@@ -19,7 +19,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/prod/aws/iam
+        working-directory: terraform/dev/aws/iam
 
     steps:
       - name: Checkout
@@ -30,7 +30,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: ./.github/actions/configure-aws-credentials
         with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-TerraformAdmin-prod
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-TerraformAdmin-dev
           aws-region: eu-west-2
 
       - name: Terraform Init
@@ -38,27 +38,27 @@ jobs:
 
       - name: Import IAM Policies
         run: |
-          terraform import aws_iam_policy.terraform_state_prod \
-            arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod || true
+          terraform import aws_iam_policy.terraform_state_dev \
+            arn:aws:iam::REDACTED_AWS_DEV:policy/TerraformState-Dev 2>/dev/null || echo "Already imported or doesn't exist"
 
-          terraform import aws_iam_policy.security_boundary_prod \
-            arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod || true
+          terraform import aws_iam_policy.security_boundary_dev \
+            arn:aws:iam::REDACTED_AWS_DEV:policy/SecurityBoundary-Dev 2>/dev/null || echo "Already imported or doesn't exist"
 
       - name: Import IAM Role
         run: |
           terraform import aws_iam_role.github_actions_infrastructure \
-            GitHubActions-Infrastructure-prod || true
+            GitHubActions-Infrastructure-dev 2>/dev/null || echo "Already imported or doesn't exist"
 
       - name: Import Role Policy Attachments
         run: |
           terraform import aws_iam_role_policy_attachment.infra_role_power_user \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::aws:policy/PowerUserAccess || true
+            GitHubActions-Infrastructure-dev/arn:aws:iam::aws:policy/PowerUserAccess 2>/dev/null || echo "Already imported or doesn't exist"
 
           terraform import aws_iam_role_policy_attachment.infra_role_security_boundary \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/SecurityBoundary-Prod || true
+            GitHubActions-Infrastructure-dev/arn:aws:iam::REDACTED_AWS_DEV:policy/SecurityBoundary-Dev 2>/dev/null || echo "Already imported or doesn't exist"
 
           terraform import aws_iam_role_policy_attachment.infra_role_tf_state \
-            GitHubActions-Infrastructure-prod/arn:aws:iam::REDACTED_AWS_PROD:policy/TerraformState-Prod || true
+            GitHubActions-Infrastructure-dev/arn:aws:iam::REDACTED_AWS_DEV:policy/TerraformState-Dev 2>/dev/null || echo "Already imported or doesn't exist"
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan
