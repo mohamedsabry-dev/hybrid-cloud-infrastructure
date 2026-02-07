@@ -25,9 +25,10 @@ jobs:
         working-directory: terraform/prod/aws/iam
 
     steps:
-      - uses: ./.github/actions/checkout
-        with:
-          fetch-depth: 1
+      - name: Checkout
+        run: |
+          git clone --depth 1 https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure.git .
+          git checkout ${{ github.sha }}
 
       - name: Configure AWS Credentials
         uses: ./.github/actions/configure-aws-credentials
