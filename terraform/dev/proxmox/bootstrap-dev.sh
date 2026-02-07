@@ -1,101 +1,156 @@
-#!/bin/bash
-#
-# Create tf_dev user with admin privileges on specific Proxmox node only
-# This user will have API token access (no password) for Terraform automation
-# Access is restricted to node: pve-dev.lab.local
-#
-
+#!/usr/bin/env bash
 set -e
 
-# Configuration
+echo ""
+echo "=== Proxmox VE 9.x Post-Install Bootstrap ==="
+echo ""
+
+if [[ $EUID -ne 0 ]]; then
+    echo "[ERROR] Run as root"
+    exit 1
+fi
+
+# --- 1. Fix Lid Switch ---
+echo "[1/7] Configuring lid switch..."
+cp /etc/systemd/logind.conf /etc/systemd/logind.conf.bak
+sed -i 's/^#\?HandleLidSwitch=.*/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
+sed -i 's/^#\?HandleLidSwitchExternalPower=.*/HandleLidSwitchExternalPower=ignore/' /etc/systemd/logind.conf
+sed -i 's/^#\?HandleLidSwitchDocked=.*/HandleLidSwitchDocked=ignore/' /etc/systemd/logind.conf
+echo "Result:"
+grep "HandleLid" /etc/systemd/logind.conf | grep -v "^#"
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 2. Fix APT Repos ---
+echo ""
+echo "[2/7] Fixing APT repositories..."
+SOURCES_DIR="/etc/apt/sources.list.d"
+for f in ceph.sources pve-enterprise.list pve-enterprise.sources; do
+    [[ -f "${SOURCES_DIR}/$f" ]] && mv "${SOURCES_DIR}/$f" "${SOURCES_DIR}/${f}.disabled" && echo "Disabled: $f"
+done
+# Only create if pve-install-repo.list doesn't already have trixie no-subscription
+if grep -q "trixie pve-no-subscription" "${SOURCES_DIR}/pve-install-repo.list" 2>/dev/null; then
+    echo "No-subscription repo already exists in pve-install-repo.list"
+else
+    echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > "${SOURCES_DIR}/pve-no-subscription.list"
+    echo "Created: pve-no-subscription.list"
+fi
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 3. APT Update ---
+echo ""
+echo "[3/7] Running apt update..."
+apt update
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 4. APT Upgrade ---
+echo ""
+echo "[4/7] Running apt upgrade..."
+apt upgrade -y
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 5. Remove Subscription Nag ---
+echo ""
+echo "[5/7] Removing subscription nag..."
+PROXMOXLIB="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
+if [[ -f "$PROXMOXLIB" ]]; then
+    sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" "$PROXMOXLIB"
+    echo "Patched: proxmoxlib.js"
+else
+    echo "proxmoxlib.js not found, skipping"
+fi
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 6. Create admin_dev Management User (PAM) ---
+echo ""
+echo "[6/7] Creating admin_dev management user (PAM)..."
+
+ADMIN_NAME="admin_dev"
+ADMIN_USER="${ADMIN_NAME}@pam"
+
+# Check if Linux user exists
+if id "$ADMIN_NAME" &>/dev/null; then
+    echo "Linux user ${ADMIN_NAME} already exists"
+    SKIP_LINUX=1
+else
+    echo "Creating Linux user ${ADMIN_NAME}..."
+    useradd -m -s /bin/bash "$ADMIN_NAME"
+    echo "Set password for ${ADMIN_NAME}:"
+    passwd "$ADMIN_NAME"
+fi
+
+# Check if Proxmox user exists
+if pveum user list | grep -q "^${ADMIN_USER}"; then
+    echo "Proxmox user ${ADMIN_USER} already exists"
+else
+    pveum user add "${ADMIN_USER}" --comment "Admin Dev - Full Admin"
+fi
+
+# Ensure admin role
+pveum acl modify "/" --users "${ADMIN_USER}" --roles Administrator
+
+echo ""
+echo "==========================================="
+echo "  ADMIN USER CREATED (PAM)"
+echo "==========================================="
+echo "Username: ${ADMIN_USER}"
+echo "Scope: / (Full Admin)"
+echo "Can login via: Console, SSH, and Web GUI"
+echo "==========================================="
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 7. Create tf_dev Automation User ---
+echo ""
+echo "[7/7] Creating tf_dev automation user..."
+
 USERNAME="tf_dev"
 REALM="pve"
 TOKEN_ID="terraform"
 FULL_USER="${USERNAME}@${REALM}"
-TARGET_NODE="pve-dev"  # Node name as it appears in Proxmox (usually short name)
 
-echo "============================================"
-echo "Creating Proxmox user: ${FULL_USER}"
-echo "============================================"
-
-# Check if running as root
-if [[ $EUID -ne 0 ]]; then
-   echo "Error: This script must be run as root"
-   exit 1
-fi
-
-# Check if user already exists
 if pveum user list | grep -q "^${FULL_USER}"; then
-    echo "Warning: User ${FULL_USER} already exists"
-    read -p "Do you want to delete and recreate? (y/N): " confirm
+    echo "User ${FULL_USER} already exists"
+    read -p "Delete and recreate? (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo "Deleting existing user..."
         pveum user delete "${FULL_USER}" || true
     else
-        echo "Aborting."
-        exit 1
+        echo "Skipping user creation"
+        SKIP_USER=1
     fi
 fi
 
-# Create user without password (token-only access)
-echo "Creating user ${FULL_USER}..."
-pveum user add "${FULL_USER}" --comment "Terraform Development - Admin on ${TARGET_NODE} only"
+if [[ -z "$SKIP_USER" ]]; then
+    pveum user add "${FULL_USER}" --comment "Terraform Dev - Full Admin"
+    pveum acl modify "/" --users "${FULL_USER}" --roles Administrator
 
-# Assign Administrator role on specific node only
-echo "Assigning Administrator role on /nodes/${TARGET_NODE}..."
-pveum acl modify "/nodes/${TARGET_NODE}" --users "${FULL_USER}" --roles Administrator
+    echo ""
+    echo "==========================================="
+    echo "  API TOKEN - SAVE THIS NOW!"
+    echo "==========================================="
+    pveum user token add "${FULL_USER}" "${TOKEN_ID}" --privsep 0 --expire 0
+    echo ""
+    echo "Token ID: ${FULL_USER}!${TOKEN_ID}"
+    echo "Scope: / (Full Admin)"
+    echo "==========================================="
+fi
 
-# Also grant access to storage on that node (commonly needed for VM operations)
-echo "Assigning Administrator role on /storage for node operations..."
-pveum acl modify "/storage" --users "${FULL_USER}" --roles PVEDatastoreAdmin
+echo ""
+echo "All configurations complete!"
+echo ""
+read -p "Press Enter to restart services (session may disconnect)..."
 
-# Grant access to create/manage VMs in the pool or globally with limited scope
-# This allows the user to see and manage VMs but only operate on the target node
-echo "Assigning PVEVMAdmin role on /vms for VM management..."
-pveum acl modify "/vms" --users "${FULL_USER}" --roles PVEVMAdmin
+# --- Restart Services (LAST STEP) ---
+echo ""
+echo "Restarting systemd-logind..."
+systemctl restart systemd-logind
+echo "Restarting pveproxy..."
+systemctl restart pveproxy
 
-# Create API token (non-expiring, with full privileges of the user)
-echo "Creating API token..."
-TOKEN_OUTPUT=$(pveum user token add "${FULL_USER}" "${TOKEN_ID}" --privsep 0 --expire 0 2>&1)
-
-cat << EOF
-
-============================================
-SUCCESS: User and token created!
-============================================
-
-User Details:
-  Username: ${FULL_USER}
-  Role: Administrator
-  Scope: /nodes/${TARGET_NODE} (restricted to dev node)
-
-Note: The node '${TARGET_NODE}' (pve-dev.lab.local) does not need
-to exist yet. The ACL is pre-configured and will apply once the
-node joins the cluster.
-
-============================================
-API TOKEN CREDENTIALS - SAVE THESE NOW!
-============================================
-
-${TOKEN_OUTPUT}
-
-Token ID: ${FULL_USER}!${TOKEN_ID}
-
-============================================
-Terraform Provider Configuration Example:
-============================================
-
-provider "proxmox" {
-  pm_api_url          = "https://<proxmox-host>:8006/api2/json"
-  pm_api_token_id     = "${FULL_USER}!${TOKEN_ID}"
-  pm_api_token_secret = "<token-value-from-above>"
-  pm_tls_insecure     = true  # Set to false in production with valid certs
-}
-
-============================================
-
-IMPORTANT: This user can only manage resources on node '${TARGET_NODE}'.
-If the node name in Proxmox differs from '${TARGET_NODE}', edit the
-TARGET_NODE variable at the top of this script before running.
-
-EOF
+echo ""
+echo "=== Done! Clear browser cache and refresh web UI ==="
+echo ""
