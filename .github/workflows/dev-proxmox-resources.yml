@@ -1,15 +1,15 @@
-# Dev IAM module deployment#
-# Triggers on push to dev branch when IAM files change
+# Dev Proxmox resources module deployment
+# Triggers on push to dev branch when Proxmox files change
 
-name: "Dev - IAM"
+name: "Dev - Proxmox Resources"
 
 on:
   push:
     branches:
       - dev
     paths:
-      - 'terraform/dev/aws/iam/**'
-      - '.github/workflows/dev-iam.yml'
+      - 'terraform/dev/proxmox/resources/**'
+      - '.github/workflows/dev-proxmox-resources.yml'
 
 permissions:
   id-token: write
@@ -22,7 +22,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/dev/aws/iam
+        working-directory: terraform/dev/proxmox/resources
 
     steps:
       - uses: actions/checkout@v4
