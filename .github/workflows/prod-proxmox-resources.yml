@@ -1,12 +1,12 @@
 # Prod Proxmox resources module deployment
-# Triggers on push to main branch when Proxmox files change
+# Triggers on push to prod branch when Proxmox files change
 
 name: "Prod - Proxmox Resources"
 
 on:
   push:
     branches:
-      - main
+      - prod
     paths:
       - 'terraform/prod/proxmox/resources/**'
       - '.github/workflows/prod-proxmox-resources.yml'

@@ -1,12 +1,12 @@
 # Prod IAM module deployment
-# Triggers on push to main branch when IAM files change
+# Triggers on push to prod branch when IAM files change
 
 name: "Prod - IAM"
 
 on:
   push:
     branches:
-      - main
+      - prod-security
     paths:
       - 'terraform/prod/aws/iam/**'
       - '.github/workflows/prod-iam.yml'
