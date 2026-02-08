@@ -196,7 +196,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub: repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/prod-security
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
       PermissionsBoundary: !Ref TerraformPermissionsBoundary

@@ -1,0 +1,18 @@
+# -----------------------------------------------
+# 6. Trust Proxmox Self-Signed CA on macOS
+# -----------------------------------------------
+# Proxmox generates a self-signed root CA (pve-root-ca.pem) that signs
+# the server certificate (pve-ssl.pem). Trusting the root CA avoids
+# browser warnings and covers future certificate renewals automatically.
+
+# 6a. Copy the root CA from the Proxmox server to your Mac
+scp root@pve.lab.local:/etc/pve/pve-root-ca.pem ~/Desktop/pve-root-ca.pem
+
+# 6b. Add it to the macOS System Keychain as a trusted root
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/Desktop/pve-root-ca.pem
+
+# 6c. Restart Chrome (fully quit and reopen) for the change to take effect
+
+# Verify the certificate is trusted:
+security find-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
+
