@@ -6,7 +6,7 @@ name: "Dev - IAM"
 on:
   push:
     branches:
-      - dev-security
+      - dev
     paths:
       - 'terraform/dev/aws/iam/**'
       - '.github/workflows/dev-iam.yml'
