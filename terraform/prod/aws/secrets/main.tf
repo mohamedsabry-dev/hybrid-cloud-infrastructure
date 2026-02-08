@@ -20,3 +20,4 @@ resource "aws_secretsmanager_secret_version" "proxmox_terraform" {
     ignore_changes = [secret_string]
   }
 }
+#
