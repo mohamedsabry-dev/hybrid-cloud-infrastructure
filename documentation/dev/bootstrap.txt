@@ -1,0 +1,331 @@
+Bootstrap Phase Documentation
+Duration: January 20 - February 8, 2026 (25 days)
+Objective: Establish automated dual-environment infrastructure with proper separation and CI/CD workflows
+
+Phase 1: GitHub Repository Setup
+Repository Structure
+
+Created new repository with dual-branch strategy
+Main branch: Production deployments
+Dev branch: Development and testing
+Legacy folder: Archived POC repository for reference
+
+Local Runner Configuration
+Purpose: Execute GitHub Actions workflows locally for testing
+Setup Steps:
+
+Installed runner on local machine
+Configured required dependencies
+Installed Terraform provider mirror with strict versioning
+
+Provider Packages Configured:
+
+hashicorp/aws (v6.28.0, approximately 650MB)
+hashicorp/azurerm (v4.57.0, approximately 500MB)
+vmware/vsphere (v2.15.0)
+hashicorp/vault (v5.6.0)
+hashicorp/kubernetes (v3.0.1)
+bpg/proxmox (v0.93.1)
+
+Branch Protection
+
+Main branch protected with merge approval requirements
+Audit trail enabled for all changes
+Review process enforced before production deployment
+
+Network Configuration
+
+Configured etc/hosts with Proxmox server aliases
+pve-dev: Development Proxmox server
+pve-master: Production Proxmox server
+
+
+Phase 2: AWS Multi-Account Architecture
+Account Structure
+Two separate AWS accounts for environment isolation:
+
+Production account (969041180300)
+Development account (018571635409)
+
+Security Foundation
+Root Account Protection:
+
+MFA enabled on both root accounts
+Root access restricted and documented
+
+Administrative Access:
+
+Created IAM admin users per account (admin_prod, admin_dev)
+Admin access for initial setup and emergency access
+
+Bootstrap Infrastructure (CloudFormation)
+Created Bootstrap.yaml for each account containing:
+S3 State Storage:
+
+Bucket for Terraform state files
+Versioning enabled for state history
+Encryption at rest configured
+
+State Locking:
+
+DynamoDB table for preventing concurrent modifications
+Ensures safe multi-user Terraform operations
+
+GitHub OIDC Integration:
+
+Configured OIDC provider for GitHub Actions
+Eliminates need for long-lived credentials
+Secure authentication from CI/CD workflows
+
+IAM Bootstrap Role:
+
+Terraform admin role with assume permissions
+Full access excluding bootstrap resource modification
+Prevents accidental infrastructure foundation changes
+
+Terraform Infrastructure Role
+GitHubActions-Infrastructure Role (per environment):
+Permissions Approach:
+
+PowerUserAccess policy attached (AWS managed)
+Allows resource creation and management
+Explicitly denies IAM, billing, and CloudTrail modifications
+
+Permission Boundaries:
+
+TerraformState policy for state file access (S3 + DynamoDB)
+SecurityBoundary policy preventing privilege escalation
+Bootstrap resource protection (cannot modify foundation)
+
+State Access:
+
+Read/write access to environment-specific state paths
+Dev role accesses dev/* state files only
+Prod role accesses prod/* state files only
+
+Secrets Management
+AWS Secrets Manager Configuration:
+
+Created secrets for Proxmox API tokens
+dev/proxmox/terraform-token (development environment)
+prod/proxmox/terraform-token (production environment)
+Values populated after Proxmox setup completion
+
+
+Phase 3: Proxmox Physical Infrastructure
+Hardware Setup
+Two Physical Servers:
+Development Server:
+
+Ryzen 7 7730U processor
+24GB RAM
+500GB internal storage
+WiFi-only connectivity (no Ethernet port)
+IP: 192.168.0.220
+
+Production Server:
+
+Higher specifications
+64GB RAM
+Approximately 2TB storage
+Ethernet connectivity
+Hostname: pve-master
+
+Proxmox Installation
+Both servers installed with Proxmox VE 9.1:
+
+Clean installation approach
+Latest stable version for long-term support
+Network configuration during installation
+
+Development Server Network Challenge
+WiFi-Only Configuration:
+Installation Issue:
+
+Proxmox installer detected WiFi adapter
+Renamed interface to eth0 during installation
+Could not configure WiFi password during setup
+Post-install had no internet connectivity
+
+Solution via USB Tethering:
+
+Connected phone via USB for internet access
+Phone provided IP: 10.28.48.205/24
+Used neighbor discovery to find gateway
+Installed wpasupplicant package
+Configured WPA authentication for WiFi
+
+WiFi Configuration:
+
+Created wpa_supplicant.conf with network credentials
+Updated /etc/network/interfaces for WiFi static IP
+Configured NAT bridge (vmbr0) for VM networking
+Note: WiFi interfaces cannot be bridge members in Linux
+
+Security Configuration
+Root Account Protection:
+
+MFA configured on both Proxmox servers
+Root access restricted and documented
+
+Administrative Users:
+
+Created admin_prod@pam and admin_dev@pam
+Full administrative privileges for management access
+Separate from automation accounts
+
+Bootstrap Script Execution
+Automated each server with bootstrap script:
+System Configuration:
+
+Disabled lid switch sleep behavior (laptop won't sleep when closed)
+Fixed APT repository configuration (disabled enterprise, enabled no-subscription)
+Updated all system packages to latest versions
+Removed subscription nag popup
+
+User Management:
+
+Created administrative users (admin_prod@pam, admin_dev@pam)
+Created Terraform automation users (tf_prod@pve, tf_dev@pve)
+Generated API tokens for automation access
+
+API Token Generation:
+
+tf_dev@pve!terraform (development automation)
+tf_prod@pve!terraform (production automation)
+Tokens stored in AWS Secrets Manager
+
+Terraform Validation
+Created resource discovery configuration:
+
+Validated connectivity to both Proxmox servers
+Discovered available storage pools
+Identified network interfaces
+Confirmed user permissions
+Documented baseline infrastructure state
+
+Development Server Resources:
+
+Node: pve-dev
+Storage: local (90GB free), local-lvm (374GB free)
+Network: vmbr0, wlp1s0, eth0
+No existing VMs (clean slate)
+
+Production Server Resources:
+
+Node: pve-master
+Storage: local (81GB free), local-lvm (1.8TB free)
+Network: eth, wlp4s0, vmbr0
+No existing VMs (clean slate)
+
+Certificate Configuration
+
+Authorized local SSL certificates for web UI access
+Enabled secure HTTPS access to both Proxmox interfaces
+Eliminated browser security warnings
+
+Secrets Population
+Final Step:
+
+Manually populated AWS Secrets Manager with Proxmox tokens
+dev/proxmox/terraform-token: Contains tf_dev token
+prod/proxmox/terraform-token: Contains tf_prod token
+Lifecycle policy: ignore_changes on secret values (allows console updates)
+
+
+End-to-End Validation
+Complete Signal Flow Test
+Development Workflow:
+
+Push code to dev branch
+GitHub Actions workflow triggered (dev-proxmox-resources.yml)
+Workflow assumes GitHubActions-Infrastructure-dev role via OIDC
+Retrieves Proxmox token from AWS Secrets Manager (dev account)
+Terraform connects to dev Proxmox server (192.168.0.220)
+Terraform init with S3 backend (dev state bucket)
+Terraform plan and apply execute successfully
+Resources discovered and validated
+
+Production Workflow:
+
+Merge dev branch to main
+GitHub Actions workflow triggered (prod-proxmox-resources.yml)
+Workflow assumes GitHubActions-Infrastructure-prod role via OIDC
+Retrieves Proxmox token from AWS Secrets Manager (prod account)
+Terraform connects to prod Proxmox server (pve-master)
+Terraform init with S3 backend (prod state bucket)
+Terraform plan and apply execute successfully
+Resources discovered and validated
+
+Validation Confirmed:
+
+Both environments deploy independently
+No cross-account dependencies
+Proper role assumption via OIDC
+Secure secrets retrieval
+State isolation maintained
+Complete automation achieved
+
+
+Architecture Summary
+GitHub Layer
+
+Repository with protected branches
+CI/CD workflows per environment
+Local runner for testing
+Terraform providers mirrored locally
+
+AWS Layer (per environment)
+
+S3 bucket for state storage
+DynamoDB table for state locking
+OIDC provider for GitHub authentication
+Bootstrap role (admin, manages foundation)
+Infrastructure role (PowerUser, manages resources)
+Secrets Manager (Proxmox API tokens)
+
+Proxmox Layer (per environment)
+
+Physical server with Proxmox VE 9.1
+Administrative users for management
+Automation users with API tokens
+Clean baseline with no existing VMs
+Network configured (including WiFi for dev)
+
+Workflow Pattern
+Development path: dev branch → dev workflow → dev AWS → dev Proxmox
+Production path: main branch → prod workflow → prod AWS → prod Proxmox
+Complete separation maintained throughout entire stack
+
+Key Learnings from 7 Iterations
+Iteration 1-2: Manual Setup Issues
+
+Learned: Automation must include the automation setup itself
+Chicken-and-egg problem with Terraform managing its own state
+
+Iteration 3-4: CloudFormation Experiments
+
+Learned: Stack dependencies create execution ordering problems
+GitSync for stacks adds complexity without solving core issues
+
+Iteration 5: Cross-Account Complexity
+
+Learned: Cross-account assume roles created unnecessary spaghetti
+Simplification to mirrored accounts provides same isolation with less complexity
+
+Iteration 6: Two-Account Simplification
+
+Learned: Separate accounts with identical structure is cleaner than shared resources
+State migration challenges when refactoring backend configuration
+
+Iteration 7: Physical Infrastructure
+
+Learned: WiFi-only hardware requires creative solutions (USB tethering)
+Nested vs physical infrastructure trade-offs for dev/prod separation
+
+Final approach: Two completely independent environments mirroring each other's architecture at different scales
+
+Bootstrap Phase: Complete
+Status: Both development and production environments fully operational and validated
+Ready for: Service deployment phase (pfSense, TrueNAS, FreeIPA, Vault, Kubernetes)
+Timeline achieved: 25 days from concept to working dual-environment infrastructure
