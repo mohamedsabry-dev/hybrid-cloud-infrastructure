@@ -10,14 +10,10 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# --- 1. Fix Lid Switch ---
-echo "[1/7] Configuring lid switch..."
-cp /etc/systemd/logind.conf /etc/systemd/logind.conf.bak
-sed -i 's/^#\?HandleLidSwitch=.*/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
-sed -i 's/^#\?HandleLidSwitchExternalPower=.*/HandleLidSwitchExternalPower=ignore/' /etc/systemd/logind.conf
-sed -i 's/^#\?HandleLidSwitchDocked=.*/HandleLidSwitchDocked=ignore/' /etc/systemd/logind.conf
-echo "Result:"
-grep "HandleLid" /etc/systemd/logind.conf | grep -v "^#"
+# --- 1. Disable Sleep/Suspend ---
+echo "[1/7] Disabling sleep/suspend..."
+systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+echo "Done."
 echo ""
 read -p "Press Enter to continue..."
 
@@ -146,8 +142,6 @@ read -p "Press Enter to restart services (session may disconnect)..."
 
 # --- Restart Services (LAST STEP) ---
 echo ""
-echo "Restarting systemd-logind..."
-systemctl restart systemd-logind
 echo "Restarting pveproxy..."
 systemctl restart pveproxy
 
