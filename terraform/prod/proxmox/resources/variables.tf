@@ -19,5 +19,5 @@ variable "proxmox_secret_id" {
 variable "node_name" {
   description = "Proxmox node name"
   type        = string
-  default     = "pve-master"
+  default     = "pve-prod-master"
 }
