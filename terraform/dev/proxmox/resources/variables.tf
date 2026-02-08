@@ -1,7 +1,7 @@
 variable "proxmox_api_url" {
   description = "Proxmox API URL (base URL without /api2/json)"
   type        = string
-  default     = "https://pve-dev:8006"
+  default     = "https://pve-dev-master:8006"
 }
 
 variable "proxmox_tls_insecure" {
@@ -19,5 +19,5 @@ variable "proxmox_secret_id" {
 variable "node_name" {
   description = "Proxmox node name"
   type        = string
-  default     = "pve-dev"
+  default     = "pve-dev-master"
 }
