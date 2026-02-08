@@ -34,7 +34,7 @@ resource "aws_iam_role" "github_actions_infrastructure" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringEquals = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/prod"
           }
         }
       }
