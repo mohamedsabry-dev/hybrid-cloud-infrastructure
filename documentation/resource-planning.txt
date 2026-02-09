@@ -88,138 +88,139 @@ Resource Planning Documentation
 │           ├── Scheduled periodic full backups
 │           └── Disaster recovery capability
 │
+├── Hardware Additions
+│   ├── Router: TP-Link ER605 (replaces pfSense VM)
+│   └── NAS Storage: ASUSTOR FLASHSTOR 6 FS6706T
+│       ├── Disks: 2x 2TB in RAID 1 (2TB usable)
+│       ├── Purpose 1: Shared storage for nested Proxmox VM workloads (dev + prod)
+│       └── Purpose 2: Backup destination for Proxmox Backup Server
+│
+├── Network Planning
+│   │
+│   ├── TP-Link ER605 Router Configuration
+│   │   ├── WAN Port
+│   │   │   └── IP: 192.168.0.150/24 (uplink to internet)
+│   │   │
+│   │   ├── LAN Network: 10.0.0.0/24
+│   │   │   ├── Router LAN IP: 10.0.0.1
+│   │   │   ├── Dev Server: 10.0.0.10
+│   │   │   ├── Prod Server: 10.0.0.20
+│   │   │   └── ASUSTOR NAS: 10.0.0.30
+│   │   │
+│   │   └── NAT: Enabled (LAN to WAN for internet access)
+│   │
+│   ├── Proxmox Internal Networks (Virtual)
+│   │   │
+│   │   ├── Development Server VLANs
+│   │   │   ├── VLAN 10 - Management: 10.10.0.0/24
+│   │   │   │   └── Physical Proxmox management, FreeIPA, LXCs
+│   │   │   └── VLAN 20 - Nested Cluster: 10.20.0.0/24
+│   │   │       └── Nested Proxmox nodes, K8s, Vault VMs
+│   │   │
+│   │   └── Production Server VLANs
+│   │       ├── VLAN 100 - Management: 10.100.0.0/24
+│   │       │   └── Physical Proxmox management, FreeIPA, LXCs
+│   │       └── VLAN 200 - Nested Cluster: 10.200.0.0/24
+│   │           └── Nested Proxmox nodes, K8s, Vault VMs
+│   │
+│   └── Routing Between Segments
+│       ├── Physical LAN (10.0.0.0/24) can reach all VLANs
+│       ├── Nested VLANs routed via Proxmox Linux bridge
+│       └── Inter-VLAN routing handled by Proxmox host
+│
 ├── RAM Allocation - Development Environment (24GB)
+│   ├── Purpose: Mirror small infra - even if slow, but functional for testing and development
 │   │
-│   ├── Day 0-2: Foundation Testing Phase
-│   │   ├── Purpose: Validate infrastructure patterns and clustering before service deployment
-│   │   │
-│   │   ├── Physical Proxmox Layer (13GB)
-│   │   │   ├── pfSense: 1.5GB
-│   │   │   ├── FreeIPA primary: 1GB
-│   │   │   ├── FreeIPA replica: 1GB (shut down after testing)
-│   │   │   ├── TrueNAS: 8GB (replaced with OMV after testing)
-│   │   │   └── Proxmox overhead: 1.5GB
-│   │   │
-│   │   ├── Nested Proxmox Cluster (9GB)
-│   │   │   ├── pve-dev-01: 3GB (1.5GB OS + 1.5GB for 1 Vault node)
-│   │   │   ├── pve-dev-02: 3GB (1.5GB OS + 1.5GB for 1 Vault node)
-│   │   │   └── pve-dev-03: 3GB (1.5GB OS + 1.5GB for 1 Vault node)
-│   │   │
-│   │   ├── Total: 22GB active, 2GB buffer
-│   │   │
-│   │   └── Testing Objectives
-│   │       ├── pfSense configuration (VLANs, firewall rules, routing)
-│   │       ├── FreeIPA replication between 2 nodes
-│   │       ├── TrueNAS NFS shared storage functionality
-│   │       ├── Nested Proxmox 3-node cluster formation
-│   │       ├── Nested Proxmox joining FreeIPA domain
-│   │       ├── Network connectivity and VLAN isolation
-│   │       ├── Vault 3-node cluster basic HA (3GB total)
-│   │       ├── Proxmox backup service configuration
-│   │       └── VM live migration between nested hosts
+│   ├── Foundation Layer (4.5GB)
+│   │   ├── FreeIPA: 1.5GB (single, no replica)
+│   │   ├── Ansible LXC: 0.5GB
+│   │   ├── Gitea LXC: 1GB
+│   │   ├── NGINX LXC: 0.5GB (optional)
+│   │   └── Proxmox overhead: 2GB
 │   │
-│   └── Day 3+: Consolidated Production Development
-│       ├── Purpose: Maximize service capacity for ongoing development and integration testing
-│       │
-│       ├── Changes from Day 0-2
-│       │   ├── Shut down: 2 nested Proxmox nodes (free 6GB)
-│       │   ├── Shut down: FreeIPA replica (free 1GB)
-│       │   ├── Replace: TrueNAS with OMV (free 5.5GB)
-│       │   ├── Total freed: 12.5GB
-│       │   └── Expand: Remaining nested Proxmox from 3GB to 15GB
-│       │
-│       ├── Physical Proxmox Layer (8.5GB)
-│       │   ├── pfSense: 1.5GB
-│       │   ├── FreeIPA primary: 1GB
-│       │   ├── OMV: 2GB (lightweight NAS replacement)
-│       │   ├── LXC containers: 2GB (Ansible, services)
-│       │   └── Proxmox overhead: 1.5GB
-│       │
-│       ├── Single Nested Proxmox (15GB)
-│       │   ├── Proxmox OS overhead: 1.5GB
-│       │   └── Available for service VMs: 13.5GB
-│       │
-│       ├── Services Inside Nested Proxmox (13.5GB)
-│       │   │
-│       │   ├── Vault Cluster (3GB)
-│       │   │   ├── Vault node 1: 1GB
-│       │   │   ├── Vault node 2: 1GB
-│       │   │   └── Vault node 3: 1GB
-│       │   │
-│       │   └── Kubernetes Cluster (10.5GB)
-│       │       ├── Master node 1: 2GB
-│       │       ├── Master node 2: 2GB
-│       │       ├── Master node 3: 2GB
-│       │       ├── Worker node 1: 1.5GB
-│       │       ├── Worker node 2: 1.5GB
-│       │       └── Worker node 3: 1.5GB
-│       │
-│       └── Total: 23.5GB active, 0.5GB buffer
+│   ├── Nested Proxmox Cluster (18GB)
+│   │   │
+│   │   ├── Nested Proxmox 1: 6GB
+│   │   │   ├── Proxmox OS: 1.5GB
+│   │   │   ├── K8s master-1: 1.5GB
+│   │   │   ├── K8s worker-1: 1.5GB
+│   │   │   └── Vault-1: 1GB
+│   │   │
+│   │   ├── Nested Proxmox 2: 6GB
+│   │   │   ├── Proxmox OS: 1.5GB
+│   │   │   ├── K8s master-2: 1.5GB
+│   │   │   ├── K8s worker-2: 1.5GB
+│   │   │   └── Vault-2: 1GB
+│   │   │
+│   │   └── Nested Proxmox 3: 6GB
+│   │       ├── Proxmox OS: 1.5GB
+│   │       ├── K8s master-3: 1.5GB
+│   │       ├── K8s worker-3: 1.5GB
+│   │       └── Vault-3: 1GB
+│   │
+│   └── Total: 23.5GB active, 0.5GB buffer
 │
 ├── RAM Allocation - Production Environment (64GB)
 │   ├── Purpose: Full-scale enterprise architecture with HA and redundancy
 │   │
-│   ├── Physical Proxmox Layer (25.5GB)
-│   │   ├── TrueNAS: 12GB (ZFS-based shared storage)
-│   │   ├── pfSense: 2GB (routing and firewall)
-│   │   ├── FreeIPA replica 1: 2.5GB
-│   │   ├── FreeIPA replica 2: 2.5GB
+│   ├── Physical Proxmox Layer (11GB)
+│   │   ├── FreeIPA replica 1: 4GB
 │   │   ├── Platform LXC containers: 4GB (Ansible, Gitea, Nginx)
-│   │   └── Proxmox overhead: 2.5GB
+│   │   └── Proxmox overhead: 3GB
 │   │
-│   ├── Nested Proxmox Cluster (36GB active + 12GB standby)
-│   │   ├── pve-prod-01: 12GB (active)
-│   │   ├── pve-prod-02: 12GB (active)
-│   │   ├── pve-prod-03: 12GB (active)
-│   │   └── pve-prod-04: 12GB (shutdown - disaster recovery standby)
+│   ├── Nested Proxmox Cluster (45GB active + 15GB standby)
+│   │   ├── pve-prod-01: 15GB (active)
+│   │   ├── pve-prod-02: 15GB (active)
+│   │   ├── pve-prod-03: 15GB (active)
+│   │   └── pve-prod-04: 15GB (shutdown - disaster recovery standby)
 │   │
 │   ├── Services Distributed Across Nested Cluster
 │   │   │
-│   │   ├── Per Nested Proxmox Node (12GB total)
-│   │   │   ├── Proxmox OS overhead: 1.5GB
-│   │   │   └── Available for VMs: 10.5GB
+│   │   ├── Per Nested Proxmox Node (15GB total)
+│   │   │   ├── Proxmox OS overhead: 2GB
+│   │   │   └── Available for VMs: 13GB
 │   │   │
 │   │   └── Service Distribution (spread across 3 active nodes)
-│   │       ├── Kubernetes workers: 5GB per node
-│   │       ├── Kubernetes masters: 3GB per node
-│   │       ├── Vault nodes: 1.5GB per node
-│   │       └── Overhead per node: 1GB buffer
+│   │       ├── Kubernetes workers: 7GB per node
+│   │       ├── Kubernetes masters: 4GB per node
+│   │       ├── Vault nodes: 2GB per node
+│   │       └── OS per node: 2GB
 │   │
 │   └── Total Active Allocation
-│       ├── Physical layer: 25.5GB
-│       ├── Nested cluster (3 active nodes): 36GB
-│       ├── Total: 61.5GB
-│       ├── Free buffer: 2.5GB
+│       ├── Physical layer: 11GB
+│       ├── Nested cluster (3 active nodes): 45GB
+│       ├── Total: 56GB
+│       ├── Free buffer: 8GB
 │       └── Note: Nested Proxmox 4 remains shutdown until needed for disaster recovery
 │
 ├── Architecture Summary
 │   │
 │   ├── Development Environment
 │   │   ├── Foundation Layer
-│   │   │   ├── pfSense, FreeIPA, OMV, LXC containers
+│   │   │   ├── FreeIPA, LXC containers (Ansible, Gitea, NGINX)
 │   │   │   ├── Proxmox overhead
-│   │   │   └── Total: 8.5GB
+│   │   │   └── Total: 4.5GB
 │   │   │
-│   │   ├── Service Layer
-│   │   │   ├── Single consolidated nested Proxmox: 15GB
-│   │   │   ├── Running full Vault + K8s clusters
-│   │   │   └── Total: 15GB
+│   │   ├── Nested Cluster
+│   │   │   ├── 3 nested Proxmox nodes: 18GB (6GB each)
+│   │   │   ├── Each node runs: K8s master, K8s worker, Vault
+│   │   │   └── Total: 18GB
 │   │   │
 │   │   └── System Total: 23.5GB active, 0.5GB buffer
 │   │
 │   └── Production Environment
 │       ├── Foundation Layer
-│       │   ├── TrueNAS, pfSense, FreeIPA (2 replicas), platform LXCs
+│       │   ├── FreeIPA replica, platform LXCs (Ansible, Gitea, Nginx)
 │       │   ├── Proxmox overhead
-│       │   └── Total: 25.5GB
+│       │   └── Total: 11GB
 │       │
 │       ├── Nested Cluster
-│       │   ├── 3 active nested Proxmox nodes: 36GB
-│       │   ├── 1 standby nested Proxmox: 0GB (shutdown)
+│       │   ├── 3 active nested Proxmox nodes: 45GB (15GB each)
+│       │   ├── 1 standby nested Proxmox: 15GB (shutdown for DR)
 │       │   ├── Services distributed across active nodes
-│       │   └── Total active: 36GB
+│       │   └── Total active: 45GB
 │       │
-│       └── System Total: 61.5GB active, 2.5GB buffer
+│       └── System Total: 56GB active, 8GB buffer
 │
 ├── ISO Images Required
 │   │
@@ -227,13 +228,10 @@ Resource Planning Documentation
 │   │   ├── proxmox-ve_9.1-1.iso (Proxmox VE hypervisor)
 │   │   └── proxmox-backup-server_4.1-1.iso (Proxmox Backup Server)
 │   │
-│   ├── Networking & Storage
-│   │   ├── netgate-installer-v1.1.1-RELEASE-amd64.iso (pfSense routing/firewall)
-│   │   ├── TrueNAS-SCALE-25.04.2.6.iso (TrueNAS SCALE for NFS storage)
-│   │   └── openmediavault_8.0.7-amd64.iso (1.2GB - OpenMediaVault for dev)
-│   │
 │   └── Operating Systems
 │       └── Rocky-10.1-x86_64-minimal.iso (Rocky Linux for FreeIPA and services)
+│
+│   Note: Networking handled by TP-Link ER605 router, storage handled by ASUSTOR FS6706T NAS
 │
 └── Backup Strategy
     │
@@ -255,6 +253,7 @@ Resource Planning Documentation
         │
         └── Internal Backups
             ├── Proxmox Backup Server integration
-            ├── TrueNAS snapshot capability
+            │   └── Backup destination: ASUSTOR FS6706T NAS (RAID 1)
+            ├── NAS snapshot capability
             ├── VM-level backups to local storage
             └── ~1.1TB available for backup retention and growth

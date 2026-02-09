@@ -1,0 +1,212 @@
+Bootstrap Phase Documentation - Part 1: CI/CD & Cloud Setup
+├── Objective: Establish automated dual-environment infrastructure with proper separation and CI/CD workflows
+│
+├── Hosts Reference (Internal Network via ER605)
+│   ├── 10.0.0.1    er605.lab.local             er605 (router gateway)
+│   ├── 10.0.0.10   pve-dev-master.lab.local    pve-dev-master
+│   ├── 10.0.0.20   pve-prod-master.lab.local   pve-prod-master
+│   └── 10.0.0.30   nas.lab.local               nas (ASUSTOR FS6706T)
+│
+├── Phase 1: GitHub Repository Setup
+│   │
+│   ├── Repository Structure
+│   │   ├── Created new repository with multi-branch strategy
+│   │   ├── main branch: Clean merges only (no workflow commits)
+│   │   ├── dev branch: Development infrastructure deployments
+│   │   ├── prod branch: Production infrastructure deployments
+│   │   ├── dev-security branch: Development IAM/security changes
+│   │   ├── prod-security branch: Production IAM/security changes
+│   │   └── Legacy folder: Archived POC repository for reference
+│   │
+│   ├── Local Runner Configuration
+│   │   ├── Purpose: Execute GitHub Actions workflows locally for testing
+│   │   ├── Setup Steps
+│   │   │   ├── Installed runner on local machine
+│   │   │   ├── Configured required dependencies
+│   │   │   └── Installed Terraform provider mirror with strict versioning
+│   │   │
+│   │   └── Provider Packages Configured
+│   │       ├── hashicorp/aws (v6.28.0, approximately 650MB)
+│   │       ├── hashicorp/azurerm (v4.57.0, approximately 500MB)
+│   │       ├── vmware/vsphere (v2.15.0)
+│   │       ├── hashicorp/vault (v5.6.0)
+│   │       ├── hashicorp/kubernetes (v3.0.1)
+│   │       ├── bpg/proxmox (v0.93.1)
+│   │       └── hashicorp/external (v2.3.4)
+│   │
+│   ├── Branch Protection
+│   │   ├── Main branch protected with merge approval requirements
+│   │   ├── Main branch require Successful CI checks before merge
+│   │   ├── dev-security and prod-security branches protected with merge approval requirements
+│   │   ├── prod branch protected with merge approval requirements and CI checks
+│   │   ├── Audit trail enabled for all changes
+│   │   └── Review process enforced before production deployment
+│   │
+│   └── Network Configuration
+│       ├── Configured etc/hosts with Proxmox server aliases
+│       ├── pve-dev-master: Development Proxmox Master server
+│       └── pve-prod-master: Production Proxmox Master server
+│
+├── Phase 2: AWS Multi-Account Architecture
+│   │
+│   ├── Account Structure
+│   │   ├── Two separate AWS accounts for environment isolation
+│   │   ├── Production account (969041180300)
+│   │   └── Development account (018571635409)
+│   │
+│   ├── Security Foundation
+│   │   ├── Root Account Protection
+│   │   │   ├── MFA enabled on both root accounts
+│   │   │   └── Root access restricted and documented
+│   │   │
+│   │   └── Administrative Access
+│   │       ├── Created IAM admin users per account (admin_prod, admin_dev)
+│   │       └── Admin access for initial setup and emergency access
+│   │
+│   ├── Bootstrap Infrastructure (CloudFormation)
+│   │   ├── Created Bootstrap.yaml for each account containing:
+│   │   │
+│   │   ├── S3 State Storage
+│   │   │   ├── Bucket for Terraform state files
+│   │   │   ├── Versioning enabled for state history
+│   │   │   └── Encryption at rest configured
+│   │   │
+│   │   ├── State Locking
+│   │   │   ├── DynamoDB table for preventing concurrent modifications
+│   │   │   └── Ensures safe multi-user Terraform operations
+│   │   │
+│   │   ├── GitHub OIDC Integration
+│   │   │   ├── Configured OIDC provider for GitHub Actions
+│   │   │   ├── Eliminates need for long-lived credentials
+│   │   │   └── Secure authentication from CI/CD workflows
+│   │   │
+│   │   └── IAM Bootstrap Role
+│   │       ├── Terraform admin role with assume permissions
+│   │       ├── Full access excluding bootstrap resource modification
+│   │       └── Prevents accidental infrastructure foundation changes
+│   │
+│   ├── IAM Roles & Branch Trust Configuration
+│   │   │
+│   │   ├── Admin Roles (TerraformAdmin)
+│   │   │   ├── GitHubActions-TerraformAdmin-prod
+│   │   │   │   ├── Trusted by: prod-security branch only
+│   │   │   │   └── Purpose: IAM and security infrastructure changes
+│   │   │   └── GitHubActions-TerraformAdmin-dev
+│   │   │       ├── Trusted by: dev-security branch only
+│   │   │       └── Purpose: IAM and security infrastructure changes
+│   │   │
+│   │   ├── Infrastructure Roles
+│   │   │   ├── GitHubActions-Infrastructure-prod
+│   │   │   │   ├── Trusted by: prod branch only
+│   │   │   │   └── Purpose: Production resource deployments
+│   │   │   └── GitHubActions-Infrastructure-dev
+│   │   │       ├── Trusted by: dev branch only
+│   │   │       └── Purpose: Development resource deployments
+│   │   │
+│   │   ├── Permissions Approach
+│   │   │   ├── PowerUserAccess policy attached (AWS managed)
+│   │   │   ├── Allows resource creation and management
+│   │   │   └── Explicitly denies IAM, billing, and CloudTrail modifications
+│   │   │
+│   │   ├── Permission Boundaries
+│   │   │   ├── TerraformState policy for state file access (S3 + DynamoDB)
+│   │   │   ├── SecurityBoundary policy preventing privilege escalation
+│   │   │   └── Bootstrap resource protection (cannot modify foundation)
+│   │   │
+│   │   └── State Access
+│   │       ├── Read/write access to environment-specific state paths
+│   │       ├── Dev role accesses dev/* state files only
+│   │       └── Prod role accesses prod/* state files only
+│   │
+│   └── Secrets Management
+│       ├── AWS Secrets Manager Configuration
+│       ├── Created secrets for Proxmox API tokens
+│       ├── dev/proxmox/terraform-token (development environment)
+│       ├── prod/proxmox/terraform-token (production environment)
+│       └── Values populated after Proxmox setup completion
+│
+├── End-to-End CI/CD Validation
+│   │
+│   ├── Complete Signal Flow Test
+│   │
+│   ├── Development Infrastructure Workflow
+│   │   ├── Push code to dev branch
+│   │   ├── GitHub Actions workflow triggered
+│   │   ├── Workflow assumes GitHubActions-Infrastructure-dev role via OIDC
+│   │   ├── Retrieves Proxmox token from AWS Secrets Manager (dev account)
+│   │   ├── Terraform connects to dev Proxmox server (10.0.0.10)
+│   │   ├── Terraform init with S3 backend (dev state bucket)
+│   │   ├── Terraform plan and apply execute successfully
+│   │   └── Resources discovered and validated
+│   │
+│   ├── Production Infrastructure Workflow
+│   │   ├── Push code to prod branch
+│   │   ├── GitHub Actions workflow triggered
+│   │   ├── Workflow assumes GitHubActions-Infrastructure-prod role via OIDC
+│   │   ├── Retrieves Proxmox token from AWS Secrets Manager (prod account)
+│   │   ├── Terraform connects to prod Proxmox server (pve-prod-master)
+│   │   ├── Terraform init with S3 backend (prod state bucket)
+│   │   ├── Terraform plan and apply execute successfully
+│   │   └── Resources discovered and validated
+│   │
+│   ├── Security Workflows
+│   │   ├── dev-security branch → GitHubActions-TerraformAdmin-dev (IAM changes)
+│   │   └── prod-security branch → GitHubActions-TerraformAdmin-prod (IAM changes)
+│   │
+│   └── Validation Confirmed
+│       ├── Both environments deploy independently
+│       ├── No cross-account dependencies
+│       ├── Proper role assumption via OIDC
+│       ├── Secure secrets retrieval
+│       ├── State isolation maintained
+│       └── Complete automation achieved
+│
+├── Architecture Summary (CI/CD Layers)
+│   │
+│   ├── GitHub Layer
+│   │   ├── Repository with protected branches
+│   │   ├── CI/CD workflows per environment
+│   │   ├── Local runner for testing
+│   │   └── Terraform providers mirrored locally
+│   │
+│   ├── AWS Layer (per environment)
+│   │   ├── S3 bucket for state storage
+│   │   ├── DynamoDB table for state locking
+│   │   ├── OIDC provider for GitHub authentication
+│   │   ├── Bootstrap role (admin, manages foundation)
+│   │   ├── Infrastructure role (PowerUser, manages resources)
+│   │   └── Secrets Manager (Proxmox API tokens)
+│   │
+│   └── Workflow Pattern
+│       ├── Dev Infrastructure: dev branch → GitHubActions-Infrastructure-dev → dev AWS → dev Proxmox
+│       ├── Prod Infrastructure: prod branch → GitHubActions-Infrastructure-prod → prod AWS → prod Proxmox
+│       ├── Dev Security/IAM: dev-security branch → GitHubActions-TerraformAdmin-dev → dev AWS
+│       ├── Prod Security/IAM: prod-security branch → GitHubActions-TerraformAdmin-prod → prod AWS
+│       ├── main branch: Clean merges only (no workflow triggers, preserves clean git history)
+│       └── Complete separation maintained throughout entire stack
+│
+├── Key Learnings from 7 Iterations
+│   │
+│   ├── Iteration 1-2: Manual Setup Issues
+│   │   ├── Learned: Automation must include the automation setup itself
+│   │   └── Chicken-and-egg problem with Terraform managing its own state
+│   │
+│   ├── Iteration 3-4: CloudFormation Experiments
+│   │   ├── Learned: Stack dependencies create execution ordering problems
+│   │   └── GitSync for stacks adds complexity without solving core issues
+│   │
+│   ├── Iteration 5: Cross-Account Complexity
+│   │   ├── Learned: Cross-account assume roles created unnecessary spaghetti
+│   │   └── Simplification to mirrored accounts provides same isolation with less complexity
+│   │
+│   ├── Iteration 6: Two-Account Simplification
+│   │   ├── Learned: Separate accounts with identical structure is cleaner than shared resources
+│   │   └── State migration challenges when refactoring backend configuration
+│   │
+│   └── Final approach: Two completely independent environments mirroring each other's architecture
+│
+└── Part 1 Status: Complete
+    ├── GitHub repository configured with branch protection
+    ├── AWS accounts bootstrapped with OIDC and IAM roles
+    ├── CI/CD pipelines validated end-to-end
+    └── See Part 2 for infrastructure setup (Router, NAS, Proxmox, Nested clusters)
