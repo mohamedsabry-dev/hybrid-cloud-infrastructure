@@ -3,7 +3,6 @@
         -- Redisgn the infra dev and prod resource allocation , 
 
 
-
         new arch for dev 
 
 Mirror Small infra even if slow but functional for testing and development.
