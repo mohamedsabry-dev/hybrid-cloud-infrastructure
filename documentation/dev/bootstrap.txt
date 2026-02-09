@@ -1,5 +1,4 @@
 Bootstrap Phase Documentation
-├── Duration: January 20 - February 8, 2026 (25 days)
 ├── Objective: Establish automated dual-environment infrastructure with proper separation and CI/CD workflows
 │
 ├── Hosts Reference
@@ -30,17 +29,21 @@ Bootstrap Phase Documentation
 │   │       ├── vmware/vsphere (v2.15.0)
 │   │       ├── hashicorp/vault (v5.6.0)
 │   │       ├── hashicorp/kubernetes (v3.0.1)
-│   │       └── bpg/proxmox (v0.93.1)
+│   │       ├── bpg/proxmox (v0.93.1)
+│   │       └── hashicorp/external (v2.3.4)
 │   │
 │   ├── Branch Protection
 │   │   ├── Main branch protected with merge approval requirements
+│   │   ├── Main branch require Successful CI checks before merge
+│   │   ├── dev-security and prod-security branches protected with merge approval requirements
+│   │   ├── prod branch protected with merge approval requirements and CI checks
 │   │   ├── Audit trail enabled for all changes
 │   │   └── Review process enforced before production deployment
 │   │
 │   └── Network Configuration
 │       ├── Configured etc/hosts with Proxmox server aliases
-│       ├── pve-dev-master: Development Proxmox server
-│       └── pve-prod-master: Production Proxmox server
+│       ├── pve-dev-master: Development Proxmox Master server
+│       └── pve-prod-master: Production Proxmox Master server
 │
 ├── Phase 2: AWS Multi-Account Architecture
 │   │
@@ -138,6 +141,7 @@ Bootstrap Phase Documentation
 │   │       ├── Approximately 2TB storage
 │   │       ├── Ethernet connectivity
 │   │       └── Hostname: pve-prod-master
+
 │   │
 │   ├── Proxmox Installation
 │   │   ├── Both servers installed with Proxmox VE 9.1
