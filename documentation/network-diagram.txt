@@ -1,0 +1,513 @@
+================================================================================
+                    HYBRID CLOUD INFRASTRUCTURE - NETWORK DIAGRAM
+================================================================================
+
+                              ENVIRONMENT CONTEXT
+                    ┌─────────────────────────────────────────┐
+                    │  HOME LAB - Development & Learning      │
+                    │  ├── Usage: Few hours/day               │
+                    │  ├── Focus: Terraform, Ansible, Python  │
+                    │  ├── Workload: Light (not heavy K8s)    │
+                    │  └── Power: Shut down when not in use   │
+                    └─────────────────────────────────────────┘
+
+
+                                    INTERNET
+                                       │
+                                       │
+                          ┌────────────┴────────────┐
+                          │      ISP ROUTER         │
+                          │   192.168.0.1/24        │
+                          └────────────┬────────────┘
+                                       │
+       ┌───────────────────────────────┼───────────────────────────────┐
+       │                               │                               │
+       │                  ┌────────────┼────────────┐                  │
+       │                  │            │            │                  │
+       │             Static IP1   Static IP2   Static IP3-5            │
+       │          (Prod AWS VPN) (Dev AWS VPN) (Services/Spare)        │
+       │                  │            │            │                  │
+       │                  └────────────┼────────────┘                  │
+       │                               │                               │
+       │                               ▼                               │
+       │    ┌──────────────────────────────────────────────────────────┼──┐
+       │    │                   TP-LINK ER605 ROUTER                   │  │
+       │    │                   192.168.0.200                          │  │
+       │    └──────────────────────────────────────────────────────────┼──┘
+       │                                                               │
+       ▼                                                               │
+┌─────────────────────────────────┐                                    │
+│      MAC MINI (Monitoring)      │                                    │
+│      192.168.0.222              │◄───────────────────────────────────┘
+│                                 │    (Same ISP Router LAN)
+│  Docker Desktop:                │
+│  ├── Prometheus Container       │
+│  ├── Grafana Container          │
+│  └── Collects metrics from:     │
+│       ├── Prod Server           │
+│       ├── Dev Server            │
+│       └── All VMs inside        │
+│                                 │
+│  Routing (TBD):                 │
+│  └── Static route to 10.0.x.x  │
+│      for management/service     │
+│      layer access               │
+└─────────────────────────────────┘
+
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           TP-LINK ER605 ROUTER                               │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  WAN PORTS (Active-Active)                                              │ │
+│  │  ├── WAN 1: Static IP1 → AWS VPN Tunnel (Prod)                          │ │
+│  │  └── WAN 2: Static IP2 → AWS VPN Tunnel (Dev)                           │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  LAN PORTS                                                              │ │
+│  │  ├── LAN 1: Prod Server NIC1 (Prod Service VLANs)                       │ │
+│  │  ├── LAN 2: Dev Server NIC1 (Dev Service VLANs)                         │ │
+│  │  └── LAN 3: Access Point → Management Subnet (shared)                   │ │
+│  │              ├── Prod Server WiFi (Management)                          │ │
+│  │              ├── Dev Server WiFi (Management)                           │ │
+│  │              └── NAS Management Interface                               │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                         VLAN INTERFACES                                 │ │
+│  │                                                                         │ │
+│  │  DEV VLANs (10.0.x.0/26)              PROD VLANs (10.1.x.0/26)          │ │
+│  │  ├── VLAN 10:  10.0.10.1 (Mgmt)       ├── VLAN 110: 10.1.10.1 (Mgmt)    │ │
+│  │  ├── VLAN 31:  10.0.31.1 (Ingress)    ├── VLAN 131: 10.1.31.1 (Ingress) │ │
+│  │  ├── VLAN 40:  10.0.40.1 (Identity)   ├── VLAN 140: 10.1.40.1 (Identity)│ │
+│  │  ├── VLAN 50:  10.0.50.1 (K8s Ctrl)   ├── VLAN 150: 10.1.50.1 (K8s Ctrl)│ │
+│  │  ├── VLAN 60:  10.0.60.1 (K8s Work)   ├── VLAN 160: 10.1.60.1 (K8s Work)│ │
+│  │  ├── VLAN 70:  10.0.70.1 (Secrets)    ├── VLAN 170: 10.1.70.1 (Secrets) │ │
+│  │  └── VLAN 99:  10.0.99.1 (Infra Ops)  └── VLAN 199: 10.1.99.1 (Infra Ops│ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ROLES: Inter-VLAN Routing | Firewall | NAT | AWS VPN | Port Forward        │
+└──────────────────────────────────────────────────────────────────────────────┘
+              │                                               │
+              │ LAN 1 (Prod VLANs)               LAN 2 (Dev VLANs)
+              │                                               │
+              │         ┌─────────────────────────────┐       │
+              │         │  LAN 3: ACCESS POINT        │       │
+              │         │  (Management Subnet)        │       │
+              │         │                             │       │
+              │         │  ┌─WiFi─┐     ┌─WiFi─┐      │       │
+              │         └──┤ Dev  ├─────┤ Prod ├──────┘       │
+              │            └──┬───┘     └──┬───┘              │
+              │               │            │                  │
+              │               │    ┌───────┘                  │
+              │               │    │   ┌──────────────────────┘
+              │               │    │   │     NAS Mgmt
+              │               │    │   │        │
+              ▼               ▼    ▼   ▼        ▼
+      ┌───────────────────────────────┐   ┌───────────────────────────────┐
+      │        PROD SERVER            │   │        DEV SERVER             │
+      │     64GB RAM, 500GB NVMe      │   │     24GB RAM, 500GB NVMe      │
+      │                               │   │                               │
+      │  NIC1: Service VLANs (LAN 1)  │   │  NIC1: Service VLANs (LAN 2)  │
+      │  WiFi: Management (LAN 3)     │   │  WiFi: Management (LAN 3)     │
+      │                               │   │                               │
+      │  ┌─────────────────────────┐  │   │  ┌─────────────────────────┐  │
+      │  │    PROXMOX VE HOST      │  │   │  │    PROXMOX VE HOST      │  │
+      │  │    (L2 Bridging Only)   │  │   │  │    (L2 Bridging Only)   │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  vmbr110 ── VLAN 110    │  │   │  │  vmbr10 ── VLAN 10      │  │
+      │  │  vmbr131 ── VLAN 131    │  │   │  │  vmbr31 ── VLAN 31      │  │
+      │  │  vmbr140 ── VLAN 140    │  │   │  │  vmbr40 ── VLAN 40      │  │
+      │  │  vmbr150 ── VLAN 150    │  │   │  │  vmbr50 ── VLAN 50      │  │
+      │  │  vmbr160 ── VLAN 160    │  │   │  │  vmbr60 ── VLAN 60      │  │
+      │  │  vmbr170 ── VLAN 170    │  │   │  │  vmbr70 ── VLAN 70      │  │
+      │  │  vmbr199 ── VLAN 199    │  │   │  │  vmbr99 ── VLAN 99      │  │
+      │  └─────────────────────────┘  │   │  └─────────────────────────┘  │
+      │                               │   │                               │
+      │  ┌─────────────────────────┐  │   │  ┌─────────────────────────┐  │
+      │  │       VMs / LXCs        │  │   │  │       VMs / LXCs        │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 131: NGINX        │  │   │  │  VLAN 31: NGINX         │  │
+      │  │           10.1.31.10    │  │   │  │           10.0.31.10    │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 140: FreeIPA      │  │   │  │  VLAN 40: FreeIPA       │  │
+      │  │           10.1.40.10    │  │   │  │           10.0.40.10    │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 150: K8s Masters  │  │   │  │  VLAN 50: K8s Masters   │  │
+      │  │           10.1.50.10-12 │  │   │  │           10.0.50.10-12 │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 160: K8s Workers  │  │   │  │  VLAN 60: K8s Workers   │  │
+      │  │           10.1.60.10-12 │  │   │  │           10.0.60.10-12 │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 170: Vault        │  │   │  │  VLAN 70: Vault         │  │
+      │  │           10.1.70.10-12 │  │   │  │           10.0.70.10-12 │  │
+      │  │                         │  │   │  │                         │  │
+      │  │  VLAN 199: Ansible,Gitea│  │   │  │  VLAN 99: Ansible,Gitea │  │
+      │  │           10.1.99.10-11 │  │   │  │           10.0.99.10-11 │  │
+      │  └─────────────────────────┘  │   │  └─────────────────────────┘  │
+      │                               │   │                               │
+      │        NIC2: 10.0.30.20       │   │        NIC2: 10.0.30.10       │
+      └───────────────┬───────────────┘   └───────────────┬───────────────┘
+                      │                                   │
+                      │     STORAGE NETWORK (ISOLATED)    │
+                      │                                   │
+                      ▼                                   ▼
+      ┌───────────────────────────────────────────────────────────────────┐
+      │                    5-PORT DUMB SWITCH                             │
+      │                  (Storage Traffic ONLY)                           │
+      │                                                                   │
+      │    [PROD NIC2]────────[DEV NIC2]─────────[NAS]                    │
+      │    10.0.30.20          10.0.30.10         10.0.30.30              │
+      └───────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+                      ┌───────────────────────────────┐
+                      │      ASUSTOR FS6706T NAS      │
+                      │      2x 2TB RAID 1 = 2TB      │
+                      │         10.0.30.30            │
+                      │                               │
+                      │  ├── Dev Data: 400GB          │
+                      │  ├── Prod Data: 800GB         │
+                      │  ├── PBS Backups: 600GB       │
+                      │  └── Buffer: 200GB            │
+                      └───────────────────────────────┘
+
+
+================================================================================
+                              TRAFFIC FLOW DIAGRAM
+================================================================================
+
+
+1. SAME VLAN, SAME SERVER (L2 only, no routing)
+   ─────────────────────────────────────────────
+
+   ┌──────────────┐         ┌──────────────┐
+   │ K8s Master 1 │◄───────►│ K8s Master 2 │
+   │ 10.0.50.10   │  vmbr50 │ 10.0.50.11   │
+   └──────────────┘ (L2)    └──────────────┘
+                     │
+                     └── No routing, direct bridge
+
+
+
+2. CROSS VLAN, SAME SERVER (via ER605)
+   ────────────────────────────────────
+
+   ┌──────────────┐                              ┌──────────────┐
+   │ K8s Master   │                              │ K8s Worker   │
+   │ 10.0.50.10   │                              │ 10.0.60.10   │
+   └──────┬───────┘                              └──────▲───────┘
+          │                                             │
+          │ VLAN 50                               VLAN 60
+          ▼                                             │
+   ┌──────────────┐                              ┌──────┴───────┐
+   │   vmbr50     │                              │   vmbr60     │
+   └──────┬───────┘                              └──────▲───────┘
+          │                                             │
+          └──────────────┐              ┌───────────────┘
+                         ▼              │
+                   ┌─────────────────────────┐
+                   │        ER605            │
+                   │  Routes VLAN 50 ↔ 60    │
+                   │  + Firewall Rules       │
+                   └─────────────────────────┘
+
+
+
+3. CROSS SERVER (via ER605)
+   ─────────────────────────
+
+   DEV SERVER                                    PROD SERVER
+   ┌──────────────┐                              ┌──────────────┐
+   │ K8s Worker   │                              │ Vault        │
+   │ 10.0.60.10   │                              │ 10.1.70.10   │
+   └──────┬───────┘                              └──────▲───────┘
+          │                                             │
+          │ VLAN 60                               VLAN 170
+          ▼                                             │
+   ┌──────────────┐                              ┌──────┴───────┐
+   │   Proxmox    │                              │   Proxmox    │
+   │   Dev        │                              │   Prod       │
+   └──────┬───────┘                              └──────▲───────┘
+          │                                             │
+          │ Trunk                                 Trunk │
+          └──────────────┐              ┌───────────────┘
+                         ▼              │
+                   ┌─────────────────────────┐
+                   │        ER605            │
+                   │  Routes Dev ↔ Prod      │
+                   │  10.0.x.x ↔ 10.1.x.x    │
+                   └─────────────────────────┘
+
+
+
+4. TO INTERNET (NAT via ER605)
+   ───────────────────────────
+
+   ┌──────────────┐
+   │  Any VM      │
+   │  10.0.x.x    │
+   └──────┬───────┘
+          │
+          ▼
+   ┌──────────────┐
+   │   Proxmox    │
+   └──────┬───────┘
+          │ Trunk
+          ▼
+   ┌──────────────┐
+   │   ER605      │──── NAT ────► INTERNET
+   │   Gateway    │
+   └──────────────┘
+
+
+
+5. AWS VPN (IPsec via ER605)
+   ──────────────────────────
+
+   ┌──────────────┐                              ┌──────────────┐
+   │  Local VM    │                              │   AWS VPC    │
+   │  10.0.x.x    │                              │  172.16.x.x  │
+   └──────┬───────┘                              └──────▲───────┘
+          │                                             │
+          ▼                                             │
+   ┌──────────────┐         IPsec Tunnel         ┌──────┴───────┐
+   │   ER605      │◄════════════════════════════►│  AWS VPN GW  │
+   │  Static IP   │         Encrypted            │              │
+   └──────────────┘                              └──────────────┘
+
+
+
+6. STORAGE/BACKUP (Isolated Network)
+   ──────────────────────────────────
+
+   ┌──────────────┐                              ┌──────────────┐
+   │  Dev Server  │                              │  Prod Server │
+   │  NIC2        │                              │  NIC2        │
+   │  10.0.30.10  │                              │  10.0.30.20  │
+   └──────┬───────┘                              └──────┬───────┘
+          │                                             │
+          │         ┌─────────────────┐                 │
+          └────────►│  Dumb Switch    │◄────────────────┘
+                    │  (No ER605!)    │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   ASUSTOR NAS   │
+                    │   10.0.30.30    │
+                    │                 │
+                    │  NFS Exports    │
+                    │  PBS Backups    │
+                    └─────────────────┘
+
+
+
+7. EXTERNAL ACCESS TO SERVICES (Port Forward)
+   ───────────────────────────────────────────
+
+   ┌──────────────┐
+   │   Internet   │
+   │   Client     │
+   └──────┬───────┘
+          │ HTTPS (443)
+          ▼
+   ┌──────────────┐
+   │   ER605      │
+   │  Static IP4  │────── Port Forward 443
+   └──────┬───────┘
+          │
+          ▼
+   ┌──────────────┐
+   │   NGINX      │
+   │  10.0.31.10  │────► Reverse Proxy to K8s Workers
+   └──────┬───────┘
+          │
+          ▼
+   ┌──────────────┐
+   │ K8s Workers  │
+   │ 10.0.60.x    │
+   └──────────────┘
+
+
+
+8. MONITORING (Mac Mini → Servers)
+   ─────────────────────────────────
+
+   ┌─────────────────────────────────┐
+   │   MAC MINI (192.168.0.222)      │
+   │   Docker Desktop                │
+   │   ├── Prometheus (scrapes)      │
+   │   └── Grafana (dashboards)      │
+   └──────────────┬──────────────────┘
+                  │
+                  │  192.168.0.x network
+                  ▼
+   ┌──────────────────────────────────┐
+   │          ISP ROUTER              │
+   │   Static route (TBD):            │
+   │   10.0.0.0/8 → 192.168.0.200     │
+   │                (ER605)           │
+   └──────────────┬───────────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────────┐
+   │           ER605                  │
+   │   Routes to VLANs:               │
+   │   ├── Management (LAN 3/WiFi)    │
+   │   ├── Dev VLANs (LAN 2)          │
+   │   └── Prod VLANs (LAN 1)         │
+   └──────────────┬───────────────────┘
+                  │
+       ┌──────────┴──────────┐
+       ▼                     ▼
+   ┌──────────┐         ┌──────────┐
+   │  Prod    │         │  Dev     │
+   │  Server  │         │  Server  │
+   │ (64GB)   │         │ (24GB)   │
+   │          │         │          │
+   │ Metrics: │         │ Metrics: │
+   │ ├─Proxmox│         │ ├─Proxmox│
+   │ ├─VMs    │         │ ├─VMs    │
+   │ └─K8s    │         │ └─K8s    │
+   └──────────┘         └──────────┘
+
+   Note: Mac Mini needs static route on ISP router
+         to reach 10.0.x.x networks via ER605
+
+
+================================================================================
+                         DESIGN DECISIONS & Q&A REFERENCE
+================================================================================
+
+This section documents architectural questions raised during design review
+and the decisions made, for future reference.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q1: Why no High Availability (HA) for router, NAS, switches?               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: Single devices acceptable                                        │
+│ Reason:                                                                     │
+│ ├── Home lab with limited resources (space, power, budget)                 │
+│ ├── Usage: Few hours per day, shut down most of the time                   │
+│ ├── Focus: Development (Terraform, Ansible, Python), not 24/7 production   │
+│ └── Light workloads, not heavy K8s pod traffic                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q2: Why WiFi for management instead of wired VLAN?                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: WiFi via Access Point on ER605 LAN 3                             │
+│ Reason:                                                                     │
+│ ├── Limited physical ports on router                                       │
+│ ├── Achieves true out-of-band isolation from service network               │
+│ ├── WiFi is stable (Access Point ~1 meter from laptops)                    │
+│ └── Practical for home lab environment                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q3: Can ER605 handle 14 VLANs + 2 VPN tunnels?                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: Yes, acceptable for this use case                                │
+│ Reason:                                                                     │
+│ ├── Light traffic (development, not production workloads)                  │
+│ ├── Few hours per day usage                                                │
+│ ├── Real hardware experience valuable for learning                         │
+│ └── Adds layer of protection vs software-only (pfSense VM)                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q4: Why route all inter-VLAN traffic through ER605 (not Proxmox internal)? │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: All inter-VLAN routing via ER605                                 │
+│ Reason:                                                                     │
+│ ├── Matches production pattern (L3 switch/router between layers)           │
+│ ├── Centralized firewall rules and policy enforcement                      │
+│ ├── Service layer cannot reach Management layer directly                   │
+│ ├── Traffic inspection and audit trail                                     │
+│ └── Proxmox does L2 bridging only, no internal routing                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q5: Why separate storage network on dumb switch?                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: Isolated 5-port dumb switch for storage only                     │
+│ Reason:                                                                     │
+│ ├── Don't mix storage/backup traffic with service traffic                  │
+│ ├── NFS and backup loads should not impact service VLANs                   │
+│ ├── True network isolation (physically separate)                           │
+│ └── Matches production storage fabric patterns                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q6: Why 2 WANs in Active-Active mode?                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: WAN 1 for Prod VPN, WAN 2 for Dev VPN                            │
+│ Reason:                                                                     │
+│ ├── 2 separate AWS VPN tunnels (one per environment)                       │
+│ ├── Each VPN needs dedicated static public IP                              │
+│ ├── Clean separation: WAN1/LAN1=Prod, WAN2/LAN2=Dev                        │
+│ └── ISP provides 5 static IPs, using 2 for VPNs                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q7: Why Mac Mini for monitoring instead of VM inside lab?                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: Mac Mini (192.168.0.222) on ISP router network                   │
+│ Reason:                                                                     │
+│ ├── Mac Mini is always on (can monitor even when lab is off)               │
+│ ├── Docker Desktop runs Prometheus + Grafana easily                        │
+│ ├── External monitoring = independent from lab failures                    │
+│ └── Can collect metrics from both servers + all VMs                        │
+│                                                                             │
+│ Routing TBD: Static route needed on ISP router or Mac Mini                 │
+│              to reach 10.0.x.x lab networks via ER605                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Q8: Why /26 subnets instead of /24?                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Decision: /26 (62 usable IPs) for all VLANs                                │
+│ Reason:                                                                     │
+│ ├── Only 8-10 VMs max per subnet                                           │
+│ ├── /24 (254 IPs) is wasteful for this scale                               │
+│ ├── /29 (6 IPs) too small for 10 VMs                                       │
+│ ├── /28 (14 IPs) would work but /26 gives room for growth                  │
+│ └── Efficient IP allocation while maintaining flexibility                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                            SECURITY LAYERS (Defense in Depth)
+================================================================================
+
+
+                    ┌─────────────────────────────────────┐
+                    │          INTERNET                   │
+                    └─────────────────┬───────────────────┘
+                                      │
+                    ┌─────────────────▼───────────────────┐
+                    │  LAYER 1: ER605 (Perimeter)         │
+                    │  ├── WAN Firewall                   │
+                    │  ├── Inter-VLAN Policies            │
+                    │  ├── VPN Encryption                 │
+                    │  └── NAT                            │
+                    └─────────────────┬───────────────────┘
+                                      │
+                    ┌─────────────────▼───────────────────┐
+                    │  LAYER 2: Proxmox (Host)            │
+                    │  ├── Proxmox Firewall               │
+                    │  └── Per VM/LXC Rules               │
+                    └─────────────────┬───────────────────┘
+                                      │
+                    ┌─────────────────▼───────────────────┐
+                    │  LAYER 3: VM/LXC (Application)      │
+                    │  ├── iptables / firewalld           │
+                    │  ├── SELinux                        │
+                    │  └── Application Security           │
+                    └─────────────────────────────────────┘
+
+
+================================================================================
