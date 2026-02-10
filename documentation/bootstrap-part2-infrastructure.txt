@@ -125,7 +125,7 @@ Bootstrap Phase Documentation - Part 2: Physical Infrastructure Setup
 │   │
 │   ├── WAN Configuration
 │   │   ├── WAN Port: Connected to ISP modem/router
-│   │   ├── WAN IP: 192.168.0.150/24 (static or DHCP reserved)
+│   │   ├── WAN IP: 192.168.0.200/24 (static or DHCP reserved)
 │   │   ├── Gateway: 192.168.0.1 (ISP router)
 │   │   └── DNS: ISP provided or custom (8.8.8.8, 1.1.1.1)
 │   │
@@ -299,7 +299,7 @@ Bootstrap Phase Documentation - Part 2: Physical Infrastructure Setup
 ├── Architecture Summary (Infrastructure Layers)
 │   │
 │   ├── Network Layer
-│   │   ├── TP-Link ER605 router (WAN: 192.168.0.150, LAN: 10.0.0.0/24)
+│   │   ├── TP-Link ER605 router (WAN: 192.168.0.200, LAN: 10.0.0.0/24)
 │   │   ├── NAT for internet access
 │   │   └── Direct connectivity for servers and NAS
 │   │
