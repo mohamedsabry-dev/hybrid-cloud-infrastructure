@@ -91,7 +91,7 @@ VLAN 65 - Dev DMZ: 10.0.65.0/24
 └── NGINX:                  10.0.65.10
 
 External / Router
-ER605 WAN:          192.168.0.150 (from home router)
+ER605 WAN:          192.168.0.175 (from home router)
 Home Router LAN:    192.168.0.1
 Static IPs (ISP):   5 public IPs (for VPN tunnels later)
 
