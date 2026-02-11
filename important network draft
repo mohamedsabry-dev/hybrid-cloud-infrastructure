@@ -1,0 +1,312 @@
+Complete Infrastructure IP Plan:
+Management Plane (WiFi → AP → ER605 LAN3)
+VLAN 10 - Prod Server Management: 10.0.10.0/24
+├── Gateway (ER605):        10.0.10.1
+└── Prod Proxmox mgmt:      10.0.10.100
+
+VLAN 20 - Dev Server Management: 10.0.20.0/24
+├── Gateway (ER605):        10.0.20.1
+└── Dev Proxmox mgmt:       10.0.20.100
+
+VLAN 30 - NAS Management: 10.0.30.0/24
+├── Gateway (ER605):        10.0.30.1
+└── NAS mgmt interface:     10.0.30.100
+
+Storage Plane (Dumb Switch only, NO routing)
+VLAN 40 - Storage Data: 10.0.40.0/24
+├── NO Gateway
+├── NAS storage interface:  10.0.40.10
+├── Prod Proxmox storage:   10.0.40.100
+└── Dev Proxmox storage:    10.0.40.110
+
+Production Service Plane (Prod Ethernet → ER605 LAN1)
+VLAN 51 - Prod Platform Management: 10.0.51.0/24
+├── Gateway (ER605):        10.0.51.1
+├── FreeIPA primary:        10.0.51.10
+├── FreeIPA replica:        10.0.51.11
+├── Ansible LXC:            10.0.51.20
+└── Gitea LXC:              10.0.51.21
+
+VLAN 52 - Prod Vault: 10.0.52.0/24
+├── Gateway (ER605):        10.0.52.1
+├── Vault node 1:           10.0.52.10
+├── Vault node 2:           10.0.52.11
+└── Vault node 3:           10.0.52.12
+
+VLAN 53 - Prod Control Plane: 10.0.53.0/24
+├── Gateway (ER605):        10.0.53.1
+├── K8s master 1:           10.0.53.10
+├── K8s master 2:           10.0.53.11
+└── K8s master 3:           10.0.53.12
+
+VLAN 54 - Prod Data Plane: 10.0.54.0/24
+├── Gateway (ER605):        10.0.54.1
+├── K8s worker 1:           10.0.54.10
+├── K8s worker 2:           10.0.54.11
+├── K8s worker 3:           10.0.54.12
+└── Pod IPs (K8s managed):  10.0.54.50-254
+
+VLAN 55 - Prod DMZ: 10.0.55.0/24
+├── Gateway (ER605):        10.0.55.1
+└── NGINX:                  10.0.55.10
+
+Development Service Plane (Dev Ethernet → ER605 LAN2)
+VLAN 61 - Dev Platform Management: 10.0.61.0/24
+├── Gateway (ER605):        10.0.61.1
+├── FreeIPA (single):       10.0.61.10
+├── Ansible LXC:            10.0.61.20
+└── Gitea LXC:              10.0.61.21
+
+VLAN 62 - Dev Vault: 10.0.62.0/24
+├── Gateway (ER605):        10.0.62.1
+├── Vault node 1:           10.0.62.10
+├── Vault node 2:           10.0.62.11
+└── Vault node 3:           10.0.62.12
+
+VLAN 63 - Dev Control Plane: 10.0.63.0/24
+├── Gateway (ER605):        10.0.63.1
+├── K8s master 1:           10.0.63.10
+├── K8s master 2:           10.0.63.11
+└── K8s master 3:           10.0.63.12
+
+VLAN 64 - Dev Data Plane: 10.0.64.0/24
+├── Gateway (ER605):        10.0.64.1
+├── K8s worker 1:           10.0.64.10
+├── K8s worker 2:           10.0.64.11
+├── K8s worker 3:           10.0.64.12
+└── Pod IPs (K8s managed):  10.0.64.50-254
+
+VLAN 65 - Dev DMZ: 10.0.65.0/24
+├── Gateway (ER605):        10.0.65.1
+└── NGINX:                  10.0.65.10
+
+External / Router
+ER605 WAN:          192.168.0.150 (from home router)
+Home Router LAN:    192.168.0.1
+Static IPs (ISP):   5 public IPs (for VPN tunnels later)
+
+Quick Reference Card:
+Role                  Prod IP         Dev IP
+─────────────────────────────────────────────
+Proxmox mgmt          10.0.10.100     10.0.20.100
+NAS mgmt              10.0.30.100     10.0.30.100
+NAS storage           10.0.40.10      10.0.40.10
+Proxmox storage       10.0.40.100     10.0.40.110
+FreeIPA primary       10.0.51.10      10.0.61.10
+FreeIPA replica       10.0.51.11      -
+Ansible               10.0.51.20      10.0.61.20
+Gitea                 10.0.51.21      10.0.61.21
+Vault node 1          10.0.52.10      10.0.62.10
+Vault node 2          10.0.52.11      10.0.62.11
+Vault node 3          10.0.52.12      10.0.62.12
+K8s master 1          10.0.53.10      10.0.63.10
+K8s master 2          10.0.53.11      10.0.63.11
+K8s master 3          10.0.53.12      10.0.63.12
+K8s worker 1          10.0.54.10      10.0.64.10
+K8s worker 2          10.0.54.11      10.0.64.11
+K8s worker 3          10.0.54.12      10.0.64.12
+NGINX                 10.0.55.10      10.0.65.10
+
+The Pattern Is Clean:
+10.0.XY.Z where:
+X = environment (5=prod, 6=dev)
+Y = plane (1=platform, 2=vault, 3=control, 4=data, 5=DMZ)
+Z = role (.1=GW, .10-.12=cluster nodes, .20-.21=LXC)
+See any IP, know exactly what it is instantly. ✅
+
+
+
+
+
+
+
+
+The Confusion:
+You're asking: "If services are on 10.0.51.x, 10.0.52.x etc, what is 10.0.50.x for? Is it useless?"
+Short answer: Yes, 10.0.50.0 becomes useless. We don't need it.
+
+Why:
+10.0.50.0 was the idea of "one service subnet per server."
+But when you have multiple VLANs per server, the physical port becomes a TRUNK.
+A trunk port carries MULTIPLE VLANs.
+It has no IP itself.
+It's just a pipe.
+
+How It Actually Works:
+Physical reality:
+Prod Proxmox
+Main Ethernet port (NO IP on this port)
+Tagged trunk carrying:
+├── VLAN 51 traffic (tagged)
+├── VLAN 52 traffic (tagged)
+├── VLAN 53 traffic (tagged)
+├── VLAN 54 traffic (tagged)
+└── VLAN 55 traffic (tagged)
+↓
+ER605 LAN1 port (also trunk, NO IP)
+↓
+ER605 creates VLAN interfaces internally:
+├── VLAN 51 interface: IP 10.0.51.1 (gateway)
+├── VLAN 52 interface: IP 10.0.52.1 (gateway)
+├── VLAN 53 interface: IP 10.0.53.1 (gateway)
+├── VLAN 54 interface: IP 10.0.54.1 (gateway)
+└── VLAN 55 interface: IP 10.0.55.1 (gateway)
+The physical port carries everything.
+The VLAN interfaces are logical, inside the router.
+Physical port itself has NO IP.
+
+Analogy:
+Think of it like a highway:
+Physical cable = highway (no address itself)
+
+Cars on highway = packets
+Each car has a color = VLAN tag
+
+VLAN 51 = red cars
+VLAN 52 = blue cars
+VLAN 53 = green cars
+
+At the destination (ER605):
+Red cars exit at red gate (VLAN 51 interface 10.0.51.1)
+Blue cars exit at blue gate (VLAN 52 interface 10.0.52.1)
+Green cars exit at green gate (VLAN 53 interface 10.0.53.1)
+One highway. Multiple lanes. Each lane has its own exit.
+
+Inside Proxmox:
+Each VM is connected to a bridge tagged with its VLAN:
+Proxmox Linux bridges:
+├── vmbr51 (VLAN 51 tag) → FreeIPA VM gets 10.0.51.10
+├── vmbr52 (VLAN 52 tag) → Vault VMs get 10.0.52.10/11/12
+├── vmbr53 (VLAN 53 tag) → K8s masters get 10.0.53.10/11/12
+├── vmbr54 (VLAN 54 tag) → K8s workers get 10.0.54.10/11/12
+└── vmbr55 (VLAN 55 tag) → NGINX gets 10.0.55.10
+
+All bridges connect to same physical port
+Physical port sends all traffic tagged to ER605
+VM thinks it's on a normal network.
+Proxmox adds the tag when traffic leaves.
+ER605 reads the tag and routes correctly.
+
+Traffic Flow Example:
+K8s master (10.0.53.10) needs a secret from Vault (10.0.52.10):
+1. Master sends packet to 10.0.52.10
+2. Default gateway is 10.0.53.1 (ER605)
+3. Packet leaves master tagged VLAN 53
+4. Travels through physical cable to ER605
+5. ER605 receives on VLAN 53 interface
+6. Checks routing table: 10.0.52.0/24 is on VLAN 52 interface
+7. Checks ACL: VLAN 53 → VLAN 52 = ALLOW
+8. Routes packet out VLAN 52 interface
+9. Packet arrives at Proxmox tagged VLAN 52
+10. Proxmox delivers to Vault VM (10.0.52.10)
+Everything happens on same physical cable.
+Tags separate the traffic.
+Router enforces the rules.
+
+
+
+
+
+
+Question 1: Do You Need Virtual Interfaces Inside Proxmox?
+Yes, you do. But it's simpler than you think.
+
+What Proxmox Needs:
+You need ONE Linux bridge per VLAN:
+vmbr0 → physical port (trunk, no IP, carries all VLANs)
+
+Then either:
+
+Option A: VLAN-aware bridge (recommended)
+└── Single bridge vmbr0 with VLAN aware enabled
+└── Each VM gets assigned VLAN tag directly
+└── Proxmox handles tagging automatically
+
+Option B: Separate bridge per VLAN
+├── vmbr51 (VLAN 51)
+├── vmbr52 (VLAN 52)
+├── vmbr53 (VLAN 53)
+└── etc...
+Option A is cleaner and what Proxmox recommends.
+
+How Option A Works:
+In Proxmox network config:
+auto eno1
+iface eno1 inet manual
+# Physical port, no IP, just carries traffic
+
+auto vmbr0
+iface vmbr0 inet manual
+    bridge-ports eno1
+    bridge-stp off
+    bridge-fd 0
+    bridge-vlan-aware yes    ← This is the key setting
+    bridge-vids 51-55        ← For prod server
+Then when creating VM:
+VM network interface → vmbr0 → VLAN tag: 51
+VM network interface → vmbr0 → VLAN tag: 52
+Proxmox tags the traffic automatically based on VM assignment.
+You don't create separate interface per VLAN.
+Just one bridge, VLAN-aware, and assign tag per VM.
+
+Management Interface:
+Proxmox itself needs management IP (10.0.10.100):
+auto vmbr0.10
+iface vmbr0.10 inet static
+    address 10.0.10.100
+    netmask 255.255.255.0
+    gateway 10.0.10.1
+    vlan-raw-device vmbr0
+This is the ONLY additional interface you create on Proxmox itself.
+Everything else is just VM assignments.
+
+Question 2: Cross-Environment Testing Via Router Only?
+Yes. Exactly correct.
+You operate at ER605 only. Don't touch Proxmox.
+
+How It Works:
+Normal state (isolated):
+DENY: all 5X → all 6X (prod cannot reach dev)
+DENY: all 6X → all 5X (dev cannot reach prod)
+Testing state (temporary ACL):
+# Temporary rule added on ER605
+ALLOW: 10.0.63.10 → 10.0.52.10 (dev K8s master → prod Vault)
+# Duration: test window only
+# Remove after test complete
+Proxmox has no idea this is happening.
+Traffic just routes differently at ER605 level.
+This is exactly how network engineers manage cross-environment access in real companies.
+Firewall rule added. Test done. Rule removed. Clean.
+
+Question 3: VLAN X = Subnet X + Tag X?
+Yes. Exactly.
+Three things always go together:
+VLAN ID (tag):     52
+Subnet:            10.0.52.0/24
+Gateway (VLAN IF): 10.0.52.1
+VLAN ID is the tag number on the packet.
+Subnet is the IP range for that segment.
+Gateway is the ER605 VLAN interface IP.
+They don't HAVE to match numerically.
+But making them match is:
+
+Easier to remember
+Easier to troubleshoot
+Standard practice in clean designs
+VLAN 52 = 10.0.52.0/24 = obvious
+
+
+Example Flow With All Three:
+Vault VM boots:
+├── Gets IP: 10.0.52.10 (from its subnet)
+├── Gets GW: 10.0.52.1 (ER605 VLAN 52 interface)
+├── Traffic leaves tagged: VLAN 52
+├── ER605 receives on VLAN 52 interface
+├── Routes based on destination
+└── ACL rules applied
+The three elements work together as one unit.
+
+Summary:
+Question 1: Yes, need virtual interfaces in Proxmox, but just ONE VLAN-aware bridge. Not separate bridge per VLAN. Plus one management VLAN interface for Proxmox itself.
+Question 2: Yes, cross-environment testing = ER605 ACL change only. Proxmox untouched. Rule added, test done, rule removed.
+Question 3: Yes, VLAN X = configure subnet 10.0.X.0/24 + tag traffic with VLAN ID X + gateway 10.0.X.1 on ER605. All three together = one complete segment.
