@@ -20,10 +20,14 @@ VLAN 40 - Storage Data: 10.0.40.0/24
 └── Dev Proxmox storage:    10.0.40.110
 
 Production Service Plane (Prod Ethernet → ER605 LAN1)
+
+VLAN 50 - Prod Identity (NEW):     10.0.50.0/24
+├── Gateway:              10.0.50.1
+├── FreeIPA primary:      10.0.50.10
+└── FreeIPA replica:      10.0.50.11
+
 VLAN 51 - Prod Platform Management: 10.0.51.0/24
 ├── Gateway (ER605):        10.0.51.1
-├── FreeIPA primary:        10.0.51.10
-├── FreeIPA replica:        10.0.51.11
 ├── Ansible LXC:            10.0.51.20
 └── Gitea LXC:              10.0.51.21
 
@@ -51,6 +55,12 @@ VLAN 55 - Prod DMZ: 10.0.55.0/24
 └── NGINX:                  10.0.55.10
 
 Development Service Plane (Dev Ethernet → ER605 LAN2)
+VLAN 60 - Dev Identity (NEW):      10.0.60.0/24
+├── Gateway:              10.0.60.1
+└── FreeIPA:              10.0.60.10
+└── FreeIPA replica:      10.0.60.11
+
+
 VLAN 61 - Dev Platform Management: 10.0.61.0/24
 ├── Gateway (ER605):        10.0.61.1
 ├── FreeIPA (single):       10.0.61.10
@@ -85,17 +95,37 @@ ER605 WAN:          192.168.0.150 (from home router)
 Home Router LAN:    192.168.0.1
 Static IPs (ISP):   5 public IPs (for VPN tunnels later)
 
-Quick Reference Card:
+
+VLAN  Name                  Subnet          GW          Path
+────────────────────────────────────────────────────────────────
+10    Prod Server Mgmt      10.0.10.0/24    10.0.10.1   WiFi→AP→LAN3
+20    Dev Server Mgmt       10.0.20.0/24    10.0.20.1   WiFi→AP→LAN3
+30    NAS Mgmt              10.0.30.0/24    10.0.30.1   WiFi→AP→LAN3
+40    Storage Data          10.0.40.0/24    NO GW       Dumb switch
+50    Prod Identity         10.0.50.0/24    10.0.50.1   Prod ETH→LAN1
+51    Prod Platform Mgmt    10.0.51.0/24    10.0.51.1   Prod ETH→LAN1
+52    Prod Vault            10.0.52.0/24    10.0.52.1   Prod ETH→LAN1
+53    Prod Control Plane    10.0.53.0/24    10.0.53.1   Prod ETH→LAN1
+54    Prod Data Plane       10.0.54.0/24    10.0.54.1   Prod ETH→LAN1
+55    Prod DMZ              10.0.55.0/24    10.0.55.1   Prod ETH→LAN1
+60    Dev Identity          10.0.60.0/24    10.0.60.1   Dev ETH→LAN2
+61    Dev Platform Mgmt     10.0.61.0/24    10.0.61.1   Dev ETH→LAN2
+62    Dev Vault             10.0.62.0/24    10.0.62.1   Dev ETH→LAN2
+63    Dev Control Plane     10.0.63.0/24    10.0.63.1   Dev ETH→LAN2
+64    Dev Data Plane        10.0.64.0/24    10.0.64.1   Dev ETH→LAN2
+65    Dev DMZ               10.0.65.0/24    10.0.65.1   Dev ETH→LAN2
+
+
 Role                  Prod IP         Dev IP
 ─────────────────────────────────────────────
 Proxmox mgmt          10.0.10.100     10.0.20.100
 NAS mgmt              10.0.30.100     10.0.30.100
 NAS storage           10.0.40.10      10.0.40.10
 Proxmox storage       10.0.40.100     10.0.40.110
-FreeIPA primary       10.0.51.10      10.0.61.10
-FreeIPA replica       10.0.51.11      -
-Ansible               10.0.51.20      10.0.61.20
-Gitea                 10.0.51.21      10.0.61.21
+FreeIPA primary       10.0.50.10      10.0.60.10
+FreeIPA replica       10.0.50.11      -
+Ansible               10.0.51.10      10.0.61.10
+Gitea                 10.0.51.11      10.0.61.11
 Vault node 1          10.0.52.10      10.0.62.10
 Vault node 2          10.0.52.11      10.0.62.11
 Vault node 3          10.0.52.12      10.0.62.12
@@ -107,12 +137,12 @@ K8s worker 2          10.0.54.11      10.0.64.11
 K8s worker 3          10.0.54.12      10.0.64.12
 NGINX                 10.0.55.10      10.0.65.10
 
-The Pattern Is Clean:
+
 10.0.XY.Z where:
 X = environment (5=prod, 6=dev)
-Y = plane (1=platform, 2=vault, 3=control, 4=data, 5=DMZ)
-Z = role (.1=GW, .10-.12=cluster nodes, .20-.21=LXC)
-See any IP, know exactly what it is instantly. ✅
+Y = plane (0=identity, 1=platform, 2=vault,
+           3=control, 4=data, 5=DMZ)
+Z = role (.1=GW, .10-.12=nodes, .20+=LXC)
 
 
 
