@@ -1,0 +1,337 @@
+Bootstrap Phase Documentation - Part 2: Physical Infrastructure Setup
+├── Objective: Configure physical network, storage, and Proxmox infrastructure
+│   └── Prerequisites: Part 1 (CI/CD & Cloud Setup) must be completed first
+│
+├── Hosts Reference (Internal Network via ER605)
+│   ├── 10.0.0.1    er605.lab.local             er605 (router gateway)
+│   ├── 10.0.0.10   pve-dev-master.lab.local    pve-dev-master
+│   ├── 10.0.0.20   pve-prod-master.lab.local   pve-prod-master
+│   └── 10.0.0.30   nas.lab.local               nas (ASUSTOR FS6706T)
+│
+├── Phase 3: Proxmox Physical Infrastructure
+│   │
+│   ├── Hardware Setup
+│   │   ├── Two Physical Servers
+│   │   │
+│   │   ├── Development Server
+│   │   │   ├── Ryzen 7 7730U processor
+│   │   │   ├── 24GB RAM
+│   │   │   ├── 500GB internal storage
+│   │   │   ├── WiFi-only connectivity (no Ethernet port)
+│   │   │   └── IP: 10.0.0.10
+│   │   │
+│   │   └── Production Server
+│   │       ├── Higher specifications
+│   │       ├── 64GB RAM
+│   │       ├── Approximately 2TB storage
+│   │       ├── Ethernet connectivity
+│   │       └── IP: 10.0.0.20
+│   │
+│   ├── Proxmox Installation
+│   │   ├── Both servers installed with Proxmox VE 9.1
+│   │   ├── Clean installation approach
+│   │   ├── Latest stable version for long-term support
+│   │   └── Network configuration during installation
+│   │
+│   ├── Development Server Network Challenge
+│   │   ├── WiFi-Only Configuration
+│   │   │
+│   │   ├── Installation Issue
+│   │   │   ├── Proxmox installer detected WiFi adapter
+│   │   │   ├── Renamed interface to eth0 during installation
+│   │   │   ├── Could not configure WiFi password during setup
+│   │   │   └── Post-install had no internet connectivity
+│   │   │
+│   │   ├── Solution via USB Tethering
+│   │   │   ├── Connected phone via USB for internet access
+│   │   │   ├── Phone provided IP: 10.28.48.205/24
+│   │   │   ├── Used neighbor discovery to find gateway
+│   │   │   ├── Installed wpasupplicant package
+│   │   │   └── Configured WPA authentication for WiFi
+│   │   │
+│   │   └── WiFi Configuration
+│   │       ├── Created wpa_supplicant.conf with network credentials
+│   │       ├── Updated /etc/network/interfaces for WiFi static IP
+│   │       ├── Configured NAT bridge (vmbr0) for VM networking
+│   │       └── Note: WiFi interfaces cannot be bridge members in Linux
+│   │
+│   ├── Security Configuration
+│   │   ├── Root Account Protection
+│   │   │   ├── MFA configured on both Proxmox servers
+│   │   │   └── Root access restricted and documented
+│   │   │
+│   │   └── Administrative Users
+│   │       ├── Created admin_prod@pam and admin_dev@pam
+│   │       ├── Full administrative privileges for management access
+│   │       └── Separate from automation accounts
+│   │
+│   ├── Bootstrap Script Execution
+│   │   ├── Automated each server with bootstrap script
+│   │   │
+│   │   ├── System Configuration
+│   │   │   ├── Disabled lid switch sleep behavior (laptop won't sleep when closed)
+│   │   │   ├── Fixed APT repository configuration (disabled enterprise, enabled no-subscription)
+│   │   │   ├── Updated all system packages to latest versions
+│   │   │   └── Removed subscription nag popup
+│   │   │
+│   │   ├── User Management
+│   │   │   ├── Created administrative users (admin_prod@pam, admin_dev@pam)
+│   │   │   ├── Created Terraform automation users (tf_prod@pve, tf_dev@pve)
+│   │   │   └── Generated API tokens for automation access
+│   │   │
+│   │   └── API Token Generation
+│   │       ├── tf_dev@pve!terraform (development automation)
+│   │       ├── tf_prod@pve!terraform (production automation)
+│   │       └── Tokens stored in AWS Secrets Manager
+│   │
+│   ├── Terraform Validation
+│   │   ├── Created resource discovery configuration
+│   │   ├── Validated connectivity to both Proxmox servers
+│   │   ├── Discovered available storage pools
+│   │   ├── Identified network interfaces
+│   │   ├── Confirmed user permissions
+│   │   ├── Documented baseline infrastructure state
+│   │   │
+│   │   ├── Development Server Resources
+│   │   │   ├── Node: pve-dev-master
+│   │   │   ├── Storage: local (90GB free), local-lvm (374GB free)
+│   │   │   ├── Network: vmbr0, wlp1s0, eth0
+│   │   │   └── No existing VMs (clean slate)
+│   │   │
+│   │   └── Production Server Resources
+│   │       ├── Node: pve-prod-master
+│   │       ├── Storage: local (81GB free), local-lvm (1.8TB free)
+│   │       ├── Network: eth, wlp4s0, vmbr0
+│   │       └── No existing VMs (clean slate)
+│   │
+│   ├── Certificate Configuration
+│   │   ├── Authorized local SSL certificates for web UI access
+│   │   ├── Enabled secure HTTPS access to both Proxmox interfaces
+│   │   └── Eliminated browser security warnings
+│   │
+│   └── Secrets Population
+│       ├── Final Step
+│       ├── Manually populated AWS Secrets Manager with Proxmox tokens
+│       ├── dev/proxmox/terraform-token: Contains tf_dev token
+│       ├── prod/proxmox/terraform-token: Contains tf_prod token
+│       └── Lifecycle policy: ignore_changes on secret values (allows console updates)
+│
+├── Phase 4: Network Infrastructure (TP-Link ER605)
+│   │
+│   ├── Router Hardware Setup
+│   │   ├── Model: TP-Link ER605 (Omada VPN Router)
+│   │   ├── Purpose: Replaces pfSense VM, dedicated hardware for routing/firewall
+│   │   └── Physical placement between ISP modem and lab infrastructure
+│   │
+│   ├── WAN Configuration
+│   │   ├── WAN Port: Connected to ISP modem/router
+│   │   ├── WAN IP: 192.168.0.200/24 (static or DHCP reserved)
+│   │   ├── Gateway: 192.168.0.1 (ISP router)
+│   │   └── DNS: ISP provided or custom (8.8.8.8, 1.1.1.1)
+│   │
+│   ├── LAN Configuration
+│   │   ├── LAN Network: 10.0.0.0/24
+│   │   ├── Router LAN IP: 10.0.0.1 (gateway for all lab devices)
+│   │   ├── DHCP: Disabled (static IPs for all devices)
+│   │   └── NAT: Enabled for internet access
+│   │
+│   ├── Connected Devices
+│   │   ├── Port 1: Dev Server (10.0.0.10)
+│   │   ├── Port 2: Prod Server (10.0.0.20)
+│   │   ├── Port 3: ASUSTOR NAS (10.0.0.30)
+│   │   └── Port 4: Reserved for expansion
+│   │
+│   └── Firewall Rules
+│       ├── Allow: LAN to WAN (internet access via NAT)
+│       ├── Allow: LAN to LAN (inter-device communication)
+│       ├── Block: WAN to LAN (inbound blocked by default)
+│       └── Optional: Port forwarding for external access
+│
+├── Phase 5: Storage Infrastructure (ASUSTOR NAS)
+│   │
+│   ├── Hardware Setup
+│   │   ├── Model: ASUSTOR FLASHSTOR 6 FS6706T
+│   │   ├── Disks: 2x 2TB drives
+│   │   ├── RAID: RAID 1 (mirrored, 2TB usable)
+│   │   └── Network: Connected to ER605 LAN (10.0.0.30)
+│   │
+│   ├── NAS Configuration
+│   │   ├── IP: 10.0.0.30 (static)
+│   │   ├── Hostname: nas.lab.local
+│   │   └── Admin account configured with secure password
+│   │
+│   ├── Storage Shares
+│   │   │
+│   │   ├── VM Storage Share
+│   │   │   ├── Path: /volume1/vm-storage
+│   │   │   ├── Protocol: NFS
+│   │   │   ├── Purpose: Shared storage for nested Proxmox VM workloads
+│   │   │   └── Access: Dev and Prod Proxmox servers
+│   │   │
+│   │   └── Backup Share
+│   │       ├── Path: /volume1/proxmox-backups
+│   │       ├── Protocol: NFS or SMB
+│   │       ├── Purpose: Proxmox Backup Server destination
+│   │       └── Access: Dev and Prod Proxmox servers
+│   │
+│   └── Proxmox Integration
+│       ├── Add NFS storage to both Proxmox hosts
+│       ├── Storage ID: nas-vm-storage
+│       ├── Content: VM images, containers
+│       └── Verify read/write access from both servers
+│
+├── Phase 6: Proxmox Internal Networks (VLANs)
+│   │
+│   ├── Network Architecture Overview
+│   │   ├── Physical LAN: 10.0.0.0/24 (ER605 managed)
+│   │   ├── Virtual networks created inside Proxmox
+│   │   └── Inter-VLAN routing via Proxmox Linux bridge
+│   │
+│   ├── Development Server Network Setup
+│   │   │
+│   │   ├── vmbr0 (Management Bridge)
+│   │   │   ├── Subnet: 10.0.0.0/24
+│   │   │   ├── Gateway: 10.0.0.1 (ER605)
+│   │   │   ├── Proxmox host IP: 10.0.0.10
+│   │   │   └── Purpose: External access, NAS connectivity
+│   │   │
+│   │   ├── vmbr10 (VLAN 10 - Management)
+│   │   │   ├── Subnet: 10.10.0.0/24
+│   │   │   ├── Gateway: 10.10.0.1 (Proxmox host)
+│   │   │   └── VMs: FreeIPA, Ansible LXC, Gitea LXC, NGINX LXC
+│   │   │
+│   │   └── vmbr20 (VLAN 20 - Nested Cluster)
+│   │       ├── Subnet: 10.20.0.0/24
+│   │       ├── Gateway: 10.20.0.1 (Proxmox host)
+│   │       └── VMs: Nested Proxmox nodes 1-3, K8s, Vault
+│   │
+│   ├── Production Server Network Setup
+│   │   │
+│   │   ├── vmbr0 (Management Bridge)
+│   │   │   ├── Subnet: 10.0.0.0/24
+│   │   │   ├── Gateway: 10.0.0.1 (ER605)
+│   │   │   ├── Proxmox host IP: 10.0.0.20
+│   │   │   └── Purpose: External access, NAS connectivity
+│   │   │
+│   │   ├── vmbr100 (VLAN 100 - Management)
+│   │   │   ├── Subnet: 10.100.0.0/24
+│   │   │   ├── Gateway: 10.100.0.1 (Proxmox host)
+│   │   │   └── VMs: FreeIPA replica, Ansible LXC, Gitea LXC, NGINX LXC
+│   │   │
+│   │   └── vmbr200 (VLAN 200 - Nested Cluster)
+│   │       ├── Subnet: 10.200.0.0/24
+│   │       ├── Gateway: 10.200.0.1 (Proxmox host)
+│   │       └── VMs: Nested Proxmox nodes 1-4, K8s, Vault
+│   │
+│   └── Routing Configuration
+│       ├── Enable IP forwarding on Proxmox hosts
+│       ├── NAT rules for VLAN to external access
+│       ├── Firewall rules between VLANs (optional isolation)
+│       └── Static routes for inter-VLAN communication
+│
+├── Phase 7: Nested Proxmox Cluster
+│   │
+│   ├── Development Nested Cluster
+│   │   │
+│   │   ├── Cluster Configuration
+│   │   │   ├── Cluster name: pve-dev-cluster
+│   │   │   ├── Nodes: 3 nested Proxmox VMs
+│   │   │   └── Network: VLAN 20 (10.20.0.0/24)
+│   │   │
+│   │   ├── Nested Proxmox Node 1
+│   │   │   ├── Hostname: pve-dev-01
+│   │   │   ├── IP: 10.20.0.11
+│   │   │   ├── RAM: 6GB total
+│   │   │   └── VMs inside: K8s master-1 (1.5GB), K8s worker-1 (1.5GB), Vault-1 (1GB)
+│   │   │
+│   │   ├── Nested Proxmox Node 2
+│   │   │   ├── Hostname: pve-dev-02
+│   │   │   ├── IP: 10.20.0.12
+│   │   │   ├── RAM: 6GB total
+│   │   │   └── VMs inside: K8s master-2 (1.5GB), K8s worker-2 (1.5GB), Vault-2 (1GB)
+│   │   │
+│   │   └── Nested Proxmox Node 3
+│   │       ├── Hostname: pve-dev-03
+│   │       ├── IP: 10.20.0.13
+│   │       ├── RAM: 6GB total
+│   │       └── VMs inside: K8s master-3 (1.5GB), K8s worker-3 (1.5GB), Vault-3 (1GB)
+│   │
+│   ├── Production Nested Cluster
+│   │   │
+│   │   ├── Cluster Configuration
+│   │   │   ├── Cluster name: pve-prod-cluster
+│   │   │   ├── Nodes: 4 nested Proxmox VMs (3 active + 1 DR standby)
+│   │   │   └── Network: VLAN 200 (10.200.0.0/24)
+│   │   │
+│   │   ├── Nested Proxmox Node 1
+│   │   │   ├── Hostname: pve-prod-01
+│   │   │   ├── IP: 10.200.0.11
+│   │   │   ├── RAM: 15GB total
+│   │   │   └── VMs inside: K8s master (4GB), K8s worker (7GB), Vault (2GB)
+│   │   │
+│   │   ├── Nested Proxmox Node 2
+│   │   │   ├── Hostname: pve-prod-02
+│   │   │   ├── IP: 10.200.0.12
+│   │   │   ├── RAM: 15GB total
+│   │   │   └── VMs inside: K8s master (4GB), K8s worker (7GB), Vault (2GB)
+│   │   │
+│   │   ├── Nested Proxmox Node 3
+│   │   │   ├── Hostname: pve-prod-03
+│   │   │   ├── IP: 10.200.0.13
+│   │   │   ├── RAM: 15GB total
+│   │   │   └── VMs inside: K8s master (4GB), K8s worker (7GB), Vault (2GB)
+│   │   │
+│   │   └── Nested Proxmox Node 4 (DR Standby)
+│   │       ├── Hostname: pve-prod-04
+│   │       ├── IP: 10.200.0.14
+│   │       ├── RAM: 15GB (shutdown until needed)
+│   │       └── Purpose: Disaster recovery standby
+│   │
+│   └── Cluster Setup Steps
+│       ├── Create first nested Proxmox VM with nested virtualization enabled
+│       ├── Install Proxmox VE on nested VM
+│       ├── Clone to create additional nodes
+│       ├── Initialize cluster on first node
+│       ├── Join remaining nodes to cluster
+│       ├── Configure shared storage (NAS NFS mount)
+│       └── Test HA and live migration
+│
+├── Architecture Summary (Infrastructure Layers)
+│   │
+│   ├── Network Layer
+│   │   ├── TP-Link ER605 router (WAN: 192.168.0.200, LAN: 10.0.0.0/24)
+│   │   ├── NAT for internet access
+│   │   └── Direct connectivity for servers and NAS
+│   │
+│   ├── Storage Layer
+│   │   ├── ASUSTOR FLASHSTOR 6 FS6706T NAS (10.0.0.30)
+│   │   ├── 2x 2TB RAID 1 (2TB usable)
+│   │   ├── NFS shares for VM storage and backups
+│   │   └── Shared between dev and prod environments
+│   │
+│   ├── Proxmox Layer (per environment)
+│   │   ├── Physical server with Proxmox VE 9.1
+│   │   ├── Administrative users for management
+│   │   ├── Automation users with API tokens
+│   │   ├── Internal VLANs for network isolation
+│   │   └── Nested Proxmox cluster for services
+│   │
+│   └── Nested Cluster Layer (per environment)
+│       ├── Dev: 3-node cluster (pve-dev-01 to 03) on VLAN 20
+│       ├── Prod: 4-node cluster (pve-prod-01 to 04) on VLAN 200
+│       ├── Services: K8s masters, K8s workers, Vault nodes
+│       └── Shared storage via NAS NFS
+│
+├── Key Learnings
+│   │
+│   ├── Iteration 7: Physical Infrastructure
+│   │   ├── Learned: WiFi-only hardware requires creative solutions (USB tethering)
+│   │   └── Nested vs physical infrastructure trade-offs for dev/prod separation
+│   │
+│   └── Final approach: Two completely independent environments mirroring each other's architecture at different scales
+│
+└── Bootstrap Phase: Complete
+    ├── Status: Both development and production environments fully operational and validated
+    ├── Infrastructure: ER605 router, ASUSTOR NAS, nested Proxmox clusters configured
+    ├── Ready for: Service deployment phase (FreeIPA, Vault, Kubernetes)
+    └── Note: pfSense replaced by ER605 hardware, TrueNAS replaced by ASUSTOR NAS
