@@ -1,0 +1,349 @@
+Resource Planning Documentation
+├── Environment: Development (24GB RAM, 500GB NVMe) and Production (64GB RAM, 500GB NVMe)
+│
+├── Environment Context
+│   ├── Type: Home Lab - Development & Learning
+│   ├── Usage: Few hours per day, shut down when not in use
+│   ├── Focus: Terraform, Ansible, Python development
+│   ├── Workload: Light (not heavy K8s production loads)
+│   └── Power: Energy-conscious, limited home space
+│
+├── Hardware
+│   ├── Dev Server: 24GB RAM, 500GB NVMe, NIC1 + NIC2 + WiFi adapter
+│   ├── Prod Server: 64GB RAM, 500GB NVMe, NIC1 + NIC2 + WiFi adapter
+│   ├── Mac Mini (Monitoring): 192.168.0.222
+│   │   ├── Docker Desktop
+│   │   ├── Prometheus container (metrics collection)
+│   │   ├── Grafana container (dashboards)
+│   │   └── Monitors: Both servers + all VMs inside
+│   ├── Router: TP-Link ER605 (2× WAN, 3× LAN)
+│   │   ├── WAN 1: Prod AWS VPN
+│   │   ├── WAN 2: Dev AWS VPN
+│   │   ├── LAN 1: Prod Service VLANs
+│   │   ├── LAN 2: Dev Service VLANs
+│   │   └── LAN 3: Access Point (Management)
+│   ├── Access Point: Connected to ER605 LAN 3 (Management WiFi)
+│   ├── Storage Switch: 5-port dumb switch (storage traffic only)
+│   └── NAS: ASUSTOR FLASHSTOR 6 FS6706T (2× 2TB RAID 1)
+│
+├── Physical Network Topology
+│   │
+│   ├── ER605 Router Configuration
+│   │   │
+│   │   ├── WAN Ports (Active-Active)
+│   │   │   ├── WAN 1: Static IP1 → AWS VPN Tunnel (Prod)
+│   │   │   └── WAN 2: Static IP2 → AWS VPN Tunnel (Dev)
+│   │   │
+│   │   └── LAN Ports
+│   │       ├── LAN 1: Prod Server NIC1 (Prod Service VLANs)
+│   │       ├── LAN 2: Dev Server NIC1 (Dev Service VLANs)
+│   │       └── LAN 3: Access Point → Management Subnet (shared)
+│   │                   ├── Prod Server WiFi
+│   │                   ├── Dev Server WiFi
+│   │                   └── NAS Management Interface
+│   │
+│   ├── Service Network (via ER605 LAN 1 & 2)
+│   │   ├── LAN 1 → Prod Server NIC1 (Prod VLANs trunk)
+│   │   ├── LAN 2 → Dev Server NIC1 (Dev VLANs trunk)
+│   │   └── Purpose: All service VLANs, inter-VLAN routing
+│   │
+│   ├── Management Network (via ER605 LAN 3 + Access Point)
+│   │   ├── Access Point connected to LAN 3
+│   │   ├── Prod Server WiFi → AP (Management)
+│   │   ├── Dev Server WiFi → AP (Management)
+│   │   ├── NAS Management → AP (Management)
+│   │   └── Purpose: Proxmox UI, SSH, out-of-band management
+│   │
+│   └── Storage Network (isolated, via dumb switch)
+│       │
+│       │    ┌───────────────────────────────┐
+│       │    │    5-Port Dumb Switch         │
+│       │    │    (Storage traffic ONLY)     │
+│       │    │                               │
+│       │    │ [Prod]────[Dev]────[NAS]      │
+│       │    │  NIC2      NIC2    ETH        │
+│       │    └───────────────────────────────┘
+│       │
+│       │    Storage IPs (10.0.30.0/26):
+│       │    ├── Prod Server NIC2: 10.0.30.20
+│       │    ├── Dev Server NIC2: 10.0.30.10
+│       │    └── ASUSTOR NAS: 10.0.30.30
+│       │
+│       └── Purpose: NFS mounts, Proxmox backups, PBS traffic only
+│
+├── WAN Configuration (ER605)
+│   │
+│   ├── ISP Static IPs (5 total)
+│   │   ├── IP1: WAN 1 → AWS VPN tunnel (Prod environment)
+│   │   ├── IP2: WAN 2 → AWS VPN tunnel (Dev environment)
+│   │   ├── IP3: Public services (port forward to NGINX)
+│   │   ├── IP4: Spare / Home network
+│   │   └── IP5: Spare / management access
+│   │
+│   ├── WAN Mode: Active-Active (dual WAN)
+│   │   ├── WAN 1 + LAN 1 = Prod path
+│   │   └── WAN 2 + LAN 2 = Dev path
+│   │
+│   └── ER605 Roles
+│       ├── Perimeter firewall
+│       ├── NAT for outbound internet
+│       ├── Inter-VLAN routing (all service VLANs)
+│       ├── Cross-server routing (Dev ↔ Prod)
+│       ├── AWS Site-to-Site VPN termination (2 tunnels)
+│       └── Port forwarding (80/443 → NGINX)
+│
+├── Monitoring Configuration
+│   │
+│   ├── Mac Mini (192.168.0.222)
+│   │   ├── Connected to: ISP Router (192.168.0.x network)
+│   │   ├── Docker Desktop running:
+│   │   │   ├── Prometheus (metrics scraping)
+│   │   │   └── Grafana (visualization)
+│   │   └── Targets: Proxmox hosts + all VMs
+│   │
+│   ├── Routing to Lab Networks (TBD)
+│   │   ├── Option 1: Static route on ISP Router
+│   │   │   └── Route 10.0.0.0/8 → 192.168.0.200 (ER605)
+│   │   ├── Option 2: Static route on Mac Mini
+│   │   │   └── route add 10.0.0.0/8 192.168.0.200
+│   │   └── ER605 routes internally to correct VLAN
+│   │
+│   └── Metrics Sources
+│       ├── Proxmox hosts (node exporter, PVE exporter)
+│       ├── VMs (node exporter inside each VM)
+│       └── K8s (kube-state-metrics, if deployed)
+│
+├── Security Architecture (Defense in Depth)
+│   │
+│   ├── Layer 1: ER605 (Perimeter)
+│   │   ├── WAN firewall rules
+│   │   ├── Inter-VLAN firewall policies
+│   │   └── VPN encryption
+│   │
+│   ├── Layer 2: Proxmox (Host)
+│   │   └── Proxmox firewall per VM/LXC
+│   │
+│   └── Layer 3: VM/LXC (Application)
+│       └── iptables / firewalld inside each VM
+│
+├── Traffic Flow
+│   │
+│   ├── Same VLAN, same server
+│   │   └── VM → Proxmox bridge → VM (internal L2, no routing)
+│   │
+│   ├── Cross VLAN (same or different server)
+│   │   └── VM → Proxmox → ER605 → Proxmox → VM
+│   │   └── ALL inter-VLAN traffic routed through ER605
+│   │
+│   ├── To internet
+│   │   └── VM → ER605 → NAT → Internet
+│   │
+│   ├── AWS VPN
+│   │   └── VM → ER605 → IPsec tunnel → AWS VPC
+│   │
+│   └── Storage/Backup
+│       └── VM → Proxmox NIC2 → Storage switch → NAS (isolated)
+│
+├── Routing Design (Production Pattern)
+│   │
+│   ├── ER605 as central L3 router for ALL VLANs
+│   │   ├── All inter-VLAN traffic passes through ER605
+│   │   ├── Centralized firewall rules between VLANs
+│   │   ├── Traffic inspection and logging
+│   │   ├── Single point of policy enforcement
+│   │   └── Matches production L3 switch pattern
+│   │
+│   ├── Why not Proxmox internal routing?
+│   │   ├── No firewall between VLANs = security gap
+│   │   ├── Production requires L3 device between layers
+│   │   ├── Service layer should not reach Management directly
+│   │   └── Audit trail requires centralized routing
+│   │
+│   └── Proxmox role
+│       ├── L2 bridging only (VLAN tagging)
+│       ├── No routing between VLANs
+│       └── Trunk port to ER605 carries all VLANs
+│
+├── VLAN Architecture
+│   │
+│   ├── Dev Server VLANs (10.0.x.0/26)
+│   │   ├── VLAN 10  │ 10.0.10.0/26 │ Management   │ .1 gw, .10 Proxmox
+│   │   ├── VLAN 31  │ 10.0.31.0/26 │ Ingress      │ .1 gw, .10 NGINX
+│   │   ├── VLAN 40  │ 10.0.40.0/26 │ Identity     │ .1 gw, .10 FreeIPA
+│   │   ├── VLAN 50  │ 10.0.50.0/26 │ K8s Masters  │ .1 gw, .10-.12 masters
+│   │   ├── VLAN 60  │ 10.0.60.0/26 │ K8s Workers  │ .1 gw, .10-.12 workers
+│   │   ├── VLAN 70  │ 10.0.70.0/26 │ Secrets      │ .1 gw, .10-.12 Vault
+│   │   └── VLAN 99  │ 10.0.99.0/26 │ Infra Ops    │ .1 gw, .10 Ansible, .11 Gitea
+│   │
+│   ├── Prod Server VLANs (10.1.x.0/26)
+│   │   ├── VLAN 110 │ 10.1.10.0/26 │ Management   │ .1 gw, .10 Proxmox
+│   │   ├── VLAN 131 │ 10.1.31.0/26 │ Ingress      │ .1 gw, .10 NGINX
+│   │   ├── VLAN 140 │ 10.1.40.0/26 │ Identity     │ .1 gw, .10 FreeIPA
+│   │   ├── VLAN 150 │ 10.1.50.0/26 │ K8s Masters  │ .1 gw, .10-.12 masters
+│   │   ├── VLAN 160 │ 10.1.60.0/26 │ K8s Workers  │ .1 gw, .10-.12 workers
+│   │   ├── VLAN 170 │ 10.1.70.0/26 │ Secrets      │ .1 gw, .10-.12 Vault
+│   │   └── VLAN 199 │ 10.1.99.0/26 │ Infra Ops    │ .1 gw, .10 Ansible, .11 Gitea
+│   │
+│   └── Storage Network (not VLAN, separate physical switch)
+│       └── 10.0.30.0/26 │ Storage │ NFS/Backup traffic only
+│
+├── ER605 VLAN Interfaces (Gateway .1 for each)
+│   │
+│   ├── Dev VLANs
+│   │   ├── VLAN 10  → 10.0.10.1/26
+│   │   ├── VLAN 31  → 10.0.31.1/26
+│   │   ├── VLAN 40  → 10.0.40.1/26
+│   │   ├── VLAN 50  → 10.0.50.1/26
+│   │   ├── VLAN 60  → 10.0.60.1/26
+│   │   ├── VLAN 70  → 10.0.70.1/26
+│   │   └── VLAN 99  → 10.0.99.1/26
+│   │
+│   └── Prod VLANs
+│       ├── VLAN 110 → 10.1.10.1/26
+│       ├── VLAN 131 → 10.1.31.1/26
+│       ├── VLAN 140 → 10.1.40.1/26
+│       ├── VLAN 150 → 10.1.50.1/26
+│       ├── VLAN 160 → 10.1.60.1/26
+│       ├── VLAN 170 → 10.1.70.1/26
+│       └── VLAN 199 → 10.1.99.1/26
+│
+├── Storage Architecture
+│   │
+│   ├── Local NVMe (OS Disks only)
+│   │   │
+│   │   ├── Dev Server (500GB NVMe)
+│   │   │   ├── Proxmox host OS: 20GB
+│   │   │   ├── FreeIPA OS: 15GB
+│   │   │   ├── NGINX OS: 10GB
+│   │   │   ├── K8s Masters (3): 15GB × 3 = 45GB
+│   │   │   ├── K8s Workers (3): 15GB × 3 = 45GB
+│   │   │   ├── Vault (3): 10GB × 3 = 30GB
+│   │   │   ├── Ansible LXC: 10GB
+│   │   │   ├── Gitea LXC: 10GB
+│   │   │   ├── ISOs/Templates: 30GB
+│   │   │   └── Total: ~215GB used, ~285GB free
+│   │   │
+│   │   └── Prod Server (500GB NVMe)
+│   │       ├── Proxmox host OS: 20GB
+│   │       ├── FreeIPA OS: 20GB
+│   │       ├── NGINX OS: 10GB
+│   │       ├── K8s Masters (3): 20GB × 3 = 60GB
+│   │       ├── K8s Workers (3): 25GB × 3 = 75GB
+│   │       ├── Vault (3): 15GB × 3 = 45GB
+│   │       ├── Ansible LXC: 15GB
+│   │       ├── Gitea LXC: 15GB
+│   │       ├── ISOs/Templates: 30GB
+│   │       └── Total: ~290GB used, ~210GB free
+│   │
+│   └── ASUSTOR NAS (Data Disks)
+│       ├── Configuration: 2× 2TB RAID 1 = 2TB usable
+│       ├── Connection: Via storage switch (isolated)
+│       │
+│       ├── Dev Data (~400GB)
+│       │   ├── FreeIPA data: 20GB
+│       │   ├── Gitea repos: 50GB
+│       │   ├── K8s PVs (persistent volumes): 200GB
+│       │   ├── Vault data: 30GB
+│       │   └── Configs/backups: 100GB
+│       │
+│       ├── Prod Data (~800GB)
+│       │   ├── FreeIPA data: 50GB
+│       │   ├── Gitea repos: 150GB
+│       │   ├── K8s PVs (persistent volumes): 400GB
+│       │   ├── Vault data: 50GB
+│       │   └── Configs/backups: 150GB
+│       │
+│       ├── PBS Backups (~600GB)
+│       │   └── Proxmox Backup Server storage
+│       │
+│       └── Free buffer: ~200GB
+│
+├── RAM Allocation - Development Environment (24GB)
+│   │
+│   ├── Infrastructure Layer (4GB)
+│   │   ├── Proxmox overhead: 2GB
+│   │   ├── FreeIPA: 1.5GB
+│   │   └── NGINX: 0.5GB
+│   │
+│   ├── Kubernetes Layer (12GB)
+│   │   ├── K8s Masters (3): 1.5GB × 3 = 4.5GB
+│   │   └── K8s Workers (3): 2.5GB × 3 = 7.5GB
+│   │
+│   ├── Secrets Layer (3GB)
+│   │   └── Vault (3): 1GB × 3 = 3GB
+│   │
+│   ├── Infra Ops Layer (1.5GB)
+│   │   ├── Ansible LXC: 0.5GB
+│   │   └── Gitea LXC: 1GB
+│   │
+│   └── Total: 20.5GB used, 3.5GB buffer
+│
+├── RAM Allocation - Production Environment (64GB)
+│   │
+│   ├── Infrastructure Layer (8GB)
+│   │   ├── Proxmox overhead: 4GB
+│   │   ├── FreeIPA: 3GB
+│   │   └── NGINX: 1GB
+│   │
+│   ├── Kubernetes Layer (36GB)
+│   │   ├── K8s Masters (3): 4GB × 3 = 12GB
+│   │   └── K8s Workers (3): 8GB × 3 = 24GB
+│   │
+│   ├── Secrets Layer (6GB)
+│   │   └── Vault (3): 2GB × 3 = 6GB
+│   │
+│   ├── Infra Ops Layer (4GB)
+│   │   ├── Ansible LXC: 1GB
+│   │   └── Gitea LXC: 3GB
+│   │
+│   └── Total: 54GB used, 10GB buffer
+│
+├── VM/LXC Inventory
+│   │
+│   ├── Dev Environment (11 VMs/LXCs)
+│   │   ├── FreeIPA VM        │ VLAN 40  │ 10.0.40.10
+│   │   ├── NGINX VM          │ VLAN 31  │ 10.0.31.10
+│   │   ├── K8s Master 1      │ VLAN 50  │ 10.0.50.10
+│   │   ├── K8s Master 2      │ VLAN 50  │ 10.0.50.11
+│   │   ├── K8s Master 3      │ VLAN 50  │ 10.0.50.12
+│   │   ├── K8s Worker 1      │ VLAN 60  │ 10.0.60.10
+│   │   ├── K8s Worker 2      │ VLAN 60  │ 10.0.60.11
+│   │   ├── K8s Worker 3      │ VLAN 60  │ 10.0.60.12
+│   │   ├── Vault 1           │ VLAN 70  │ 10.0.70.10
+│   │   ├── Vault 2           │ VLAN 70  │ 10.0.70.11
+│   │   ├── Vault 3           │ VLAN 70  │ 10.0.70.12
+│   │   ├── Ansible LXC       │ VLAN 99  │ 10.0.99.10
+│   │   └── Gitea LXC         │ VLAN 99  │ 10.0.99.11
+│   │
+│   └── Prod Environment (11 VMs/LXCs)
+│       ├── FreeIPA VM        │ VLAN 140 │ 10.1.40.10
+│       ├── NGINX VM          │ VLAN 131 │ 10.1.31.10
+│       ├── K8s Master 1      │ VLAN 150 │ 10.1.50.10
+│       ├── K8s Master 2      │ VLAN 150 │ 10.1.50.11
+│       ├── K8s Master 3      │ VLAN 150 │ 10.1.50.12
+│       ├── K8s Worker 1      │ VLAN 160 │ 10.1.60.10
+│       ├── K8s Worker 2      │ VLAN 160 │ 10.1.60.11
+│       ├── K8s Worker 3      │ VLAN 160 │ 10.1.60.12
+│       ├── Vault 1           │ VLAN 170 │ 10.1.70.10
+│       ├── Vault 2           │ VLAN 170 │ 10.1.70.11
+│       ├── Vault 3           │ VLAN 170 │ 10.1.70.12
+│       ├── Ansible LXC       │ VLAN 199 │ 10.1.99.10
+│       └── Gitea LXC         │ VLAN 199 │ 10.1.99.11
+│
+├── ISO Images Required
+│   ├── proxmox-ve_9.1-1.iso (Proxmox VE hypervisor)
+│   ├── proxmox-backup-server_4.1-1.iso (Proxmox Backup Server)
+│   └── Rocky-10.1-x86_64-minimal.iso (Rocky Linux for VMs)
+│
+└── Backup Strategy
+    │
+    ├── Storage Path: All backups via isolated storage switch
+    │
+    ├── Local NVMe
+    │   └── OS disks only, no persistent data
+    │
+    └── ASUSTOR NAS
+        ├── All persistent data stored here
+        ├── Proxmox Backup Server target (~600GB)
+        ├── NAS-level snapshots
+        └── RAID 1 for disk redundancy
