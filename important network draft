@@ -1,21 +1,41 @@
 Complete Infrastructure IP Plan:
-Management Plane (WiFi → AP → ER605 LAN3)
-VLAN 10 - Prod Server Management: 10.0.10.0/24
+Management Plane (WiFi → AP → ER605 Port 3)
+================================================================================
+VLAN 5 - Unified Management: 10.0.5.0/24  [ACTIVE - WiFi]
+├── Gateway (ER605):        10.0.5.1
+├── AP (Archer C24):        10.0.5.10
+├── Prod Proxmox mgmt:      10.0.5.100
+├── Dev Proxmox mgmt:       10.0.5.110
+└── NAS mgmt:               10.0.5.120
+
+WiFi Configuration:
+├── SSID: unified_mgmt
+├── Security: WPA2-PSK[AES]
+├── Password: ##############
+└── AP Mode: Access Point (Bridge)
+
+**WHY UNIFIED?** Consumer AP (Archer C24) cannot pass VLAN tags over 802.11 WiFi.
+All WiFi management traffic is untagged → PVID 5 → VLAN 5.
+
+--------------------------------------------------------------------------------
+OLD VLANS (Reserved for future Ethernet-based management):
+--------------------------------------------------------------------------------
+VLAN 10 - Prod Server Management: 10.0.10.0/24 [UNUSED - Future]
 ├── Gateway (ER605):        10.0.10.1
-└── Prod Proxmox mgmt:      10.0.10.100
+└── OLD Prod Proxmox mgmt:  10.0.10.100
 
-VLAN 20 - Dev Server Management: 10.0.20.0/24
+VLAN 20 - Dev Server Management: 10.0.20.0/24 [UNUSED - Future]
 ├── Gateway (ER605):        10.0.20.1
-└── Dev Proxmox mgmt:       10.0.20.100
+└── OLD Dev Proxmox mgmt:   10.0.20.100
 
-VLAN 30 - NAS Management: 10.0.30.0/24
+VLAN 30 - NAS Management: 10.0.30.0/24 [UNUSED - Future]
 ├── Gateway (ER605):        10.0.30.1
-└── NAS mgmt interface:     10.0.30.100
+└── OLD NAS mgmt interface: 10.0.30.100
 
 Storage Plane (Dumb Switch only, NO routing)
 VLAN 40 - Storage Data: 10.0.40.0/24
-├── NO Gateway
-├── NAS storage interface:  10.0.40.10
+├── NO Gateway (isolated L2 network)
+├── NAS storage interface:  10.0.40.120
 ├── Prod Proxmox storage:   10.0.40.100
 └── Dev Proxmox storage:    10.0.40.110
 
@@ -98,9 +118,10 @@ Static IPs (ISP):   5 public IPs (for VPN tunnels later)
 
 VLAN  Name                  Subnet          GW          Path
 ────────────────────────────────────────────────────────────────
-10    Prod Server Mgmt      10.0.10.0/24    10.0.10.1   WiFi→AP→LAN3
-20    Dev Server Mgmt       10.0.20.0/24    10.0.20.1   WiFi→AP→LAN3
-30    NAS Mgmt              10.0.30.0/24    10.0.30.1   WiFi→AP→LAN3
+5     Unified Mgmt [ACTIVE] 10.0.5.0/24     10.0.5.1    WiFi→AP→Port3 (UNTAG)
+10    Prod Server Mgmt [OLD] 10.0.10.0/24   10.0.10.1   Port3 (TAG) - Future
+20    Dev Server Mgmt [OLD]  10.0.20.0/24   10.0.20.1   Port3 (TAG) - Future
+30    NAS Mgmt [OLD]         10.0.30.0/24   10.0.30.1   Port3 (TAG) - Future
 40    Storage Data          10.0.40.0/24    NO GW       Dumb switch
 50    Prod Identity         10.0.50.0/24    10.0.50.1   Prod ETH→LAN1
 51    Prod Platform Mgmt    10.0.51.0/24    10.0.51.1   Prod ETH→LAN1
@@ -116,11 +137,13 @@ VLAN  Name                  Subnet          GW          Path
 65    Dev DMZ               10.0.65.0/24    10.0.65.1   Dev ETH→LAN2
 
 
-Role                  Prod IP         Dev IP
-─────────────────────────────────────────────
-Proxmox mgmt          10.0.10.100     10.0.20.100
-NAS mgmt              10.0.30.100     10.0.30.100
-NAS storage           10.0.40.10      10.0.40.10
+Role                  NEW IP (VLAN 5)   OLD IP
+──────────────────────────────────────────────────────
+Proxmox Prod mgmt     10.0.5.100        10.0.10.100
+Proxmox Dev mgmt      10.0.5.110        10.0.20.100
+NAS mgmt              10.0.5.120        10.0.30.100
+AP (Archer C24)       10.0.5.10         -
+NAS storage           10.0.40.120     10.0.40.120
 Proxmox storage       10.0.40.100     10.0.40.110
 FreeIPA primary       10.0.50.10      10.0.60.10
 FreeIPA replica       10.0.50.11      -
@@ -340,3 +363,632 @@ Summary:
 Question 1: Yes, need virtual interfaces in Proxmox, but just ONE VLAN-aware bridge. Not separate bridge per VLAN. Plus one management VLAN interface for Proxmox itself.
 Question 2: Yes, cross-environment testing = ER605 ACL change only. Proxmox untouched. Rule added, test done, rule removed.
 Question 3: Yes, VLAN X = configure subnet 10.0.X.0/24 + tag traffic with VLAN ID X + gateway 10.0.X.1 on ER605. All three together = one complete segment.
+
+
+================================================================================
+ER605 CONFIGURATION LOG
+================================================================================
+
+Date: 2026-02-12
+Mode: Standalone (no Omada Controller)
+
+COMPLETED STEPS:
+────────────────
+
+1. WAN Configuration
+   - ER605 WAN IP: 192.168.0.175 (static, from home router)
+   - Gateway: 192.168.0.1
+
+2. Attack Defense Settings (Firewall → Attack Defense)
+   - Uncheck "Block Ping from WAN" (allows ping testing from Mac Mini)
+   - Keep other DoS protections enabled
+
+3. IP Address Lists Created (Preferences → IP Group → IP Address)
+   **Best Practice:** Create granular lists (1 per subnet), then combine into groups.
+
+   | ID | Name             | Type          | Value              | Description           |
+   |----|------------------|---------------|--------------------|-----------------------|
+   | 1  | IP_LAN           | /Mask         | (auto-generated)   | All LAN subnets       |
+   | 2  | Mac_Mini_IP      | /Mask         | 192.168.0.220/30   | Mac Mini WiFi range   |
+   | 3  | Mgmt_Prod_10     | /Mask         | 10.0.10.0/24       | Mgmt Prod Server      |
+   | 4  | Mgmt_Dev_20      | /Mask         | 10.0.20.0/24       | Mgmt Dev Server       |
+   | 5  | Mgmt_NAS_30      | /Mask         | 10.0.30.0/24       | Mgmt NAS              |
+   | 6  | Prod_Identity_50 | /Mask         | 10.0.50.0/24       | Prod Identity         |
+   | 7  | Prod_Platform_51 | /Mask         | 10.0.51.0/24       | Prod Platform         |
+   | 8  | Prod_Vault_52    | /Mask         | 10.0.52.0/24       | Prod Vault            |
+   | 9  | Prod_Control_53  | /Mask         | 10.0.53.0/24       | Prod Control          |
+   | 10 | Prod_Data_54     | /Mask         | 10.0.54.0/24       | Prod Data             |
+   | 11 | Prod_DMZ_55      | /Mask         | 10.0.55.0/24       | Prod DMZ              |
+   | 12 | Dev_Identity_60  | /Mask         | 10.0.60.0/24       | Dev Identity          |
+   | 13 | Dev_Platform_61  | /Mask         | 10.0.61.0/24       | Dev Platform          |
+   | 14 | Dev_Vault_62     | /Mask         | 10.0.62.0/24       | Dev Vault             |
+   | 15 | Dev_Control_63   | /Mask         | 10.0.63.0/24       | Dev Control           |
+   | 16 | Dev_Data_64      | /Mask         | 10.0.64.0/24       | Dev Data              |
+   | 17 | Dev_DMZ_65       | /Mask         | 10.0.65.0/24       | Dev DMZ               |
+   | 18 | Router_Mgmt_1    | /Mask         | 10.0.1.0/24        | Router Management     |
+   | 19 | Unified_Mgmt_5   | /Mask         | 10.0.5.0/24        | Unified WiFi Mgmt     |
+
+   **Mac_Mini_IP /30 Range:**
+   - Network:    192.168.0.220
+   - Usable 1:   192.168.0.221
+   - Usable 2:   192.168.0.222
+   - Broadcast:  192.168.0.223
+
+4. IP Groups Created (Preferences → IP Group → IP Group)
+   **Use groups for broad rules, individual lists for specific rules.**
+
+   | ID | Group Name       | Members                                                    |
+   |----|------------------|------------------------------------------------------------|
+   | 1  | IPGROUP_ANY      | (system - any IP)                                          |
+   | 2  | IPGROUP_LAN      | IP_LAN (auto-generated, all LANs)                          |
+   | 3  | Mac_Mini_PC      | Mac_Mini_IP                                                |
+   | 4  | Prod_All         | Prod_Identity_50, Prod_Platform_51, Prod_Vault_52,         |
+   |    |                  | Prod_Control_53, Prod_Data_54, Prod_DMZ_55                 |
+   | 5  | Dev_All          | Dev_Identity_60, Dev_Platform_61, Dev_Vault_62,            |
+   |    |                  | Dev_Control_63, Dev_Data_64, Dev_DMZ_65                    |
+   | 6  | Server_Mgmt_All  | Mgmt_Prod_10, Mgmt_Dev_20, Mgmt_NAS_30 (OLD)               |
+   | 7  | Unified_Mgmt     | Unified_Mgmt_5 (ACTIVE - WiFi management)                  |
+
+5. Access Control Rules (Firewall → Access Control)
+   **Note:** Use Direction "All" to access IP Groups. "LAN→LAN" only shows LAN interface names.
+
+   | ID | Name              | Policy | Service | Direction | Source      | Destination  |
+   |----|-------------------|--------|---------|-----------|-------------|--------------|
+   | 1  | Mac_Mini_Allow    | Allow  | ALL     | [WAN] IN  | Mac_Mini_PC | IPGROUP_LAN  |
+   | 2  | Block_Dev_to_Prod | Block  | ALL     | ALL       | Dev_All     | Prod_All     |
+   | 3  | Block_Prod_to_Dev | Block  | ALL     | ALL       | Prod_All    | Dev_All      |
+
+   **ACL Effect:**
+   - Mac Mini can access all internal networks from WAN (for management)
+   - Development VLANs (60-65) cannot reach Production VLANs (50-55)
+   - Production VLANs (50-55) cannot reach Development VLANs (60-65)
+   - Management VLANs (10, 20, 30) can access both Prod and Dev (for administration)
+
+6. Mac Mini Static Route (on Mac Mini, not ER605)
+   - Command: sudo route add -net 10.0.0.0/8 192.168.0.175
+   - Allows Mac Mini (192.168.0.220-223) to reach all 10.x internal networks via ER605
+   - Make persistent: Add to startup script or System Preferences → Network → Routes
+
+7. VLAN Configuration (Network → VLAN)
+   Port Layout:
+   - Port 1 = WAN (VLAN 4094)
+   - Port 2 = WAN/LAN unused (VLAN 1 - Default-Vlan1)
+   - Port 3 = Management (VLAN 5 UNTAG + VLANs 10,20,30 TAG) - AP Archer C24
+   - Port 4 = Development (VLANs 60-65 TAG)
+   - Port 5 = Production (VLANs 50-55 TAG)
+
+   Port PVID Settings:
+   | Port  | PVID | VLANs                              |
+   |-------|------|------------------------------------|
+   | Port1 | 4094 | 4094(UNTAG)                        |
+   | Port2 | 1    | 1(UNTAG)                           |
+   | Port3 | 5    | 5(UNTAG) 10(TAG) 20(TAG) 30(TAG)   |
+   | Port4 | 65   | 60-65(TAG)                         |
+   | Port5 | 55   | 50-55(TAG)                         |
+
+   VLANs Created:
+   | VLAN ID | Name             | Port    | Mode  | Status          |
+   |---------|------------------|---------|-------|-----------------|
+   | 1       | Default-Vlan1    | 2       | UNTAG | Router Mgmt     |
+   | 5       | Unified-Mgmt     | 3       | UNTAG | ACTIVE - WiFi   |
+   | 10      | Mgmt-Prod-Server | 3       | TAG   | OLD - Future    |
+   | 20      | Mgmt-Dev-Server  | 3       | TAG   | OLD - Future    |
+   | 30      | Mgmt-NAS-Server  | 3       | TAG   | OLD - Future    |
+   | 50      | Prod-Identity    | 5       | TAG  |
+   | 51      | Prod-Platform    | 5       | TAG  |
+   | 52      | Prod-Vault       | 5       | TAG  |
+   | 53      | Prod-Control     | 5       | TAG  |
+   | 54      | Prod-Data        | 5       | TAG  |
+   | 55      | Prod-DMZ         | 5       | TAG  |
+   | 60      | Dev-Identity     | 4       | TAG  |
+   | 61      | Dev-Platform     | 4       | TAG  |
+   | 62      | Dev-Vault        | 4       | TAG  |
+   | 63      | Dev-Control      | 4       | TAG  |
+   | 64      | Dev-Data         | 4       | TAG  |
+   | 65      | Dev-DMZ          | 4       | TAG  |
+   | 4094    | vlan4094         | 1       | UNTAG|
+
+8. LAN Interface / Router Management (Network → LAN)
+   - Changed default LAN from 10.0.0.1/16 to:
+   - Name: Router_Mgmt
+   - VLAN: 1
+   - IP: 10.0.1.1/24
+   - DHCP: Disabled
+   - Purpose: Internal router web management
+
+9. Remote Management (System Tools → Administration)
+   - Disabled WAN/remote management
+   - Router now managed via internal IP 10.0.1.1 only
+
+VERIFICATION:
+   - traceroute 10.0.1.1 works via WAN (while ACL still active)
+   - Will manage router from internal network via AP on Port 3
+
+10. LAN Interfaces Created (Network → LAN) - COMPLETED
+    **KEY DISCOVERY:** Create LAN interface FIRST → VLAN auto-creates
+    Then edit VLAN to assign correct port with TAG mode.
+
+    | ID | Name             | VLAN | IP         | Subnet        | DHCP    | Status        |
+    |----|------------------|------|------------|---------------|---------|---------------|
+    | 1  | Internal_Mgmt    | 1    | 10.0.1.1   | 255.255.255.0 | Enabled | Router Mgmt   |
+    | 2  | Unified_Mgmt     | 5    | 10.0.5.1   | 255.255.255.0 | Disabled| ACTIVE - WiFi |
+    | 3  | Mgmt_Prod_Server | 10   | 10.0.10.1  | 255.255.255.0 | Disabled| OLD - Future  |
+    | 4  | Mgmt_Dev_Server  | 20   | 10.0.20.1  | 255.255.255.0 | Disabled| OLD - Future  |
+    | 5  | Mgmt_NAS         | 30   | 10.0.30.1  | 255.255.255.0 | Disabled| OLD - Future  |
+    | 5  | Prod_Identity    | 50   | 10.0.50.1  | 255.255.255.0 | Disabled|
+    | 6  | Prod_Platform    | 51   | 10.0.51.1  | 255.255.255.0 | Disabled|
+    | 7  | Prod_Vault       | 52   | 10.0.52.1  | 255.255.255.0 | Disabled|
+    | 8  | Prod_Control     | 53   | 10.0.53.1  | 255.255.255.0 | Disabled|
+    | 9  | Prod_Data        | 54   | 10.0.54.1  | 255.255.255.0 | Disabled|
+    | 10 | Prod_DMZ         | 55   | 10.0.55.1  | 255.255.255.0 | Disabled|
+    | 11 | Dev_Identity     | 60   | 10.0.60.1  | 255.255.255.0 | Disabled|
+    | 12 | Dev_Platform     | 61   | 10.0.61.1  | 255.255.255.0 | Disabled|
+    | 13 | Dev_Vault        | 62   | 10.0.62.1  | 255.255.255.0 | Disabled|
+    | 14 | Dev_Control      | 63   | 10.0.63.1  | 255.255.255.0 | Disabled|
+    | 15 | Dev_Data         | 64   | 10.0.64.1  | 255.255.255.0 | Disabled|
+    | 16 | Dev_DMZ          | 65   | 10.0.65.1  | 255.255.255.0 | Disabled|
+
+11. Final VLAN Port Assignment (Network → VLAN) - COMPLETED
+    | VLAN ID | Name    | Port     | Mode  | Description        |
+    |---------|---------|----------|-------|--------------------|
+    | 1       | vlan1   | 2        | UNTAG | Default-Vlan1-mgmt |
+    | 10      | vlan10  | 3        | TAG   | Mgmt_Prod_Server   |
+    | 20      | vlan20  | 3        | TAG   | Mgmt_Dev_Server    |
+    | 30      | vlan30  | 3        | TAG   | Mgmt_NAS           |
+    | 50      | vlan50  | 5        | TAG   | Prod_Identity      |
+    | 51      | vlan51  | 5        | TAG   | Prod_Platform      |
+    | 52      | vlan52  | 5        | TAG   | Prod_Vault         |
+    | 53      | vlan53  | 5        | TAG   | Prod_Control       |
+    | 54      | vlan54  | 5        | TAG   | Prod_Data          |
+    | 55      | vlan55  | 5        | TAG   | Prod_DMZ           |
+    | 60      | vlan60  | 4        | TAG   | Dev_Identity       |
+    | 61      | vlan61  | 4        | TAG   | Dev_Platform       |
+    | 62      | vlan62  | 4        | TAG   | Dev_Vault          |
+    | 63      | vlan63  | 4        | TAG   | Dev_Control        |
+    | 64      | vlan64  | 4        | TAG   | Dev_Data           |
+    | 65      | vlan65  | 4        | TAG   | Dev_DMZ            |
+    | 4094    | vlan4094| 1        | UNTAG | WAN                |
+
+12. AP Configuration (Archer C24 / AC750) - COMPLETED
+    - Mode: Access Point (Bridge)
+    - IP: 10.0.5.10 (static)
+    - Subnet: 255.255.255.0
+    - Gateway: 10.0.5.1
+    - VLAN: 5
+    - WiFi SSID: unified_mgmt
+    - WiFi Security: WPA2-PSK[AES]
+    - WiFi Password: ##############
+    - Connected to: ER605 Port 3
+
+VERIFICATION - ALL PASSED:
+    From Mac Mini (192.168.0.223/32) via route 10.0.0.0/8 → 192.168.0.175:
+    ✓ ping 10.0.1.1   (Internal Mgmt)
+    ✓ ping 10.0.5.1   (Unified Mgmt - WiFi)
+    ✓ ping 10.0.5.10  (AP Archer C24)
+    ✓ ping 10.0.10.1  (Mgmt Prod Server - OLD)
+    ✓ ping 10.0.20.1  (Mgmt Dev Server - OLD)
+    ✓ ping 10.0.30.1  (Mgmt NAS - OLD)
+    ✓ ping 10.0.50.1  (Prod Identity)
+    ✓ ping 10.0.60.1  (Dev Identity)
+    All gateway interfaces responding.
+
+    WiFi Test (via unified_mgmt SSID):
+    ✓ WiFi connection to AP
+    ✓ ping 10.0.5.1   (Gateway)
+    ✓ ping 10.0.50.1  (Prod)
+    ✓ ping 10.0.60.1  (Dev)
+
+    Proxmox DEV Server Tests:
+    ✓ ssh root@10.0.5.110 from Mac Mini (via WAN)
+    ✓ ping 10.0.40.120 from Proxmox (storage to NAS)
+
+================================================================================
+ER605 CONFIGURATION COMPLETE
+================================================================================
+
+================================================================================
+ER605 CONFIGURATION WORKFLOW SUMMARY
+================================================================================
+
+**KEY DISCOVERY - Correct Configuration Sequence:**
+
+1. Create LAN Interface (Network → LAN → Add)
+   - Set Name, VLAN ID, IP, Subnet Mask
+   - VLAN auto-creates with same ID
+
+2. Edit VLAN (Network → VLAN → Edit)
+   - Change ports from "all" to specific port
+   - Set TAG mode for trunk ports
+
+3. Create IP Address Lists (Preferences → IP Group → IP Address)
+   - One list per subnet (granular approach)
+   - Enables reuse in multiple rules
+
+4. Create IP Groups (Preferences → IP Group → IP Group)
+   - Combine lists into logical groups
+   - Use for broad ACL rules
+
+5. Create ACL Rules (Firewall → Access Control)
+   - Use Direction "All" to access IP Groups
+   - Direction "LAN→LAN" only shows LAN names
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+[✓] Configure AP on Port 3 - COMPLETED
+    - AP Mode: Access Point (Bridge)
+    - IP: 10.0.5.10
+    - SSID: unified_mgmt
+    - Security: WPA2-PSK[AES]
+    - VLAN 5 (UNTAG) for WiFi management
+[✓] Test WiFi connectivity - COMPLETED
+    - Ping 10.0.5.1 (gateway) ✓
+    - Ping 10.0.5.10 (AP) ✓
+    - Ping 10.0.50.1 (Prod) ✓
+    - Ping 10.0.60.1 (Dev) ✓
+[✓] Configure inter-VLAN ACL rules - COMPLETED
+    - Block_Dev_to_Prod: Dev cannot reach Prod
+    - Block_Prod_to_Dev: Prod cannot reach Dev
+[✓] Configure Proxmox DEV Server (3 interfaces) - COMPLETED
+    See detailed configuration above.
+
+    Summary:
+    | Interface       | IP           | Purpose                    |
+    |-----------------|--------------|----------------------------|
+    | wlp1s0 (WiFi)   | 10.0.5.110   | Management (SSH, Web UI)   |
+    | vmbr0 (bridge)  | None         | VM VLANs 60-65 (tagged)    |
+    | enxc8a362d2713e | 10.0.40.110  | Storage to NAS             |
+
+[ ] Configure Proxmox PROD Server (3 interfaces)
+    Interface 1: WiFi (Management)
+    ├── Connect to: unified_mgmt SSID
+    ├── IP: 10.0.5.100
+    ├── Subnet: 255.255.255.0
+    ├── Gateway: 10.0.5.1
+    └── Purpose: Proxmox web UI, SSH access
+
+    Interface 2: Ethernet - Service Trunk (to ER605 Port 5)
+    ├── VLAN-aware bridge (vmbr0)
+    ├── VLANs: 50, 51, 52, 53, 54, 55 (tagged)
+    ├── No IP on bridge itself
+    └── Purpose: VM service networks
+
+    Interface 3: Ethernet - Storage (to Dumb Switch)
+    ├── IP: 10.0.40.100
+    ├── Subnet: 255.255.255.0
+    ├── No Gateway (isolated)
+    └── Purpose: NFS/iSCSI to NAS (10.0.40.120)
+[✓] Configure NAS (ASUSTOR) - COMPLETED
+    Server name: NAS-Storage
+    Default Gateway: LAN 2
+
+    | Interface | IP           | Subnet        | Gateway   | Speed   | Purpose      |
+    |-----------|--------------|---------------|-----------|---------|--------------|
+    | LAN 2     | 10.0.5.120   | 255.255.255.0 | 10.0.5.1  | 100Mb   | Management   |
+    | LAN 1     | 10.0.40.120  | 255.255.255.0 | --        | 1000Mb  | Storage      |
+
+    - LAN 2 → AP → ER605 Port 3 → VLAN 5 (untagged)
+    - LAN 1 → Dumb switch → Storage network (isolated, no routing)
+
+[✓] Configure Proxmox DEV Server - COMPLETED
+    Hostname: pve-dev-master
+
+    Interface Names Discovered:
+    | Interface        | Type         | MAC               | Purpose          |
+    |------------------|--------------|-------------------|------------------|
+    | wlp1s0           | WiFi         | d0:39:57:7a:83:27 | Management       |
+    | nic0             | Ethernet     | 6c:1f:f7:1e:ce:ad | Service VLANs    |
+    | enxc8a362d2713e  | USB Ethernet | c8:a3:62:d2:71:3e | Storage          |
+
+    Configuration Steps:
+    ─────────────────────
+
+    Step 1: Install WiFi packages
+    ```
+    apt update && apt install -y wpasupplicant wireless-tools
+    ```
+
+    Step 2: Create wpa_supplicant config
+    ```
+    cat > /etc/wpa_supplicant/wpa_supplicant-wlp1s0.conf << 'EOF'
+    ctrl_interface=/var/run/wpa_supplicant
+    update_config=1
+    country=US
+
+    network={
+        ssid="unified_mgmt"
+        psk="##############"
+        key_mgmt=WPA-PSK
+    }
+    EOF
+    chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlp1s0.conf
+    ```
+
+    Step 3: Test WiFi connection manually
+    ```
+    wpa_supplicant -B -i wlp1s0 -c /etc/wpa_supplicant/wpa_supplicant-wlp1s0.conf
+    ip link set wlp1s0 up
+    ip addr add 10.0.5.110/24 dev wlp1s0
+    ping 10.0.5.1   # Test gateway
+    ```
+
+    Step 4: Final /etc/network/interfaces
+    ```
+    auto lo
+    iface lo inet loopback
+
+    # WiFi Management Interface
+    auto wlp1s0
+    iface wlp1s0 inet static
+        address 10.0.5.110
+        netmask 255.255.255.0
+        gateway 10.0.5.1
+        wpa-conf /etc/wpa_supplicant/wpa_supplicant-wlp1s0.conf
+
+    # Service VLAN Trunk (to ER605 Port 4)
+    auto nic0
+    iface nic0 inet manual
+
+    auto vmbr0
+    iface vmbr0 inet manual
+        bridge-ports nic0
+        bridge-stp off
+        bridge-fd 0
+        bridge-vlan-aware yes
+        bridge-vids 60-65
+
+    # Storage Interface (to Dumb Switch)
+    auto enxc8a362d2713e
+    iface enxc8a362d2713e inet static
+        address 10.0.40.110
+        netmask 255.255.255.0
+
+    source /etc/network/interfaces.d/*
+    ```
+
+    Step 5: Enable wpa_supplicant service
+    ```
+    systemctl enable wpa_supplicant
+    reboot
+    ```
+
+    Final Interface Configuration:
+    | Interface       | IP           | Gateway   | VLAN      | Purpose           |
+    |-----------------|--------------|-----------|-----------|-------------------|
+    | wlp1s0          | 10.0.5.110   | 10.0.5.1  | 5 (untag) | Management/SSH    |
+    | vmbr0           | None         | -         | 60-65 tag | VM Service Bridge |
+    | enxc8a362d2713e | 10.0.40.110  | -         | 40        | Storage to NAS    |
+
+    Verification:
+    ✓ ping 10.0.5.1    (Gateway via WiFi)
+    ✓ ping 10.0.40.120 (NAS storage interface)
+    ✓ ssh root@10.0.5.110 from Mac Mini
+
+================================================================================
+TROUBLESHOOTING LOG: SSH from WAN to LAN Issue
+================================================================================
+
+Problem:
+    - Mac Mini (192.168.0.223) could PING 10.0.5.110 (Proxmox WiFi)
+    - But SSH hung with no password prompt
+    - curl to HTTP also failed
+    - SSH from same VLAN (WiFi 10.0.5.x) worked fine
+
+Failed Troubleshooting Attempts:
+────────────────────────────────
+
+1. Check SSH service status
+   ```
+   systemctl status ssh
+   ```
+   Result: SSH running, listening on 0.0.0.0:22 ✓
+
+2. Check Proxmox firewall
+   - Datacenter → Firewall → Options
+   - Firewall: No (disabled)
+   Result: Not the issue ✓
+
+3. Check routing table
+   ```
+   ip route
+   ```
+   Result: Default gateway correct (10.0.5.1 via wlp1s0) ✓
+
+4. Add ER605 ACL rules for return traffic
+   - Added: Allow_LAN_to_Mac (LAN→WAN direction)
+   - Added: rrrrr (ALL direction, IPGROUP_LAN → Mac_Mini_PC)
+   Result: Still failed ✗
+
+5. Verbose SSH test
+   ```
+   ssh -v root@10.0.5.110
+   ```
+   Result: "Connection established" but then hung, later showed:
+   "kex_exchange_identification: read: Connection reset by peer"
+
+Root Cause Found:
+─────────────────
+ASYMMETRIC ROUTING
+
+Proxmox had TWO network paths to 192.168.0.x:
+1. WiFi (wlp1s0) → Gateway 10.0.5.1 → ER605 → WAN → 192.168.0.x
+2. vmbr0 with IP 192.168.0.220 → DIRECT to 192.168.0.x (same subnet)
+
+Traffic flow was broken:
+- Inbound:  Mac Mini → ER605 WAN → VLAN 5 → Proxmox WiFi (wlp1s0)
+- Outbound: Proxmox saw 192.168.0.223, had 192.168.0.220 on vmbr0,
+            replied DIRECTLY via vmbr0, bypassing ER605
+
+TCP requires symmetric routing. SYN came in on wlp1s0, but SYN-ACK
+went out on vmbr0 = connection reset.
+
+Solution:
+─────────
+Remove the old 192.168.0.220 IP from vmbr0:
+```
+ip addr del 192.168.0.220/24 dev vmbr0
+ip route del 192.168.0.0/24 dev vmbr0
+```
+
+Then update /etc/network/interfaces to remove old config permanently.
+
+Lesson Learned:
+───────────────
+When migrating management from one interface to another, REMOVE the old
+IP completely. Having IPs on multiple interfaces in overlapping/related
+subnets causes asymmetric routing issues for TCP connections.
+[ ] Add specific allow rules as needed (e.g., Prod_Control → Prod_Vault:8200)
+[ ] Change WiFi password to something stronger!
+
+================================================================================
+PROXMOX SERVER SETUP WORKFLOW
+================================================================================
+
+Scripts Location: /scripts/
+├── proxmox-network-setup-dev.sh   (DEV server network)
+├── proxmox-network-setup-prod.sh  (PROD server network)
+└── foundation/proxmox/bootstrap-dev.sh (Post-install bootstrap)
+
+--------------------------------------------------------------------------------
+STEP 0: INTERFACE NAMING (During Proxmox Install or After)
+--------------------------------------------------------------------------------
+
+Standard interface names (rename via systemd .link files):
+
+| Original Name      | Standard Name | Purpose              |
+|--------------------|---------------|----------------------|
+| wlp1s0             | wlp1s0        | Management WiFi (keep original) |
+| nic0 (varies)      | svc0          | Service VLAN trunk   |
+| enxc8a362d2713e    | stor0         | Storage network      |
+
+**NOTE:** WiFi interface renaming (wifi0) did not work reliably during testing.
+The .link file was created but the name reverted to wlp1s0 after reboot.
+Keeping original WiFi name (wlp1s0) in scripts. Only rename svc0 and stor0.
+
+Create .link files in /etc/systemd/network/:
+
+```bash
+# Service interface (get MAC with: ip link)
+cat > /etc/systemd/network/10-svc0.link << 'EOF'
+[Match]
+MACAddress=XX:XX:XX:XX:XX:XX
+
+[Link]
+Name=svc0
+EOF
+
+# Storage interface
+cat > /etc/systemd/network/10-stor0.link << 'EOF'
+[Match]
+MACAddress=XX:XX:XX:XX:XX:XX
+
+[Link]
+Name=stor0
+EOF
+```
+
+Reboot after creating .link files.
+
+--------------------------------------------------------------------------------
+STEP 1: BOOTSTRAP (Run First)
+--------------------------------------------------------------------------------
+
+Script: foundation/proxmox/bootstrap-dev.sh
+
+Purpose:
+- Disable sleep/suspend
+- Fix APT repos (disable enterprise, enable no-subscription)
+- APT update/upgrade
+- Remove subscription nag popup
+- Create admin user
+
+Run from temporary IP (192.168.0.x):
+```bash
+scp bootstrap-dev.sh root@192.168.0.x:/tmp/
+ssh root@192.168.0.x
+chmod +x /tmp/bootstrap-dev.sh
+/tmp/bootstrap-dev.sh
+```
+
+--------------------------------------------------------------------------------
+STEP 2: NETWORK SETUP (Run Second)
+--------------------------------------------------------------------------------
+
+Script: proxmox-network-setup-dev.sh (or -prod.sh)
+
+Purpose:
+- Install wpasupplicant
+- Configure WiFi for management (10.0.5.x)
+- Configure vmbr0 as VLAN-aware bridge
+- Configure storage interface (10.0.40.x)
+
+Prerequisites:
+- Interfaces svc0 and stor0 renamed (Step 0)
+- Bootstrap completed (Step 1)
+
+Run from console (NOT over WiFi!):
+```bash
+scp proxmox-network-setup-dev.sh root@192.168.0.x:/tmp/
+# Connect via console
+chmod +x /tmp/proxmox-network-setup-dev.sh
+WIFI_PASSWORD="yourpassword" /tmp/proxmox-network-setup-dev.sh
+# Or without env var to be prompted for password
+```
+
+--------------------------------------------------------------------------------
+STEP 3: VERIFY (After Reboot)
+--------------------------------------------------------------------------------
+
+```bash
+# Check interfaces
+ip addr
+
+# Test management
+ping 10.0.5.1
+
+# Test storage
+ping 10.0.40.120
+
+# Check VLAN bridge
+bridge vlan show
+```
+
+--------------------------------------------------------------------------------
+DEV SERVER FINAL STATE - TESTED & VERIFIED ✓
+--------------------------------------------------------------------------------
+
+| Interface | IP           | VLAN    | Purpose                    |
+|-----------|--------------|---------|----------------------------|
+| wlp1s0    | 10.0.5.110   | 5       | Management (SSH, Web UI)   |
+| svc0      | -            | -       | Physical (bridged)         |
+| vmbr0     | -            | 60-65   | VLAN-aware bridge for VMs  |
+| stor0     | 10.0.40.110  | 40      | Storage (NAS NFS/iSCSI)    |
+
+ER605 Connection:
+- wlp1s0 → AP → ER605 Port 3 (VLAN 5 untagged)
+- svc0 → ER605 Port 4 (VLANs 60-65 tagged)
+- stor0 → Dumb switch (isolated, no ER605)
+
+Test Results (2026-02-12):
+✓ ping google.com          - Internet access working
+✓ ping 10.0.5.1            - Management gateway OK
+✓ ping 10.0.40.120         - Storage NAS OK
+✓ bridge vlan show         - VLANs 60-65 configured on svc0
+✓ ssh root@10.0.5.110      - Remote access from Mac Mini OK
+
+--------------------------------------------------------------------------------
+PROD SERVER FINAL STATE
+--------------------------------------------------------------------------------
+
+| Interface | IP           | VLAN    | Purpose                    |
+|-----------|--------------|---------|----------------------------|
+| wlp4s0    | 10.0.5.100   | 5       | Management (SSH, Web UI)   |
+| svc0      | -            | -       | Physical (bridged)         |
+| vmbr0     | -            | 50-55   | VLAN-aware bridge for VMs  |
+| stor0     | 10.0.40.100  | 40      | Storage (NAS NFS/iSCSI)    |
+
+ER605 Connection:
+- wlp4s0 → AP → ER605 Port 3 (VLAN 5 untagged)
+- svc0 → ER605 Port 5 (VLANs 50-55 tagged)
+- stor0 → Dumb switch (isolated, no ER605)
