@@ -5,10 +5,9 @@
 
 set -e
 
-PLIST_NAME="com.local.route10.plist"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLIST_SRC="${SCRIPT_DIR}/${PLIST_NAME}"
-PLIST_DST="/Library/LaunchDaemons/${PLIST_NAME}"
+ROUTE_SCRIPT="/usr/local/bin/add-route.sh"
+PLIST_DST="/Library/LaunchDaemons/com.local.route10.plist"
 
 if [[ $EUID -ne 0 ]]; then
     echo "Run with sudo: sudo $0"
@@ -17,24 +16,26 @@ fi
 
 echo "Installing persistent route to 10.0.0.0/8 via 192.168.0.175..."
 
-# Copy plist
-cp "${PLIST_SRC}" "${PLIST_DST}"
+# Install route script
+cp "${SCRIPT_DIR}/add-route.sh" "$ROUTE_SCRIPT"
+chmod 755 "$ROUTE_SCRIPT"
+echo "Installed: $ROUTE_SCRIPT"
 
-# Set permissions
-chown root:wheel "${PLIST_DST}"
-chmod 644 "${PLIST_DST}"
+# Install plist
+cp "${SCRIPT_DIR}/com.local.route10.plist" "$PLIST_DST"
+chown root:wheel "$PLIST_DST"
+chmod 644 "$PLIST_DST"
+echo "Installed: $PLIST_DST"
 
-# Unload if already loaded
-launchctl unload "${PLIST_DST}" 2>/dev/null || true
+# Reload
+launchctl unload "$PLIST_DST" 2>/dev/null || true
+launchctl load "$PLIST_DST"
 
-# Load (also runs immediately)
-launchctl load "${PLIST_DST}"
-
-# Verify
-sleep 1
+# Wait and verify
+sleep 3
 echo ""
 echo "Route table:"
-netstat -rn | grep -E "^10 |^default"
+netstat -rn | grep -E "^10|^default"
 
 echo ""
-echo "Done! Route will persist after reboot."
+echo "Done! Reboot to verify persistence."
