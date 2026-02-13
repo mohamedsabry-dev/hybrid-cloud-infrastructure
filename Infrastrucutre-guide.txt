@@ -12,10 +12,20 @@ WiFi Configuration:
 ├── SSID: unified_mgmt
 ├── Security: WPA2-PSK[AES]
 ├── Password: ##############
-└── AP Mode: Access Point (Bridge)
+├── AP Mode: Access Point (Bridge)
+└── AP Isolation: ENABLED (DEV/PROD cannot reach each other)
 
 **WHY UNIFIED?** Consumer AP (Archer C24) cannot pass VLAN tags over 802.11 WiFi.
 All WiFi management traffic is untagged → PVID 5 → VLAN 5.
+
+**SECURITY:** AP Isolation enabled at Layer 2. Each WiFi client can only reach
+the gateway (10.0.5.1), not other clients. DEV (10.0.5.110) ←✗→ PROD (10.0.5.100).
+
+[TESTED 2026-02-13] ✓
+├── DEV (10.0.5.110) → PROD (10.0.5.100): BLOCKED (AP Isolation)
+├── PROD (10.0.5.100) → DEV (10.0.5.110): BLOCKED (AP Isolation)
+├── DEV → Gateway (10.0.5.1): PASS
+└── PROD → Gateway (10.0.5.1): PASS
 
 --------------------------------------------------------------------------------
 OLD VLANS (Reserved for future Ethernet-based management):
@@ -38,6 +48,31 @@ VLAN 40 - Storage Data: 10.0.40.0/24
 ├── NAS storage interface:  10.0.40.120
 ├── Prod Proxmox storage:   10.0.40.100
 └── Dev Proxmox storage:    10.0.40.110
+
+NAS Firewall Configuration (ASUSTOR ADM Defender)
+================================================================================
+Profile: Security_Restriction_for_Mac_Mini
+
+LAN 2 (Management - 10.0.5.x):
+├── Allow 192.168.0.223 (Mac Mini home network)
+├── Allow 10.0.5.223 (Mac Mini mgmt VLAN)
+└── Deny All
+
+LAN 1 (Storage - 10.0.40.x):
+├── Allow 10.0.40.100 (PROD Proxmox storage)
+├── Allow 10.0.40.110 (DEV Proxmox storage)
+└── Deny All
+
+**WHY?** Servers can access NAS storage (10.0.40.x) but NOT NAS management (10.0.5.120).
+VMs/LXCs work because storage traffic goes through Proxmox host IP, not VM IP.
+Only Mac Mini can manage NAS via web UI.
+
+[TESTED 2026-02-13] ✓
+├── PROD (10.0.40.100) → NAS storage (10.0.40.120): PASS
+├── DEV (10.0.40.110) → NAS storage (10.0.40.120): PASS
+├── PROD (10.0.5.100) → NAS mgmt (10.0.5.120): BLOCKED
+├── DEV (10.0.5.110) → NAS mgmt (10.0.5.120): BLOCKED
+└── Mac Mini → NAS mgmt (10.0.5.120): PASS
 
 Production Service Plane (Prod Ethernet → ER605 LAN1)
 
@@ -114,6 +149,34 @@ External / Router
 ER605 WAN:          192.168.0.175 (from home router)
 Home Router LAN:    192.168.0.1
 Static IPs (ISP):   5 public IPs (for VPN tunnels later)
+
+--------------------------------------------------------------------------------
+Static Route Configuration (Mac Mini to reach 10.x networks)
+--------------------------------------------------------------------------------
+
+**FAILED APPROACH - ISP Router Static Route:**
+├── Network Destination: 10.0.0.0
+├── Subnet Mask:         255.0.0.0
+├── Default Gateway:     192.168.0.175 (ER605 WAN)
+├── Interface:           LAN
+├── Result:              SSH disconnects after ~30 seconds
+└── Issue:               Same issue encountered in POC-v1 with this router
+                         See: poc-v1/troubleshooting/network/08-Static-Route-Loop-SSH-Disconnect.md
+
+**WORKING APPROACH - Local Static Route on Mac Mini:**
+├── Command:             sudo route add -net 10.0.0.0/8 192.168.0.175
+├── Result:              Stable SSH connections
+└── Note:                Must be configured on each external device that needs
+                         access to internal 10.x networks
+
+Persistent Route Setup (survives reboot):
+├── Scripts Location:    foundation/mac-mini/
+│   ├── com.local.route10.plist   (LaunchDaemon config)
+│   └── install-route.sh          (Installation script)
+├── Install Command:     sudo ./install-route.sh
+├── Plist Location:      /Library/LaunchDaemons/com.local.route10.plist
+├── How it works:        Runs at boot, pings ER605 to warm ARP, adds route
+└── Verify:              netstat -rn | grep "^10 "
 
 
 VLAN  Name                  Subnet          GW          Path
@@ -415,41 +478,71 @@ COMPLETED STEPS:
    - Broadcast:  192.168.0.223
 
 4. IP Groups Created (Preferences → IP Group → IP Group)
-   **Use groups for broad rules, individual lists for specific rules.**
 
    | ID | Group Name       | Members                                                    |
    |----|------------------|------------------------------------------------------------|
    | 1  | IPGROUP_ANY      | (system - any IP)                                          |
-   | 2  | IPGROUP_LAN      | IP_LAN (auto-generated, all LANs)                          |
+   | 2  | IPGROUP_LAN      | IP_LAN (all LAN subnets)                                   |
    | 3  | Mac_Mini_PC      | Mac_Mini_IP                                                |
-   | 4  | Prod_All         | Prod_Identity_50, Prod_Platform_51, Prod_Vault_52,         |
-   |    |                  | Prod_Control_53, Prod_Data_54, Prod_DMZ_55                 |
-   | 5  | Dev_All          | Dev_Identity_60, Dev_Platform_61, Dev_Vault_62,            |
-   |    |                  | Dev_Control_63, Dev_Data_64, Dev_DMZ_65                    |
-   | 6  | Server_Mgmt_All  | Mgmt_Prod_10, Mgmt_Dev_20, Mgmt_NAS_30 (OLD)               |
-   | 7  | Unified_Mgmt     | Unified_Mgmt_5 (ACTIVE - WiFi management)                  |
+   | 4  | DataCenter_Cairo | All IPs (Mac Mini + all VLANs + management)                |
+   | 5  | DC_SVC           | All service VLANs (50-55, 60-65)                           |
+   | 6  | DC_MGMT          | Router_Mgmt_1, Dev_Mgmt_IP, Prod_Mgmt_IP, NAS_mgmt         |
+   | 7  | Prod_Svc         | Prod_Identity_50 thru Prod_DMZ_55                          |
+   | 8  | Dev_Svc          | Dev_Identity_60 thru Dev_DMZ_65                            |
 
-5. Access Control Rules (Firewall → Access Control)
+5. IP Address Lists (Preferences → IP Group → IP Address)
+
+   | ID | Name             | IP Address/Mask    | Description              |
+   |----|------------------|--------------------|--------------------------|
+   | 1  | IP_LAN           | All LAN subnets    | Auto-generated           |
+   | 2  | Mac_Mini_IP      | 192.168.0.223/32   | Mac Mini WiFi adapter    |
+   | 3  | Prod_Identity_50 | 10.0.50.0/24       | PROD Identity VLAN       |
+   | 4  | Prod_Platform_51 | 10.0.51.0/24       | PROD Platform VLAN       |
+   | 5  | Prod_Vault_52    | 10.0.52.0/24       | PROD Vault VLAN          |
+   | 6  | Prod_Control_53  | 10.0.53.0/24       | PROD K8s Control VLAN    |
+   | 7  | Prod_Data_54     | 10.0.54.0/24       | PROD K8s Data VLAN       |
+   | 8  | Prod_DMZ_55      | 10.0.55.0/24       | PROD DMZ VLAN            |
+   | 9  | Dev_Identity_60  | 10.0.60.0/24       | DEV Identity VLAN        |
+   | 10 | Dev_Platform_61  | 10.0.61.0/24       | DEV Platform VLAN        |
+   | 11 | Dev_Vault_62     | 10.0.62.0/24       | DEV Vault VLAN           |
+   | 12 | Dev_Control_63   | 10.0.63.0/24       | DEV K8s Control VLAN     |
+   | 13 | Dev_Data_64      | 10.0.64.0/24       | DEV K8s Data VLAN        |
+   | 14 | Dev_DMZ_65       | 10.0.65.0/24       | DEV DMZ VLAN             |
+   | 15 | Router_Mgmt_1    | 10.0.1.0/24        | Router VLAN 1            |
+   | 16 | Dev_Mgmt_IP      | 10.0.5.110/32      | DEV Proxmox mgmt         |
+   | 17 | Prod_Mgmt_IP     | 10.0.5.100/32      | PROD Proxmox mgmt        |
+   | 18 | NAS_mgmt         | 10.0.5.120/32      | NAS mgmt                 |
+
+6. Access Control Rules (Firewall → Access Control)
    **Note:** Use Direction "All" to access IP Groups. "LAN→LAN" only shows LAN interface names.
 
-   | ID | Name              | Policy | Service | Direction | Source      | Destination  |
-   |----|-------------------|--------|---------|-----------|-------------|--------------|
-   | 1  | Mac_Mini_Allow    | Allow  | ALL     | [WAN] IN  | Mac_Mini_PC | IPGROUP_LAN  |
-   | 2  | Block_Dev_to_Prod | Block  | ALL     | ALL       | Dev_All     | Prod_All     |
-   | 3  | Block_Prod_to_Dev | Block  | ALL     | ALL       | Prod_All    | Dev_All      |
+   | ID | Name               | Policy | Service | Direction | Source      | Destination  |
+   |----|--------------------|--------|---------|-----------|-------------|--------------|
+   | 1  | Mac_Mini_Allow     | Allow  | ALL     | [WAN] IN  | Mac_Mini_PC | IPGROUP_LAN  |
+   | 2  | SVC_BLOCK_MGMT     | Block  | ALL     | ALL       | DC_SVC      | DC_MGMT      |
+   | 3  | PROD_SVC_Block_DEV | Block  | ALL     | ALL       | Prod_Svc    | Dev_Svc      |
+   | 4  | DEV_SVC_Block_PROD | Block  | ALL     | ALL       | Dev_Svc     | Prod_Svc     |
 
    **ACL Effect:**
    - Mac Mini can access all internal networks from WAN (for management)
+   - Service VLANs (50-65) cannot reach Management network (10.0.5.x)
    - Development VLANs (60-65) cannot reach Production VLANs (50-55)
    - Production VLANs (50-55) cannot reach Development VLANs (60-65)
-   - Management VLANs (10, 20, 30) can access both Prod and Dev (for administration)
+   - Management CAN reach Service (one-way for admin access)
 
-6. Mac Mini Static Route (on Mac Mini, not ER605)
+   [TESTED 2026-02-13] ✓
+   ├── DEV LXC (10.0.60.12) → PROD LXC (10.0.50.12): BLOCKED
+   ├── PROD LXC (10.0.54.12) → DEV LXC (10.0.64.12): BLOCKED
+   ├── DEV LXC (10.0.60.12) → DEV LXC (10.0.64.12): PASS (same env)
+   ├── Service VLANs → Management (10.0.5.x): BLOCKED
+   └── Service VLANs → Own gateway: PASS
+
+7. Mac Mini Static Route (on Mac Mini, not ER605)
    - Command: sudo route add -net 10.0.0.0/8 192.168.0.175
    - Allows Mac Mini (192.168.0.220-223) to reach all 10.x internal networks via ER605
    - Make persistent: Add to startup script or System Preferences → Network → Routes
 
-7. VLAN Configuration (Network → VLAN)
+8. VLAN Configuration (Network → VLAN)
    Port Layout:
    - Port 1 = WAN (VLAN 4094)
    - Port 2 = WAN/LAN unused (VLAN 1 - Default-Vlan1)
@@ -488,7 +581,7 @@ COMPLETED STEPS:
    | 65      | Dev-DMZ          | 4       | TAG  |
    | 4094    | vlan4094         | 1       | UNTAG|
 
-8. LAN Interface / Router Management (Network → LAN)
+9. LAN Interface / Router Management (Network → LAN)
    - Changed default LAN from 10.0.0.1/16 to:
    - Name: Router_Mgmt
    - VLAN: 1
@@ -558,7 +651,20 @@ VERIFICATION:
     - WiFi SSID: unified_mgmt
     - WiFi Security: WPA2-PSK[AES]
     - WiFi Password: ##############
+    - AP Isolation: ENABLED
     - Connected to: ER605 Port 3
+
+13. Remote Management (System Tools → Admin Setup → Remote Management)
+    | ID | Subnet/Mask       | Status  |
+    |----|-------------------|---------|
+    | 1  | 192.168.0.223/32  | Enabled |
+
+    Only Mac Mini can access ER605 web UI from WAN.
+
+14. System Settings (System Tools)
+    - Time Zone: (UTC+02:00) Cairo
+    - NTP: Auto from Internet
+    - Backup: backup-ER605-2026-02-13.bin
 
 VERIFICATION - ALL PASSED:
     From Mac Mini (192.168.0.223/32) via route 10.0.0.0/8 → 192.168.0.175:
