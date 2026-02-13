@@ -489,6 +489,9 @@ COMPLETED STEPS:
    | 6  | DC_MGMT          | Router_Mgmt_1, Dev_Mgmt_IP, Prod_Mgmt_IP, NAS_mgmt         |
    | 7  | Prod_Svc         | Prod_Identity_50 thru Prod_DMZ_55                          |
    | 8  | Dev_Svc          | Dev_Identity_60 thru Dev_DMZ_65                            |
+   | 9  | Prod_Mgmt_IP     | Prod_Mgmt_IP (10.0.5.100/32)                               |
+   | 10 | Dev_Mgmt_IP      | Dev_Mgmt_IP (10.0.5.110/32)                                |
+   | 11 | Unified_Mgmt_5   | Unified_Mgmt_5 (10.0.5.0/24)                               |
 
 5. IP Address Lists (Preferences → IP Group → IP Address)
 
@@ -512,35 +515,62 @@ COMPLETED STEPS:
    | 16 | Dev_Mgmt_IP      | 10.0.5.110/32      | DEV Proxmox mgmt         |
    | 17 | Prod_Mgmt_IP     | 10.0.5.100/32      | PROD Proxmox mgmt        |
    | 18 | NAS_mgmt         | 10.0.5.120/32      | NAS mgmt                 |
+   | 19 | Unified_Mgmt_5   | 10.0.5.0/24        | Entire mgmt subnet       |
 
 6. Access Control Rules (Firewall → Access Control)
    **Note:** Use Direction "All" to access IP Groups. "LAN→LAN" only shows LAN interface names.
+   **Rule order matters:** First match wins. ALLOW rules before BLOCK catch-all.
 
-   | ID | Name               | Policy | Service | Direction | Source      | Destination  |
-   |----|--------------------|--------|---------|-----------|-------------|--------------|
-   | 1  | Mac_Mini_Allow     | Allow  | ALL     | [WAN] IN  | Mac_Mini_PC | IPGROUP_LAN  |
-   | 2  | SVC_BLOCK_MGMT     | Block  | ALL     | ALL       | DC_SVC      | DC_MGMT      |
-   | 3  | PROD_SVC_Block_DEV | Block  | ALL     | ALL       | Prod_Svc    | Dev_Svc      |
-   | 4  | DEV_SVC_Block_PROD | Block  | ALL     | ALL       | Dev_Svc     | Prod_Svc     |
+   | ID | Name                | Policy | Service | Direction | Source         | Destination   |
+   |----|---------------------|--------|---------|-----------|----------------|---------------|
+   | 1  | Mac_Mini_Allow      | Allow  | ALL     | [WAN] IN  | Mac_Mini_PC    | IPGROUP_LAN   |
+   | 2  | SVC_BLOCK_MGMT      | Block  | ALL     | ALL       | DC_SVC         | DC_MGMT       |
+   | 3  | PROD_SVC_Block_DEV  | Block  | ALL     | ALL       | Prod_Svc       | Dev_Svc       |
+   | 4  | DEV_SVC_Block_PROD  | Block  | ALL     | ALL       | Dev_Svc        | Prod_Svc      |
+   | 5  | PROD_MGMT_Allow_PROD| Allow  | ALL     | ALL       | Prod_Mgmt_IP   | Prod_Svc      |
+   | 6  | DEV_MGMT_Allow_DEV  | Allow  | ALL     | ALL       | Dev_Mgmt_IP    | Dev_Svc       |
+   | 7  | MGMT_Block_SVC      | Block  | ALL     | ALL       | Unified_Mgmt_5 | DC_SVC        |
 
    **ACL Effect:**
    - Mac Mini can access all internal networks from WAN (for management)
    - Service VLANs (50-65) cannot reach Management network (10.0.5.x)
    - Development VLANs (60-65) cannot reach Production VLANs (50-55)
    - Production VLANs (50-55) cannot reach Development VLANs (60-65)
-   - Management CAN reach Service (one-way for admin access)
+   - PROD mgmt (10.0.5.100) can ONLY reach PROD services (50-55)
+   - DEV mgmt (10.0.5.110) can ONLY reach DEV services (60-65)
+   - Any rogue device on 10.0.5.x CANNOT reach any service VLANs
 
    [TESTED 2026-02-13] ✓
    ├── DEV LXC (10.0.60.12) → PROD LXC (10.0.50.12): BLOCKED
    ├── PROD LXC (10.0.54.12) → DEV LXC (10.0.64.12): BLOCKED
    ├── DEV LXC (10.0.60.12) → DEV LXC (10.0.64.12): PASS (same env)
    ├── Service VLANs → Management (10.0.5.x): BLOCKED
+   ├── PROD mgmt (10.0.5.100) → PROD services: PASS
+   ├── PROD mgmt (10.0.5.100) → DEV services: BLOCKED
+   ├── DEV mgmt (10.0.5.110) → DEV services: PASS
+   ├── DEV mgmt (10.0.5.110) → PROD services: BLOCKED
    └── Service VLANs → Own gateway: PASS
 
 7. Mac Mini Static Route (on Mac Mini, not ER605)
-   - Command: sudo route add -net 10.0.0.0/8 192.168.0.175
-   - Allows Mac Mini (192.168.0.220-223) to reach all 10.x internal networks via ER605
-   - Make persistent: Add to startup script or System Preferences → Network → Routes
+   Allows Mac Mini (192.168.0.223) to reach all 10.x internal networks via ER605.
+
+   Manual command: sudo route add -net 10.0.0.0/8 192.168.0.175
+
+   Persistent installation (survives reboot):
+   ```
+   cd foundation/mac-mini
+   sudo ./install-route.sh
+   ```
+
+   Files installed:
+   ├── /usr/local/bin/add-route.sh          (waits for network, adds route)
+   └── /Library/LaunchDaemons/com.local.route10.plist (runs at boot)
+
+   Verify after reboot:
+   ```
+   netstat -rn | grep "^10"
+   # Should show: 10/8  192.168.0.175  UGSc  ...
+   ```
 
 8. VLAN Configuration (Network → VLAN)
    Port Layout:
