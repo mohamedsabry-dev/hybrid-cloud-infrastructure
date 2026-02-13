@@ -22,6 +22,8 @@ STORAGE_INTERFACE="stor0"
 STORAGE_IP="10.0.40.100"
 STORAGE_NETMASK="255.255.255.0"
 NAS_STORAGE_IP="10.0.40.120"
+HOSTNAME_SHORT="pve-prod"
+HOSTNAME_FQDN="pve-prod.lab.local"
 
 #===============================================================================
 # CHECKS
@@ -124,6 +126,16 @@ if [[ -n "$OLD_IP" ]]; then
 fi
 
 systemctl enable wpa_supplicant
+
+# Update /etc/hosts with new management IP
+echo "Updating /etc/hosts..."
+sed -i "/\s${HOSTNAME_SHORT}/d" /etc/hosts
+echo "${MGMT_IP}  ${HOSTNAME_FQDN} ${HOSTNAME_SHORT}" >> /etc/hosts
+
+# Regenerate Proxmox certificate with new IP
+echo "Regenerating Proxmox SSL certificate..."
+pvecm updatecerts --force
+systemctl restart pveproxy
 
 echo ""
 echo "==============================================="
