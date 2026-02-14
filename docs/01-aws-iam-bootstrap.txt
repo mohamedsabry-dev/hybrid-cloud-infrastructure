@@ -19,67 +19,82 @@ Development  │ REDACTED_AWS_DEV   │ admin_dev   │ Enabled
                          BOOTSTRAP INFRASTRUCTURE
 ================================================================================
 
-CloudFormation Resources (per account)
+CloudFormation Bootstrap Stack (per account)
 ─────────────────────────────────────────────────────────────────────────────────
-Resource Type         │ Resource Name                                      │ Purpose
-──────────────────────┼────────────────────────────────────────────────────┼───────────────────────────────
-AWS::IAM::OIDCProvider│ GitHub OIDC Provider                               │ Identity federation for GitHub Actions
-AWS::S3::Bucket       │ hybrid-cloud-infrastructure-terraform-state        │ Terraform state storage
-AWS::DynamoDB::Table  │ hybrid-cloud-infrastructure-terraform-state-lock   │ State locking (prevent concurrent)
-AWS::S3::Bucket       │ hybrid-cloud-infrastructure-audit-logs             │ Audit/CloudTrail logs
-AWS::S3::BucketPolicy │ AuditBucketPolicy                                  │ Allow CloudTrail + Deny non-SSL
+Resource Type             │ Resource Name                                      │ Purpose
+──────────────────────────┼────────────────────────────────────────────────────┼────────────────────────────
+AWS::IAM::OIDCProvider    │ GitHub OIDC Provider                               │ Identity federation for GitHub Actions
+AWS::IAM::ManagedPolicy   │ TerraformPermissionsBoundary                       │ Protects bootstrap resources
+AWS::S3::Bucket           │ hybrid-cloud-infrastructure-tf-state-{env}         │ Terraform state storage
+AWS::S3::BucketPolicy     │ TerraformStateBucketPolicy                         │ Enforce TLS
+AWS::DynamoDB::Table      │ hybrid-cloud-infrastructure-tf-state-lock-{env}    │ State locking
+AWS::IAM::Role            │ GitHubActions-TerraformAdmin-{env}                 │ Admin role for security branch
+
+Deployment Files:
+├── infrastructure/aws/bootstrap-dev.yaml  → Deploy to dev account
+└── infrastructure/aws/bootstrap-prod.yaml → Deploy to prod account
+
+Deploy Command:
+    aws cloudformation deploy --template-file bootstrap-{env}.yaml \
+        --stack-name {env}-bootstrap --capabilities CAPABILITY_NAMED_IAM \
+        --region eu-west-2
 
 Security Features:
-├── S3 Buckets: Versioning, Encryption (AES256), Public Access Blocked
-├── Terraform State Bucket: Logging to AuditBucket, Lifecycle (90 days for old versions)
-├── DynamoDB: DeletionProtectionEnabled, SSESpecification enabled
-├── AuditBucket: Lifecycle (365 days expiration, 90 days for old versions)
-└── Resources 2, 3, 4 have DeletionPolicy: Retain (won't delete if stack deleted)
+├── S3 Buckets: Versioning, Encryption (AES256), Public Access Blocked, TLS Enforced
+├── DynamoDB: DeletionProtectionEnabled, SSE enabled
+├── DeletionPolicy: Retain on S3 and DynamoDB (survives stack deletion)
+└── PermissionsBoundary: Denies modification of OIDC, State Bucket, Lock Table, Admin Role
 
 ================================================================================
                          IAM ROLES
 ================================================================================
 
-Roles & Branch Trust
+2-Tier Role Architecture
 ─────────────────────────────────────────────────────────────────────────────────
-Role                              │ Trusted Branch   │ Purpose                         │ Attached Policies
-──────────────────────────────────┼──────────────────┼─────────────────────────────────┼────────────────────────────────────
-GitHubActions-TerraformAdmin-prod │ prod-security    │ IAM/security changes            │ TerraformState, SecurityAuditControl, ReadOnlyAccess
-GitHubActions-TerraformAdmin-dev  │ dev-security     │ IAM/security changes            │ TerraformState, SecurityAuditControl, ReadOnlyAccess
-GitHubActions-Network             │ main + feature/* │ The Infrastructure Architect    │ TerraformState, NetworkFullManagement, ReadOnlyAccess
-GitHubActions-Application         │ main + feature/* │ The Builder                     │ TerraformState, SecurityBoundary, ApplicationFullManagement, ReadOnlyAccess
-GitHubActions-Audit               │ main + feature/* │ Security, Monitoring & Observ.  │ TerraformState, SecurityAuditControl, ReadOnlyAccess
-GitHubActions-Infrastructure-prod │ prod             │ Production deployments          │ TerraformState, NetworkFullManagement, ApplicationFullManagement
-GitHubActions-Infrastructure-dev  │ dev              │ Development deployments         │ TerraformState, NetworkFullManagement, ApplicationFullManagement
 
-Role Details:
-├── Network: Core network only, no PassRole needed (doesn't deploy compute)
-├── Application: Has SecurityBoundary for PassRole to EC2-*/EKS-* roles
-├── Audit: Manages CloudTrail and audit infrastructure
-└── All roles: Restricted to main + mohamedsabrydev/* branches only
+TIER 1: CloudFormation Bootstrap Roles (Manual Deploy)
+─────────────────────────────────────────────────────────────────────────────────
+Role                              │ Trusted Branch   │ Policies
+──────────────────────────────────┼──────────────────┼────────────────────────────────────
+GitHubActions-TerraformAdmin-dev  │ dev-security     │ AdministratorAccess + PermissionsBoundary
+GitHubActions-TerraformAdmin-prod │ prod-security    │ AdministratorAccess + PermissionsBoundary
+
+Purpose: Full admin for IAM/security changes, constrained by PermissionsBoundary
+
+TIER 2: Terraform-Managed Roles (Deployed by TerraformAdmin)
+─────────────────────────────────────────────────────────────────────────────────
+Role                              │ Trusted Branch   │ Policies
+──────────────────────────────────┼──────────────────┼────────────────────────────────────
+GitHubActions-Infrastructure-dev  │ dev              │ PowerUserAccess + TerraformState + SecurityBoundary
+GitHubActions-Infrastructure-prod │ prod             │ PowerUserAccess + TerraformState + SecurityBoundary
+
+Purpose: Infrastructure deployments (Proxmox VMs, etc), no IAM mutation allowed
+
+Terraform Files:
+├── terraform/dev/aws/iam/  → Creates Infrastructure-dev role
+└── terraform/prod/aws/iam/ → Creates Infrastructure-prod role
 
 ================================================================================
                          IAM POLICIES
 ================================================================================
 
-CloudFormation Stack Policies
+CloudFormation Bootstrap Policy
 ─────────────────────────────────────────────────────────────────────────────────
-Policy Name                              │ Purpose
-─────────────────────────────────────────┼─────────────────────────────────────────
-HybridCloud-TerraformState-Common        │ S3 + DynamoDB access for Terraform state
-HybridCloud-Terraform-SecurityBoundary   │ PassRole for EC2-*/EKS-* only, Deny IAM mutations
-HybridCloud-NetworkFullManagement        │ Core network: VPC, Subnets, Routes, VPN, Peering, NACLs, Endpoints
-HybridCloud-ApplicationFullManagement    │ App-facing: EC2, EKS, ECR, SG, NAT, ELB, EIP, ENI
-HybridCloud-SecurityAuditControl         │ CloudTrail, CloudWatch, EventBridge, SNS, Audit Bucket config
+Policy Name                    │ Purpose
+───────────────────────────────┼────────────────────────────────────────────────────
+TerraformPermissionsBoundary   │ Denies modification of bootstrap resources:
+                               │ - OIDC Provider
+                               │ - State Bucket
+                               │ - Lock Table
+                               │ - TerraformAdmin role
+                               │ - PermissionsBoundary policy itself
 
-Policy Details:
-├── TerraformStatePolicy: Uses !ImportValue for bucket/table ARNs (cross-stack reference)
-├── SecurityBoundary: PassRole limited to EC2-* and EKS-* role patterns only
-├── NetworkFullManagement: Core fabric only (VPC, subnets, routes, VPN, peering)
-├── ApplicationFullManagement: Includes SG, NAT, ELB, EIP, ENI (app-facing resources)
-└── SecurityAuditControl: PassRole for CloudTrail role, manages audit infrastructure
-
-Explicit Denies: IAM mutations, Billing, CloudTrail modifications
+Terraform-Managed Policies
+─────────────────────────────────────────────────────────────────────────────────
+Policy Name                    │ Purpose
+───────────────────────────────┼────────────────────────────────────────────────────
+TerraformState-Dev/Prod        │ S3 + DynamoDB access for Terraform state ({env}/* only)
+SecurityBoundary-Dev/Prod      │ Denies: iam:*, cloudtrail:*, billing actions
 
 ================================================================================
                          STATE ACCESS ISOLATION
@@ -87,37 +102,68 @@ Explicit Denies: IAM mutations, Billing, CloudTrail modifications
 
 Role to State Path Mapping
 ─────────────────────────────────────────────────────────────────────────────────
-Role                 │ State Path Access
-─────────────────────┼──────────────────────────────────────
-Infrastructure-dev   │ dev/* only
-Infrastructure-prod  │ prod/* only
+Role                         │ State Path Access
+─────────────────────────────┼──────────────────────────────────
+GitHubActions-Infrastructure-dev  │ dev/* only
+GitHubActions-Infrastructure-prod │ prod/* only
 
 ================================================================================
                          SECRETS MANAGEMENT
 ================================================================================
 
-AWS Secrets Manager
+AWS Secrets Manager (Terraform-managed)
 ─────────────────────────────────────────────────────────────────────────────────
-Secret Path                      │ Environment │ Content
-─────────────────────────────────┼─────────────┼────────────────────────
-dev/proxmox/terraform-token      │ Development │ Proxmox API token
-prod/proxmox/terraform-token     │ Production  │ Proxmox API token
+Secret Path                          │ Content
+─────────────────────────────────────┼──────────────────────────────────────────
+{env}/proxmox/terraform-token        │ Proxmox API token (token_id + token_secret JSON)
+{env}/proxmox/ssh-admin-password     │ SSH password for admin_{env} user
+{env}/proxmox/vm-root-password       │ Root password for VMs (cloud-init)
+{env}/proxmox/gandalf-password       │ Break-glass emergency password
+
+Terraform Files:
+├── terraform/dev/aws/secrets/  → Creates dev secrets
+└── terraform/prod/aws/secrets/ → Creates prod secrets
 
 ================================================================================
-                         DEPLOYMENT MODEL
+                         DEPLOYMENT WORKFLOW
 ================================================================================
 
-Stack Deployment Methods
-─────────────────────────────────────────────────────────────────────────────────
-Stack      │ Method         │ Deployment File Path                                           │ Reason
-───────────┼────────────────┼────────────────────────────────────────────────────────────────┼──────────────────────────────
-Bootstrap  │ MANUAL ONLY    │ cloud/aws/bootstrap/cloudformation/bootstrap/deployment-file.yaml │ Critical infra, manual control
-Policies   │ GitSync (main) │ cloud/aws/iam/cloudformation/policies/deployment-file.yaml        │ Auto-deploy after PR review
-Roles      │ GitSync (main) │ cloud/aws/iam/cloudformation/roles/deployment-file.yaml           │ Depends on Policies stack
+Step │ What                          │ How                    │ Role Used
+─────┼───────────────────────────────┼────────────────────────┼──────────────────────────────
+1    │ Bootstrap (OIDC, State, Admin)│ Manual CloudFormation  │ Console admin (human)
+2    │ IAM/Secrets via Terraform     │ GitHub Actions         │ GitHubActions-TerraformAdmin-{env}
+3    │ Infrastructure (VMs, etc)     │ GitHub Actions         │ GitHubActions-Infrastructure-{env}
+
+Branch Strategy:
+├── dev-security / prod-security : IAM changes (TerraformAdmin role)
+├── dev / prod                   : Infrastructure deployments (Infrastructure role)
+└── main                         : Documentation and shared code
 
 Security Controls:
-├── Branch protection on main (require PR + review)
-├── CODEOWNERS: /cloud/aws/iam/ requires @mohamedsabrydev approval
-├── SecurityBoundary policy denies IAM mutations from Terraform roles
-├── GitSync only triggers on merge to main (not on feature branches)
+├── PermissionsBoundary prevents bootstrap resource modification
+├── SecurityBoundary prevents IAM mutation from Infrastructure roles
+├── State isolation: dev role can only access dev/* state paths
 └── Bootstrap stack manually deployed by console admin only
+
+================================================================================
+                         TERRAFORM STRUCTURE
+================================================================================
+
+terraform/
+├── dev/
+│   ├── aws/
+│   │   ├── iam/           # GitHubActions-Infrastructure-dev role + policies
+│   │   └── secrets/       # Proxmox secrets in Secrets Manager
+│   └── proxmox/
+│       ├── resources/     # Query Proxmox cluster info
+│       └── vms/
+│           ├── golden-image/  # Rocky Linux golden image template
+│           └── test-clones/   # Test VMs from template
+└── prod/
+    ├── aws/
+    │   ├── iam/           # GitHubActions-Infrastructure-prod role + policies
+    │   └── secrets/       # Proxmox secrets in Secrets Manager
+    └── proxmox/
+        └── resources/     # Query Proxmox cluster info
+
+================================================================================
