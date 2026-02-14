@@ -31,5 +31,5 @@ variable "golden_image_vmid" {
 variable "cloud_image_file_id" {
   description = "Rocky Linux cloud image file ID on NAS (format: storage:content_type/filename)"
   type        = string
-  default     = "nas-iso:iso/Rocky-10-GenericCloud.latest.x86_64.qcow2"
+  default     = "nas-iso:iso/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2"
 }
