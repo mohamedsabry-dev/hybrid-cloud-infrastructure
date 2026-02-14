@@ -1,89 +1,143 @@
 #!/bin/bash
 #===============================================================================
-# Golden Image Cleanup Script
-# Run AFTER cloud-init completes, BEFORE converting to template
+# Golden Image Setup & Cleanup Script
+# Run AFTER manual OS installation, BEFORE converting to template
 # Supports: Rocky Linux 10.x / RHEL-based
 #
-# Usage: ./golden-image-setup.sh
+# Usage: curl -sL <url> | bash  OR  ./golden-image-setup.sh
 #===============================================================================
 
 set -e
 
 echo "==============================================================================="
-echo "         GOLDEN IMAGE CLEANUP - Preparing for Template"
+echo "         GOLDEN IMAGE SETUP - Rocky Linux 10.x"
 echo "==============================================================================="
 
-# Wait for cloud-init to complete
-echo ">>> Checking cloud-init status..."
-cloud-init status --wait || true
+#-------------------------------------------------------------------------------
+# 1. System Update
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [1/9] Updating system packages..."
+dnf update -y
 
 #-------------------------------------------------------------------------------
-# 1. Clean Package Cache
+# 2. Install Essential Packages
 #-------------------------------------------------------------------------------
-echo ">>> Cleaning package cache..."
+echo ""
+echo ">>> [2/9] Installing essential packages..."
+dnf install -y \
+    qemu-guest-agent \
+    cloud-init \
+    curl \
+    wget \
+    vim \
+    htop \
+    git \
+    ca-certificates \
+    sudo \
+    bash-completion \
+    tar \
+    unzip \
+    openssh-server \
+    openssh-clients \
+    net-tools \
+    traceroute \
+    bind-utils \
+    tcpdump \
+    nmap-ncat \
+    iputils \
+    iproute
+
+#-------------------------------------------------------------------------------
+# 3. Enable Services
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [3/9] Enabling services..."
+systemctl enable qemu-guest-agent
+systemctl start qemu-guest-agent
+systemctl enable sshd
+systemctl enable cloud-init
+
+# Enable root SSH login
+sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
+systemctl restart sshd
+
+#-------------------------------------------------------------------------------
+# 4. Clean Package Cache
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [4/9] Cleaning package cache..."
 dnf clean all
 rm -rf /var/cache/dnf/*
 
 #-------------------------------------------------------------------------------
-# 2. Clear Logs
+# 5. Clear Logs
 #-------------------------------------------------------------------------------
-echo ">>> Clearing logs..."
+echo ""
+echo ">>> [5/9] Clearing logs..."
 find /var/log -type f -exec truncate -s 0 {} \;
 journalctl --vacuum-time=1s
 
 #-------------------------------------------------------------------------------
-# 3. Clear Temp Files
+# 6. Clear Temp Files and History
 #-------------------------------------------------------------------------------
-echo ">>> Clearing temp files..."
+echo ""
+echo ">>> [6/9] Clearing temp files and history..."
 rm -rf /tmp/*
 rm -rf /var/tmp/*
-
-#-------------------------------------------------------------------------------
-# 4. Clear Shell History
-#-------------------------------------------------------------------------------
-echo ">>> Clearing shell history..."
 unset HISTFILE
 rm -f /root/.bash_history
 rm -f /home/*/.bash_history
-history -c
+history -c 2>/dev/null || true
 
 #-------------------------------------------------------------------------------
-# 5. Reset Machine ID (regenerates on first boot)
+# 7. Reset Machine ID (regenerates on first boot)
 #-------------------------------------------------------------------------------
-echo ">>> Resetting machine-id..."
+echo ""
+echo ">>> [7/9] Resetting machine-id..."
 truncate -s 0 /etc/machine-id
 rm -f /var/lib/dbus/machine-id
 
 #-------------------------------------------------------------------------------
-# 6. Remove SSH Host Keys (regenerates on first boot)
+# 8. Remove SSH Host Keys (regenerates on first boot)
 #-------------------------------------------------------------------------------
-echo ">>> Removing SSH host keys..."
+echo ""
+echo ">>> [8/9] Removing SSH host keys..."
 rm -f /etc/ssh/ssh_host_*
 
 #-------------------------------------------------------------------------------
-# 7. Clear Network Config (configure per-clone)
+# 9. Clear Network Config & Cloud-Init State
 #-------------------------------------------------------------------------------
-echo ">>> Clearing network configuration..."
+echo ""
+echo ">>> [9/9] Clearing network and cloud-init state..."
 rm -f /etc/NetworkManager/system-connections/*.nmconnection
 rm -f /etc/sysconfig/network-scripts/ifcfg-*
 truncate -s 0 /etc/hostname
+cloud-init clean --logs --seed 2>/dev/null || true
 
 #-------------------------------------------------------------------------------
-# 8. Reset Cloud-Init (runs fresh on clone)
+# Done - Ready for Template
 #-------------------------------------------------------------------------------
-echo ">>> Resetting cloud-init..."
-cloud-init clean --logs --seed
-
-#-------------------------------------------------------------------------------
-# Done - Shutdown
-#-------------------------------------------------------------------------------
+echo ""
 echo "==============================================================================="
-echo "Cleanup complete! Ready for template conversion."
+echo "  SETUP COMPLETE - Ready for template conversion"
+echo "==============================================================================="
+echo ""
+echo "Installed packages:"
+echo "  - qemu-guest-agent, cloud-init"
+echo "  - curl, wget, vim, htop, git"
+echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat"
+echo "  - openssh-server/clients, bash-completion, tar, unzip"
 echo ""
 echo "Next steps:"
-echo "  1. Shutdown: shutdown -h now"
-echo "  2. In Proxmox: Right-click VM > Convert to Template"
+echo "  1. Verify everything looks good"
+echo "  2. Shutdown: shutdown -h now"
+echo "  3. Remove CD-ROM in Proxmox (Hardware > CD/DVD > Do not use any media)"
+echo "  4. Change boot order to disk only (Options > Boot Order)"
+echo "  5. Convert to template: Right-click VM > Convert to Template"
 echo "==============================================================================="
+echo ""
 
 read -p "Shutdown now? (y/n): " SHUTDOWN
 if [ "$SHUTDOWN" = "y" ]; then
