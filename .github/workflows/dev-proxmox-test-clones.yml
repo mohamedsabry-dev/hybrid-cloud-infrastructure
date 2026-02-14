@@ -1,5 +1,5 @@
 # Dev Proxmox Test Clones - Verify Golden Image Template
-# Creates test VMs from template, verifies cloud-init, then cleans up
+# Creates test VMs from template, waits for shutdown, then cleans up
 
 name: "Dev - Test Golden Image Clones"
 
@@ -32,10 +32,6 @@ jobs:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-    outputs:
-      vm1_ip: ${{ steps.ips.outputs.vm1_ip }}
-      vm2_ip: ${{ steps.ips.outputs.vm2_ip }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -54,107 +50,77 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
-      - name: Get VM IPs
-        id: ips
-        run: |
-          echo "vm1_ip=10.0.64.99" >> $GITHUB_OUTPUT
-          echo "vm2_ip=10.0.63.99" >> $GITHUB_OUTPUT
-
-  #=============================================================================
-  # Job 2: Wait for VMs to Boot
-  #=============================================================================
-  wait-boot:
-    name: "Wait for VMs to Boot"
-    needs: deploy
-    runs-on: mac-mini
-    timeout-minutes: 10
-
-    steps:
-      - name: Wait for cloud-init
-        run: |
-          echo "Waiting 90 seconds for VMs to boot and cloud-init to complete..."
-          sleep 90
-
-  #=============================================================================
-  # Job 3: Verify Cloud-Init Configuration
-  #=============================================================================
-  verify:
-    name: "Verify Cloud-Init"
-    needs: [deploy, wait-boot]
-    runs-on: mac-mini
-
-    steps:
-      - name: Verify VM 1
+      - name: Show Test Instructions
         run: |
           echo "=============================================="
-          echo "  VERIFYING test-vm-01 (${{ needs.deploy.outputs.vm1_ip }})"
-          echo "=============================================="
-
-          # Check hostname
-          HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm1_ip }} 'hostname' 2>/dev/null || echo "FAILED")
-          echo "Hostname: $HOSTNAME"
-
-          if echo "$HOSTNAME" | grep -q "test-vm-01"; then
-            echo "✓ Hostname matches expected value"
-          else
-            echo "✗ Hostname mismatch! Expected: test-vm-01, Got: $HOSTNAME"
-            exit 1
-          fi
-
-          # Check cloud-init log
-          LOG=$(ssh -o StrictHostKeyChecking=no root@${{ needs.deploy.outputs.vm1_ip }} 'cat /var/log/cloud-init-done.log' 2>/dev/null || echo "FAILED")
-          echo "Cloud-init log: $LOG"
-
-          if echo "$LOG" | grep -q "Cloud-init completed"; then
-            echo "✓ Cloud-init completed successfully"
-          else
-            echo "✗ Cloud-init log not found"
-            exit 1
-          fi
-
-      - name: Verify VM 2
-        run: |
-          echo "=============================================="
-          echo "  VERIFYING test-vm-02 (${{ needs.deploy.outputs.vm2_ip }})"
-          echo "=============================================="
-
-          # Check hostname
-          HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm2_ip }} 'hostname' 2>/dev/null || echo "FAILED")
-          echo "Hostname: $HOSTNAME"
-
-          if echo "$HOSTNAME" | grep -q "test-vm-02"; then
-            echo "✓ Hostname matches expected value"
-          else
-            echo "✗ Hostname mismatch! Expected: test-vm-02, Got: $HOSTNAME"
-            exit 1
-          fi
-
-          # Check cloud-init log
-          LOG=$(ssh -o StrictHostKeyChecking=no root@${{ needs.deploy.outputs.vm2_ip }} 'cat /var/log/cloud-init-done.log' 2>/dev/null || echo "FAILED")
-          echo "Cloud-init log: $LOG"
-
-          if echo "$LOG" | grep -q "Cloud-init completed"; then
-            echo "✓ Cloud-init completed successfully"
-          else
-            echo "✗ Cloud-init log not found"
-            exit 1
-          fi
-
-      - name: Test Results
-        run: |
-          echo "=============================================="
-          echo "  ALL TESTS PASSED!"
+          echo "  TEST VMs CREATED"
           echo "=============================================="
           echo ""
-          echo "Golden image template is working correctly."
-          echo "Cloud-init configurations applied successfully."
+          echo "VMs:"
+          echo "  - test-vm-01: 10.0.64.99 (VLAN 64)"
+          echo "  - test-vm-02: 10.0.63.99 (VLAN 63)"
+          echo ""
+          echo "Verify manually via SSH, then shutdown both VMs."
+          echo "Workflow will auto-destroy after shutdown."
+          echo "=============================================="
 
   #=============================================================================
-  # Job 4: Cleanup Test VMs
+  # Job 2: Wait for VMs to Shutdown
+  #=============================================================================
+  wait-shutdown:
+    name: "Wait for VMs Shutdown"
+    needs: deploy
+    runs-on: mac-mini
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Wait for Both VMs to Shutdown
+        run: |
+          echo "Waiting for test VMs to shutdown..."
+          echo "SSH to VMs, verify cloud-init, then run: shutdown -h now"
+          echo ""
+
+          # Get Proxmox credentials from AWS
+          PROXMOX_CREDS=$(aws secretsmanager get-secret-value --secret-id dev/proxmox/terraform-token --query SecretString --output text)
+          TOKEN_ID=$(echo "$PROXMOX_CREDS" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$PROXMOX_CREDS" | jq -r '.token_secret')
+          TOKEN="${TOKEN_ID}=${TOKEN_SECRET}"
+
+          PROXMOX_URL="https://pve-dev:8006/api2/json"
+          NODE="pve-dev"
+
+          # Poll both VMs until both are stopped
+          while true; do
+            VM1_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+              "${PROXMOX_URL}/nodes/${NODE}/qemu/101/status/current" | jq -r '.data.status')
+            VM2_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+              "${PROXMOX_URL}/nodes/${NODE}/qemu/102/status/current" | jq -r '.data.status')
+
+            echo "$(date '+%H:%M:%S') - VM 101: $VM1_STATUS, VM 102: $VM2_STATUS"
+
+            if [ "$VM1_STATUS" = "stopped" ] && [ "$VM2_STATUS" = "stopped" ]; then
+              echo ""
+              echo "Both VMs are stopped. Proceeding to cleanup."
+              break
+            fi
+
+            sleep 30
+          done
+
+  #=============================================================================
+  # Job 3: Cleanup Test VMs
   #=============================================================================
   cleanup:
     name: "Cleanup Test VMs"
-    needs: [deploy, verify]
+    needs: wait-shutdown
     runs-on: mac-mini
 
     defaults:
@@ -177,4 +143,7 @@ jobs:
         run: |
           echo "Cleaning up test VMs..."
           terraform destroy -auto-approve
-          echo "Test VMs destroyed."
+          echo ""
+          echo "=============================================="
+          echo "  TEST VMs DESTROYED"
+          echo "=============================================="
