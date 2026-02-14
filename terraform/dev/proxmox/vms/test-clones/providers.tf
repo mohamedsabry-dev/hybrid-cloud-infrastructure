@@ -44,6 +44,11 @@ data "aws_secretsmanager_secret_version" "vm_root_password" {
   secret_id = "dev/proxmox/vm-root-password"
 }
 
+# Mark password as sensitive to prevent display in logs
+locals {
+  vm_root_password = sensitive(data.aws_secretsmanager_secret_version.vm_root_password.secret_string)
+}
+
 locals {
   proxmox_creds = jsondecode(data.aws_secretsmanager_secret_version.proxmox.secret_string)
 }
