@@ -11,6 +11,17 @@ data "aws_secretsmanager_secret_version" "golden_image_root" {
 }
 
 #-------------------------------------------------------------------------------
+# Download Rocky Linux Cloud Image
+#-------------------------------------------------------------------------------
+resource "proxmox_virtual_environment_download_file" "rocky_cloud_image" {
+  content_type = "iso"
+  datastore_id = "local"
+  node_name    = var.node_name
+  url          = "https://download.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2"
+  file_name    = "Rocky-10-GenericCloud-Base.latest.x86_64.qcow2"
+}
+
+#-------------------------------------------------------------------------------
 # Upload Cloud-Init Config (user_data)
 #-------------------------------------------------------------------------------
 resource "proxmox_virtual_environment_file" "cloud_config" {
@@ -96,10 +107,10 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
     dedicated = 2048
   }
 
-  # OS Disk - import from cloud image on NAS
+  # OS Disk - import from downloaded cloud image
   disk {
     datastore_id = "local-lvm"
-    file_id      = var.cloud_image_file_id
+    file_id      = proxmox_virtual_environment_download_file.rocky_cloud_image.id
     interface    = "scsi0"
     size         = 20
     ssd          = true
