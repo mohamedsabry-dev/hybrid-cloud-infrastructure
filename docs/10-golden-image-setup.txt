@@ -1,0 +1,26 @@
+which image? minimal rocky 10.1 
+=== Rocky-10.1-x86_64-minimal.iso
+need to setup tf code for create 1 vm against the dev server 
+=== 
+understand the tf code , 
+====
+understand the needs of thws script for the needed ionsde the template image 
+simplify the code as possible 
+make workflow github 
+
+befopre bacup the vm into template >> 
+[use gates ]
+
+make sure to un attach the iso and fix the boot order to from disk 
+  After template conversion, cloned VMs should have:
+  boot_order = ["scsi0"]  # Disk only, no CD-ROM
+
+test , let workflow wait for ack of shutdown for vm, if it done, the script i think trigger another workflow just another task to create template out of the image and save it in the nas storage 
+
+then , let have workflow wait and then deploy 2 vms out of the created template which saved in nas 
+deploy 2 vms out of the template 
+
+then test with grep if it will save the passed config from the cloudini or not 
+if matched the comparison with the mentioned values in config files variable, then workflow complete and done 
+
+The wait was caused by agent { enabled = true }

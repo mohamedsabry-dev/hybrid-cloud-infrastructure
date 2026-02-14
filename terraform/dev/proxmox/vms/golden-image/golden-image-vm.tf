@@ -20,21 +20,21 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
 
   # CPU
   cpu {
-    cores   = 2
+    cores   = var.vm_cores
     sockets = 1
     type    = "host"
   }
 
   # Memory
   memory {
-    dedicated = 2048
+    dedicated = var.vm_memory
   }
 
-  # OS Disk - empty disk for installation
+  # OS Disk
   disk {
-    datastore_id = "local-lvm"
+    datastore_id = var.datastore_id
     interface    = "scsi0"
-    size         = 20
+    size         = var.disk_size
     ssd          = true
     discard      = "on"
     file_format  = "raw"
@@ -47,11 +47,11 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
     interface = "ide2"
   }
 
-  # Network - VLAN 65 (temporary IP during setup)
+  # Network
   network_device {
-    bridge  = "vmbr0"
+    bridge  = var.network_bridge
     model   = "virtio"
-    vlan_id = 65
+    vlan_id = var.network_vlan
   }
 
   # SCSI Controller
