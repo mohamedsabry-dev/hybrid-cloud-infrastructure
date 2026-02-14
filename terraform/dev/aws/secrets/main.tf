@@ -66,3 +66,26 @@ resource "aws_secretsmanager_secret_version" "golden_image_root" {
     ignore_changes = [secret_string]
   }
 }
+
+#-------------------------------------------------------------------------------
+# Proxmox Root SSH Password (for Terraform provider SSH access)
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "proxmox_root" {
+  name        = "dev/proxmox/root-password"
+  description = "Proxmox root SSH password for Terraform provider"
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "terraform"
+    Purpose     = "proxmox-automation"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "proxmox_root" {
+  secret_id     = aws_secretsmanager_secret.proxmox_root.id
+  secret_string = "REPLACE_ME"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
