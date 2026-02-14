@@ -18,7 +18,7 @@ permissions:
 jobs:
   deploy:
     name: "Plan & Apply"
-    runs-on: production
+    runs-on: mac-mini
 
     defaults:
       run:

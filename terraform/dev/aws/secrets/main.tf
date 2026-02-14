@@ -66,3 +66,26 @@ resource "aws_secretsmanager_secret_version" "vm_root_password" {
     ignore_changes = [secret_string]
   }
 }
+
+#-------------------------------------------------------------------------------
+# Gandalf Break-Glass User Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "gandalf_password" {
+  name        = "dev/vm/gandalf-password"
+  description = "Break-glass user password for emergency VM access"
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "terraform"
+    Purpose     = "vm-automation"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "gandalf_password" {
+  secret_id     = aws_secretsmanager_secret.gandalf_password.id
+  secret_string = "REPLACE_ME"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}

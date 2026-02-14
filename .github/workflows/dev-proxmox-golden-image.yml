@@ -1,5 +1,5 @@
 # Dev Proxmox Golden Image VM deployment
-# Triggers on push to dev branch when golden-image files change
+# Creates VM, waits for manual setup, then converts to template
 
 name: "Dev - Proxmox Golden Image"
 
@@ -10,6 +10,7 @@ on:
     paths:
       - 'terraform/dev/proxmox/vms/golden-image/**'
       - '.github/workflows/dev-proxmox-golden-image.yml'
+
   workflow_dispatch:
     inputs:
       action:
@@ -26,14 +27,25 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  TF_WORKING_DIR: terraform/dev/proxmox/vms/golden-image
+  VM_ID: 9000
+  PROXMOX_NODE: pve-dev
+
 jobs:
-  deploy:
-    name: "Plan & Apply"
-    runs-on: production
+  #=============================================================================
+  # Job 1: Create VM via Terraform
+  #=============================================================================
+  create-vm:
+    name: "Create Golden Image VM"
+    runs-on: mac-mini
 
     defaults:
       run:
-        working-directory: terraform/dev/proxmox/vms/golden-image
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    outputs:
+      vm_created: ${{ steps.apply.outcome == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,9 +63,125 @@ jobs:
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
-        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+        id: apply
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
         run: terraform apply -auto-approve tfplan
 
       - name: Terraform Destroy
-        if: github.event.inputs.action == 'destroy'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
         run: terraform destroy -auto-approve
+
+      - name: Post-Create Instructions
+        if: github.event.inputs.action == 'apply' && steps.apply.outcome == 'success'
+        run: |
+          echo "=============================================="
+          echo "  VM CREATED - MANUAL SETUP REQUIRED"
+          echo "=============================================="
+          echo ""
+          echo "1. Open Proxmox console for VM ${{ env.VM_ID }}"
+          echo "2. Install Rocky Linux (see docs/10-golden-image-setup.txt)"
+          echo "3. SSH and run setup script:"
+          echo "   scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/root/"
+          echo "   ssh root@10.0.65.99 '/root/golden-image-setup.sh'"
+          echo "4. Approve the next job when VM is shutdown"
+          echo ""
+          echo "=============================================="
+
+  #=============================================================================
+  # Job 2: Wait for Manual Approval
+  #=============================================================================
+  wait-for-setup:
+    name: "Waiting for Manual Setup"
+    needs: create-vm
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    runs-on: mac-mini
+    environment: golden-image-approval
+
+    steps:
+      - name: Setup Confirmed
+        run: |
+          echo "=============================================="
+          echo "  MANUAL SETUP CONFIRMED"
+          echo "=============================================="
+          echo "Proceeding to convert VM to template..."
+
+  #=============================================================================
+  # Job 3: Convert to Template
+  #=============================================================================
+  convert-template:
+    name: "Convert to Template"
+    needs: wait-for-setup
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    runs-on: mac-mini
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Get Proxmox API Token
+        id: secrets
+        run: |
+          TOKEN=$(aws secretsmanager get-secret-value \
+            --secret-id dev/proxmox/terraform-token \
+            --query SecretString --output text | jq -r '"\(.token_id)=\(.token_secret)"')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check VM is Stopped
+        run: |
+          STATUS=$(curl -sk \
+            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
+            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/status/current" \
+            | jq -r '.data.status')
+
+          if [ "$STATUS" != "stopped" ]; then
+            echo "ERROR: VM is not stopped (status: $STATUS)"
+            echo "Please shutdown the VM before converting to template"
+            exit 1
+          fi
+          echo "VM is stopped. Proceeding..."
+
+      - name: Remove CD-ROM
+        run: |
+          curl -sk -X PUT \
+            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "delete=ide2" \
+            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/config"
+          echo "CD-ROM removed"
+
+      - name: Update Boot Order
+        run: |
+          curl -sk -X PUT \
+            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "boot=order=scsi0" \
+            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/config"
+          echo "Boot order updated to disk only"
+
+      - name: Convert to Template
+        run: |
+          RESPONSE=$(curl -sk -X POST \
+            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
+            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/template")
+
+          echo "Response: $RESPONSE"
+
+          if echo "$RESPONSE" | jq -e '.data' > /dev/null 2>&1; then
+            echo "=============================================="
+            echo "  TEMPLATE CREATED SUCCESSFULLY!"
+            echo "=============================================="
+            echo "Template ID: ${{ env.VM_ID }}"
+            echo "Node: ${{ env.PROXMOX_NODE }}"
+            echo ""
+            echo "You can now clone VMs from this template"
+          else
+            echo "ERROR: Failed to convert to template"
+            echo "$RESPONSE"
+            exit 1
+          fi
