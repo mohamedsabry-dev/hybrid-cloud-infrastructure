@@ -48,9 +48,18 @@ apt upgrade -y
 echo ""
 read -p "Press Enter to continue..."
 
-# --- 5. Remove Subscription Nag ---
+# --- 5. Enable Snippets on Local Storage ---
 echo ""
-echo "[5/7] Removing subscription nag..."
+echo "[5/8] Enabling snippets on local storage..."
+mkdir -p /var/lib/vz/snippets
+/usr/sbin/pvesm set local --content backup,iso,vztmpl,snippets
+echo "Done."
+echo ""
+read -p "Press Enter to continue..."
+
+# --- 6. Remove Subscription Nag ---
+echo ""
+echo "[6/8] Removing subscription nag..."
 PROXMOXLIB="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
 if [[ -f "$PROXMOXLIB" ]]; then
     sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" "$PROXMOXLIB"
@@ -61,9 +70,9 @@ fi
 echo ""
 read -p "Press Enter to continue..."
 
-# --- 6. Create admin_prod Management User (PAM) ---
+# --- 7. Create admin_prod Management User (PAM) ---
 echo ""
-echo "[6/7] Creating admin_prod management user (PAM)..."
+echo "[7/8] Creating admin_prod management user (PAM)..."
 
 ADMIN_NAME="admin_prod"
 ADMIN_USER="${ADMIN_NAME}@pam"
@@ -99,9 +108,9 @@ echo "==========================================="
 echo ""
 read -p "Press Enter to continue..."
 
-# --- 7. Create tf_prod Automation User ---
+# --- 8. Create tf_prod Automation User ---
 echo ""
-echo "[7/7] Creating tf_prod automation user..."
+echo "[8/8] Creating tf_prod automation user..."
 
 USERNAME="tf_prod"
 REALM="pve"
