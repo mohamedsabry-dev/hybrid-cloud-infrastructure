@@ -53,6 +53,9 @@ echo ""
 echo "[5/8] Enabling snippets on local storage..."
 mkdir -p /var/lib/vz/snippets
 /usr/sbin/pvesm set local --content backup,iso,vztmpl,snippets
+# Allow admin_dev to write snippets (for Terraform)
+chown root:admin_dev /var/lib/vz/snippets
+chmod 775 /var/lib/vz/snippets
 echo "Done."
 echo ""
 read -p "Press Enter to continue..."
