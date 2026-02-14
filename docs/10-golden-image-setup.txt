@@ -61,6 +61,12 @@ NETWORK CONFIGURATION
   - DNS Server          : 8.8.8.8
   - Search Domain       : lab.local
 
+TIME & DATE
+-----------
+  - Region              : Africa
+  - City                : Cairo (Egypt)
+  - Network Time        : ON
+
 Click "Begin Installation" and wait for completion.
 
 AFTER INSTALLATION - REBOOT
@@ -189,6 +195,160 @@ NETWORK REFERENCE
 VLAN    Purpose              Subnet          IP
 ----    -------              ------          --
 65      Golden Image Setup   10.0.65.0/24    10.0.65.99 (temporary)
+64      Test Clone VM 1      10.0.64.0/24    10.0.64.99
+63      Test Clone VM 2      10.0.63.0/24    10.0.63.99
+
+
+================================================================================
+DESIGN DECISIONS & APPROACHES TRIED
+================================================================================
+
+1. QCOW2 CLOUD IMAGE vs ISO INSTALLATION
+-----------------------------------------
+Initially attempted to use Rocky Linux QCOW2 cloud image for faster deployment:
+
+  QCOW2 Approach (FAILED):
+  - download_file resource to fetch .qcow2 from Rocky mirrors
+  - Error: "unable to parse directory volume name 'nas-iso:qcow2/...'"
+  - Error: "wrong file extension" for iso content type
+  - Root cause: bpg/proxmox provider doesn't support QCOW2 on directory storage
+  - Would require import_from with LVM storage, more complex
+
+  ISO Approach (CHOSEN):
+  - Manual installation from Rocky-10.1-x86_64-minimal.iso
+  - More control over installation options
+  - Reliable and well-documented process
+  - Allows custom partitioning if needed
+
+2. WORKFLOW WAIT STRATEGY
+-------------------------
+Need workflow to wait for manual OS installation before converting to template:
+
+  Environment Approval Gates (LIMITED):
+  - GitHub environments with "Required reviewers"
+  - Works for public repos or GitHub Team/Enterprise
+  - Private repos on GitHub Pro: approval gates don't block workflow
+  - Workflows complete immediately without waiting
+
+  Polling Approach (CHOSEN):
+  - Workflow polls Proxmox API every 30 seconds
+  - Checks VM status via: GET /nodes/{node}/qemu/{vmid}/status/current
+  - Continues when status = "stopped"
+  - Timeout: 2 hours (120 minutes)
+  - Works on any GitHub plan
+
+3. SCRIPT DEVELOPMENT & TESTING
+--------------------------------
+Before automating, each command in golden-image-setup.sh was run manually:
+
+  - Executed each dnf install command individually
+  - Verified packages installed correctly
+  - Discovered missing repos (EPEL needed for htop)
+  - Tested cloud-init and qemu-guest-agent configuration
+  - Fixed interactive prompt issues (added </dev/tty for read)
+  - Suppressed kernel messages (dmesg -n 1)
+  - Once all commands verified working, consolidated into script
+  - Then destroyed VM and recreated via workflow to test full automation
+
+4. TEMPLATE VERIFICATION
+------------------------
+Need to verify golden image template works correctly with cloud-init:
+
+  Test Clone Infrastructure:
+  - Terraform module: terraform/dev/proxmox/vms/test-clones/
+  - Creates 2 test VMs from template on different VLANs
+  - Applies cloud-init configuration (hostname, root password, network)
+  - Workflow verifies: hostname set correctly, cloud-init completed
+  - Auto-cleanup after successful test
+
+  Test Actions:
+  - plan   : Show what would be created
+  - apply  : Create test VMs
+  - test   : Create VMs, verify cloud-init, destroy
+  - destroy: Remove test VMs
+
+5. SECRETS MANAGEMENT
+---------------------
+Multiple approaches considered for storing credentials:
+
+  Hardcoded in Terraform (REJECTED):
+  - Security risk, visible in state files
+  - No rotation capability
+
+  Terraform Variables (REJECTED):
+  - Requires passing secrets via CLI or tfvars
+  - Risk of accidental commit
+
+  AWS Secrets Manager (CHOSEN):
+  - Secrets stored securely in AWS
+  - Fetched at runtime via data source
+  - OIDC authentication from GitHub Actions
+  - Easy rotation without code changes
+  - Centralized secret management
+
+6. SSH ACCESS FOR SNIPPETS
+--------------------------
+Proxmox provider needs SSH to upload cloud-init snippets:
+
+  Root SSH (REJECTED):
+  - Security risk
+  - Against best practices
+
+  admin_dev User (CHOSEN):
+  - Dedicated admin user with sudo
+  - Password stored in AWS Secrets Manager
+  - Can upload to /var/lib/vz/snippets/
+
+
+================================================================================
+TEST CLONE WORKFLOW
+================================================================================
+
+Workflow: .github/workflows/dev-proxmox-test-clones.yml
+
+Manual trigger with actions:
+
+    # Plan only (see what would be created)
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=plan
+
+    # Create test VMs
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=apply
+
+    # Full test cycle (create, verify, destroy)
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=test
+
+    # Cleanup test VMs
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=destroy
+
+Test VMs Created:
+  - test-vm-01: VMID 101, VLAN 64, IP 10.0.64.99
+  - test-vm-02: VMID 102, VLAN 63, IP 10.0.63.99
+
+Verification Checks:
+  - SSH connectivity
+  - Hostname matches VM name
+  - /var/log/cloud-init-done.log exists
+  - Cloud-init completed message present
+
+VERIFIED TEST RESULTS (2026-02-14):
+-----------------------------------
+test-vm-01 (VLAN 64, 10.0.64.99):
+  ✓ Hostname: test-vm-01.lab.local
+  ✓ IP/Gateway: 10.0.64.99/24 via 10.0.64.1
+  ✓ Cross-VLAN ping to test-vm-02: OK
+  ✓ Internet (google.com): OK
+  ✓ Timezone: Africa/Cairo (EET)
+  ✓ Cloud-init: Completed
+  ✓ qemu-guest-agent: Running
+
+test-vm-02 (VLAN 63, 10.0.63.99):
+  ✓ Hostname: test-vm-02.lab.local
+  ✓ IP/Gateway: 10.0.63.99/24 via 10.0.63.1
+  ✓ Cross-VLAN ping to test-vm-01: OK
+  ✓ Internet (google.com): OK
+  ✓ Timezone: Africa/Cairo (EET)
+  ✓ Cloud-init: Completed
+  ✓ qemu-guest-agent: Running
 
 
 ================================================================================
