@@ -1,5 +1,5 @@
 # Dev Proxmox Golden Image VM deployment
-# Creates VM, waits for manual setup, then converts to template
+# Creates VM, waits for shutdown, then converts to template
 
 name: "Dev - Proxmox Golden Image"
 
@@ -72,7 +72,7 @@ jobs:
         run: terraform destroy -auto-approve
 
       - name: Post-Create Instructions
-        if: github.event.inputs.action == 'apply' && steps.apply.outcome == 'success'
+        if: steps.apply.outcome == 'success'
         run: |
           echo "=============================================="
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
@@ -80,39 +80,23 @@ jobs:
           echo ""
           echo "1. Open Proxmox console for VM ${{ env.VM_ID }}"
           echo "2. Install Rocky Linux (see docs/10-golden-image-setup.txt)"
-          echo "3. SSH and run setup script:"
-          echo "   scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/root/"
-          echo "   ssh root@10.0.65.99 '/root/golden-image-setup.sh'"
-          echo "4. Approve the next job when VM is shutdown"
+          echo "3. After reboot, select 'Troubleshooting' > 'Boot from local drive'"
+          echo "4. SSH and run setup script:"
+          echo "   scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/"
+          echo "   ssh root@10.0.65.99 '/tmp/golden-image-setup.sh'"
+          echo "5. Workflow will detect shutdown and convert to template"
           echo ""
           echo "=============================================="
 
   #=============================================================================
-  # Job 2: Wait for Manual Approval
+  # Job 2: Wait for VM Shutdown (polls every 30s for up to 2 hours)
   #=============================================================================
-  wait-for-setup:
-    name: "Waiting for Manual Setup"
+  wait-for-shutdown:
+    name: "Waiting for VM Shutdown"
     needs: create-vm
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    if: needs.create-vm.outputs.vm_created == 'true'
     runs-on: mac-mini
-    environment: golden-image-approval
-
-    steps:
-      - name: Setup Confirmed
-        run: |
-          echo "=============================================="
-          echo "  MANUAL SETUP CONFIRMED"
-          echo "=============================================="
-          echo "Proceeding to convert VM to template..."
-
-  #=============================================================================
-  # Job 3: Convert to Template
-  #=============================================================================
-  convert-template:
-    name: "Convert to Template"
-    needs: wait-for-setup
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-    runs-on: mac-mini
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v4
@@ -132,19 +116,61 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Check VM is Stopped
+      - name: Wait for VM Shutdown
         run: |
-          STATUS=$(curl -sk \
-            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
-            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/status/current" \
-            | jq -r '.data.status')
+          echo "=============================================="
+          echo "  WAITING FOR VM SHUTDOWN"
+          echo "=============================================="
+          echo ""
+          echo "Polling VM ${{ env.VM_ID }} status every 30 seconds..."
+          echo "Complete the manual setup and shutdown the VM."
+          echo ""
 
-          if [ "$STATUS" != "stopped" ]; then
-            echo "ERROR: VM is not stopped (status: $STATUS)"
-            echo "Please shutdown the VM before converting to template"
-            exit 1
-          fi
-          echo "VM is stopped. Proceeding..."
+          while true; do
+            STATUS=$(curl -sk \
+              -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
+              "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/status/current" \
+              | jq -r '.data.status')
+
+            TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+            echo "[$TIMESTAMP] VM status: $STATUS"
+
+            if [ "$STATUS" = "stopped" ]; then
+              echo ""
+              echo "=============================================="
+              echo "  VM IS STOPPED - Proceeding to template"
+              echo "=============================================="
+              break
+            fi
+
+            sleep 30
+          done
+
+  #=============================================================================
+  # Job 3: Convert to Template
+  #=============================================================================
+  convert-template:
+    name: "Convert to Template"
+    needs: wait-for-shutdown
+    runs-on: mac-mini
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Get Proxmox API Token
+        id: secrets
+        run: |
+          TOKEN=$(aws secretsmanager get-secret-value \
+            --secret-id dev/proxmox/terraform-token \
+            --query SecretString --output text | jq -r '"\(.token_id)=\(.token_secret)"')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Remove CD-ROM
         run: |
@@ -176,10 +202,12 @@ jobs:
             echo "=============================================="
             echo "  TEMPLATE CREATED SUCCESSFULLY!"
             echo "=============================================="
+            echo ""
             echo "Template ID: ${{ env.VM_ID }}"
             echo "Node: ${{ env.PROXMOX_NODE }}"
             echo ""
-            echo "You can now clone VMs from this template"
+            echo "You can now clone VMs from this template."
+            echo "=============================================="
           else
             echo "ERROR: Failed to convert to template"
             echo "$RESPONSE"
