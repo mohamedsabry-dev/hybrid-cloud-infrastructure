@@ -33,3 +33,45 @@ variable "iso_file_id" {
   type        = string
   default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
 }
+
+#-------------------------------------------------------------------------------
+# VM Hardware Configuration
+#-------------------------------------------------------------------------------
+variable "vm_cores" {
+  description = "Number of CPU cores"
+  type        = number
+  default     = 2
+}
+
+variable "vm_memory" {
+  description = "Memory in MB"
+  type        = number
+  default     = 2048
+}
+
+variable "disk_size" {
+  description = "OS disk size in GB"
+  type        = number
+  default     = 20
+}
+
+variable "datastore_id" {
+  description = "Proxmox datastore for VM disk"
+  type        = string
+  default     = "local-lvm"
+}
+
+#-------------------------------------------------------------------------------
+# Network Configuration
+#-------------------------------------------------------------------------------
+variable "network_bridge" {
+  description = "Proxmox network bridge"
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "network_vlan" {
+  description = "VLAN ID for golden image network"
+  type        = number
+  default     = 65
+}
