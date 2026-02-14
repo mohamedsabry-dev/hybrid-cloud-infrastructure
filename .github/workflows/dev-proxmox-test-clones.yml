@@ -1,0 +1,203 @@
+# Dev Proxmox Test Clones - Verify Golden Image Template
+# Creates test VMs from template, verifies cloud-init, then cleans up
+
+name: "Dev - Test Golden Image Clones"
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/vms/test-clones/**'
+      - '.github/workflows/dev-proxmox-test-clones.yml'
+
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+          - test
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: terraform/dev/proxmox/vms/test-clones
+
+jobs:
+  #=============================================================================
+  # Job 1: Deploy Test VMs
+  #=============================================================================
+  deploy:
+    name: "Deploy Test VMs"
+    runs-on: mac-mini
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    outputs:
+      vm1_ip: ${{ steps.ips.outputs.vm1_ip }}
+      vm2_ip: ${{ steps.ips.outputs.vm2_ip }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        id: apply
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'apply' || github.event.inputs.action == 'test'))
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+        run: terraform destroy -auto-approve
+
+      - name: Get VM IPs
+        id: ips
+        if: steps.apply.outcome == 'success'
+        run: |
+          echo "vm1_ip=10.0.64.99" >> $GITHUB_OUTPUT
+          echo "vm2_ip=10.0.63.99" >> $GITHUB_OUTPUT
+
+  #=============================================================================
+  # Job 2: Wait for VMs to Boot
+  #=============================================================================
+  wait-boot:
+    name: "Wait for VMs to Boot"
+    needs: deploy
+    if: needs.deploy.outputs.vm1_ip != ''
+    runs-on: mac-mini
+    timeout-minutes: 10
+
+    steps:
+      - name: Wait for cloud-init
+        run: |
+          echo "Waiting 90 seconds for VMs to boot and cloud-init to complete..."
+          sleep 90
+
+  #=============================================================================
+  # Job 3: Verify Cloud-Init Configuration
+  #=============================================================================
+  verify:
+    name: "Verify Cloud-Init"
+    needs: [deploy, wait-boot]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'test'
+    runs-on: mac-mini
+
+    steps:
+      - name: Verify VM 1
+        run: |
+          echo "=============================================="
+          echo "  VERIFYING test-vm-01 (${{ needs.deploy.outputs.vm1_ip }})"
+          echo "=============================================="
+
+          # Check hostname
+          HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm1_ip }} 'hostname' 2>/dev/null || echo "FAILED")
+          echo "Hostname: $HOSTNAME"
+
+          if [ "$HOSTNAME" = "test-vm-01" ]; then
+            echo "✓ Hostname matches expected value"
+          else
+            echo "✗ Hostname mismatch! Expected: test-vm-01, Got: $HOSTNAME"
+            exit 1
+          fi
+
+          # Check cloud-init log
+          LOG=$(ssh -o StrictHostKeyChecking=no root@${{ needs.deploy.outputs.vm1_ip }} 'cat /var/log/cloud-init-done.log' 2>/dev/null || echo "FAILED")
+          echo "Cloud-init log: $LOG"
+
+          if echo "$LOG" | grep -q "Cloud-init completed"; then
+            echo "✓ Cloud-init completed successfully"
+          else
+            echo "✗ Cloud-init log not found"
+            exit 1
+          fi
+
+      - name: Verify VM 2
+        run: |
+          echo "=============================================="
+          echo "  VERIFYING test-vm-02 (${{ needs.deploy.outputs.vm2_ip }})"
+          echo "=============================================="
+
+          # Check hostname
+          HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm2_ip }} 'hostname' 2>/dev/null || echo "FAILED")
+          echo "Hostname: $HOSTNAME"
+
+          if [ "$HOSTNAME" = "test-vm-02" ]; then
+            echo "✓ Hostname matches expected value"
+          else
+            echo "✗ Hostname mismatch! Expected: test-vm-02, Got: $HOSTNAME"
+            exit 1
+          fi
+
+          # Check cloud-init log
+          LOG=$(ssh -o StrictHostKeyChecking=no root@${{ needs.deploy.outputs.vm2_ip }} 'cat /var/log/cloud-init-done.log' 2>/dev/null || echo "FAILED")
+          echo "Cloud-init log: $LOG"
+
+          if echo "$LOG" | grep -q "Cloud-init completed"; then
+            echo "✓ Cloud-init completed successfully"
+          else
+            echo "✗ Cloud-init log not found"
+            exit 1
+          fi
+
+      - name: Test Results
+        run: |
+          echo "=============================================="
+          echo "  ALL TESTS PASSED!"
+          echo "=============================================="
+          echo ""
+          echo "Golden image template is working correctly."
+          echo "Cloud-init configurations applied successfully."
+          echo ""
+          echo "To cleanup test VMs, run workflow with action: destroy"
+
+  #=============================================================================
+  # Job 4: Cleanup (optional, runs on 'test' action after verify)
+  #=============================================================================
+  cleanup:
+    name: "Cleanup Test VMs"
+    needs: [deploy, verify]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'test'
+    runs-on: mac-mini
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::REDACTED_AWS_DEV:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: |
+          echo "Cleaning up test VMs..."
+          terraform destroy -auto-approve
+          echo "Test VMs destroyed."
