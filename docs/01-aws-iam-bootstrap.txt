@@ -1,0 +1,123 @@
+================================================================================
+                    AWS IAM & BOOTSTRAP CONFIGURATION
+================================================================================
+
+Multi-account architecture with OIDC authentication for GitHub Actions.
+
+================================================================================
+                         ACCOUNT STRUCTURE
+================================================================================
+
+AWS Accounts
+─────────────────────────────────────────────────────────────────────────────────
+Environment  │ Account ID     │ Admin User  │ Root MFA
+─────────────┼────────────────┼─────────────┼──────────
+Production   │ REDACTED_AWS_PROD   │ admin_prod  │ Enabled
+Development  │ REDACTED_AWS_DEV   │ admin_dev   │ Enabled
+
+================================================================================
+                         BOOTSTRAP INFRASTRUCTURE
+================================================================================
+
+CloudFormation Resources (per account)
+─────────────────────────────────────────────────────────────────────────────────
+Resource Type         │ Resource Name                                      │ Purpose
+──────────────────────┼────────────────────────────────────────────────────┼───────────────────────────────
+AWS::IAM::OIDCProvider│ GitHub OIDC Provider                               │ Identity federation for GitHub Actions
+AWS::S3::Bucket       │ hybrid-cloud-infrastructure-terraform-state        │ Terraform state storage
+AWS::DynamoDB::Table  │ hybrid-cloud-infrastructure-terraform-state-lock   │ State locking (prevent concurrent)
+AWS::S3::Bucket       │ hybrid-cloud-infrastructure-audit-logs             │ Audit/CloudTrail logs
+AWS::S3::BucketPolicy │ AuditBucketPolicy                                  │ Allow CloudTrail + Deny non-SSL
+
+Security Features:
+├── S3 Buckets: Versioning, Encryption (AES256), Public Access Blocked
+├── Terraform State Bucket: Logging to AuditBucket, Lifecycle (90 days for old versions)
+├── DynamoDB: DeletionProtectionEnabled, SSESpecification enabled
+├── AuditBucket: Lifecycle (365 days expiration, 90 days for old versions)
+└── Resources 2, 3, 4 have DeletionPolicy: Retain (won't delete if stack deleted)
+
+================================================================================
+                         IAM ROLES
+================================================================================
+
+Roles & Branch Trust
+─────────────────────────────────────────────────────────────────────────────────
+Role                              │ Trusted Branch   │ Purpose                         │ Attached Policies
+──────────────────────────────────┼──────────────────┼─────────────────────────────────┼────────────────────────────────────
+GitHubActions-TerraformAdmin-prod │ prod-security    │ IAM/security changes            │ TerraformState, SecurityAuditControl, ReadOnlyAccess
+GitHubActions-TerraformAdmin-dev  │ dev-security     │ IAM/security changes            │ TerraformState, SecurityAuditControl, ReadOnlyAccess
+GitHubActions-Network             │ main + feature/* │ The Infrastructure Architect    │ TerraformState, NetworkFullManagement, ReadOnlyAccess
+GitHubActions-Application         │ main + feature/* │ The Builder                     │ TerraformState, SecurityBoundary, ApplicationFullManagement, ReadOnlyAccess
+GitHubActions-Audit               │ main + feature/* │ Security, Monitoring & Observ.  │ TerraformState, SecurityAuditControl, ReadOnlyAccess
+GitHubActions-Infrastructure-prod │ prod             │ Production deployments          │ TerraformState, NetworkFullManagement, ApplicationFullManagement
+GitHubActions-Infrastructure-dev  │ dev              │ Development deployments         │ TerraformState, NetworkFullManagement, ApplicationFullManagement
+
+Role Details:
+├── Network: Core network only, no PassRole needed (doesn't deploy compute)
+├── Application: Has SecurityBoundary for PassRole to EC2-*/EKS-* roles
+├── Audit: Manages CloudTrail and audit infrastructure
+└── All roles: Restricted to main + mohamedsabrydev/* branches only
+
+================================================================================
+                         IAM POLICIES
+================================================================================
+
+CloudFormation Stack Policies
+─────────────────────────────────────────────────────────────────────────────────
+Policy Name                              │ Purpose
+─────────────────────────────────────────┼─────────────────────────────────────────
+HybridCloud-TerraformState-Common        │ S3 + DynamoDB access for Terraform state
+HybridCloud-Terraform-SecurityBoundary   │ PassRole for EC2-*/EKS-* only, Deny IAM mutations
+HybridCloud-NetworkFullManagement        │ Core network: VPC, Subnets, Routes, VPN, Peering, NACLs, Endpoints
+HybridCloud-ApplicationFullManagement    │ App-facing: EC2, EKS, ECR, SG, NAT, ELB, EIP, ENI
+HybridCloud-SecurityAuditControl         │ CloudTrail, CloudWatch, EventBridge, SNS, Audit Bucket config
+
+Policy Details:
+├── TerraformStatePolicy: Uses !ImportValue for bucket/table ARNs (cross-stack reference)
+├── SecurityBoundary: PassRole limited to EC2-* and EKS-* role patterns only
+├── NetworkFullManagement: Core fabric only (VPC, subnets, routes, VPN, peering)
+├── ApplicationFullManagement: Includes SG, NAT, ELB, EIP, ENI (app-facing resources)
+└── SecurityAuditControl: PassRole for CloudTrail role, manages audit infrastructure
+
+Explicit Denies: IAM mutations, Billing, CloudTrail modifications
+
+================================================================================
+                         STATE ACCESS ISOLATION
+================================================================================
+
+Role to State Path Mapping
+─────────────────────────────────────────────────────────────────────────────────
+Role                 │ State Path Access
+─────────────────────┼──────────────────────────────────────
+Infrastructure-dev   │ dev/* only
+Infrastructure-prod  │ prod/* only
+
+================================================================================
+                         SECRETS MANAGEMENT
+================================================================================
+
+AWS Secrets Manager
+─────────────────────────────────────────────────────────────────────────────────
+Secret Path                      │ Environment │ Content
+─────────────────────────────────┼─────────────┼────────────────────────
+dev/proxmox/terraform-token      │ Development │ Proxmox API token
+prod/proxmox/terraform-token     │ Production  │ Proxmox API token
+
+================================================================================
+                         DEPLOYMENT MODEL
+================================================================================
+
+Stack Deployment Methods
+─────────────────────────────────────────────────────────────────────────────────
+Stack      │ Method         │ Deployment File Path                                           │ Reason
+───────────┼────────────────┼────────────────────────────────────────────────────────────────┼──────────────────────────────
+Bootstrap  │ MANUAL ONLY    │ cloud/aws/bootstrap/cloudformation/bootstrap/deployment-file.yaml │ Critical infra, manual control
+Policies   │ GitSync (main) │ cloud/aws/iam/cloudformation/policies/deployment-file.yaml        │ Auto-deploy after PR review
+Roles      │ GitSync (main) │ cloud/aws/iam/cloudformation/roles/deployment-file.yaml           │ Depends on Policies stack
+
+Security Controls:
+├── Branch protection on main (require PR + review)
+├── CODEOWNERS: /cloud/aws/iam/ requires @mohamedsabrydev approval
+├── SecurityBoundary policy denies IAM mutations from Terraform roles
+├── GitSync only triggers on merge to main (not on feature branches)
+└── Bootstrap stack manually deployed by console admin only
