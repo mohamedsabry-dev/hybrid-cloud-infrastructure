@@ -1,0 +1,188 @@
+================================================================================
+                    CI/CD WORKFLOWS CONFIGURATION
+================================================================================
+
+GitHub Actions workflows for infrastructure deployment and security changes.
+
+================================================================================
+                         WORKFLOW PATTERNS
+================================================================================
+
+Flow Overview
+─────────────────────────────────────────────────────────────────────────────────
+Flow                                                              │ Type
+──────────────────────────────────────────────────────────────────┼──────────
+dev → Infrastructure-dev → dev AWS → dev Proxmox                  │ Infra
+prod → Infrastructure-prod → prod AWS → prod Proxmox              │ Infra
+dev-security → TerraformAdmin-dev → dev AWS                       │ Security
+prod-security → TerraformAdmin-prod → prod AWS                    │ Security
+main → (no workflow, clean merges only)                           │ -
+
+================================================================================
+                         INFRASTRUCTURE WORKFLOWS
+================================================================================
+
+Development Infrastructure Workflow
+─────────────────────────────────────────────────────────────────────────────────
+Step │ Action
+─────┼───────────────────────────────────────────────────────────────────────────
+1    │ Push code to dev branch
+2    │ GitHub Actions workflow triggered
+3    │ Assume GitHubActions-Infrastructure-dev role via OIDC
+4    │ Retrieve Proxmox token from AWS Secrets Manager (dev account)
+5    │ Terraform connects to dev Proxmox server
+6    │ Terraform init with S3 backend (dev state bucket)
+7    │ Terraform plan and apply
+8    │ Resources deployed and validated
+
+Production Infrastructure Workflow
+─────────────────────────────────────────────────────────────────────────────────
+Step │ Action
+─────┼───────────────────────────────────────────────────────────────────────────
+1    │ Push code to prod branch
+2    │ GitHub Actions workflow triggered
+3    │ Assume GitHubActions-Infrastructure-prod role via OIDC
+4    │ Retrieve Proxmox token from AWS Secrets Manager (prod account)
+5    │ Terraform connects to prod Proxmox server
+6    │ Terraform init with S3 backend (prod state bucket)
+7    │ Terraform plan and apply
+8    │ Resources deployed and validated
+
+================================================================================
+                         SECURITY WORKFLOWS
+================================================================================
+
+IAM/Security Change Workflows
+─────────────────────────────────────────────────────────────────────────────────
+Branch           │ Role                            │ Purpose
+─────────────────┼─────────────────────────────────┼────────────────────────
+dev-security     │ GitHubActions-TerraformAdmin-dev│ IAM changes (dev)
+prod-security    │ GitHubActions-TerraformAdmin-prod│ IAM changes (prod)
+
+================================================================================
+                         GITHUB WORKFLOWS
+================================================================================
+
+Workflow Files
+─────────────────────────────────────────────────────────────────────────────────
+Workflow                │ Purpose                  │ Trigger                    │ Runner
+────────────────────────┼──────────────────────────┼────────────────────────────┼───────────
+tf-bootstrap.yml        │ Terraform Apply (Audit)  │ push + workflow_dispatch   │ production
+setup-providers.yml     │ Provider Mirror Setup    │ push + workflow_dispatch   │ production
+
+Workflow Details:
+├── tf-bootstrap.yml: Deploys CloudTrail via Terraform, uses GitHubActions-Audit role
+│   ├── Push trigger: auto-runs on feature branch (for testing)
+│   ├── workflow_dispatch: manual trigger, requires typing "deploy" to confirm
+│   └── Path filter: only runs when workflow or terraform files change
+└── setup-providers.yml: Downloads providers to local mirror, configures ~/.terraformrc
+
+================================================================================
+                         CLOUDTRAIL SETUP
+================================================================================
+
+Deployed via Terraform
+─────────────────────────────────────────────────────────────────────────────────
+Resource         │ Name              │ Purpose
+─────────────────┼───────────────────┼─────────────────────────────────────────
+aws_cloudtrail   │ hybrid-main-trail │ Audit all AWS API calls across all regions
+
+Configuration:
+├── Multi-region trail: true
+├── Global service events: true
+├── Log file validation: enabled
+├── S3 bucket: hybrid-cloud-infrastructure-audit-logs
+└── Event Selectors: Secrets Manager data events (GetSecretValue, PutSecretValue)
+
+What's Logged:
+├── Management events: All API calls (CreateBucket, DeleteRole, etc.) - FREE
+└── Data events: Secrets Manager access (GetSecretValue) - $0.10/100k events
+
+================================================================================
+                         VALIDATION RESULTS
+================================================================================
+
+CI/CD Validation Status
+─────────────────────────────────────────────────────────────────────────────────
+Check                              │ Status
+───────────────────────────────────┼────────
+Both environments deploy           │ PASS
+No cross-account dependencies      │ PASS
+OIDC role assumption               │ PASS
+Secure secrets retrieval           │ PASS
+State isolation maintained         │ PASS
+Complete automation                │ PASS
+
+================================================================================
+                         TEST ARTIFACTS
+================================================================================
+
+Location: tests/archive/bootstrap-phase1/
+─────────────────────────────────────────────────────────────────────────────────
+File                           │ Purpose
+───────────────────────────────┼─────────────────────────────────────────
+tf-bootstrap-test-apply.yml    │ Test workflow for terraform apply
+tf-bootstrap-test-destroy.yml  │ Test workflow for terraform destroy
+app/main.tf                    │ Test Application role permissions
+network/main.tf                │ Test Network role permissions
+audit/main.tf                  │ Test Audit role permissions
+query/main.tf                  │ Test ReadOnly role permissions
+
+Why archived: Keep for reference (Git history), don't clutter main workflows
+
+================================================================================
+                         ISSUES & LESSONS LEARNED
+================================================================================
+
+─────────────────────────────────────────────────────────────────────────────────
+Issue                                        │ Resolution
+─────────────────────────────────────────────┼─────────────────────────────────
+CloudFormation resource recreation           │ Don't change Description/Name (immutable)
+GitSync auto-deploy security risk            │ Branch protection + CODEOWNERS
+Provider download slow on runner             │ Created local provider mirror
+ReadOnly role redundant                      │ Deleted - all roles have ReadOnlyAccess
+PassRole too permissive (Resource: *)        │ Limited to EC2-* and EKS-* role patterns
+Network/App policy overlap                   │ Separated: Network=fabric, App=compute
+S3 bucket missing SSL enforcement            │ Added DenyNonSSL statement to policies
+DynamoDB missing deletion protection         │ Added DeletionProtectionEnabled + SSE
+
+================================================================================
+                         KEY LEARNINGS (7 Iterations)
+================================================================================
+
+─────────────────────────────────────────────────────────────────────────────────
+Iteration     │ Problem                        │ Learning
+──────────────┼────────────────────────────────┼────────────────────────────────
+1-2           │ Manual setup issues            │ Automate the automation setup
+3-4           │ CloudFormation experiments     │ Stack dependencies = ordering problems
+5             │ Cross-account complexity       │ Mirrored accounts > spaghetti roles
+6             │ Two-account simplification     │ Separate accounts = cleaner structure
+Final         │ -                              │ Two independent mirrored environments
+
+================================================================================
+                         PHASE 1 STATUS
+================================================================================
+
+COMPLETED
+─────────────────────────────────────────────────────────────────────────────────
+[x] Local runner setup (mac-mini, production tags)
+[x] Provider mirror configured
+[x] OIDC Provider created
+[x] Terraform state bucket + lock table created (with logging, lifecycle, deletion protection)
+[x] Audit bucket created (with lifecycle rules)
+[x] IAM policies created (5 policies with cross-stack references)
+[x] IAM roles created (3 roles - ReadOnly removed as redundant)
+[x] CloudTrail deployed via Terraform (with Secrets Manager data events)
+[x] GitHub workflows created
+[x] CODEOWNERS configured for /cloud/aws/iam/
+[x] Branch protection on main (PR + review required)
+[x] Documentation created
+[x] Test artifacts archived
+
+PENDING TASKS
+─────────────────────────────────────────────────────────────────────────────────
+[ ] Disconnect GitSync from Bootstrap stack (manual deploy only)
+[ ] Configure GitSync for Policies stack (main branch)
+[ ] Configure GitSync for Roles stack (main branch)
+[ ] Verify branch protection rules on main
+[ ] Verify CODEOWNERS working for IAM directory
