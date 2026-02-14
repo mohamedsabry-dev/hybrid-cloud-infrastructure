@@ -22,11 +22,11 @@ resource "aws_secretsmanager_secret_version" "proxmox_terraform" {
 }
 
 #-------------------------------------------------------------------------------
-# Proxmox SSH Root Password (for snippets upload)
+# Proxmox SSH Admin Password (for snippets upload to Proxmox host)
 #-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "proxmox_ssh_root" {
-  name        = "dev/proxmox/ssh-root-password"
-  description = "Proxmox root SSH password for Terraform provider"
+resource "aws_secretsmanager_secret" "proxmox_ssh_admin" {
+  name        = "dev/proxmox/ssh-admin-password"
+  description = "Proxmox admin_dev SSH password for Terraform provider (host access)"
 
   tags = {
     Environment = "dev"
@@ -35,8 +35,31 @@ resource "aws_secretsmanager_secret" "proxmox_ssh_root" {
   }
 }
 
-resource "aws_secretsmanager_secret_version" "proxmox_ssh_root" {
-  secret_id     = aws_secretsmanager_secret.proxmox_ssh_root.id
+resource "aws_secretsmanager_secret_version" "proxmox_ssh_admin" {
+  secret_id     = aws_secretsmanager_secret.proxmox_ssh_admin.id
+  secret_string = "REPLACE_ME"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Golden Image VM Root Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "golden_image_root" {
+  name        = "dev/proxmox/golden-image-root-password"
+  description = "Root password for Golden Image VMs"
+
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "terraform"
+    Purpose     = "golden-image"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "golden_image_root" {
+  secret_id     = aws_secretsmanager_secret.golden_image_root.id
   secret_string = "REPLACE_ME"
 
   lifecycle {
