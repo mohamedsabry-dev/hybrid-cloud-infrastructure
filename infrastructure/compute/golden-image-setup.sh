@@ -12,6 +12,9 @@
 
 set -e
 
+# Suppress kernel messages on console
+dmesg -n 1
+
 echo "==============================================================================="
 echo "         GOLDEN IMAGE SETUP - Rocky Linux 10.x"
 echo "==============================================================================="
@@ -179,7 +182,7 @@ echo "         This will DISCONNECT your SSH session!"
 echo ""
 echo "The VM will automatically shutdown after cleanup."
 echo ""
-read -p "Proceed with cleanup and shutdown? (y/n): " PROCEED
+read -p "Proceed with cleanup and shutdown? (y/n): " PROCEED </dev/tty
 if [ "$PROCEED" != "y" ]; then
     echo "Aborted. Run script again when ready."
     exit 0
@@ -224,7 +227,7 @@ echo "     - Convert to template: Right-click VM > Convert to Template"
 echo "==============================================================================="
 echo ""
 
-read -p "Shutdown now? (y/n): " SHUTDOWN
+read -p "Shutdown now? (y/n): " SHUTDOWN </dev/tty
 if [ "$SHUTDOWN" = "y" ]; then
     echo "Shutting down..."
     shutdown -h now
