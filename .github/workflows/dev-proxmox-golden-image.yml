@@ -6,7 +6,7 @@ name: "Dev - Proxmox Golden Image"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/vms/golden-image/**'
       - '.github/workflows/dev-proxmox-golden-image.yml'
