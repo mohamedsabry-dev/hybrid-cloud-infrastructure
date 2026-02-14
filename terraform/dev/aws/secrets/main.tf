@@ -45,44 +45,21 @@ resource "aws_secretsmanager_secret_version" "proxmox_ssh_admin" {
 }
 
 #-------------------------------------------------------------------------------
-# Golden Image VM Root Password
+# VM Root Password (for cloud-init when cloning VMs)
 #-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "golden_image_root" {
-  name        = "dev/proxmox/golden-image-root-password"
-  description = "Root password for Golden Image VMs"
+resource "aws_secretsmanager_secret" "vm_root_password" {
+  name        = "dev/proxmox/vm-root-password"
+  description = "Root password for VMs created via cloud-init"
 
   tags = {
     Environment = "dev"
     ManagedBy   = "terraform"
-    Purpose     = "golden-image"
+    Purpose     = "vm-automation"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "golden_image_root" {
-  secret_id     = aws_secretsmanager_secret.golden_image_root.id
-  secret_string = "REPLACE_ME"
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
-
-#-------------------------------------------------------------------------------
-# Proxmox Root SSH Password (for Terraform provider SSH access)
-#-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "proxmox_root" {
-  name        = "dev/proxmox/root-password"
-  description = "Proxmox root SSH password for Terraform provider"
-
-  tags = {
-    Environment = "dev"
-    ManagedBy   = "terraform"
-    Purpose     = "proxmox-automation"
-  }
-}
-
-resource "aws_secretsmanager_secret_version" "proxmox_root" {
-  secret_id     = aws_secretsmanager_secret.proxmox_root.id
+resource "aws_secretsmanager_secret_version" "vm_root_password" {
+  secret_id     = aws_secretsmanager_secret.vm_root_password.id
   secret_string = "REPLACE_ME"
 
   lifecycle {

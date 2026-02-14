@@ -28,8 +28,8 @@ variable "golden_image_vmid" {
   default     = 9000
 }
 
-variable "cloud_image_file_id" {
-  description = "Rocky Linux cloud image file ID on local storage (format: storage:content_type/filename)"
+variable "iso_file_id" {
+  description = "Rocky Linux Minimal ISO file ID (format: storage:iso/filename)"
   type        = string
-  default     = "local:iso/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2"
+  default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
 }
