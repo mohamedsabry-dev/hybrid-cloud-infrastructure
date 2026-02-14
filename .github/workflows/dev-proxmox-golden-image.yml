@@ -12,16 +12,6 @@ on:
       - '.github/workflows/dev-proxmox-golden-image.yml'
 
   workflow_dispatch:
-    inputs:
-      action:
-        description: 'Action to perform'
-        required: true
-        default: 'plan'
-        type: choice
-        options:
-          - plan
-          - apply
-          - destroy
 
 permissions:
   id-token: write
@@ -44,8 +34,6 @@ jobs:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-    outputs:
-      vm_created: ${{ steps.apply.outcome == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +52,7 @@ jobs:
 
       - name: Terraform Apply
         id: apply
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
         run: terraform apply -auto-approve tfplan
-
-      - name: Terraform Destroy
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        run: terraform destroy -auto-approve
 
       - name: Post-Create Instructions
         if: steps.apply.outcome == 'success'
@@ -89,14 +72,13 @@ jobs:
           echo "=============================================="
 
   #=============================================================================
-  # Job 2: Wait for VM Shutdown (polls every 30s for up to 2 hours)
+  # Job 2: Wait for VM Shutdown (polls every 30s for up to 1 hour)
   #=============================================================================
   wait-for-shutdown:
     name: "Waiting for VM Shutdown"
     needs: create-vm
-    if: needs.create-vm.outputs.vm_created == 'true'
     runs-on: mac-mini
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
