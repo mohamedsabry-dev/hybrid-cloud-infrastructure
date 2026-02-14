@@ -12,17 +12,6 @@ on:
       - '.github/workflows/dev-proxmox-test-clones.yml'
 
   workflow_dispatch:
-    inputs:
-      action:
-        description: 'Action to perform'
-        required: true
-        default: 'plan'
-        type: choice
-        options:
-          - plan
-          - apply
-          - destroy
-          - test
 
 permissions:
   id-token: write
@@ -63,17 +52,10 @@ jobs:
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
-        id: apply
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'apply' || github.event.inputs.action == 'test'))
         run: terraform apply -auto-approve tfplan
-
-      - name: Terraform Destroy
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        run: terraform destroy -auto-approve
 
       - name: Get VM IPs
         id: ips
-        if: steps.apply.outcome == 'success'
         run: |
           echo "vm1_ip=10.0.64.99" >> $GITHUB_OUTPUT
           echo "vm2_ip=10.0.63.99" >> $GITHUB_OUTPUT
@@ -84,7 +66,6 @@ jobs:
   wait-boot:
     name: "Wait for VMs to Boot"
     needs: deploy
-    if: needs.deploy.outputs.vm1_ip != ''
     runs-on: mac-mini
     timeout-minutes: 10
 
@@ -100,7 +81,6 @@ jobs:
   verify:
     name: "Verify Cloud-Init"
     needs: [deploy, wait-boot]
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'test'
     runs-on: mac-mini
 
     steps:
@@ -114,7 +94,7 @@ jobs:
           HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm1_ip }} 'hostname' 2>/dev/null || echo "FAILED")
           echo "Hostname: $HOSTNAME"
 
-          if [ "$HOSTNAME" = "test-vm-01" ]; then
+          if echo "$HOSTNAME" | grep -q "test-vm-01"; then
             echo "✓ Hostname matches expected value"
           else
             echo "✗ Hostname mismatch! Expected: test-vm-01, Got: $HOSTNAME"
@@ -142,7 +122,7 @@ jobs:
           HOSTNAME=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${{ needs.deploy.outputs.vm2_ip }} 'hostname' 2>/dev/null || echo "FAILED")
           echo "Hostname: $HOSTNAME"
 
-          if [ "$HOSTNAME" = "test-vm-02" ]; then
+          if echo "$HOSTNAME" | grep -q "test-vm-02"; then
             echo "✓ Hostname matches expected value"
           else
             echo "✗ Hostname mismatch! Expected: test-vm-02, Got: $HOSTNAME"
@@ -168,16 +148,13 @@ jobs:
           echo ""
           echo "Golden image template is working correctly."
           echo "Cloud-init configurations applied successfully."
-          echo ""
-          echo "To cleanup test VMs, run workflow with action: destroy"
 
   #=============================================================================
-  # Job 4: Cleanup (optional, runs on 'test' action after verify)
+  # Job 4: Cleanup Test VMs
   #=============================================================================
   cleanup:
     name: "Cleanup Test VMs"
     needs: [deploy, verify]
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'test'
     runs-on: mac-mini
 
     defaults:

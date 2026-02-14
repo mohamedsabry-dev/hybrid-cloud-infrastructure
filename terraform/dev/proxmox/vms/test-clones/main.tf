@@ -22,7 +22,7 @@ fqdn: ${each.value.name}.${var.search_domain}
 # Set root password
 chpasswd:
   list: |
-    root:${data.aws_secretsmanager_secret_version.vm_root_password.secret_string}
+    root:${local.vm_root_password}
   expire: false
 
 # Disable cloud-init network config (we use Proxmox cloud-init)
