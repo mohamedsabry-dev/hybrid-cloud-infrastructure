@@ -4,6 +4,13 @@
 #===============================================================================
 
 #-------------------------------------------------------------------------------
+# Fetch Golden Image Root Password from Secrets Manager
+#-------------------------------------------------------------------------------
+data "aws_secretsmanager_secret_version" "golden_image_root" {
+  secret_id = "dev/proxmox/golden-image-root-password"
+}
+
+#-------------------------------------------------------------------------------
 # Upload Cloud-Init Config (user_data)
 #-------------------------------------------------------------------------------
 resource "proxmox_virtual_environment_file" "cloud_config" {
@@ -16,6 +23,15 @@ resource "proxmox_virtual_environment_file" "cloud_config" {
 #cloud-config
 package_update: true
 package_upgrade: true
+
+# Set root password
+chpasswd:
+  list: |
+    root:${data.aws_secretsmanager_secret_version.golden_image_root.secret_string}
+  expire: false
+
+# Enable root SSH login
+ssh_pwauth: true
 
 packages:
   - qemu-guest-agent
@@ -43,6 +59,8 @@ runcmd:
   - systemctl enable qemu-guest-agent
   - systemctl start qemu-guest-agent
   - systemctl enable sshd
+  - sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+  - systemctl restart sshd
   - dnf clean all
   - rm -rf /var/cache/dnf/*
 EOF
