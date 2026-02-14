@@ -1,0 +1,59 @@
+# Dev Proxmox Golden Image VM deployment
+# Triggers on push to dev branch when golden-image files change
+
+name: "Dev - Proxmox Golden Image"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/dev/proxmox/vms/golden-image/**'
+      - '.github/workflows/dev-proxmox-golden-image.yml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: "Plan & Apply"
+    runs-on: production
+
+    defaults:
+      run:
+        working-directory: terraform/dev/proxmox/vms/golden-image
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: terraform destroy -auto-approve
