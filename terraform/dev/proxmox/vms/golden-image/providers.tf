@@ -36,7 +36,7 @@ data "aws_secretsmanager_secret_version" "proxmox" {
 
 # Fetch Proxmox SSH password from Secrets Manager
 data "aws_secretsmanager_secret_version" "proxmox_ssh" {
-  secret_id = "dev/proxmox/ssh-root-password"
+  secret_id = "dev/proxmox/ssh-admin-password"
 }
 
 locals {
@@ -49,7 +49,7 @@ provider "proxmox" {
   insecure  = var.proxmox_tls_insecure
 
   ssh {
-    username = "root"
+    username = "admin_dev"
     password = data.aws_secretsmanager_secret_version.proxmox_ssh.secret_string
   }
 }
