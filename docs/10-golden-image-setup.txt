@@ -18,7 +18,7 @@ WORKFLOW SUMMARY
 1. Push to dev branch     → Triggers workflow, creates VM
 2. Manual OS install      → Install Rocky Linux from ISO
 3. Manual setup script    → Run golden-image-setup.sh, test, shutdown
-4. Approve workflow gate  → Workflow removes CD-ROM, converts to template
+4. Workflow auto-detects  → Polls VM status, converts to template when stopped
 5. Template ready         → Clone VMs from template
 
 
@@ -28,9 +28,9 @@ STEP 1: TRIGGER WORKFLOW
 
 Push changes to dev branch or manually trigger workflow:
 
-    gh workflow run "Dev - Proxmox Golden Image" --ref dev -f action=apply
+    gh workflow run "Dev - Proxmox Golden Image" --ref dev
 
-Workflow creates VM 9000 and waits at approval gate.
+Workflow creates VM 9000 and polls for shutdown.
 
 
 ================================================================================
@@ -111,21 +111,16 @@ After installation completes and VM reboots:
 
 
 ================================================================================
-STEP 4: APPROVE WORKFLOW GATE
+STEP 4: WORKFLOW AUTO-CONVERTS TO TEMPLATE
 ================================================================================
 
-After VM is shutdown:
-
-1. Go to GitHub Actions
-2. Find the running "Dev - Proxmox Golden Image" workflow
-3. Click "Review deployments"
-4. Approve the "golden-image-approval" environment
-
-Workflow automatically:
-  - Verifies VM is stopped
+After VM is shutdown, workflow automatically:
+  - Detects VM stopped (polls every 30 seconds)
   - Removes CD-ROM drive
   - Updates boot order to disk only (scsi0)
   - Converts VM to template
+
+No manual approval needed - just shutdown the VM and wait.
 
 
 ================================================================================
@@ -179,9 +174,9 @@ See: troubleshooting/06-proxmox-golden-image-terraform.md
    - Solution: AWS Console > DynamoDB > Tables >
      hybrid-cloud-infrastructure-tf-state-lock-dev > Delete lock item
 
-3. Workflow waiting forever
-   - Need GitHub environment "golden-image-approval"
-   - Create: Settings > Environments > New > Add yourself as reviewer
+3. Workflow polling timeout (1 hour)
+   - VM not shutdown within timeout
+   - Solution: Manually shutdown VM or re-run workflow
 
 4. agent { enabled = true } causes Terraform to wait
    - This is normal - waits for qemu-guest-agent to respond
@@ -234,7 +229,7 @@ Need workflow to wait for manual OS installation before converting to template:
   - Workflow polls Proxmox API every 30 seconds
   - Checks VM status via: GET /nodes/{node}/qemu/{vmid}/status/current
   - Continues when status = "stopped"
-  - Timeout: 2 hours (120 minutes)
+  - Timeout: 1 hour (60 minutes)
   - Works on any GitHub plan
 
 3. SCRIPT DEVELOPMENT & TESTING
@@ -306,29 +301,25 @@ TEST CLONE WORKFLOW
 
 Workflow: .github/workflows/dev-proxmox-test-clones.yml
 
-Manual trigger with actions:
+Trigger workflow (push to dev or manual):
 
-    # Plan only (see what would be created)
-    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=plan
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev
 
-    # Create test VMs
-    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=apply
-
-    # Full test cycle (create, verify, destroy)
-    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=test
-
-    # Cleanup test VMs
-    gh workflow run "Dev - Test Golden Image Clones" --ref dev -f action=destroy
+Workflow flow:
+  1. Deploy test VMs (terraform apply)
+  2. Wait for both VMs to shutdown (polls every 30 seconds)
+  3. Cleanup (terraform destroy)
 
 Test VMs Created:
   - test-vm-01: VMID 101, VLAN 64, IP 10.0.64.99
   - test-vm-02: VMID 102, VLAN 63, IP 10.0.63.99
 
-Verification Checks:
-  - SSH connectivity
-  - Hostname matches VM name
-  - /var/log/cloud-init-done.log exists
-  - Cloud-init completed message present
+Manual Verification (SSH to VMs before shutdown):
+  - Check hostname: hostname
+  - Check cloud-init: cat /var/log/cloud-init-done.log
+  - Check timezone: timedatectl
+  - Check network: ping google.com
+  - Shutdown when done: shutdown -h now
 
 VERIFIED TEST RESULTS (2026-02-14):
 -----------------------------------
