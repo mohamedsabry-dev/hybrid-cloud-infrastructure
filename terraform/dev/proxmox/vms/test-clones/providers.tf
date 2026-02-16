@@ -4,15 +4,15 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"
+      version = "6.28.0"  # Pinned for offline runner
     }
     proxmox = {
       source  = "bpg/proxmox"
-      version = "0.93.1"
+      version = "0.93.1"  # Pinned for offline runner
     }
     external = {
       source  = "hashicorp/external"
-      version = "2.3.4"
+      version = "2.3.4"  # Pinned for offline runner
     }
   }
 
@@ -27,31 +27,46 @@ terraform {
 
 provider "aws" {
   region = "eu-west-2"
+
+  default_tags {
+    tags = {
+      Environment = "dev"
+      ManagedBy   = "terraform"
+      Module      = "proxmox-test-clones"
+    }
+  }
 }
 
-# Fetch Proxmox API credentials from Secrets Manager
-data "aws_secretsmanager_secret_version" "proxmox" {
+#===============================================================================
+# Fetch Secrets from AWS Secrets Manager
+#===============================================================================
+
+# Proxmox API credentials
+data "aws_secretsmanager_secret_version" "proxmox_api" {
   secret_id = var.proxmox_secret_id
 }
 
-# Fetch Proxmox admin SSH password from Secrets Manager (for cloud-init snippet uploads)
+# Proxmox SSH password
 data "aws_secretsmanager_secret_version" "proxmox_ssh" {
-  secret_id = "dev/proxmox/ssh-admin-password"
+  secret_id = var.proxmox_ssh_secret_id
 }
 
-# Fetch VM root password for cloud-init
-data "aws_secretsmanager_secret_version" "vm_root_password" {
-  secret_id = "dev/proxmox/vm-root-password"
+# VM root password for cloud-init
+data "aws_secretsmanager_secret_version" "vm_root" {
+  secret_id = var.vm_root_secret_id
 }
 
-# Mark password as sensitive to prevent display in logs
+#===============================================================================
+# Locals
+#===============================================================================
+
 locals {
-  vm_root_password = sensitive(data.aws_secretsmanager_secret_version.vm_root_password.secret_string)
+  proxmox_creds = jsondecode(data.aws_secretsmanager_secret_version.proxmox_api.secret_string)
 }
 
-locals {
-  proxmox_creds = jsondecode(data.aws_secretsmanager_secret_version.proxmox.secret_string)
-}
+#===============================================================================
+# Proxmox Provider
+#===============================================================================
 
 provider "proxmox" {
   endpoint  = var.proxmox_api_url
@@ -59,7 +74,7 @@ provider "proxmox" {
   insecure  = var.proxmox_tls_insecure
 
   ssh {
-    username = "admin_dev"
+    username = var.proxmox_ssh_username
     password = data.aws_secretsmanager_secret_version.proxmox_ssh.secret_string
   }
 }
