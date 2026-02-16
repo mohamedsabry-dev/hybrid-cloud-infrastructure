@@ -1,0 +1,42 @@
+# macOS - Persistent Static Route
+
+## Issue
+Routes added via `route add` are lost after Mac reboot.
+
+## Solution
+Create a launch daemon plist to restore the route at boot.
+
+```bash
+sudo tee /Library/LaunchDaemons/com.local.route.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.local.route</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/sbin/route</string>
+        <string>add</string>
+        <string>-net</string>
+        <string>10.0.0.0/16</string>
+        <string>192.168.0.175</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>LaunchOnlyOnce</key>
+    <true/>
+</dict>
+</plist>
+EOF
+```
+
+Then set permissions and load it:
+
+```bash
+sudo chmod 644 /Library/LaunchDaemons/com.local.route.plist
+sudo launchctl load /Library/LaunchDaemons/com.local.route.plist
+```
+
+## Date Recorded
+2026-02-16
