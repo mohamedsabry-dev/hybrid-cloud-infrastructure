@@ -81,3 +81,21 @@ variable "proxmox_ssh_username" {
   type        = string
   default     = "admin_dev"
 }
+
+variable "proxmox_secret_id" {
+  description = "AWS Secrets Manager secret ID for Proxmox API token"
+  type        = string
+  default     = "dev/proxmox/terraform-token"
+}
+
+variable "proxmox_api_url" {
+  description = "Proxmox API endpoint URL"
+  type        = string
+  default     = "https://pve-dev.lab.local:8006"
+}
+
+variable "proxmox_tls_insecure" {
+  description = "Skip TLS verification for Proxmox API"
+  type        = bool
+  default     = true
+}
