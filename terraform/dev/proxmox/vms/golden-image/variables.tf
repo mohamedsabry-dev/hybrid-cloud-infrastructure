@@ -54,7 +54,7 @@ variable "datastore_id" {
 variable "iso_file_id" {
   description = "Proxmox ISO file ID for Rocky Linux 10.1"
   type        = string
-  default     = "local:iso/Rocky-10.1-x86_64-minimal.iso"
+  default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
 }
 
 variable "proxmox_secret_id" {
