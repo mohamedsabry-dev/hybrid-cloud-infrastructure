@@ -1,5 +1,5 @@
 # Dev Proxmox Golden Image VM deployment
-# Creates VM, waits for shutdown, then converts to template
+# Creates VM from ISO for manual installation
 
 name: "Dev - Proxmox Golden Image"
 
@@ -18,22 +18,20 @@ permissions:
   contents: read
 
 env:
+  ENVIRONMENT: dev
   TF_WORKING_DIR: terraform/dev/proxmox/vms/golden-image
-  VM_ID: 9000
-  PROXMOX_NODE: pve-dev
 
 jobs:
   #=============================================================================
-  # Job 1: Create VM via Terraform
+  # Create VM via Terraform
   #=============================================================================
   create-vm:
-    name: "Create Golden Image VM"
+    name: "Create Golden Image VM (${{ env.ENVIRONMENT }})"
     runs-on: mac-mini
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-
 
     steps:
       - uses: actions/checkout@v4
@@ -41,8 +39,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
-          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
@@ -50,148 +48,30 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan
 
+      - name: Review Window
+        run: |
+          echo "⏳ 3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
 
-      - name: Post-Create Instructions
+      - name: Display Setup Instructions
         if: steps.apply.outcome == 'success'
         run: |
           echo "=============================================="
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
           echo "=============================================="
           echo ""
-          echo "1. Open Proxmox console for VM ${{ env.VM_ID }}"
-          echo "2. Install Rocky Linux (see docs/10-golden-image-setup.txt)"
-          echo "3. After reboot, select 'Troubleshooting' > 'Boot from local drive'"
-          echo "4. SSH and run setup script:"
-          echo "   scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/"
-          echo "   ssh root@10.0.65.99 '/tmp/golden-image-setup.sh'"
-          echo "5. Workflow will detect shutdown and convert to template"
+          terraform output -raw golden_image.setup_instructions
           echo ""
           echo "=============================================="
-
-  #=============================================================================
-  # Job 2: Wait for VM Shutdown (polls every 30s for up to 1 hour)
-  #=============================================================================
-  wait-for-shutdown:
-    name: "Waiting for VM Shutdown"
-    needs: create-vm
-    runs-on: mac-mini
-    timeout-minutes: 60
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
-          aws-region: eu-west-2
-
-      - name: Get Proxmox API Token
-        id: secrets
-        run: |
-          TOKEN=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/terraform-token \
-            --query SecretString --output text | jq -r '"\(.token_id)=\(.token_secret)"')
-          echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Wait for VM Shutdown
-        run: |
-          echo "=============================================="
-          echo "  WAITING FOR VM SHUTDOWN"
-          echo "=============================================="
           echo ""
-          echo "Polling VM ${{ env.VM_ID }} status every 30 seconds..."
-          echo "Complete the manual setup and shutdown the VM."
-          echo ""
-
-          while true; do
-            STATUS=$(curl -sk \
-              -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
-              "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/status/current" \
-              | jq -r '.data.status')
-
-            TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-            echo "[$TIMESTAMP] VM status: $STATUS"
-
-            if [ "$STATUS" = "stopped" ]; then
-              echo ""
-              echo "=============================================="
-              echo "  VM IS STOPPED - Proceeding to template"
-              echo "=============================================="
-              break
-            fi
-
-            sleep 30
-          done
-
-  #=============================================================================
-  # Job 3: Convert to Template
-  #=============================================================================
-  convert-template:
-    name: "Convert to Template"
-    needs: wait-for-shutdown
-    runs-on: mac-mini
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
-          aws-region: eu-west-2
-
-      - name: Get Proxmox API Token
-        id: secrets
-        run: |
-          TOKEN=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/terraform-token \
-            --query SecretString --output text | jq -r '"\(.token_id)=\(.token_secret)"')
-          echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-
-      - name: Remove CD-ROM
-        run: |
-          curl -sk -X PUT \
-            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "delete=ide2" \
-            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/config"
-          echo "CD-ROM removed"
-
-      - name: Update Boot Order
-        run: |
-          curl -sk -X PUT \
-            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "boot=order=scsi0" \
-            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/config"
-          echo "Boot order updated to disk only"
-
-      - name: Convert to Template
-        run: |
-          RESPONSE=$(curl -sk -X POST \
-            -H "Authorization: PVEAPIToken=${{ steps.secrets.outputs.token }}" \
-            "https://${{ env.PROXMOX_NODE }}:8006/api2/json/nodes/${{ env.PROXMOX_NODE }}/qemu/${{ env.VM_ID }}/template")
-
-          echo "Response: $RESPONSE"
-
-          if echo "$RESPONSE" | jq -e '.data' > /dev/null 2>&1; then
-            echo "=============================================="
-            echo "  TEMPLATE CREATED SUCCESSFULLY!"
-            echo "=============================================="
-            echo ""
-            echo "Template ID: ${{ env.VM_ID }}"
-            echo "Node: ${{ env.PROXMOX_NODE }}"
-            echo ""
-            echo "You can now clone VMs from this template."
-            echo "=============================================="
-          else
-            echo "ERROR: Failed to convert to template"
-            echo "$RESPONSE"
-            exit 1
-          fi
+          echo "After completing setup and converting to template,"
+          echo "update the Terraform code to reference the template"
+          echo "for future VM cloning operations."
+          echo "=============================================="
