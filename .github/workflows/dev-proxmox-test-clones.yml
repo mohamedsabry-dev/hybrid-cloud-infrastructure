@@ -28,6 +28,8 @@ jobs:
   deploy:
     name: "Deploy Test VM"
     runs-on: mac-mini
+    # Skip if locked (unless manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TEST_CLONES_DEV_LOCKED != 'true' }}
 
     defaults:
       run:
