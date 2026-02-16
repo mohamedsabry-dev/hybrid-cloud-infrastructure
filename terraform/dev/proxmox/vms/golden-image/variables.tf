@@ -1,77 +1,88 @@
-variable "proxmox_api_url" {
-  description = "Proxmox API URL (base URL without /api2/json)"
-  type        = string
-  default     = "https://pve-dev:8006"
+# variables.tf
+
+#===============================================================================
+# Golden Image VM Configuration
+#===============================================================================
+
+variable "golden_image" {
+  description = "Configuration for Rocky Linux 10.1 golden image VM"
+  type = object({
+    vm_id       = number
+    name        = string
+    tags        = list(string)
+    description = string
+    cpu_cores   = number
+    memory      = number
+    disk_size   = number
+    bridge      = string
+    vlan_id     = number
+  })
+  
+  default = {
+    vm_id       = 9000
+    name        = "rocky10-golden-image"
+    tags        = ["golden-image", "template", "rocky10"]
+    description = "Rocky Linux 10.1 Golden Image - Install from ISO, run cleanup script, then convert to template"
+    cpu_cores   = 2
+    memory      = 2048
+    disk_size   = 20
+    bridge      = "vmbr0"
+    vlan_id     = 50
+  }
 }
 
-variable "proxmox_tls_insecure" {
-  description = "Skip TLS verification (set false in production with valid certs)"
-  type        = bool
-  default     = true
-}
-
-variable "proxmox_secret_id" {
-  description = "Secrets Manager secret ID for Proxmox credentials"
-  type        = string
-  default     = "dev/proxmox/terraform-token"
-}
+#===============================================================================
+# Proxmox Node Configuration
+#===============================================================================
 
 variable "node_name" {
-  description = "Proxmox node name"
+  description = "Proxmox node name where VM will be created"
   type        = string
   default     = "pve-dev"
 }
 
-variable "golden_image_vmid" {
-  description = "VM ID for golden image (use 9xxx range for templates)"
-  type        = number
-  default     = 9000
-}
-
-variable "iso_file_id" {
-  description = "Rocky Linux Minimal ISO file ID (format: storage:iso/filename)"
-  type        = string
-  default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
-}
-
-#-------------------------------------------------------------------------------
-# VM Hardware Configuration
-#-------------------------------------------------------------------------------
-variable "vm_cores" {
-  description = "Number of CPU cores"
-  type        = number
-  default     = 2
-}
-
-variable "vm_memory" {
-  description = "Memory in MB"
-  type        = number
-  default     = 2048
-}
-
-variable "disk_size" {
-  description = "OS disk size in GB"
-  type        = number
-  default     = 20
-}
-
 variable "datastore_id" {
-  description = "Proxmox datastore for VM disk"
+  description = "Proxmox datastore ID for VM disk"
   type        = string
   default     = "local-lvm"
 }
 
-#-------------------------------------------------------------------------------
-# Network Configuration
-#-------------------------------------------------------------------------------
-variable "network_bridge" {
-  description = "Proxmox network bridge"
+#===============================================================================
+# ISO Configuration
+#===============================================================================
+
+variable "iso_file_id" {
+  description = "Proxmox ISO file ID for Rocky Linux 10.1"
   type        = string
-  default     = "vmbr0"
+  default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
 }
 
-variable "network_vlan" {
-  description = "VLAN ID for golden image network"
-  type        = number
-  default     = 65
+variable "proxmox_secret_id" {
+  description = "AWS Secrets Manager secret ID for Proxmox API token"
+  type        = string
+  default     = "dev/proxmox/terraform-token"
+}
+
+variable "proxmox_ssh_secret_id" {
+  description = "AWS Secrets Manager secret ID for Proxmox SSH password"
+  type        = string
+  default     = "dev/proxmox/ssh-admin-password"
+}
+
+variable "proxmox_ssh_username" {
+  description = "Proxmox SSH username for snippet uploads"
+  type        = string
+  default     = "admin_dev"
+}
+
+variable "proxmox_api_url" {
+  description = "Proxmox API endpoint URL"
+  type        = string
+  default     = "https://pve-dev.lab.local:8006"
+}
+
+variable "proxmox_tls_insecure" {
+  description = "Skip TLS verification for Proxmox API (self-signed cert)"
+  type        = bool
+  default     = true
 }
