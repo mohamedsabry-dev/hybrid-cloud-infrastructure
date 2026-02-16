@@ -67,6 +67,17 @@ jobs:
           echo ""
           echo "=============================================="
 
+      - name: Review Window
+        run: |
+          echo "⏳ 3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+          echo "scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/"
+
+
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
