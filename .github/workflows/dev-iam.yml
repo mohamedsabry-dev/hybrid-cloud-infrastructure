@@ -15,14 +15,19 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/aws/iam
+
+
 jobs:
   deploy:
     name: "Plan & Apply"
-    runs-on: production
+    runs-on: mac-mini
 
     defaults:
       run:
-        working-directory: terraform/dev/aws/iam
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
       - uses: actions/checkout@v4
@@ -30,14 +35,31 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-TerraformAdmin-dev
-          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Plan
+        timeout-minutes: 3
         run: terraform plan -out=tfplan
+
+      - name: Lock Cleanup Instructions
+        if: failure() || cancelled()
+        run: |
+          echo "=============================================="
+          echo "⚠️  Workflow cancelled or timed out"
+          echo "=============================================="
+          echo ""
+          echo "State may be locked. To release:"
+          echo ""
+          echo "AWS Console → DynamoDB → Tables"
+          echo "→ hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "→ Explore items >> Find the Locked ID"
+          echo "→ Delete item"
+          echo ""
+          echo "=============================================="
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

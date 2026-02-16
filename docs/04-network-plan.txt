@@ -1,0 +1,261 @@
+================================================================================
+                              NETWORK PLAN
+================================================================================
+
+Domain: lab.local
+DNS Servers: FreeIPA (10.0.50.10, 10.0.60.10)
+
+================================================================================
+                              HARDWARE TOPOLOGY
+================================================================================
+
+Device          │ Model                  │ Role              │ Ports Used
+────────────────┼────────────────────────┼───────────────────┼────────────────
+Router          │ TP-Link ER605          │ L3 routing, FW    │ WAN1, LAN1-3
+Access Point    │ Archer C24             │ WiFi mgmt bridge  │ LAN → ER605 Port3
+Storage Switch  │ 5-port dumb switch     │ L2 storage only   │ 3 ports
+NAS             │ ASUSTOR FS6706T        │ NFS storage       │ 2 NICs (mgmt+storage)
+Dev Server      │ Proxmox VE             │ Hypervisor        │ ETH + WiFi
+Prod Server     │ Proxmox VE             │ Hypervisor        │ ETH + WiFi
+
+================================================================================
+                              ER605 PORT ASSIGNMENT
+================================================================================
+
+Port   │ Mode    │ Connected To         │ VLANs                │ Purpose
+───────┼─────────┼──────────────────────┼──────────────────────┼─────────────────
+WAN1   │ WAN     │ Home Router          │ -                    │ Internet uplink
+LAN3   │ Access  │ Access Point         │ 5 (PVID)             │ WiFi management
+LAN4   │ Trunk   │ Dev Server ETH       │ 60,61,62,63,64,65    │ Dev service VLANs
+LAN5   │ Trunk   │ Prod Server ETH      │ 50,51,52,53,54,55    │ Prod service VLANs
+
+================================================================================
+                              VLAN SUMMARY
+================================================================================
+
+VLAN │ Name              │ Subnet        │ Gateway    │ Path              │ Status
+─────┼───────────────────┼───────────────┼────────────┼───────────────────┼────────
+5    │ Unified Mgmt      │ 10.0.5.0/24   │ 10.0.5.1   │ WiFi → AP → LAN3  │ ACTIVE
+40   │ Storage Data      │ 10.0.40.0/24  │ None (L2)  │ Dumb Switch       │ ACTIVE
+─────┼───────────────────┼───────────────┼────────────┼───────────────────┼────────
+50   │ Prod Identity     │ 10.0.50.0/24  │ 10.0.50.1  │ Prod ETH → LAN5   │ ACTIVE
+51   │ Prod Platform     │ 10.0.51.0/24  │ 10.0.51.1  │ Prod ETH → LAN5   │ ACTIVE
+52   │ Prod Vault        │ 10.0.52.0/24  │ 10.0.52.1  │ Prod ETH → LAN5   │ ACTIVE
+53   │ Prod Control      │ 10.0.53.0/24  │ 10.0.53.1  │ Prod ETH → LAN5   │ ACTIVE
+54   │ Prod Data         │ 10.0.54.0/24  │ 10.0.54.1  │ Prod ETH → LAN5   │ ACTIVE
+55   │ Prod DMZ          │ 10.0.55.0/24  │ 10.0.55.1  │ Prod ETH → LAN5   │ ACTIVE
+─────┼───────────────────┼───────────────┼────────────┼───────────────────┼────────
+60   │ Dev Identity      │ 10.0.60.0/24  │ 10.0.60.1  │ Dev ETH → LAN4    │ ACTIVE
+61   │ Dev Platform      │ 10.0.61.0/24  │ 10.0.61.1  │ Dev ETH → LAN4    │ ACTIVE
+62   │ Dev Vault         │ 10.0.62.0/24  │ 10.0.62.1  │ Dev ETH → LAN4    │ ACTIVE
+63   │ Dev Control       │ 10.0.63.0/24  │ 10.0.63.1  │ Dev ETH → LAN4    │ ACTIVE
+64   │ Dev Data          │ 10.0.64.0/24  │ 10.0.64.1  │ Dev ETH → LAN4    │ ACTIVE
+65   │ Dev DMZ           │ 10.0.65.0/24  │ 10.0.65.1  │ Dev ETH → LAN4    │ ACTIVE
+
+================================================================================
+                         MANAGEMENT PLANE (VLAN 5 - WiFi)
+================================================================================
+
+Device              │ IP Address    │ Hostname                    │ Access
+────────────────────┼───────────────┼─────────────────────────────┼─────────────
+ER605 Gateway       │ 10.0.5.1      │ er605.lab.local             │ Web UI
+Access Point        │ 10.0.5.10     │ ap.lab.local                │ Web UI
+Prod Proxmox        │ 10.0.5.100    │ pve-prod.lab.local          │ Web UI, SSH
+Dev Proxmox         │ 10.0.5.110    │ pve-dev.lab.local           │ Web UI, SSH
+NAS                 │ 10.0.5.120    │ nas.lab.local               │ Web UI
+
+WiFi SSID: unified_mgmt
+Security: WPA2-PSK [AES]
+AP Isolation: ENABLED (clients cannot reach each other)
+
+================================================================================
+                         STORAGE PLANE (VLAN 40 - Isolated L2)
+================================================================================
+
+Device              │ IP Address    │ Hostname                    │ Protocol
+────────────────────┼───────────────┼─────────────────────────────┼──────────
+Prod Proxmox        │ 10.0.40.100   │ pve-prod-stor.lab.local     │ NFS client
+Dev Proxmox         │ 10.0.40.110   │ pve-dev-stor.lab.local      │ NFS client
+NAS                 │ 10.0.40.120   │ nas-stor.lab.local          │ NFS server
+
+Note: No gateway - isolated L2 network via dumb switch.
+      Storage traffic never routes through ER605.
+
+================================================================================
+                         EXTERNAL NETWORK
+================================================================================
+
+Device              │ IP Address      │ Hostname                  │ Notes
+────────────────────┼─────────────────┼───────────────────────────┼────────────
+Home Router         │ 192.168.0.1     │ -                         │ ISP gateway
+ER605 WAN           │ 192.168.0.175   │ -                         │ Lab uplink
+Mac Mini            │ 192.168.0.223   │ -                         │ Admin workstation
+
+Static Route (Mac Mini): 10.0.0.0/8 via 192.168.0.175
+
+================================================================================
+                         PRODUCTION SERVICE PLANE
+================================================================================
+
+VLAN 50 - Identity (10.0.50.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.50.1     │ -                           │ ER605
+FreeIPA Primary     │ 10.0.50.10    │ ipa1.lab.local              │ VM
+FreeIPA Replica     │ 10.0.50.11    │ ipa2.lab.local              │ VM
+
+VLAN 51 - Platform Management (10.0.51.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.51.1     │ -                           │ ER605
+Ansible             │ 10.0.51.10    │ ansible.lab.local           │ LXC
+GH Runner           │ 10.0.51.11    │ gh-runner.lab.local         │ LXC
+Prometheus          │ 10.0.51.20    │ prometheus.lab.local        │ LXC
+Grafana             │ 10.0.51.21    │ grafana.lab.local           │ LXC
+Loki                │ 10.0.51.22    │ loki.lab.local              │ LXC
+ArgoCD              │ 10.0.51.30    │ argocd.lab.local            │ LXC
+
+VLAN 52 - Vault (10.0.52.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.52.1     │ -                           │ ER605
+Vault Node 1        │ 10.0.52.10    │ vault1.lab.local            │ VM
+Vault Node 2        │ 10.0.52.11    │ vault2.lab.local            │ VM
+Vault Node 3        │ 10.0.52.12    │ vault3.lab.local            │ VM
+
+VLAN 53 - K8s Control Plane (10.0.53.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.53.1     │ -                           │ ER605
+K8s Master 1        │ 10.0.53.10    │ k8s-master1.lab.local       │ VM
+K8s Master 2        │ 10.0.53.11    │ k8s-master2.lab.local       │ VM
+K8s Master 3        │ 10.0.53.12    │ k8s-master3.lab.local       │ VM
+K8s API VIP         │ 10.0.53.100   │ k8s-api.lab.local           │ VIP
+
+VLAN 54 - K8s Data Plane (10.0.54.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.54.1     │ -                           │ ER605
+K8s Worker 1        │ 10.0.54.10    │ k8s-worker1.lab.local       │ VM
+K8s Worker 2        │ 10.0.54.11    │ k8s-worker2.lab.local       │ VM
+K8s Worker 3        │ 10.0.54.12    │ k8s-worker3.lab.local       │ VM
+Pod Network         │ 10.0.54.50-254│ -                           │ K8s managed
+
+VLAN 55 - DMZ (10.0.55.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.55.1     │ -                           │ ER605
+NGINX               │ 10.0.55.10    │ nginx.lab.local             │ LXC
+
+================================================================================
+                         DEVELOPMENT SERVICE PLANE
+================================================================================
+
+VLAN 60 - Identity (10.0.60.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.60.1     │ -                           │ ER605
+FreeIPA             │ 10.0.60.10    │ ipa1-dev.lab.local          │ VM
+FreeIPA Replica     │ 10.0.60.11    │ ipa2-dev.lab.local          │ VM
+
+VLAN 61 - Platform Management (10.0.61.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.61.1     │ -                           │ ER605
+Ansible             │ 10.0.61.10    │ ansible-dev.lab.local       │ LXC
+GH Runner           │ 10.0.61.11    │ gh-runner-dev.lab.local     │ LXC
+Prometheus          │ 10.0.61.20    │ prometheus-dev.lab.local    │ LXC
+Grafana             │ 10.0.61.21    │ grafana-dev.lab.local       │ LXC
+Loki                │ 10.0.61.22    │ loki-dev.lab.local          │ LXC
+ArgoCD              │ 10.0.61.30    │ argocd-dev.lab.local        │ LXC
+
+VLAN 62 - Vault (10.0.62.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.62.1     │ -                           │ ER605
+Vault Node 1        │ 10.0.62.10    │ vault1-dev.lab.local        │ VM
+Vault Node 2        │ 10.0.62.11    │ vault2-dev.lab.local        │ VM
+Vault Node 3        │ 10.0.62.12    │ vault3-dev.lab.local        │ VM
+
+VLAN 63 - K8s Control Plane (10.0.63.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.63.1     │ -                           │ ER605
+K8s Master 1        │ 10.0.63.10    │ k8s-master1-dev.lab.local   │ VM
+K8s Master 2        │ 10.0.63.11    │ k8s-master2-dev.lab.local   │ VM
+K8s Master 3        │ 10.0.63.12    │ k8s-master3-dev.lab.local   │ VM
+K8s API VIP         │ 10.0.63.100   │ k8s-api-dev.lab.local       │ VIP
+
+VLAN 64 - K8s Data Plane (10.0.64.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.64.1     │ -                           │ ER605
+K8s Worker 1        │ 10.0.64.10    │ k8s-worker1-dev.lab.local   │ VM
+K8s Worker 2        │ 10.0.64.11    │ k8s-worker2-dev.lab.local   │ VM
+K8s Worker 3        │ 10.0.64.12    │ k8s-worker3-dev.lab.local   │ VM
+Pod Network         │ 10.0.64.50-254│ -                           │ K8s managed
+
+VLAN 65 - DMZ (10.0.65.0/24)
+─────────────────────────────────────────────────────────────────────────────────
+Role                │ IP Address    │ Hostname                    │ Type
+────────────────────┼───────────────┼─────────────────────────────┼──────
+Gateway             │ 10.0.65.1     │ -                           │ ER605
+NGINX               │ 10.0.65.10    │ nginx-dev.lab.local         │ LXC
+
+================================================================================
+                              DNS RECORDS (FreeIPA)
+================================================================================
+
+Record Type │ Name                        │ Value
+────────────┼─────────────────────────────┼─────────────────────────────────────
+A           │ er605.lab.local             │ 10.0.5.1
+A           │ nas.lab.local               │ 10.0.5.120
+A           │ pve-prod.lab.local          │ 10.0.5.100
+A           │ pve-dev.lab.local           │ 10.0.5.110
+────────────┼─────────────────────────────┼─────────────────────────────────────
+A           │ ipa1.lab.local              │ 10.0.50.10
+A           │ ipa2.lab.local              │ 10.0.50.11
+A           │ vault1.lab.local            │ 10.0.52.10
+A           │ k8s-api.lab.local           │ 10.0.53.100
+A           │ nginx.lab.local             │ 10.0.55.10
+────────────┼─────────────────────────────┼─────────────────────────────────────
+A           │ ipa1-dev.lab.local          │ 10.0.60.10
+A           │ vault1-dev.lab.local        │ 10.0.62.10
+A           │ k8s-api-dev.lab.local       │ 10.0.63.100
+A           │ nginx-dev.lab.local         │ 10.0.65.10
+
+================================================================================
+                              IP ALLOCATION SUMMARY
+================================================================================
+
+Range           │ Purpose                    │ Environment
+────────────────┼────────────────────────────┼─────────────────────────────────
+10.0.5.0/24     │ Management (WiFi)          │ Shared
+10.0.40.0/24    │ Storage (isolated L2)      │ Shared
+────────────────┼────────────────────────────┼─────────────────────────────────
+10.0.50.0/24    │ Identity (FreeIPA)         │ PROD
+10.0.51.0/24    │ Platform (Ansible, CI/CD)  │ PROD
+10.0.52.0/24    │ Secrets (Vault)            │ PROD
+10.0.53.0/24    │ K8s Control Plane          │ PROD
+10.0.54.0/24    │ K8s Data Plane             │ PROD
+10.0.55.0/24    │ DMZ (NGINX)                │ PROD
+────────────────┼────────────────────────────┼─────────────────────────────────
+10.0.60.0/24    │ Identity (FreeIPA)         │ DEV
+10.0.61.0/24    │ Platform (Ansible, CI/CD)  │ DEV
+10.0.62.0/24    │ Secrets (Vault)            │ DEV
+10.0.63.0/24    │ K8s Control Plane          │ DEV
+10.0.64.0/24    │ K8s Data Plane             │ DEV
+10.0.65.0/24    │ DMZ (NGINX)                │ DEV
+────────────────┼────────────────────────────┼─────────────────────────────────
+192.168.0.0/24  │ Home/External network      │ External
