@@ -1,7 +1,7 @@
-# Prod Proxmox Test Clones - Verify Golden Image Template
-# Creates test VMs from template, waits for shutdown, then cleans up
+# prod Proxmox Test Clones - Verify Golden Image Template
+# Creates test VM from template, waits for shutdown, then cleans up
 
-name: "Prod - Test Golden Image Clones"
+name: "prod - Test Golden Image Clones"
 
 on:
   push:
@@ -23,11 +23,13 @@ env:
 
 jobs:
   #=============================================================================
-  # Job 1: Deploy Test VMs
+  # Job 1: Deploy Test VM
   #=============================================================================
   deploy:
-    name: "Deploy Test VMs"
+    name: "Deploy Test VM"
     runs-on: mac-mini
+    # Skip if locked (unless manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TEST_CLONES_prod_LOCKED != 'true' }}
 
     defaults:
       run:
@@ -53,17 +55,28 @@ jobs:
         if: failure() || cancelled()
         run: |
           echo "=============================================="
-          echo "⚠️  Workflow cancelled or timed out"
+          echo "  Workflow cancelled or timed out"
           echo "=============================================="
           echo ""
           echo "State may be locked. To release:"
           echo ""
-          echo "AWS Console → DynamoDB → Tables"
-          echo "→ hybrid-cloud-infrastructure-tf-state-lock-dev"
-          echo "→ Explore items >> Find the Locked ID"
-          echo "→ Delete item"
+          echo "AWS Console -> DynamoDB -> Tables"
+          echo "-> hybrid-cloud-infrastructure-tf-state-lock-prod"
+          echo "-> Explore items >> Find the Locked ID"
+          echo "-> Delete item"
           echo ""
           echo "=============================================="
+
+      - name: Review Window
+        run: |
+          echo "⏳ 3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+          echo "scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/"
+
+
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -71,74 +84,51 @@ jobs:
       - name: Show Test Instructions
         run: |
           echo "=============================================="
-          echo "  TEST VMs CREATED"
+          echo "  TEST VM CREATED"
           echo "=============================================="
           echo ""
-          echo "VMs:"
-          echo "  - test-vm-01: 10.0.64.99 (VLAN 64)"
-          echo "  - test-vm-02: 10.0.63.99 (VLAN 63)"
+          echo "VM:"
+          echo "  - test-vm-01: 10.0.60.10 (VLAN 60)"
           echo ""
-          echo "Verify manually via SSH, then shutdown both VMs."
+          echo "Verify manually via SSH, then shutdown the VM."
           echo "Workflow will auto-destroy after shutdown."
           echo "=============================================="
 
   #=============================================================================
-  # Job 2: Wait for VMs to Shutdown
+  # Job 2: Review Window (5 minutes before destroy)
   #=============================================================================
-  wait-shutdown:
-    name: "Wait for VMs Shutdown"
+  review:
+    name: "Review Window"
     needs: deploy
     runs-on: mac-mini
-    timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Infrastructure-prod
-          aws-region: eu-west-2
-
-      - name: Wait for Both VMs to Shutdown
+      - name: Wait 5 minutes for testing
         run: |
-          echo "Waiting for test VMs to shutdown..."
-          echo "SSH to VMs, verify cloud-init, then run: shutdown -h now"
+          echo "=============================================="
+          echo "  REVIEW WINDOW - 5 MINUTES"
+          echo "=============================================="
           echo ""
-
-          # Get Proxmox credentials from AWS
-          PROXMOX_CREDS=$(aws secretsmanager get-secret-value --secret-id prod/proxmox/terraform-token --query SecretString --output text)
-          TOKEN_ID=$(echo "$PROXMOX_CREDS" | jq -r '.token_id')
-          TOKEN_SECRET=$(echo "$PROXMOX_CREDS" | jq -r '.token_secret')
-          TOKEN="${TOKEN_ID}=${TOKEN_SECRET}"
-
-          PROXMOX_URL="https://pve-prod:8006/api2/json"
-          NODE="pve-prod"
-
-          # Poll both VMs until both are stopped
-          while true; do
-            VM1_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
-              "${PROXMOX_URL}/nodes/${NODE}/qemu/101/status/current" | jq -r '.data.status')
-            VM2_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
-              "${PROXMOX_URL}/nodes/${NODE}/qemu/102/status/current" | jq -r '.data.status')
-
-            echo "$(date '+%H:%M:%S') - VM 101: $VM1_STATUS, VM 102: $VM2_STATUS"
-
-            if [ "$VM1_STATUS" = "stopped" ] && [ "$VM2_STATUS" = "stopped" ]; then
-              echo ""
-              echo "Both VMs are stopped. Proceeding to cleanup."
-              break
-            fi
-
+          echo "SSH to VM and verify:"
+          echo "  ssh root@10.0.60.10"
+          echo ""
+          echo "Cancel this workflow if you need more time."
+          echo ""
+          echo "Auto-destroy in 300 seconds..."
+          echo ""
+          for i in $(seq 300 -30 30); do
+            echo "  $i seconds remaining..."
             sleep 30
           done
+          echo ""
+          echo "Proceeding to cleanup..."
 
   #=============================================================================
-  # Job 3: Cleanup Test VMs
+  # Job 3: Cleanup Test VM
   #=============================================================================
   cleanup:
-    name: "Cleanup Test VMs"
-    needs: wait-shutdown
+    name: "Cleanup Test VM"
+    needs: review
     runs-on: mac-mini
 
     defaults:
@@ -151,17 +141,17 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::REDACTED_AWS_PROD:role/GitHubActions-Infrastructure-prod
-          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_prod }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Destroy
         run: |
-          echo "Cleaning up test VMs..."
+          echo "Cleaning up test VM..."
           terraform destroy -auto-approve
           echo ""
           echo "=============================================="
-          echo "  TEST VMs DESTROYED"
+          echo "  TEST VM DESTROYED"
           echo "=============================================="
