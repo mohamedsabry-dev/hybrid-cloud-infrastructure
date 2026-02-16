@@ -28,6 +28,8 @@ jobs:
   create-vm:
     name: "Create Golden Image VM (prod)"
     runs-on: mac-mini
+    # Skip if locked (unless manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_prod_LOCKED != 'true' }}
 
     defaults:
       run:
@@ -59,7 +61,7 @@ jobs:
           echo "State may be locked. To release:"
           echo ""
           echo "AWS Console → DynamoDB → Tables"
-          echo "→ hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "→ hybrid-cloud-infrastructure-tf-state-lock-prod"
           echo "→ Explore items >> Find the Locked ID"
           echo "→ Delete item"
           echo ""
@@ -72,8 +74,8 @@ jobs:
           echo "Plan output is available above for auditor review"
           sleep 180
           echo "✅ Review window ended at $(date)"
-          echo "After Resource Creation copy the file into the vm and excute it"
           echo "scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/"
+
 
       - name: Terraform Apply
         id: apply
@@ -86,7 +88,7 @@ jobs:
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
           echo "=============================================="
           echo ""
-          terraform output -raw golden_image.setup_instructions
+          terraform output -json golden_image | jq -r '.setup_instructions'
           echo ""
           echo "=============================================="
           echo ""
