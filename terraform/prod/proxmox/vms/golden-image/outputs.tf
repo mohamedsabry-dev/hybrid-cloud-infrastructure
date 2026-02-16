@@ -1,21 +1,32 @@
-output "golden_image_vm" {
-  description = "Golden image VM details"
-  value = {
-    vm_id     = proxmox_virtual_environment_vm.golden_image.vm_id
-    name      = proxmox_virtual_environment_vm.golden_image.name
-    node_name = proxmox_virtual_environment_vm.golden_image.node_name
-  }
-}
+# outputs.tf
 
-output "next_steps" {
-  description = "Manual steps after VM creation"
-  value       = <<-EOT
-    1. Open Proxmox console for VM ${var.golden_image_vmid}
-    2. Install Rocky Linux (minimal install, set root password)
-    3. Configure network: IP 10.0.65.99/24, Gateway 10.0.65.1, VLAN 65
-    4. Install qemu-guest-agent: dnf install -y qemu-guest-agent && systemctl enable --now qemu-guest-agent
-    5. Install packages: dnf install -y curl wget vim htop git sudo bash-completion tar unzip openssh-server net-tools traceroute bind-utils tcpdump nmap-ncat
-    6. Run cleanup script: infrastructure/compute/golden-image-setup.sh
-    7. Shutdown VM and convert to template in Proxmox UI
-  EOT
+output "golden_image" {
+  description = "Complete golden image VM information and next steps"
+  value = {
+    # VM Details
+    vm_id  = proxmox_virtual_environment_vm.golden_image.vm_id
+    name   = proxmox_virtual_environment_vm.golden_image.name
+    node   = proxmox_virtual_environment_vm.golden_image.node_name
+    status = proxmox_virtual_environment_vm.golden_image.started ? "running" : "stopped"
+    ip     = try(proxmox_virtual_environment_vm.golden_image.ipv4_addresses[1][0], "Not available - agent not running")
+    
+    # Configuration
+    cpu_cores = proxmox_virtual_environment_vm.golden_image.cpu[0].cores
+    memory    = proxmox_virtual_environment_vm.golden_image.memory[0].dedicated
+    disk_size = proxmox_virtual_environment_vm.golden_image.disk[0].size
+    vlan_id   = proxmox_virtual_environment_vm.golden_image.network_device[0].vlan_id
+    
+    # Commands
+    conversion_command = "qm template ${proxmox_virtual_environment_vm.golden_image.vm_id}"
+    clone_example      = "qm clone ${proxmox_virtual_environment_vm.golden_image.vm_id} <new-vmid> --name <new-vm-name> --full"
+    
+    # Next Steps
+    setup_instructions = <<-EOT
+      1. Access VM console: ${var.proxmox_api_url}
+      2. Install Rocky Linux 10.1 from ISO
+      3. SSH to VM: ssh root@${try(proxmox_virtual_environment_vm.golden_image.ipv4_addresses[1][0], "<IP>")}
+      4. Run cleanup script
+      5. Convert to template: qm template ${proxmox_virtual_environment_vm.golden_image.vm_id}
+    EOT
+  }
 }
