@@ -17,11 +17,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "hybrid-cloud-infrastructure-tf-state-prod"
-    key            = "prod/proxmox/vms/test-clones/terraform.tfstate"
+    bucket         = "hybrid-cloud-infrastructure-tf-state-dev"
+    key            = "dev/proxmox/vms/test-clones/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-prod"
+    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev"
   }
 }
 
@@ -30,7 +30,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment = "prod"
+      Environment = "dev"
       ManagedBy   = "terraform"
       Module      = "proxmox-test-clones"
     }
