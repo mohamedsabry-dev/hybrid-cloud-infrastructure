@@ -1,5 +1,5 @@
 module "my_lab_secrets" {
-  source = "../../../modules/aws/secrets"
+  source = "../../../../modules/aws/secrets"
 
   # 1. Proxmox Token
   proxmox_token_secret_name   = "dev/proxmox/terraform-token"
