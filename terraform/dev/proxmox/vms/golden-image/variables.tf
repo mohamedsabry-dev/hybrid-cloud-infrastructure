@@ -27,7 +27,7 @@ variable "golden_image" {
     memory      = 2048
     disk_size   = 20
     bridge      = "vmbr0"
-    vlan_id     = 65
+    vlan_id     = 50
   }
 }
 
