@@ -1,26 +1,26 @@
-# Dev - Secrets Module
+# Secrets Management
 
-Manages AWS Secrets Manager secrets for the dev environment.
+## Initial Setup
 
-## Resources
+After running `terraform apply`, update placeholder values:
+```bash
+# Proxmox API Token
+aws secretsmanager put-secret-value \
+  --secret-id dev/proxmox/terraform-token \
+  --secret-string '{"token_id":"tf_dev@pve!terraform","token_secret":"YOUR_ACTUAL_TOKEN"}'
 
-| Resource | Description |
-|----------|-------------|
-| `dev/proxmox/terraform-token` | Proxmox API token for tf_dev@pve user |
+# Proxmox SSH Password
+aws secretsmanager put-secret-value \
+  --secret-id dev/proxmox/ssh-admin-password \
+  --secret-string 'YOUR_ACTUAL_PASSWORD'
 
-## Usage
+# VM Root Password
+aws secretsmanager put-secret-value \
+  --secret-id dev/proxmox/vm-root-password \
+  --secret-string 'YOUR_ACTUAL_PASSWORD'
 
-Terraform reads this secret to authenticate with Proxmox API when managing dev infrastructure.
-
-## Secret Format
-
-```json
-{
-  "token_id": "tf_dev@pve!terraform",
-  "token_secret": "<token-value>"
-}
+# Gandalf Break-Glass Password
+aws secretsmanager put-secret-value \
+  --secret-id dev/vm/gandalf-password \
+  --secret-string 'YOUR_ACTUAL_PASSWORD'
 ```
-
-## Workflow
-
-Deployed by: `.github/workflows/dev-secrets.yml`

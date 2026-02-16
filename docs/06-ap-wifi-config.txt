@@ -1,0 +1,196 @@
+================================================================================
+                    ACCESS POINT & WIFI CONFIGURATION
+================================================================================
+
+Device: TP-Link Archer C24 (AC750)
+Mode: Access Point (Bridge)
+Connected to: ER605 Port 3
+
+================================================================================
+                         NETWORK CONFIGURATION
+================================================================================
+
+AP Network Settings
+─────────────────────────────────────────────────────────────────────────────────
+Setting          │ Value
+─────────────────┼───────────────────────────────────
+IP Address       │ 10.0.5.10 (static)
+Subnet Mask      │ 255.255.255.0
+Gateway          │ 10.0.5.1
+VLAN             │ 5 (UNTAG on Port 3)
+Management UI    │ http://10.0.5.10
+
+Connection Path:
+└── AP (10.0.5.10) → ER605 Port 3 → VLAN 5 (untagged)
+
+================================================================================
+                         WIFI CONFIGURATION
+================================================================================
+
+Wireless Settings
+─────────────────────────────────────────────────────────────────────────────────
+Setting          │ Value
+─────────────────┼───────────────────────────────────
+SSID             │ unified_mgmt
+Security         │ WPA2-PSK[AES]
+Password         │ ##############
+AP Mode          │ Access Point (Bridge)
+AP Isolation     │ ENABLED
+
+================================================================================
+                         VLAN 5 - UNIFIED MANAGEMENT
+================================================================================
+
+Connected Devices (via WiFi)
+─────────────────────────────────────────────────────────────────────────────────
+Device               │ IP Address    │ Purpose
+─────────────────────┼───────────────┼─────────────────────────────
+Gateway (ER605)      │ 10.0.5.1      │ Default gateway
+AP (Archer C24)      │ 10.0.5.10     │ Access point
+Prod Proxmox mgmt    │ 10.0.5.100    │ Production server management
+Dev Proxmox mgmt     │ 10.0.5.110    │ Development server management
+NAS mgmt             │ 10.0.5.120    │ NAS management interface
+
+================================================================================
+                         WHY UNIFIED MANAGEMENT VLAN?
+================================================================================
+
+Consumer AP Limitation:
+─────────────────────────────────────────────────────────────────────────────────
+The Archer C24 (consumer AP) cannot pass VLAN tags over 802.11 WiFi.
+All WiFi management traffic is untagged → PVID 5 → VLAN 5.
+
+This means:
+├── Cannot have separate WiFi VLANs for PROD/DEV management
+├── All WiFi clients land on same VLAN 5
+└── Must use AP Isolation for security separation
+
+================================================================================
+                         AP ISOLATION (SECURITY)
+================================================================================
+
+How It Works:
+─────────────────────────────────────────────────────────────────────────────────
+AP Isolation enabled at Layer 2. Each WiFi client can only reach
+the gateway (10.0.5.1), not other clients.
+
+Effect:
+├── DEV (10.0.5.110) ←✗→ PROD (10.0.5.100) - BLOCKED
+├── Any WiFi client → Gateway (10.0.5.1) - ALLOWED
+└── Any WiFi client → Other clients - BLOCKED
+
+Security Model:
+├── Proxmox servers on same WiFi VLAN cannot reach each other directly
+├── All inter-server traffic must go through ER605 gateway
+└── ER605 ACLs control what traffic is allowed between devices
+
+================================================================================
+                         PROXMOX WIFI CLIENT CONFIGURATION
+================================================================================
+
+WiFi Packages Required:
+─────────────────────────────────────────────────────────────────────────────────
+```bash
+apt update && apt install -y wpasupplicant wireless-tools
+```
+
+WPA Supplicant Configuration:
+─────────────────────────────────────────────────────────────────────────────────
+File: /etc/wpa_supplicant/wpa_supplicant-<interface>.conf
+
+```
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+country=US
+
+network={
+    ssid="unified_mgmt"
+    psk="##############"
+    key_mgmt=WPA-PSK
+}
+```
+
+chmod 600 /etc/wpa_supplicant/wpa_supplicant-<interface>.conf
+
+Network Interface Configuration:
+─────────────────────────────────────────────────────────────────────────────────
+In /etc/network/interfaces:
+
+```
+# WiFi Management Interface
+auto wlp1s0
+iface wlp1s0 inet static
+    address 10.0.5.110    # DEV: 10.0.5.110, PROD: 10.0.5.100
+    netmask 255.255.255.0
+    gateway 10.0.5.1
+    wpa-conf /etc/wpa_supplicant/wpa_supplicant-wlp1s0.conf
+```
+
+Enable Service:
+─────────────────────────────────────────────────────────────────────────────────
+```bash
+systemctl enable wpa_supplicant
+```
+
+================================================================================
+                         PROXMOX SERVER WIFI INTERFACES
+================================================================================
+
+DEV Server (pve-dev-master):
+─────────────────────────────────────────────────────────────────────────────────
+Interface │ IP         │ Gateway  │ VLAN      │ Purpose
+──────────┼────────────┼──────────┼───────────┼─────────────────────
+wlp1s0    │ 10.0.5.110 │ 10.0.5.1 │ 5 (untag) │ Management/SSH
+
+PROD Server:
+─────────────────────────────────────────────────────────────────────────────────
+Interface │ IP         │ Gateway  │ VLAN      │ Purpose
+──────────┼────────────┼──────────┼───────────┼─────────────────────
+wlp4s0    │ 10.0.5.100 │ 10.0.5.1 │ 5 (untag) │ Management/SSH
+
+================================================================================
+                         TESTING & VERIFICATION
+================================================================================
+
+AP Isolation Tests [TESTED 2026-02-13]:
+─────────────────────────────────────────────────────────────────────────────────
+Test                                           │ Result
+───────────────────────────────────────────────┼────────
+DEV (10.0.5.110) → PROD (10.0.5.100)           │ BLOCKED (AP Isolation)
+PROD (10.0.5.100) → DEV (10.0.5.110)           │ BLOCKED (AP Isolation)
+DEV → Gateway (10.0.5.1)                       │ PASS
+PROD → Gateway (10.0.5.1)                      │ PASS
+
+WiFi Connectivity Tests:
+─────────────────────────────────────────────────────────────────────────────────
+Test                                           │ Result
+───────────────────────────────────────────────┼────────
+WiFi connection to AP                          │ PASS
+Ping 10.0.5.1 (Gateway)                        │ PASS
+Ping 10.0.5.10 (AP)                            │ PASS
+Ping 10.0.50.1 (Prod VLAN via gateway)         │ PASS
+Ping 10.0.60.1 (Dev VLAN via gateway)          │ PASS
+
+Proxmox Server Tests:
+─────────────────────────────────────────────────────────────────────────────────
+Test                                           │ Result
+───────────────────────────────────────────────┼────────
+ping google.com (Internet access)              │ PASS
+ping 10.0.5.1 (Management gateway)             │ PASS
+ssh root@10.0.5.110 from Mac Mini              │ PASS
+
+================================================================================
+                         PENDING TASKS
+================================================================================
+
+[ ] Change WiFi password to something stronger
+
+================================================================================
+                              STATUS: COMPLETE
+================================================================================
+
+[x] AP configured in Access Point (Bridge) mode
+[x] WiFi SSID and security configured
+[x] AP Isolation enabled for security
+[x] Proxmox servers connected via WiFi management
+[x] All connectivity tests passed
