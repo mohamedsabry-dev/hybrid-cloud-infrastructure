@@ -46,8 +46,13 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
+        timeout-minutes: 2
         run: terraform plan -out=tfplan
 
+      - name: Release Lock on Failure
+        if: failure() || cancelled()
+        run: terraform force-unlock -force $(terraform force-unlock -help 2>&1 | head -1) || true
+      
       - name: Review Window
         run: |
           echo "⏳ 3-minute review window started at $(date)"
