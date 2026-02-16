@@ -1,6 +1,6 @@
 resource "aws_secretsmanager_secret" "proxmox_terraform" {
   name        = "dev/proxmox/terraform-token"
-  description = "Proxmox API token for Terraform (tf_dev@pve)"
+  description = "Proxmox API token for Terraform dev (tf_dev@pve)"
 
   tags = {
     Environment = "dev"
