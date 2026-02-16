@@ -1,14 +1,11 @@
 #===============================================================================
-# Test VM Clones from Golden Image Template
-# Tests cloud-init configuration with cloned VMs
+# Test VM Clone from Golden Image Template
 #===============================================================================
 
 #-------------------------------------------------------------------------------
-# Cloud-Init Config for each VM
+# Cloud-Init Config
 #-------------------------------------------------------------------------------
 resource "proxmox_virtual_environment_file" "cloud_config" {
-  for_each = var.test_vms
-
   content_type = "snippets"
   datastore_id = "local"
   node_name    = var.node_name
@@ -16,46 +13,38 @@ resource "proxmox_virtual_environment_file" "cloud_config" {
   source_raw {
     data = <<-EOF
 #cloud-config
-hostname: ${each.value.name}
-fqdn: ${each.value.name}.${var.search_domain}
+hostname: ${var.test_vm.name}
+fqdn: ${var.test_vm.name}.lab.local
 
-# Set root password
 chpasswd:
   list: |
-    root:${local.vm_root_password}
+    root:${data.aws_secretsmanager_secret_version.vm_root.secret_string}
   expire: false
 
-# Disable cloud-init network config (we use Proxmox cloud-init)
 network:
   config: disabled
 
-# Enable SSH
 ssh_pwauth: true
 
-# Run commands on first boot
 runcmd:
   - systemctl enable qemu-guest-agent
   - systemctl start qemu-guest-agent
-  - echo "Cloud-init completed for ${each.value.name}" > /var/log/cloud-init-done.log
-  - date >> /var/log/cloud-init-done.log
 EOF
 
-    file_name = "cloud-config-${each.value.name}.yaml"
+    file_name = "cloud-config-${var.test_vm.name}.yaml"
   }
 }
 
 #-------------------------------------------------------------------------------
-# Clone VMs from Template
+# Clone VM from Template
 #-------------------------------------------------------------------------------
 resource "proxmox_virtual_environment_vm" "test_vm" {
-  for_each = var.test_vms
-
   node_name = var.node_name
-  vm_id     = each.value.vmid
-  name      = each.value.name
+  vm_id     = var.test_vm.vmid
+  name      = var.test_vm.name
   tags      = ["test", "clone", "dev"]
 
-  description = "Test VM cloned from golden image template"
+  description = "Test VM cloned from ${var.template_name} golden image"
 
   # Clone from template
   clone {
@@ -68,28 +57,27 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
   on_boot         = false
   stop_on_destroy = true
 
-  # CPU (override template if needed)
+  # CPU
   cpu {
-    cores   = each.value.cores
+    cores   = var.test_vm.cores
     sockets = 1
     type    = "host"
   }
 
   # Memory
   memory {
-    dedicated = each.value.memory
+    dedicated = var.test_vm.memory
   }
 
   # Cloud-Init configuration
   initialization {
-    datastore_id = "local-lvm"
-
-    user_data_file_id = proxmox_virtual_environment_file.cloud_config[each.key].id
+    datastore_id      = var.datastore_id
+    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
 
     ip_config {
       ipv4 {
-        address = each.value.ip
-        gateway = each.value.gateway
+        address = var.test_vm.ip
+        gateway = var.test_vm.gateway
       }
     }
 
@@ -101,9 +89,9 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
 
   # Network
   network_device {
-    bridge  = "vmbr0"
+    bridge  = var.test_vm.bridge
     model   = "virtio"
-    vlan_id = each.value.vlan
+    vlan_id = var.test_vm.vlan_id
   }
 
   # Agent
@@ -112,9 +100,7 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
   }
 
   lifecycle {
-    ignore_changes = [
-      started,
-    ]
+    ignore_changes = [started]
   }
 
   depends_on = [proxmox_virtual_environment_file.cloud_config]
