@@ -86,7 +86,7 @@ jobs:
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
           echo "=============================================="
           echo ""
-          terraform output -raw golden_image.setup_instructions
+          terraform output -json golden_image | jq -r '.setup_instructions'
           echo ""
           echo "=============================================="
           echo ""

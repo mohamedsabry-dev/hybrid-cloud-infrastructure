@@ -1,5 +1,5 @@
 # Dev Proxmox Test Clones - Verify Golden Image Template
-# Creates test VMs from template, waits for shutdown, then cleans up
+# Creates test VM from template, waits for shutdown, then cleans up
 
 name: "Dev - Test Golden Image Clones"
 
@@ -23,10 +23,10 @@ env:
 
 jobs:
   #=============================================================================
-  # Job 1: Deploy Test VMs
+  # Job 1: Deploy Test VM
   #=============================================================================
   deploy:
-    name: "Deploy Test VMs"
+    name: "Deploy Test VM"
     runs-on: mac-mini
 
     defaults:
@@ -53,15 +53,15 @@ jobs:
         if: failure() || cancelled()
         run: |
           echo "=============================================="
-          echo "⚠️  Workflow cancelled or timed out"
+          echo "  Workflow cancelled or timed out"
           echo "=============================================="
           echo ""
           echo "State may be locked. To release:"
           echo ""
-          echo "AWS Console → DynamoDB → Tables"
-          echo "→ hybrid-cloud-infrastructure-tf-state-lock-dev"
-          echo "→ Explore items >> Find the Locked ID"
-          echo "→ Delete item"
+          echo "AWS Console -> DynamoDB -> Tables"
+          echo "-> hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "-> Explore items >> Find the Locked ID"
+          echo "-> Delete item"
           echo ""
           echo "=============================================="
 
@@ -71,22 +71,21 @@ jobs:
       - name: Show Test Instructions
         run: |
           echo "=============================================="
-          echo "  TEST VMs CREATED"
+          echo "  TEST VM CREATED"
           echo "=============================================="
           echo ""
-          echo "VMs:"
-          echo "  - test-vm-01: 10.0.64.99 (VLAN 64)"
-          echo "  - test-vm-02: 10.0.63.99 (VLAN 63)"
+          echo "VM:"
+          echo "  - test-vm-01: 10.0.60.10 (VLAN 60)"
           echo ""
-          echo "Verify manually via SSH, then shutdown both VMs."
+          echo "Verify manually via SSH, then shutdown the VM."
           echo "Workflow will auto-destroy after shutdown."
           echo "=============================================="
 
   #=============================================================================
-  # Job 2: Wait for VMs to Shutdown
+  # Job 2: Wait for VM to Shutdown
   #=============================================================================
   wait-shutdown:
-    name: "Wait for VMs Shutdown"
+    name: "Wait for VM Shutdown"
     needs: deploy
     runs-on: mac-mini
     timeout-minutes: 60
@@ -97,13 +96,13 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
-          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Wait for Both VMs to Shutdown
+      - name: Wait for VM to Shutdown
         run: |
-          echo "Waiting for test VMs to shutdown..."
-          echo "SSH to VMs, verify cloud-init, then run: shutdown -h now"
+          echo "Waiting for test VM to shutdown..."
+          echo "SSH to VM, verify cloud-init, then run: shutdown -h now"
           echo ""
 
           # Get Proxmox credentials from AWS
@@ -115,18 +114,16 @@ jobs:
           PROXMOX_URL="https://pve-dev:8006/api2/json"
           NODE="pve-dev"
 
-          # Poll both VMs until both are stopped
+          # Poll VM until stopped
           while true; do
-            VM1_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+            VM_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
               "${PROXMOX_URL}/nodes/${NODE}/qemu/101/status/current" | jq -r '.data.status')
-            VM2_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
-              "${PROXMOX_URL}/nodes/${NODE}/qemu/102/status/current" | jq -r '.data.status')
 
-            echo "$(date '+%H:%M:%S') - VM 101: $VM1_STATUS, VM 102: $VM2_STATUS"
+            echo "$(date '+%H:%M:%S') - VM 101: $VM_STATUS"
 
-            if [ "$VM1_STATUS" = "stopped" ] && [ "$VM2_STATUS" = "stopped" ]; then
+            if [ "$VM_STATUS" = "stopped" ]; then
               echo ""
-              echo "Both VMs are stopped. Proceeding to cleanup."
+              echo "VM is stopped. Proceeding to cleanup."
               break
             fi
 
@@ -134,10 +131,10 @@ jobs:
           done
 
   #=============================================================================
-  # Job 3: Cleanup Test VMs
+  # Job 3: Cleanup Test VM
   #=============================================================================
   cleanup:
-    name: "Cleanup Test VMs"
+    name: "Cleanup Test VM"
     needs: wait-shutdown
     runs-on: mac-mini
 
@@ -151,17 +148,17 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
-          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Destroy
         run: |
-          echo "Cleaning up test VMs..."
+          echo "Cleaning up test VM..."
           terraform destroy -auto-approve
           echo ""
           echo "=============================================="
-          echo "  TEST VMs DESTROYED"
+          echo "  TEST VM DESTROYED"
           echo "=============================================="
