@@ -26,7 +26,7 @@ jobs:
   # Create VM via Terraform
   #=============================================================================
   create-vm:
-    name: "Create Golden Image VM (${{ env.ENVIRONMENT }})"
+    name: "Create Golden Image VM (prod)"
     runs-on: mac-mini
 
     defaults:
