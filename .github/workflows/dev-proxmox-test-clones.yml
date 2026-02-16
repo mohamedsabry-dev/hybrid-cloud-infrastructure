@@ -1,0 +1,149 @@
+# Dev Proxmox Test Clones - Verify Golden Image Template
+# Creates test VMs from template, waits for shutdown, then cleans up
+
+name: "Dev - Test Golden Image Clones"
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/vms/test-clones/**'
+      - '.github/workflows/dev-proxmox-test-clones.yml'
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: terraform/dev/proxmox/vms/test-clones
+
+jobs:
+  #=============================================================================
+  # Job 1: Deploy Test VMs
+  #=============================================================================
+  deploy:
+    name: "Deploy Test VMs"
+    runs-on: mac-mini
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Show Test Instructions
+        run: |
+          echo "=============================================="
+          echo "  TEST VMs CREATED"
+          echo "=============================================="
+          echo ""
+          echo "VMs:"
+          echo "  - test-vm-01: 10.0.64.99 (VLAN 64)"
+          echo "  - test-vm-02: 10.0.63.99 (VLAN 63)"
+          echo ""
+          echo "Verify manually via SSH, then shutdown both VMs."
+          echo "Workflow will auto-destroy after shutdown."
+          echo "=============================================="
+
+  #=============================================================================
+  # Job 2: Wait for VMs to Shutdown
+  #=============================================================================
+  wait-shutdown:
+    name: "Wait for VMs Shutdown"
+    needs: deploy
+    runs-on: mac-mini
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Wait for Both VMs to Shutdown
+        run: |
+          echo "Waiting for test VMs to shutdown..."
+          echo "SSH to VMs, verify cloud-init, then run: shutdown -h now"
+          echo ""
+
+          # Get Proxmox credentials from AWS
+          PROXMOX_CREDS=$(aws secretsmanager get-secret-value --secret-id dev/proxmox/terraform-token --query SecretString --output text)
+          TOKEN_ID=$(echo "$PROXMOX_CREDS" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$PROXMOX_CREDS" | jq -r '.token_secret')
+          TOKEN="${TOKEN_ID}=${TOKEN_SECRET}"
+
+          PROXMOX_URL="https://pve-dev:8006/api2/json"
+          NODE="pve-dev"
+
+          # Poll both VMs until both are stopped
+          while true; do
+            VM1_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+              "${PROXMOX_URL}/nodes/${NODE}/qemu/101/status/current" | jq -r '.data.status')
+            VM2_STATUS=$(curl -sk -H "Authorization: PVEAPIToken=$TOKEN" \
+              "${PROXMOX_URL}/nodes/${NODE}/qemu/102/status/current" | jq -r '.data.status')
+
+            echo "$(date '+%H:%M:%S') - VM 101: $VM1_STATUS, VM 102: $VM2_STATUS"
+
+            if [ "$VM1_STATUS" = "stopped" ] && [ "$VM2_STATUS" = "stopped" ]; then
+              echo ""
+              echo "Both VMs are stopped. Proceeding to cleanup."
+              break
+            fi
+
+            sleep 30
+          done
+
+  #=============================================================================
+  # Job 3: Cleanup Test VMs
+  #=============================================================================
+  cleanup:
+    name: "Cleanup Test VMs"
+    needs: wait-shutdown
+    runs-on: mac-mini
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::018571635409:role/GitHubActions-Infrastructure-dev
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Destroy
+        run: |
+          echo "Cleaning up test VMs..."
+          terraform destroy -auto-approve
+          echo ""
+          echo "=============================================="
+          echo "  TEST VMs DESTROYED"
+          echo "=============================================="
