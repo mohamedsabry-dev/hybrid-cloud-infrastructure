@@ -1,0 +1,222 @@
+================================================================================
+                    GITHUB REPOSITORY CONFIGURATION
+================================================================================
+
+Repository: hybrid-cloud-infrastructure
+Platform: GitHub
+
+================================================================================
+                         LOCAL RUNNER SETUP
+================================================================================
+
+Platform Information
+─────────────────────────────────────────────────────────────────────────────────
+OS: macOS (Darwin 25.2.0)
+Architecture: ARM64 (Apple Silicon)
+Machine: Mac Mini
+Mirror Location: $HOME/.terraform.d/providers-mirror
+
+Benefits:
+├── Future on-premises deployment needs local access
+├── Mac mini connects to internal environment via pfSense virtual IP
+├── Self-hosted runner avoids GitHub-hosted runner limitations
+└── Local provider mirror speeds up Terraform init (no internet download)
+
+Runner Labels
+─────────────────────────────────────────────────────────────────────────────────
+Label          │ Description
+───────────────┼─────────────────────────────────────
+self-hosted    │ Identifies as self-hosted runner
+macOS          │ Operating system
+arm64          │ CPU architecture
+mac-mini       │ Machine type
+production     │ Environment designation
+
+Dependencies
+─────────────────────────────────────────────────────────────────────────────────
+Tool           │ Version  │ Purpose
+───────────────┼──────────┼─────────────────────────────────────
+Python         │ 3.14.2   │ Automation scripts
+Docker         │ 29.1.3   │ Container builds
+PowerShell     │ 7.5.4    │ VMware/Windows automation
+AWS CLI        │ 2.33.4   │ AWS resource management
+Terraform      │ 1.14.3   │ Infrastructure provisioning
+Ansible        │ 2.20.1   │ Configuration management
+Node.js        │ 25.4.0   │ GitHub Actions runner
+
+Provider Mirror (Cached Locally)
+─────────────────────────────────────────────────────────────────────────────────
+Provider              │ Version  │ Size
+──────────────────────┼──────────┼──────────
+hashicorp/aws         │ v6.28.0  │ ~650MB
+hashicorp/azurerm     │ v4.57.0  │ ~500MB
+vmware/vsphere        │ v2.15.0  │ -
+hashicorp/vault       │ v5.6.0   │ -
+hashicorp/kubernetes  │ v3.0.1   │ -
+bpg/proxmox           │ v0.93.1  │ -
+hashicorp/external    │ v2.3.4   │ -
+
+================================================================================
+                         RUNNER INSTALLATION
+================================================================================
+
+Step 1: Install Dependencies
+─────────────────────────────────────────────────────────────────────────────────
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install required tools
+brew install python@3.14 node terraform ansible awscli
+brew install --cask docker powershell
+
+Step 2: Download and Install GitHub Actions Runner
+─────────────────────────────────────────────────────────────────────────────────
+# Create runner directory
+mkdir -p ~/actions-runner && cd ~/actions-runner
+
+# Download latest runner (ARM64)
+curl -o actions-runner-osx-arm64.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.XXX.X/actions-runner-osx-arm64-2.XXX.X.tar.gz
+
+# Extract
+tar xzf ./actions-runner-osx-arm64.tar.gz
+
+Step 3: Configure Runner with Repository Token
+─────────────────────────────────────────────────────────────────────────────────
+# Get token from: GitHub Repo > Settings > Actions > Runners > New self-hosted runner
+
+# Configure runner with labels
+./config.sh --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
+  --token YOUR_RUNNER_TOKEN \
+  --labels self-hosted,macOS,arm64,mac-mini,production \
+  --name mac-mini-runner-01
+
+Step 4: Setup Runner as Auto-Start Service (launchd)
+─────────────────────────────────────────────────────────────────────────────────
+# Install as service
+sudo ./svc.sh install
+
+# Start the service
+sudo ./svc.sh start
+
+# Check status
+sudo ./svc.sh status
+
+Working Directory and Cache
+─────────────────────────────────────────────────────────────────────────────────
+Default working directory: ~/actions-runner/_work
+Cache directory: ~/actions-runner/_cache (set via ACTIONS_CACHE_DIR)
+
+================================================================================
+                         RUNNER VALIDATION
+================================================================================
+
+Validation Checklist
+─────────────────────────────────────────────────────────────────────────────────
+Check              │ Command/Action                              │ Expected
+───────────────────┼─────────────────────────────────────────────┼───────────
+Runner Status      │ GitHub > Settings > Actions > Runners       │ Shows "Idle"
+Service Running    │ sudo ./svc.sh status                        │ "Running"
+Auto-start Test    │ Reboot Mac, check runner status             │ Auto-starts
+Workflow Test      │ Run sample workflow                         │ Executes OK
+
+Sample Test Workflow (.github/workflows/test-runner.yml)
+─────────────────────────────────────────────────────────────────────────────────
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, macOS, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: System Info
+        run: |
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $(uname -a)"
+          echo "Architecture: $(uname -m)"
+
+      - name: Verify Tools
+        run: |
+          python3 --version
+          docker --version
+          terraform --version
+          ansible --version
+          aws --version
+          node --version
+          pwsh --version
+
+================================================================================
+                         RUNNER TROUBLESHOOTING
+================================================================================
+
+Runner Not Starting
+─────────────────────────────────────────────────────────────────────────────────
+# Check logs
+cat ~/actions-runner/_diag/Runner_*.log
+
+# Restart service
+sudo ./svc.sh stop
+sudo ./svc.sh start
+
+Runner Offline After Reboot
+─────────────────────────────────────────────────────────────────────────────────
+# Verify launchd service
+sudo launchctl list | grep actions.runner
+
+# Re-install service if needed
+sudo ./svc.sh uninstall
+sudo ./svc.sh install
+sudo ./svc.sh start
+
+================================================================================
+                         BRANCH STRATEGY
+================================================================================
+
+Branch Configuration
+─────────────────────────────────────────────────────────────────────────────────
+Branch              │ Purpose                              │ Workflow Trigger
+────────────────────┼──────────────────────────────────────┼────────────────────
+main                │ Clean merges only (no workflow)      │ None
+dev                 │ Development infrastructure deploys   │ Infrastructure-dev
+prod                │ Production infrastructure deploys    │ Infrastructure-prod
+dev-security        │ Development IAM/security changes     │ TerraformAdmin-dev
+prod-security       │ Production IAM/security changes      │ TerraformAdmin-prod
+
+================================================================================
+                         BRANCH PROTECTION
+================================================================================
+
+Protection Rules
+─────────────────────────────────────────────────────────────────────────────────
+Branch              │ Merge Approval │ CI Checks │ Audit Trail
+────────────────────┼────────────────┼───────────┼─────────────
+main                │ Required       │ Required  │ Enabled
+prod                │ Required       │ Required  │ Enabled
+dev-security        │ Required       │ -         │ Enabled
+prod-security       │ Required       │ -         │ Enabled
+
+================================================================================
+                         CODEOWNERS (Security Controls)
+================================================================================
+
+Protected Paths (require @mohamedsabrydev approval)
+─────────────────────────────────────────────────────────────────────────────────
+Path                                         │ Reason
+─────────────────────────────────────────────┼─────────────────────────────────
+/cloud/aws/iam/                              │ IAM templates (roles, policies)
+/cloud/aws/bootstrap/cloudformation/         │ Bootstrap CloudFormation templates
+/cloud/aws/bootstrap/**/backend.tf           │ Terraform state configuration
+/cloud/aws/bootstrap/**/providers.tf         │ Provider configuration
+/.github/workflows/tf-bootstrap.yml          │ Production deployment workflow
+/.github/workflows/setup-providers.yml       │ Infrastructure workflow
+/.github/CODEOWNERS                          │ The protection file itself
+
+Unprotected (developers can modify freely):
+├── Other workflows (test workflows)
+├── Dev/staging terraform configs
+└── Application code
