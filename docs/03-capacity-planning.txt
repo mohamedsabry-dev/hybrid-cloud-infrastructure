@@ -1,0 +1,183 @@
+================================================================================
+                         RESOURCE PLANNING DOCUMENTATION
+================================================================================
+
+Environment Context
+├── Type: Home Lab - Development & Learning
+├── Usage: Few hours per day, shut down when not in use
+├── Focus: Terraform, Ansible, Python development
+├── Workload: Light (not heavy K8s production loads)
+└── Power: Energy-conscious, limited home space
+
+================================================================================
+                              HARDWARE SUMMARY
+================================================================================
+
+Server          │ CPU                    │ RAM    │ Local Storage │ Notes
+────────────────┼────────────────────────┼────────┼───────────────┼─────────────
+Dev Server      │ Ryzen 7 7730U (8c/16t) │ 24GB   │ 500GB NVMe    │ 16 vCPUs
+Prod Server     │ Ryzen 7 7435HS (8c/16t)│ 64GB   │ 500GB NVMe    │ 16 vCPUs
+NAS             │ ASUSTOR FLASHSTOR 6 FS6706T     │ 2×2TB RAID1   │ 1.8TB usable
+
+================================================================================
+                    DEVELOPMENT ENVIRONMENT (24GB RAM, 500GB NVMe)
+================================================================================
+
+VM/LXC          │ Type │ OS Disk │ Data Disk │ RAM    │ vCPU │ Purpose
+────────────────┼──────┼─────────┼───────────┼────────┼──────┼────────────────
+FreeIPA         │ VM   │ 25GB    │ 30GB      │ 1.5GB  │ 1    │ Identity mgmt
+K8s Master 1    │ VM   │ 25GB    │ -         │ 2GB    │ 2    │ Control plane
+K8s Master 2    │ VM   │ 25GB    │ -         │ 2GB    │ 2    │ Control plane
+K8s Master 3    │ VM   │ 25GB    │ -         │ 2GB    │ 2    │ Control plane
+K8s Worker 1    │ VM   │ 25GB    │ 50GB      │ 2GB    │ 2    │ Workloads
+K8s Worker 2    │ VM   │ 25GB    │ 50GB      │ 2GB    │ 2    │ Workloads
+K8s Worker 3    │ VM   │ 25GB    │ 50GB      │ 2GB    │ 2    │ Workloads
+Vault 1         │ VM   │ 20GB    │ 20GB      │ 1GB    │ 1    │ Secrets mgmt
+Vault 2         │ VM   │ 20GB    │ 20GB      │ 1GB    │ 1    │ Secrets mgmt
+Vault 3         │ VM   │ 20GB    │ 20GB      │ 1GB    │ 1    │ Secrets mgmt
+────────────────┼──────┼─────────┼───────────┼────────┼──────┼────────────────
+NGINX           │ LXC  │ 10GB    │ -         │ 0.5GB  │ 1    │ Reverse proxy
+Ansible         │ LXC  │ 10GB    │ -         │ 0.5GB  │ 1    │ Automation
+GH Runner       │ LXC  │ 15GB    │ 20GB      │ 1GB    │ 2    │ GitHub Actions runner
+Prometheus      │ LXC  │ 10GB    │ 30GB      │ 0.5GB  │ 1    │ Metrics collection
+Grafana         │ LXC  │ 10GB    │ 10GB      │ 0.5GB  │ 1    │ Dashboards
+Loki            │ LXC  │ 10GB    │ 50GB      │ 0.5GB  │ 1    │ Log aggregation
+ArgoCD          │ LXC  │ 10GB    │ 10GB      │ 1GB    │ 1    │ GitOps CD
+────────────────┴──────┴─────────┴───────────┴────────┴──────┴────────────────
+TOTALS                 │ 310GB   │ 360GB     │ 21GB   │ 24   │
+────────────────────────┴─────────┴───────────┴────────┴──────┘
+
+Local NVMe: ~310GB OS + 30GB ISOs = ~340GB used, ~160GB free (snapshots)
+NAS (dev-storage): ~360GB
+RAM: 21GB used + 2GB Proxmox = 23GB, ~1GB buffer
+
+================================================================================
+                    PRODUCTION ENVIRONMENT (64GB RAM, 500GB NVMe)
+================================================================================
+
+VM/LXC          │ Type │ OS Disk │ Data Disk │ RAM    │ vCPU │ Purpose
+────────────────┼──────┼─────────┼───────────┼────────┼──────┼────────────────
+FreeIPA         │ VM   │ 25GB    │ 40GB      │ 3GB    │ 2    │ Identity mgmt
+K8s Master 1    │ VM   │ 25GB    │ -         │ 4GB    │ 2    │ Control plane
+K8s Master 2    │ VM   │ 25GB    │ -         │ 4GB    │ 2    │ Control plane
+K8s Master 3    │ VM   │ 25GB    │ -         │ 4GB    │ 2    │ Control plane
+K8s Worker 1    │ VM   │ 25GB    │ 100GB     │ 8GB    │ 2    │ Workloads
+K8s Worker 2    │ VM   │ 25GB    │ 100GB     │ 8GB    │ 2    │ Workloads
+K8s Worker 3    │ VM   │ 25GB    │ 100GB     │ 8GB    │ 2    │ Workloads
+Vault 1         │ VM   │ 20GB    │ 25GB      │ 2GB    │ 1    │ Secrets mgmt
+Vault 2         │ VM   │ 20GB    │ 25GB      │ 2GB    │ 1    │ Secrets mgmt
+Vault 3         │ VM   │ 20GB    │ 25GB      │ 2GB    │ 1    │ Secrets mgmt
+────────────────┼──────┼─────────┼───────────┼────────┼──────┼────────────────
+NGINX           │ LXC  │ 10GB    │ -         │ 1GB    │ 2    │ Reverse proxy
+Ansible         │ LXC  │ 10GB    │ -         │ 1GB    │ 1    │ Automation
+GH Runner       │ LXC  │ 15GB    │ 30GB      │ 2GB    │ 2    │ GitHub Actions runner
+Prometheus      │ LXC  │ 10GB    │ 50GB      │ 1GB    │ 1    │ Metrics collection
+Grafana         │ LXC  │ 10GB    │ 15GB      │ 1GB    │ 1    │ Dashboards
+Loki            │ LXC  │ 10GB    │ 70GB      │ 1GB    │ 1    │ Log aggregation
+ArgoCD          │ LXC  │ 10GB    │ 20GB      │ 2GB    │ 2    │ GitOps CD
+────────────────┴──────┴─────────┴───────────┴────────┴──────┴────────────────
+TOTALS                 │ 310GB   │ 600GB     │ 54GB   │ 27   │
+────────────────────────┴─────────┴───────────┴────────┴──────┘
+
+Local NVMe: ~310GB OS + 30GB ISOs = ~340GB used, ~160GB free (snapshots)
+NAS (prod-storage): ~600GB
+RAM: 54GB used + 4GB Proxmox = 58GB, ~6GB buffer
+
+================================================================================
+                              NAS STORAGE ALLOCATION (1.8TB Total)
+================================================================================
+
+NAS: ASUSTOR FLASHSTOR 6 FS6706T
+
+Share           │ Environment │ Size   │ Content
+────────────────┼─────────────┼────────┼─────────────────────────────────────
+shared-iso      │ Both        │ 50GB   │ ISO images, templates
+dev-storage     │ Dev only    │ 360GB  │ Dev data disks
+prod-storage    │ Prod only   │ 600GB  │ Prod data disks
+PBS backups     │ Both        │ 650GB  │ Proxmox Backup Server
+────────────────┴─────────────┴────────┴─────────────────────────────────────
+TOTAL                         │ 1660GB │ (~140GB buffer on 1.8TB)
+──────────────────────────────┴────────┘
+
+================================================================================
+                              ISO IMAGES REQUIRED
+================================================================================
+
+Image                              │ Size   │ Purpose
+───────────────────────────────────┼────────┼────────────────────────────────
+proxmox-ve_9.1-1.iso               │ ~1.2GB │ Proxmox VE hypervisor
+proxmox-backup-server_4.1-1.iso    │ ~0.9GB │ Proxmox Backup Server
+Rocky-10.1-x86_64-minimal.iso      │ ~1.5GB │ Rocky Linux for VMs
+───────────────────────────────────┴────────┴────────────────────────────────
+
+================================================================================
+                              BACKUP STRATEGY
+================================================================================
+
+Storage Type    │ Content              │ Backup Target
+────────────────┼──────────────────────┼─────────────────────────────────────
+Local NVMe      │ OS disks only        │ PBS on NAS (daily snapshots)
+NAS Data        │ Persistent data      │ NAS-level snapshots + RAID 1
+NAS PBS         │ VM/LXC backups       │ RAID 1 redundancy
+────────────────┴──────────────────────┴─────────────────────────────────────
+
+================================================================================
+                              CI/CD ARCHITECTURE
+================================================================================
+
+Code Repository: GitHub (external)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  GitHub Repo                                                                │
+│      │                                                                      │
+│      ├── Infrastructure workflows ──→ GitHub-hosted runner                  │
+│      │   └── Terraform, AWS (secrets from AWS Secrets Manager)              │
+│      │                                                                      │
+│      └── Application workflows ──→ Self-hosted GH Runner (internal LXC)     │
+│          └── Builds, tests, deploys (secrets from Vault)                    │
+│                    │                                                        │
+│                    ▼                                                        │
+│              ┌──────────┐         ┌──────────┐                             │
+│              │ GH Runner│────────→│  Vault   │                             │
+│              │   LXC    │ fetches │ (internal)│                             │
+│              └────┬─────┘ secrets └──────────┘                             │
+│                   │                                                         │
+│                   │ updates K8s manifests                                   │
+│                   ▼                                                         │
+│              ┌──────────┐                                                   │
+│              │  ArgoCD  │──────→ Kubernetes Cluster                         │
+│              │   LXC    │ GitOps                                            │
+│              └──────────┘ sync                                              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Key Points:
+├── GitHub = source of truth for code
+├── GitHub Actions = CI (build, test)
+├── Self-hosted runner = internal network access + Vault secrets
+├── ArgoCD = CD (GitOps deployment to K8s)
+└── Secrets: AWS Secrets Manager (cloud) / Vault (internal)
+
+================================================================================
+                                    NOTES
+================================================================================
+
+├── Data disks stored on NAS, accessed via NFS mount
+├── OS disks stored on local NVMe for performance
+├── vCPU overcommit acceptable for home lab workloads
+├── Thin provisioning used - disk sizes are max limits
+│
+├── Observability Stack:
+│   ├── Prometheus: Metrics collection and alerting
+│   ├── Grafana: Visualization dashboards
+│   └── Loki: Log aggregation (query logs via Grafana)
+│
+├── CI/CD Stack:
+│   ├── GitHub Actions: CI pipelines
+│   ├── GH Runner (self-hosted): Internal builds with Vault access
+│   └── ArgoCD: GitOps CD (auto-deploy to K8s from Git)
+│
+└── GitOps Flow:
+    Push code → GitHub Actions → GH Runner (build/test)
+              → Update manifests → ArgoCD → Kubernetes
