@@ -46,13 +46,25 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: terraform plan -out=tfplan
 
-      - name: Release Lock on Failure
+      - name: Lock Cleanup Instructions
         if: failure() || cancelled()
-        run: terraform force-unlock -force $(terraform force-unlock -help 2>&1 | head -1) || true
-      
+        run: |
+          echo "=============================================="
+          echo "⚠️  Workflow cancelled or timed out"
+          echo "=============================================="
+          echo ""
+          echo "State may be locked. To release:"
+          echo ""
+          echo "AWS Console → DynamoDB → Tables"
+          echo "→ hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "→ Explore items >> Find the Locked ID"
+          echo "→ Delete item"
+          echo ""
+          echo "=============================================="
+
       - name: Review Window
         run: |
           echo "⏳ 3-minute review window started at $(date)"
