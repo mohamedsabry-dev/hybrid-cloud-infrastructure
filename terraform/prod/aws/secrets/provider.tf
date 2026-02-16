@@ -1,17 +1,13 @@
-# IAM module for prod environment
-# - Creates GitHubActions-Infrastructure-prod role (PowerUserAccess + SecurityBoundary)
-# - State stored in prod account S3 bucket under prod/*
-
 terraform {
   required_version = ">= 1.5.0"
-
+  
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"
+      version = "6.28.0"  # Pinned for offline runner
     }
   }
-
+  
   backend "s3" {
     bucket         = "hybrid-cloud-infrastructure-tf-state-prod"
     key            = "prod/aws/secrets/terraform.tfstate"
@@ -23,10 +19,12 @@ terraform {
 
 provider "aws" {
   region = "eu-west-2"
-}
-
-locals {
-  tags = {
-    env = "prod"
+  
+  default_tags {
+    tags = {
+      Environment = "prod"
+      ManagedBy   = "terraform"
+      Module      = "secrets"
+    }
   }
 }
