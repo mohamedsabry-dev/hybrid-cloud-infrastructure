@@ -20,10 +20,10 @@ variable "test_vm" {
     name    = "test-vm-01"
     cores   = 2
     memory  = 2048
-    ip      = "10.0.60.10/24"
-    gateway = "10.0.60.1"
+    ip      = "10.0.50.10/24"
+    gateway = "10.0.50.1"
     bridge  = "vmbr0"
-    vlan_id = 60
+    vlan_id = 50
   }
 }
 
