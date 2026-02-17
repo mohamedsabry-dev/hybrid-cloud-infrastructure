@@ -27,7 +27,7 @@ jobs:
   #=============================================================================
   create-vm:
     name: "Create Golden Image VM (prod)"
-    runs-on: mac-mini
+    runs-on: macOS
     # Skip if locked (unless manual trigger)
     if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_prod_LOCKED != 'true' }}
 

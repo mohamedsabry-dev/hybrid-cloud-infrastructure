@@ -22,7 +22,7 @@ env:
 jobs:
   create-lxc-template:
     name: "Create Golden LXC (dev)"
-    runs-on: mac-mini
+    runs-on: macOS
     if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_LXC_DEV_LOCKED != 'true' }}
 
     defaults:

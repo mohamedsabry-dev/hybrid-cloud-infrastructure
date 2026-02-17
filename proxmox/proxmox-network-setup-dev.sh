@@ -19,6 +19,7 @@ MGMT_GATEWAY="10.0.5.1"
 SERVICE_INTERFACE="svc0"
 SERVICE_VLANS="60-65"
 STORAGE_INTERFACE="stor0"
+STORAGE_VLAN="40"
 STORAGE_IP="10.0.40.110"
 STORAGE_NETMASK="255.255.255.0"
 NAS_STORAGE_IP="10.0.40.120"
@@ -108,11 +109,16 @@ iface vmbr0 inet manual
     bridge-vlan-aware yes
     bridge-vids ${SERVICE_VLANS}
 
-# Storage (VLAN 40 - isolated)
+# Storage physical interface (no IP)
 auto ${STORAGE_INTERFACE}
-iface ${STORAGE_INTERFACE} inet static
+iface ${STORAGE_INTERFACE} inet manual
+
+# Storage VLAN ${STORAGE_VLAN} (tagged)
+auto ${STORAGE_INTERFACE}.${STORAGE_VLAN}
+iface ${STORAGE_INTERFACE}.${STORAGE_VLAN} inet static
     address ${STORAGE_IP}
     netmask ${STORAGE_NETMASK}
+    vlan-raw-device ${STORAGE_INTERFACE}
 
 source /etc/network/interfaces.d/*
 EOF
