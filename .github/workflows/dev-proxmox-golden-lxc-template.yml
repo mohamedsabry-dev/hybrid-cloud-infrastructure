@@ -1,0 +1,81 @@
+name: "Dev - Proxmox Golden LXC Template"
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/lxc/golden-template/**' # Updated path for LXC
+      - '.github/workflows/dev-proxmox-golden-lxc-template.yml'
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/proxmox/lxc/golden-template
+  AWS_SECRET_NAME: "dev/lxc/root-password" 
+
+jobs:
+  create-lxc-template:
+    name: "Create Golden LXC (dev)"
+    runs-on: mac-mini
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_LXC_DEV_LOCKED != 'true' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Authenticate with AWS via OIDC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 2. FETCH THE PASSWORD FROM AWS
+      - name: Get Secret from AWS
+        uses: aws-actions/aws-secretsmanager-get-secrets@v2
+        with:
+          secret-ids: |
+            LXC_PWD, ${{ env.AWS_SECRET_NAME }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      # 3. PASS THE PASSWORD TO TERRAFORM PLAN
+      - name: Terraform Plan
+        timeout-minutes: 3
+        env:
+          TF_VAR_lxc_root_password: ${{ env.LXC_PWD }} # Injected here
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "⏳ 3-minute review window for LXC Template deployment"
+          sleep 180
+
+      # 4. PASS THE PASSWORD TO TERRAFORM APPLY
+      - name: Terraform Apply
+        id: apply
+        env:
+          TF_VAR_lxc_root_password: ${{ env.LXC_PWD }} # Injected here
+        run: terraform apply -auto-approve tfplan
+
+      - name: Post-Build Cleanup Instructions
+        if: steps.apply.outcome == 'success'
+        run: |
+          echo "=============================================="
+          echo " ✅ LXC CONTAINER CREATED"
+          echo "=============================================="
+          echo "Next Steps:"
+          echo "1. Log in with the root password from AWS."
+          echo "2. Run your final hardening/update scripts."
+          echo "3. Convert to template: 'pct template <ID>'"
+          echo "=============================================="
