@@ -43,6 +43,15 @@ variable "secrets" {
         ManagedBy   = "terraform"
       }
     }
+    lxc_root = {
+      name        = "dev/lxc/root-password"
+      description = "Default root password for LXC provisioning"
+      tags = {
+        Purpose = "cloud-init-setup"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 
