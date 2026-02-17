@@ -51,16 +51,16 @@ VLAN ID │ Name             │ Port │ Mode  │ Status
 20      │ Mgmt-Dev-Server  │ 3    │ TAG   │ OLD - Future
 30      │ Mgmt-NAS-Server  │ 3    │ TAG   │ OLD - Future
 50      │ Prod-Identity    │ 5    │ TAG   │ Active
-51      │ Prod-Platform    │ 5    │ TAG   │ Active
+51      │ Prod-K8s-Control │ 5    │ TAG   │ Active
 52      │ Prod-Vault       │ 5    │ TAG   │ Active
-53      │ Prod-Control     │ 5    │ TAG   │ Active
-54      │ Prod-Data        │ 5    │ TAG   │ Active
+53      │ Prod-Management  │ 5    │ TAG   │ Active
+54      │ Prod-K8s-Data    │ 5    │ TAG   │ Active
 55      │ Prod-DMZ         │ 5    │ TAG   │ Active
 60      │ Dev-Identity     │ 4    │ TAG   │ Active
-61      │ Dev-Platform     │ 4    │ TAG   │ Active
+61      │ Dev-K8s-Control  │ 4    │ TAG   │ Active
 62      │ Dev-Vault        │ 4    │ TAG   │ Active
-63      │ Dev-Control      │ 4    │ TAG   │ Active
-64      │ Dev-Data         │ 4    │ TAG   │ Active
+63      │ Dev-Management   │ 4    │ TAG   │ Active
+64      │ Dev-K8s-Data     │ 4    │ TAG   │ Active
 65      │ Dev-DMZ          │ 4    │ TAG   │ Active
 4094    │ vlan4094         │ 1    │ UNTAG │ WAN
 
@@ -78,16 +78,16 @@ ID │ Name             │ VLAN │ IP         │ Subnet        │ DHCP    �
 4  │ Mgmt_Dev_Server  │ 20   │ 10.0.20.1  │ 255.255.255.0 │ Disabled│ OLD-Future
 5  │ Mgmt_NAS         │ 30   │ 10.0.30.1  │ 255.255.255.0 │ Disabled│ OLD-Future
 6  │ Prod_Identity    │ 50   │ 10.0.50.1  │ 255.255.255.0 │ Disabled│ Active
-7  │ Prod_Platform    │ 51   │ 10.0.51.1  │ 255.255.255.0 │ Disabled│ Active
+7  │ Prod_K8s_Control │ 51   │ 10.0.51.1  │ 255.255.255.0 │ Disabled│ Active
 8  │ Prod_Vault       │ 52   │ 10.0.52.1  │ 255.255.255.0 │ Disabled│ Active
-9  │ Prod_Control     │ 53   │ 10.0.53.1  │ 255.255.255.0 │ Disabled│ Active
-10 │ Prod_Data        │ 54   │ 10.0.54.1  │ 255.255.255.0 │ Disabled│ Active
+9  │ Prod_Management  │ 53   │ 10.0.53.1  │ 255.255.255.0 │ Disabled│ Active
+10 │ Prod_K8s_Data    │ 54   │ 10.0.54.1  │ 255.255.255.0 │ Disabled│ Active
 11 │ Prod_DMZ         │ 55   │ 10.0.55.1  │ 255.255.255.0 │ Disabled│ Active
 12 │ Dev_Identity     │ 60   │ 10.0.60.1  │ 255.255.255.0 │ Disabled│ Active
-13 │ Dev_Platform     │ 61   │ 10.0.61.1  │ 255.255.255.0 │ Disabled│ Active
+13 │ Dev_K8s_Control  │ 61   │ 10.0.61.1  │ 255.255.255.0 │ Disabled│ Active
 14 │ Dev_Vault        │ 62   │ 10.0.62.1  │ 255.255.255.0 │ Disabled│ Active
-15 │ Dev_Control      │ 63   │ 10.0.63.1  │ 255.255.255.0 │ Disabled│ Active
-16 │ Dev_Data         │ 64   │ 10.0.64.1  │ 255.255.255.0 │ Disabled│ Active
+15 │ Dev_Management   │ 63   │ 10.0.63.1  │ 255.255.255.0 │ Disabled│ Active
+16 │ Dev_K8s_Data     │ 64   │ 10.0.64.1  │ 255.255.255.0 │ Disabled│ Active
 17 │ Dev_DMZ          │ 65   │ 10.0.65.1  │ 255.255.255.0 │ Disabled│ Active
 
 KEY DISCOVERY: Create LAN interface FIRST → VLAN auto-creates
@@ -106,16 +106,16 @@ ID │ Name             │ IP Address/Mask    │ Description
 1  │ IP_LAN           │ All LAN subnets    │ Auto-generated
 2  │ Mac_Mini_IP      │ 192.168.0.223/32   │ Mac Mini WiFi adapter
 3  │ Prod_Identity_50 │ 10.0.50.0/24       │ PROD Identity VLAN
-4  │ Prod_Platform_51 │ 10.0.51.0/24       │ PROD Platform VLAN
+4  │ Prod_K8sCtrl_51  │ 10.0.51.0/24       │ PROD K8s Control VLAN
 5  │ Prod_Vault_52    │ 10.0.52.0/24       │ PROD Vault VLAN
-6  │ Prod_Control_53  │ 10.0.53.0/24       │ PROD K8s Control VLAN
-7  │ Prod_Data_54     │ 10.0.54.0/24       │ PROD K8s Data VLAN
+6  │ Prod_Mgmt_53     │ 10.0.53.0/24       │ PROD Management VLAN
+7  │ Prod_K8sData_54  │ 10.0.54.0/24       │ PROD K8s Data VLAN
 8  │ Prod_DMZ_55      │ 10.0.55.0/24       │ PROD DMZ VLAN
 9  │ Dev_Identity_60  │ 10.0.60.0/24       │ DEV Identity VLAN
-10 │ Dev_Platform_61  │ 10.0.61.0/24       │ DEV Platform VLAN
+10 │ Dev_K8sCtrl_61   │ 10.0.61.0/24       │ DEV K8s Control VLAN
 11 │ Dev_Vault_62     │ 10.0.62.0/24       │ DEV Vault VLAN
-12 │ Dev_Control_63   │ 10.0.63.0/24       │ DEV K8s Control VLAN
-13 │ Dev_Data_64      │ 10.0.64.0/24       │ DEV K8s Data VLAN
+12 │ Dev_Mgmt_63      │ 10.0.63.0/24       │ DEV Management VLAN
+13 │ Dev_K8sData_64   │ 10.0.64.0/24       │ DEV K8s Data VLAN
 14 │ Dev_DMZ_65       │ 10.0.65.0/24       │ DEV DMZ VLAN
 15 │ Router_Mgmt_1    │ 10.0.1.0/24        │ Router VLAN 1
 16 │ Dev_Mgmt_IP      │ 10.0.5.110/32      │ DEV Proxmox mgmt

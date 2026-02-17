@@ -39,7 +39,6 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
   
   # CD-ROM with Rocky Linux ISO
   cdrom {
-    enabled   = true
     file_id   = var.iso_file_id
     interface = "ide2"
   }

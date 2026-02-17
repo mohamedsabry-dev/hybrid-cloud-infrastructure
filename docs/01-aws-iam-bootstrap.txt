@@ -19,7 +19,24 @@ Development  │ REDACTED_AWS_DEV   │ admin_dev   │ Enabled
                          BOOTSTRAP INFRASTRUCTURE
 ================================================================================
 
-CloudFormation Bootstrap Stack (per account)
+Overview
+─────────────────────────────────────────────────────────────────────────────────
+Bootstrap is a ONE-TIME manual deployment via AWS Console CloudFormation.
+Two separate YAML files deployed as stacks - one per AWS account.
+
+This creates the foundation (OIDC, state storage, admin role) that enables
+all subsequent Terraform automation via GitHub Actions.
+
+CloudFormation Stacks Deployed
+─────────────────────────────────────────────────────────────────────────────────
+Account     │ Stack Name     │ Template File                          │ Region
+────────────┼────────────────┼────────────────────────────────────────┼─────────
+Development │ dev-bootstrap  │ infrastructure/aws/bootstrap-dev.yaml  │ eu-west-2
+Production  │ prod-bootstrap │ infrastructure/aws/bootstrap-prod.yaml │ eu-west-2
+
+Deployment Method: AWS Console → CloudFormation → Create Stack → Upload YAML
+
+Resources Created (per stack)
 ─────────────────────────────────────────────────────────────────────────────────
 Resource Type             │ Resource Name                                      │ Purpose
 ──────────────────────────┼────────────────────────────────────────────────────┼────────────────────────────
@@ -30,16 +47,23 @@ AWS::S3::BucketPolicy     │ TerraformStateBucketPolicy                        
 AWS::DynamoDB::Table      │ hybrid-cloud-infrastructure-tf-state-lock-{env}    │ State locking
 AWS::IAM::Role            │ GitHubActions-TerraformAdmin-{env}                 │ Admin role for security branch
 
-Deployment Files:
-├── infrastructure/aws/bootstrap-dev.yaml  → Deploy to dev account
-└── infrastructure/aws/bootstrap-prod.yaml → Deploy to prod account
+How to Deploy (One-Time Setup)
+─────────────────────────────────────────────────────────────────────────────────
+1. Login to AWS Console with admin user (admin_dev or admin_prod)
+2. Navigate to CloudFormation → Stacks → Create stack
+3. Select "Upload a template file"
+4. Upload bootstrap-{env}.yaml
+5. Stack name: {env}-bootstrap
+6. Check "I acknowledge that AWS CloudFormation might create IAM resources"
+7. Create stack
 
-Deploy Command:
+Alternative (CLI):
     aws cloudformation deploy --template-file bootstrap-{env}.yaml \
         --stack-name {env}-bootstrap --capabilities CAPABILITY_NAMED_IAM \
         --region eu-west-2
 
-Security Features:
+Security Features
+─────────────────────────────────────────────────────────────────────────────────
 ├── S3 Buckets: Versioning, Encryption (AES256), Public Access Blocked, TLS Enforced
 ├── DynamoDB: DeletionProtectionEnabled, SSE enabled
 ├── DeletionPolicy: Retain on S3 and DynamoDB (survives stack deletion)
