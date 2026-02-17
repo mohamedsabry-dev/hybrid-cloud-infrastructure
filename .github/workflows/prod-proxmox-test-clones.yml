@@ -87,7 +87,7 @@ jobs:
           echo "=============================================="
           echo ""
           echo "VM:"
-          echo "  - test-vm-01: 10.0.60.10 (VLAN 60)"
+          echo "  - test-vm-01: 10.0.53.98 (VLAN 53)"
           echo ""
           echo "Verify manually via SSH, then shutdown the VM."
           echo "Workflow will auto-destroy after shutdown."
