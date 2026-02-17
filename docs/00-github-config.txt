@@ -18,7 +18,6 @@ Mirror Location: $HOME/.terraform.d/providers-mirror
 
 Benefits:
 ├── Future on-premises deployment needs local access
-├── Mac mini connects to internal environment via pfSense virtual IP
 ├── Self-hosted runner avoids GitHub-hosted runner limitations
 └── Local provider mirror speeds up Terraform init (no internet download)
 
@@ -28,17 +27,14 @@ Label          │ Description
 ───────────────┼─────────────────────────────────────
 self-hosted    │ Identifies as self-hosted runner
 macOS          │ Operating system
-arm64          │ CPU architecture
-mac-mini       │ Machine type
-production     │ Environment designation
+ARM64          │ CPU architecture
 
 Dependencies
 ─────────────────────────────────────────────────────────────────────────────────
 Tool           │ Version  │ Purpose
 ───────────────┼──────────┼─────────────────────────────────────
 Python         │ 3.14.2   │ Automation scripts
-Docker         │ 29.1.3   │ Container builds
-PowerShell     │ 7.5.4    │ VMware/Windows automation
+Docker         │ 29.1.5   │ Container builds
 AWS CLI        │ 2.33.4   │ AWS resource management
 Terraform      │ 1.14.3   │ Infrastructure provisioning
 Ansible        │ 2.20.1   │ Configuration management
@@ -49,10 +45,6 @@ Provider Mirror (Cached Locally)
 Provider              │ Version  │ Size
 ──────────────────────┼──────────┼──────────
 hashicorp/aws         │ v6.28.0  │ ~650MB
-hashicorp/azurerm     │ v4.57.0  │ ~500MB
-vmware/vsphere        │ v2.15.0  │ -
-hashicorp/vault       │ v5.6.0   │ -
-hashicorp/kubernetes  │ v3.0.1   │ -
 bpg/proxmox           │ v0.93.1  │ -
 hashicorp/external    │ v2.3.4   │ -
 
@@ -72,11 +64,11 @@ brew install --cask docker powershell
 Step 2: Download and Install GitHub Actions Runner
 ─────────────────────────────────────────────────────────────────────────────────
 # Create runner directory
-mkdir -p ~/actions-runner && cd ~/actions-runner
+mkdir -p ~/WorkSpace/actions-runner && cd ~/WorkSpace/actions-runner
 
 # Download latest runner (ARM64)
 curl -o actions-runner-osx-arm64.tar.gz -L \
-  https://github.com/actions/runner/releases/download/v2.XXX.X/actions-runner-osx-arm64-2.XXX.X.tar.gz
+  https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-osx-arm64-2.331.0.tar.gz
 
 # Extract
 tar xzf ./actions-runner-osx-arm64.tar.gz
@@ -88,8 +80,8 @@ Step 3: Configure Runner with Repository Token
 # Configure runner with labels
 ./config.sh --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
   --token YOUR_RUNNER_TOKEN \
-  --labels self-hosted,macOS,arm64,mac-mini,production \
-  --name mac-mini-runner-01
+  --labels self-hosted,macOS,ARM64 \
+  --name Mohameds-Mac-mini
 
 Step 4: Setup Runner as Auto-Start Service (launchd)
 ─────────────────────────────────────────────────────────────────────────────────
@@ -104,8 +96,8 @@ sudo ./svc.sh status
 
 Working Directory and Cache
 ─────────────────────────────────────────────────────────────────────────────────
-Default working directory: ~/actions-runner/_work
-Cache directory: ~/actions-runner/_cache (set via ACTIONS_CACHE_DIR)
+Default working directory: ~/WorkSpace/actions-runner/_work
+Cache directory: ~/WorkSpace/actions-runner/_cache (set via ACTIONS_CACHE_DIR)
 
 ================================================================================
                          RUNNER VALIDATION
@@ -129,7 +121,7 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, macOS, arm64]
+    runs-on: macOS
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -148,30 +140,7 @@ jobs:
           ansible --version
           aws --version
           node --version
-          pwsh --version
 
-================================================================================
-                         RUNNER TROUBLESHOOTING
-================================================================================
-
-Runner Not Starting
-─────────────────────────────────────────────────────────────────────────────────
-# Check logs
-cat ~/actions-runner/_diag/Runner_*.log
-
-# Restart service
-sudo ./svc.sh stop
-sudo ./svc.sh start
-
-Runner Offline After Reboot
-─────────────────────────────────────────────────────────────────────────────────
-# Verify launchd service
-sudo launchctl list | grep actions.runner
-
-# Re-install service if needed
-sudo ./svc.sh uninstall
-sudo ./svc.sh install
-sudo ./svc.sh start
 
 ================================================================================
                          BRANCH STRATEGY
@@ -201,22 +170,105 @@ dev-security        │ Required       │ -         │ Enabled
 prod-security       │ Required       │ -         │ Enabled
 
 ================================================================================
-                         CODEOWNERS (Security Controls)
+                         DEPLOYMENT WORKFLOW PATTERN
 ================================================================================
 
-Protected Paths (require @mohamedsabrydev approval)
+Standard Changes (No IAM)
 ─────────────────────────────────────────────────────────────────────────────────
-Path                                         │ Reason
-─────────────────────────────────────────────┼─────────────────────────────────
-/cloud/aws/iam/                              │ IAM templates (roles, policies)
-/cloud/aws/bootstrap/cloudformation/         │ Bootstrap CloudFormation templates
-/cloud/aws/bootstrap/**/backend.tf           │ Terraform state configuration
-/cloud/aws/bootstrap/**/providers.tf         │ Provider configuration
-/.github/workflows/tf-bootstrap.yml          │ Production deployment workflow
-/.github/workflows/setup-providers.yml       │ Infrastructure workflow
-/.github/CODEOWNERS                          │ The protection file itself
 
-Unprotected (developers can modify freely):
-├── Other workflows (test workflows)
-├── Dev/staging terraform configs
-└── Application code
+    ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+    │  dev    │────▶│  Test   │────▶│  prod   │────▶│  main   │
+    │ (push)  │     │  Pass   │     │  (PR)   │     │  (PR)   │
+    └─────────┘     └─────────┘     └─────────┘     └─────────┘
+         │                              │               │
+         ▼                              ▼               ▼
+    Infrastructure-dev            Infrastructure-prod   Milestone
+    workflow runs                 workflow runs         complete
+
+Steps:
+1. Push changes to dev branch
+2. Infrastructure-dev workflow runs automatically
+3. Test and verify in DEV environment
+4. Create PR from dev → prod (requires review & approval)
+5. Infrastructure-prod workflow runs after merge
+6. When phase/milestone complete: PR from prod → main
+
+IAM/Security Changes
+─────────────────────────────────────────────────────────────────────────────────
+
+    ┌─────────┐     ┌──────────────┐     ┌───────────────┐     ┌─────────┐
+    │  dev    │────▶│ dev-security │────▶│ prod-security │────▶│  prod   │
+    │ (push)  │     │    (PR)      │     │     (PR)      │     │  (PR)   │
+    └─────────┘     └──────────────┘     └───────────────┘     └─────────┘
+                          │                    │                    │
+                          ▼                    ▼                    ▼
+                    TerraformAdmin-dev   TerraformAdmin-prod   Infrastructure-prod
+                    workflow runs        workflow runs         workflow runs
+
+Steps:
+1. Push changes to dev branch (test infrastructure first)
+2. Create PR from dev → dev-security (requires review)
+3. TerraformAdmin-dev workflow runs (IAM changes in DEV AWS)
+4. Test and verify IAM/security in DEV environment
+5. Create PR from dev-security → prod-security (requires review)
+6. TerraformAdmin-prod workflow runs (IAM changes in PROD AWS)
+7. Create PR from prod-security → prod (infrastructure deployment)
+8. When phase/milestone complete: PR from prod → main
+
+Summary
+─────────────────────────────────────────────────────────────────────────────────
+Change Type        │ Path
+───────────────────┼─────────────────────────────────────────────────────────────
+Infrastructure     │ dev → prod → main
+IAM/Security       │ dev → dev-security → prod-security → prod → main
+
+================================================================================
+                         ACTIONS SECRETS & VARIABLES
+================================================================================
+
+Repository Variables (Settings → Secrets and variables → Actions → Variables)
+─────────────────────────────────────────────────────────────────────────────────
+Variable Name              │ Value            │ Purpose
+───────────────────────────┼──────────────────┼─────────────────────────────────
+AWS_ACCOUNT_ID_DEV         │ 018571635409     │ DEV AWS account ID
+AWS_ACCOUNT_ID_PROD        │ 969041180300     │ PROD AWS account ID
+AWS_REGION                 │ eu-west-2        │ Default AWS region (London)
+GOLDEN_IMAGE_DEV_LOCKED    │ false            │ Lock DEV golden image workflow
+GOLDEN_IMAGE_PROD_LOCKED   │ true             │ Lock PROD golden image workflow
+GOLDEN_LXC_DEV_LOCKED      │ true             │ Lock DEV LXC workflow
+TEST_CLONES_DEV_LOCKED     │ true             │ Lock DEV test clones workflow
+TEST_CLONES_PROD_LOCKED    │ true             │ Lock PROD test clones workflow
+
+Workflow Lock Pattern (Safe Trigger Mechanism)
+─────────────────────────────────────────────────────────────────────────────────
+The *_LOCKED variables provide a safe trigger mechanism as a workaround for:
+
+├── workflow_dispatch (manual trigger) only works on default branch (main)
+│   └── Cannot manually trigger workflows from dev/prod branches directly
+│
+└── Environment approval gates only available in GitHub Enterprise
+    └── GitHub Pro does not support required reviewers for workflow runs
+
+How it works:
+├── LOCKED = true  → Workflow skips execution (safe default)
+├── LOCKED = false → Workflow runs on push
+└── workflow_dispatch always runs (manual override)
+
+Usage in workflow (after runs-on):
+```yaml
+jobs:
+  deploy:
+    runs-on: macOS
+    # Skip if locked (unless manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_DEV_LOCKED != 'true' }}
+```
+
+To trigger a workflow:
+1. Set variable to 'false' in GitHub UI
+2. Push to branch (workflow runs)
+3. Set variable back to 'true' (re-lock)
+
+Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
+─────────────────────────────────────────────────────────────────────────────────
+Note: Secrets are stored encrypted. Actual values managed via GitHub UI.
+Workflows retrieve sensitive data from AWS Secrets Manager at runtime via OIDC.
