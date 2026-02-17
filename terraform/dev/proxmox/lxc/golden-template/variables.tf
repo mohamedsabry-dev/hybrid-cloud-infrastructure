@@ -9,6 +9,7 @@ variable "lxc_container" {
     hostname    = string
     cores       = number
     memory      = number
+    swap        = number
     rootfs_size = number
     bridge      = string
     vlan_id     = number
@@ -19,13 +20,14 @@ variable "lxc_container" {
   default = {
     ctid        = 9001
     hostname    = "rocky10-lxc-golden"
-    cores       = 2
-    memory      = 2048
-    rootfs_size = 8
+    cores       = 1
+    memory      = 1024
+    swap        = 256
+    rootfs_size = 10
     bridge      = "vmbr0"
-    vlan_id     = 65
-    ip          = "10.0.65.98/24"
-    gateway     = "10.0.65.1"
+    vlan_id     = 63
+    ip          = "10.0.63.97/24"
+    gateway     = "10.0.63.1"
   }
 }
 
@@ -83,4 +85,10 @@ variable "proxmox_tls_insecure" {
   description = "Skip TLS verification for Proxmox API"
   type        = bool
   default     = true
+}
+
+variable "lxc_root_password" {
+  description = "The root password for the LXC container, injected via CI/CD"
+  type        = string
+  sensitive   = true
 }
