@@ -1,0 +1,24 @@
+What done in phase 1: 
+1- draft the project target: 
+( hybrid cloud infrastructure , include 2 stages dev and prod with 2 mirror env across 2 different aws accounts and mirrored local servers 2 , aim to perform deployement for k8s cluster and manage it to luch application for testing and learning purpose, using enterprise standard tools and practices )
+( use hardware for routers, switches, servers, storage, access point and other network devices, Follow datacneter best practice of cabling and labels)
+( use software pattern for enterpise , github private repo , github actions, terrafrom, ansible, k8s, gitops, hashicorp vault, freeipa domain, backup proxmox, internal and external cicd runners, prometheus, grafana, nginx for internal and external reverse proxy , static public ip from isp)
+( 4 different branches in github for dev , dev-sec and prod and prod-sec with specific assume role asslowed only by the target branch , 2 assumed role per account one for infra and one full adimn (exclude the cloudformation bootstrap resources for oicd and core s3 buket and adminterraform rule and dynamo table))
+
+2- Identuify the mile stone before appling jkobs, 
+( reach stable state with full secure cicd pipeline seemess delivery and deployment, simulate multiple disater recorvery on k8s cluster , vault, internal service, external service, emergency plans for shift resources between the prod to dev env for incident resolution or spaw resources from latest image or snapshot or backup)
+
+3- solo team project, 1 infrastructure enginer with devops mindset. 
+
+4- Phases. 
+    (phase 0 for foundation setup of day 0 , accounts, servers, bootstraps for everything, network and vlans and storage setup with basic security, and template image for VM and LXC which will be used in the project, with clear documentation and network design recorded , also include complete resource planning to make identical mirror env from dev to prod and vie versa., setup local runner for github mac mini internal have access to proxmox servers , isolate the service,magament and storage plane physical ports and interfaces) 
+5- Deploy mindset pattern and acl in semi-shit tests when deploy change in critical service and need to test the production rrsponse before deploy there, we open acl rule allow production parent service to reach child edited service on dev server for interact iteration with role back plans. 
+
+6- Phase 1 ( service deployment phase for core freeipa, ansible lxc, github local runner internal, setup vault cluster and setup monitoring tools lxc and ensure smooth clean intergration - establish vpn tunnel with aws for freeipa and vault intergars with aws identity and dns and secrets for auto unseal ) 
+
+7- Phase 2 ( K8s setup, wroker and maseter and integration and etcc maybe helm and other 
+
+8- Phase 3 service plane , integrate nginx, argocd and integrate with k8s worker on aws if logic to do . 
+
+
+So when start conslidate phase, i need to think of the where am i standing and what finshed and cleaned and colslidated and understanded for wht behind me 
