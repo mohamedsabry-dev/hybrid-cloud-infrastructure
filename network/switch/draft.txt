@@ -300,3 +300,68 @@ Pending
 ACL rule: permit only Mac Mini IP to reach Management VLAN 5, deny all else
 LAG configuration for ports 2+3 uplink to ER605
 Port 5 → Prod_Svc_Trunk_Port5 assignment (when home)
+
+
+
+____________
+
+ACL Refine and Add AP 
+
+Here's the documentation:
+
+Switch ACL Rules — Network Isolation Policy
+Philosophy: Deny broad first, permit exceptions on top. VLAN 40 (NAS Storage) excluded from ACL — naturally isolated by L2-only design.
+
+ACL Rule Table
+IndexNamePolicySourceDestination1Mac_Mini_Allow_AllPermitMac_Mini (192.168.0.223)IPGroup_Any2Deny_Prod_DevDenyProd SVC (50-55)Dev SVC (60-65) + Management3Deny_Prod_Dev_reverseDenyDev SVC (60-65)Prod SVC (50-55) + Management4Deny_All_to_NASMgmtDenyIPGroup_AnyNAS_Mgmt (10.0.5.120)
+All rules: Protocols = All, Bi-Directional = Disabled, Binding = All Ports
+
+Isolation Policy Matrix
+SourceDev SVC 60-65Dev Mgmt .110Prod SVC 50-55Prod Mgmt .100NAS Mgmt .120Dev SVC 60-65✅✅❌❌❌Dev Mgmt .110✅-❌❌❌Prod SVC 50-55❌❌✅✅❌Prod Mgmt .100❌❌✅-❌NAS Mgmt .120❌❌❌❌-Mac Mini .223✅✅✅✅✅
+
+ACL Processing Order
+Rules are evaluated top to bottom, first match wins:
+
+Mac Mini hits Rule 1 (Permit) → allowed everywhere, never hits deny rules
+Prod SVC hits Rule 2 (Deny) → blocked from Dev SVC + Management
+Dev SVC hits Rule 3 (Deny) → blocked from Prod SVC + Management
+Any source hits Rule 4 (Deny) → blocked from NAS_Mgmt
+
+
+Important Clarifications
+Why VLAN 40 (NAS Storage) is excluded from ACL:
+
+Purpose: VLAN (L2 only), no gateway, no routing
+Switch has no L3 interface on VLAN 40
+Physically accessible only via ports 6, 7, 8
+Cannot appear as routable source or destination in ACL
+Isolated by design, no ACL needed
+
+Intra-VLAN 5 (Management) L2 traffic:
+
+10.0.5.100 (Prod_Mgmt), 10.0.5.110 (Dev_Mgmt), 10.0.5.120 (NAS_Mgmt) are all in same VLAN 5
+L2 intra-subnet traffic between them does NOT pass through switch routing — ACL rules don't apply
+This means at pure L2 level, mgmt IPs can technically reach each other within VLAN 5
+This is acceptable and mitigated by multiple layers:
+
+AC750 client isolation enabled on AP
+NAS mgmt port has its own FW rule — only Mac Mini permitted
+No DHCP on VLAN 5 — unexpected devices get no IP
+Physical access to VLAN 5 only via Port 3 (AC750 AP)
+
+
+
+Prod_Mgmt internal access to Prod SVC:
+
+Prod_Mgmt (10.0.5.100) reaching Prod SVC (50-55) is inter-VLAN routing through the switch
+ACL rules 2+3 only block cross-env traffic — intra-Prod routing is unaffected
+Same applies to Dev_Mgmt (10.0.5.110) reaching Dev SVC (60-65)
+
+
+Pending
+
+Fine-grained intra-Prod ACLs (e.g. Prod_DMZ cannot reach Prod_Vault)
+Fine-grained intra-Dev ACLs (e.g. Dev_DMZ cannot reach Dev_Vault)
+LAG configuration ports 1+2 → ER605
+Port 5 → Prod_Svc_Trunk_Port5 (when home)
+Gateway ACL on ER605 for external traffic control
