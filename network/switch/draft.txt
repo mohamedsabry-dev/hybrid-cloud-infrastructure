@@ -1,0 +1,302 @@
+VLAN 40 — NAS Storage Network
+Purpose: Isolated internal storage traffic between servers and NAS. No external access, no routing.
+Network Config (Networks tab)
+
+Name: NAS_Storage
+Purpose: VLAN
+VLAN ID: 40
+Application: Switches Only
+Gateway: None
+DHCP: Disabled
+IGMP/MLD Snooping: Disabled
+Legal DHCP Servers: Disabled
+DHCP L2 Relay: Disabled
+
+Profile Config (Profile tab)
+
+Profile Name: NAS_Storage
+Native Network: NAS_Storage
+Isolation: Off
+PoE: Off
+
+Switch Port Config (Switch Settings tab)
+
+Device: Festa FS308GP
+Ports: 6, 7, 8
+Profile: NAS_Storage
+Operation: Switching
+PoE Mode: Off
+Link Speed: Auto
+Port Mode: Trunk (tagged VLAN 40)
+
+Traffic Flow
+
+Devices tag frames with VLAN 40 internally
+Frames enter trunk ports 6/7/8
+Switch forwards only within VLAN 40 member ports
+Traffic never reaches ER605 or any other VLAN
+
+Connected Devices
+
+Port 6: (your device)
+Port 7: (your device)
+Port 8: (your device)
+
+
+
+
+Dev Server Trunk Port — Port 4 (svc0 Interface)
+Purpose: Single physical trunk port carrying 6 dev VLANs from dev server (svc0 interface). Switch handles inter-VLAN routing internally, external traffic forwarded to ER605 via ports 1+2 LAG.
+
+Step 1 — Create 6 Dev LANs (Networks tab)
+NamePurposeVLANGatewaySubnetDev_IdentityInterface6010.0.60.1/24Dev_K8s_ControlInterface6110.0.61.1/24Dev_VaultInterface6210.0.62.1/24Dev_ManagementInterface6310.0.63.1/24Dev_K8s_DataInterface6410.0.64.1/24Dev_DMZInterface6510.0.65.1/24
+Settings for all 6 LANs:
+
+LAN Interfaces: ALL_LAN
+VLAN Type: Single
+DHCP Server: Disabled
+IGMP/MLD Snooping: Disabled
+Legal DHCP Servers: Disabled
+DHCP L2 Relay: Disabled
+
+
+Step 2 — Create Dummy Native VLAN (Networks tab)
+
+Name: Dummy_Native
+Purpose: VLAN
+VLAN: 99
+Application: Switches Only
+All options: Disabled
+
+Reason: Festa requires a Native Network on every port. Dummy_Native acts as a dead VLAN to catch any accidental untagged frames on Port 45, since svc0 tags all traffic.
+
+Step 3 — Create Trunk Profile (Profile tab)
+
+Name: Dev_Trunk_Port5
+PoE: Disable
+Native Network: Dummy_Native
+Tagged Networks: Dev_Identity, Dev_K8s_Control, Dev_Vault, Dev_Management, Dev_K8s_Data, Dev_DMZ
+Untagged Networks: Dummy_Native (auto-assigned)
+Voice Network: None
+
+Advanced Options:
+
+Port Isolation: Disable
+Flow Control: Enable
+EEE: Disable
+Loopback Control: Loopback Detection Port Based
+LLDP-MED: Enable
+Bandwidth Control: Off
+DHCP L2 Relay: Disable
+
+
+Step 4 — Assign Profile to Port 4 (Switch Settings tab)
+
+Device: Festa FS308GP
+Port 4 → Profile: Dev_Trunk_Port4
+Operation: Switching
+PoE: Off
+Link Speed: Auto
+
+
+Traffic Flow
+
+svc0 tags frames with VLAN 60-65 before leaving server
+Frames arrive tagged on Port 4
+Switch routes inter-VLAN traffic internally (10.0.60-65)
+External traffic forwarded to ER605 via Port 1+2 LAG
+Untagged frames (if any) land in Dummy_Native VLAN 99 — isolated, no gateway, dead end
+
+
+Pending
+
+ACLs between Dev VLANs (which VLAN can reach which)
+LAG configuration for ports 2+3 uplink to ER605
+
+
+
+
+
+______
+
+Prod Server Trunk Port — Port 4 (svc0 Interface)
+Purpose: Single physical trunk port carrying 6 prod VLANs from prod server (svc0 interface). Switch handles inter-VLAN routing internally, external traffic forwarded to ER605 via ports 1+2 LAG (pending).
+
+Step 1 — Create 6 Prod LANs (Networks tab)
+NamePurposeVLANGatewaySubnetProd_IdentityInterface5010.0.50.1/24Prod_K8s_ControlInterface5110.0.51.1/24Prod_VaultInterface5210.0.52.1/24Prod_ManagementInterface5310.0.53.1/24Prod_K8s_DataInterface5410.0.54.1/24Prod_DMZInterface5510.0.55.1/24
+Settings for all 6 LANs:
+
+LAN Interfaces: ALL_LAN
+VLAN Type: Single
+DHCP Server: Disabled
+IGMP/MLD Snooping: Disabled
+Legal DHCP Servers: Disabled
+DHCP L2 Relay: Disabled
+
+
+Step 2 — Create Trunk Profile (Profile tab)
+
+Name: Prod_Svc_Trunk_Port4
+PoE: Disable
+Native Network: Dummy_Native (VLAN 99 — dead VLAN for untagged frames)
+Tagged Networks: Prod_Identity, Prod_K8s_Control, Prod_Vault, Prod_Management, Prod_K8s_Data, Prod_DMZ
+Untagged Networks: Dummy_Native (auto-assigned)
+Voice Network: None
+
+Advanced Options:
+
+Port Isolation: Disable
+Flow Control: Enable
+EEE: Disable
+Loopback Control: Loopback Detection Port Based
+LLDP-MED: Enable
+Bandwidth Control: Off
+DHCP L2 Relay: Disable
+
+
+Step 3 — Assign Profile to Port 4 (Switch Settings tab)
+
+Device: Festa FS308GP
+Port 4 → Profile: Prod_Svc_Trunk_Port4
+Operation: Switching
+PoE: Off
+Link Speed: Auto
+
+
+Traffic Flow
+
+svc0 tags frames with VLAN 50-55 before leaving server
+Frames arrive tagged on Port 4
+Switch routes inter-VLAN traffic internally (10.0.50-55)
+External traffic forwarded to ER605 via Port 1+2 LAG (pending)
+Untagged frames (if any) land in Dummy_Native VLAN 99 — isolated, no gateway, dead end
+
+
+Pending
+
+Assign Prod_Svc_Trunk_Port5 to Port 5 (when home — management WiFi currently on Port 5)
+LAG configuration for ports 2+3 uplink to ER605
+ACLs between Prod VLANs and between Prod/Dev VLANs
+
+
+
+____________
+Switch ACL — Global Isolation Rules
+Purpose: Enforce broad network isolation between Prod and Dev environments at the switch level. Storage network (VLAN 40) is naturally isolated by design (L2 only, no gateway, no routing).
+
+ACL Rules
+Rule 1 — Deny_Prod_Dev
+
+Status: Enabled
+Policy: Deny
+Protocols: All
+Bi-Directional: Enabled (auto-generates reverse rule)
+Source: Prod_Identity, Prod_K8s_Control, Prod_Vault, Prod_Management, Prod_K8s_Data, Prod_DMZ
+Destination: Dev_Identity, Dev_K8s_Control, Dev_Vault, Dev_Management, Dev_K8s_Data, Dev_DMZ
+Time Range: Disabled
+Ethertype: Disabled
+ACL Binding: Ports — All Ports
+
+Rule 2 — Deny_Prod_Dev_reverse (auto-generated)
+
+Status: Enabled
+Policy: Deny
+Protocols: All
+Source: Dev_Identity, Dev_K8s_Control, Dev_Vault, Dev_Management, Dev_K8s_Data, Dev_DMZ
+Destination: Prod_Identity, Prod_K8s_Control, Prod_Vault, Prod_Management, Prod_K8s_Data, Prod_DMZ
+ACL Binding: Ports — All Ports
+
+
+Why No ACL for NAS_Storage
+NAS_Storage (VLAN 40) is naturally isolated by design:
+
+Purpose: VLAN (L2 only)
+No gateway, no routing
+Switches Only — never propagated to ER605
+Accessible only via physical ports 6, 7, 8
+Does not appear as routable destination in Switch ACL
+
+
+Pending ACLs (Fine-Grained — Future)
+
+Intra-Prod VLAN isolation (e.g. Prod_DMZ cannot reach Prod_K8s_Data)
+Intra-Dev VLAN isolation (e.g. Dev_DMZ cannot reach Dev_K8s_Data)
+Vault access restrictions (only specific VLANs can reach Prod_Vault / Dev_Vault)
+Management VLAN access policy
+
+______
+
+
+
+Here's the documentation:
+
+Management Network — VLAN 5
+Purpose: Isolated management plane for Proxmox servers and NAS storage management interfaces. Accessible only via AC750 AP uplink on Port 3. Only Mac Mini permitted via ACL.
+
+Network Config (Networks tab)
+
+Name: Management
+Purpose: Interface
+VLAN: 5
+Gateway: 10.0.5.1/24
+LAN Interfaces: ALL_LAN
+VLAN Type: Single
+DHCP Server: Disabled
+IGMP/MLD Snooping: Disabled
+Legal DHCP Servers: Disabled
+DHCP L2 Relay: Disabled
+
+Static IP Assignments:
+DeviceIPProd Proxmox mgmt10.0.5.100Dev Proxmox mgmt10.0.5.110NAS mgmt10.0.5.120
+
+Profile Config (Profile tab)
+
+Name: Mgmt_AP_Port3
+PoE: Disable
+Native Network: Management
+Tagged Networks: None
+Untagged Networks: Management (auto-assigned)
+Voice Network: None
+
+Advanced Options:
+
+Port Isolation: Disable
+Flow Control: Enable
+EEE: Disable
+Loopback Control: Loopback Detection Port Based
+LLDP-MED: Enable
+Bandwidth Control: Off
+DHCP L2 Relay: Disable
+
+
+Port Assignment (Switch Settings tab)
+
+Device: Festa FS308GP
+Port 3 → Profile: Mgmt_AP_Port3
+Operation: Switching
+PoE: Off
+Link Speed: Auto
+
+
+Traffic Flow
+
+AC750 AP sends untagged traffic from both SSIDs out of uplink
+Untagged frames enter Port 3 → switch tags as VLAN 5
+All management devices (Proxmox, NAS) use static IPs in 10.0.5.0/24
+Mac Mini reaches VLAN 5 via ER605 routing (via LAG ports 2+1 — pending)
+No DHCP — unexpected devices get no IP and cannot communicate
+
+
+Why No Per-SSID VLAN Separation
+AC750 is a consumer AP with no VLAN tagging support per SSID. All SSIDs share the same untagged uplink. Traffic separation between Dev mgmt and Prod mgmt is handled by:
+
+Static IP assignment per device
+ACL rule permitting only Mac Mini IP to reach 10.0.5.0/24 (pending)
+AP client isolation
+
+
+Pending
+
+ACL rule: permit only Mac Mini IP to reach Management VLAN 5, deny all else
+LAG configuration for ports 2+3 uplink to ER605
+Port 5 → Prod_Svc_Trunk_Port5 assignment (when home)
