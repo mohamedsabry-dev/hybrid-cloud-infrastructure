@@ -1,0 +1,345 @@
+================================================================================
+                    GOLDEN IMAGE SETUP GUIDE
+                    Rocky Linux 10.1 on Proxmox
+================================================================================
+
+OVERVIEW
+--------
+This guide documents creating a Rocky Linux 10.1 golden image template on
+Proxmox for VM cloning. Used for K8s masters/workers, IPA, Vault nodes.
+
+ISO: Rocky-10.1-x86_64-minimal.iso
+
+
+================================================================================
+WORKFLOW SUMMARY
+================================================================================
+
+1. Push to dev branch     → Triggers workflow, creates VM
+2. Manual OS install      → Install Rocky Linux from ISO
+3. Manual setup script    → Run golden-image-setup.sh, test, shutdown
+4. Workflow auto-detects  → Polls VM status, converts to template when stopped
+5. Template ready         → Clone VMs from template
+
+
+================================================================================
+STEP 1: TRIGGER WORKFLOW
+================================================================================
+
+Push changes to dev branch or manually trigger workflow:
+
+    gh workflow run "Dev - Proxmox Golden Image" --ref dev
+
+Workflow creates VM 9000 and polls for shutdown.
+
+
+================================================================================
+STEP 2: MANUAL OS INSTALLATION (IMPORTANT)
+================================================================================
+
+Open Proxmox console for VM 9000 and configure:
+
+ROOT ACCOUNT
+------------
+  - Root Password       : Set strong password
+  - Allow root SSH      : ENABLED (check this!)
+
+STORAGE
+-------
+  - Installation Dest   : Use the 20GB disk (automatic partitioning)
+
+SOFTWARE SELECTION
+------------------
+  - Base Environment    : Minimal Install
+  - Additional Software : Standard (check this!)
+
+NETWORK CONFIGURATION
+---------------------
+  - IP Address          : 10.0.65.99
+  - Subnet Mask         : /24 (255.255.255.0)
+  - Gateway             : 10.0.65.1
+  - DNS Server          : 8.8.8.8
+  - Search Domain       : lab.local
+
+TIME & DATE
+-----------
+  - Region              : Africa
+  - City                : Cairo (Egypt)
+  - Network Time        : ON
+
+Click "Begin Installation" and wait for completion.
+
+AFTER INSTALLATION - REBOOT
+---------------------------
+When installation completes and prompts to restart:
+  1. Click "Reboot System"
+  2. VM will boot to ISO menu again (CD-ROM is first in boot order)
+  3. Select "Troubleshooting" from the menu
+  4. Select "Boot from local drive"
+  5. VM boots from installed disk
+
+
+================================================================================
+STEP 3: RUN SETUP SCRIPT
+================================================================================
+
+After installation completes and VM reboots:
+
+1. Copy script to VM:
+
+    scp infrastructure/compute/golden-image-setup.sh root@10.0.65.99:/tmp/
+
+2. SSH and run script:
+
+    ssh root@10.0.65.99
+    chmod +x /tmp/golden-image-setup.sh
+    /tmp/golden-image-setup.sh
+
+3. Script installs:
+   - qemu-guest-agent, cloud-init
+   - vim, htop, git, jq, curl, wget
+   - net-tools, traceroute, bind-utils, nmcli, tcpdump
+   - ipa-client (package only)
+   - gandalf user (break-glass, locked)
+
+4. FOR DEV ENVIRONMENT:
+   - When prompted "Proceed with cleanup and shutdown?" → Answer "n"
+   - Review and test manually
+   - Verify: rpm -q qemu-guest-agent cloud-init ipa-client
+   - When satisfied, run script again → Answer "y"
+   - VM will cleanup and shutdown
+
+
+================================================================================
+STEP 4: WORKFLOW AUTO-CONVERTS TO TEMPLATE
+================================================================================
+
+After VM is shutdown, workflow automatically:
+  - Detects VM stopped (polls every 30 seconds)
+  - Removes CD-ROM drive
+  - Updates boot order to disk only (scsi0)
+  - Converts VM to template
+
+No manual approval needed - just shutdown the VM and wait.
+
+
+================================================================================
+STEP 5: VERIFY TEMPLATE
+================================================================================
+
+In Proxmox UI:
+  - VM 9000 should show as template (icon changes)
+  - Cannot start a template directly
+  - Clone to create new VMs
+
+
+================================================================================
+INSTALLED PACKAGES
+================================================================================
+
+Category          Packages
+--------          --------
+VM Integration    qemu-guest-agent, cloud-init
+Basic Tools       curl, wget, vim, htop, git, jq, tar, unzip, sudo
+Security          openssh-server/clients, audit, rsyslog
+Network           net-tools, traceroute, bind-utils, tcpdump, nmap-ncat, nmcli
+IPA               ipa-client (package only - configure via Ansible)
+User              gandalf (break-glass, locked - password via Ansible)
+
+
+================================================================================
+AWS SECRETS REQUIRED
+================================================================================
+
+Secret                              Purpose
+------                              -------
+dev/proxmox/terraform-token         API token for tf_dev@pve
+dev/proxmox/ssh-admin-password      admin_dev SSH (for snippets upload)
+dev/proxmox/vm-root-password        Root password for cloned VMs
+dev/vm/gandalf-password             Break-glass user password
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+See: troubleshooting/06-proxmox-golden-image-terraform.md
+
+1. Terraform stuck at "Refreshing state"
+   - VM has agent enabled but not responding
+   - Solution: qm stop 9000 --skiplock && qm destroy 9000 --purge
+
+2. State lock error in DynamoDB
+   - Previous run left lock
+   - Solution: AWS Console > DynamoDB > Tables >
+     hybrid-cloud-infrastructure-tf-state-lock-dev > Delete lock item
+
+3. Workflow polling timeout (1 hour)
+   - VM not shutdown within timeout
+   - Solution: Manually shutdown VM or re-run workflow
+
+4. agent { enabled = true } causes Terraform to wait
+   - This is normal - waits for qemu-guest-agent to respond
+   - Agent installed by setup script
+
+
+================================================================================
+NETWORK REFERENCE
+================================================================================
+
+VLAN    Purpose              Subnet          IP
+----    -------              ------          --
+65      Golden Image Setup   10.0.65.0/24    10.0.65.99 (temporary)
+64      Test Clone VM 1      10.0.64.0/24    10.0.64.99
+63      Test Clone VM 2      10.0.63.0/24    10.0.63.99
+
+
+================================================================================
+DESIGN DECISIONS & APPROACHES TRIED
+================================================================================
+
+1. QCOW2 CLOUD IMAGE vs ISO INSTALLATION
+-----------------------------------------
+Initially attempted to use Rocky Linux QCOW2 cloud image for faster deployment:
+
+  QCOW2 Approach (FAILED):
+  - download_file resource to fetch .qcow2 from Rocky mirrors
+  - Error: "unable to parse directory volume name 'nas-iso:qcow2/...'"
+  - Error: "wrong file extension" for iso content type
+  - Root cause: bpg/proxmox provider doesn't support QCOW2 on directory storage
+  - Would require import_from with LVM storage, more complex
+
+  ISO Approach (CHOSEN):
+  - Manual installation from Rocky-10.1-x86_64-minimal.iso
+  - More control over installation options
+  - Reliable and well-documented process
+  - Allows custom partitioning if needed
+
+2. WORKFLOW WAIT STRATEGY
+-------------------------
+Need workflow to wait for manual OS installation before converting to template:
+
+  Environment Approval Gates (LIMITED):
+  - GitHub environments with "Required reviewers"
+  - Works for public repos or GitHub Team/Enterprise
+  - Private repos on GitHub Pro: approval gates don't block workflow
+  - Workflows complete immediately without waiting
+
+  Polling Approach (CHOSEN):
+  - Workflow polls Proxmox API every 30 seconds
+  - Checks VM status via: GET /nodes/{node}/qemu/{vmid}/status/current
+  - Continues when status = "stopped"
+  - Timeout: 1 hour (60 minutes)
+  - Works on any GitHub plan
+
+3. SCRIPT DEVELOPMENT & TESTING
+--------------------------------
+Before automating, each command in golden-image-setup.sh was run manually:
+
+  - Executed each dnf install command individually
+  - Verified packages installed correctly
+  - Discovered missing repos (EPEL needed for htop)
+  - Tested cloud-init and qemu-guest-agent configuration
+  - Fixed interactive prompt issues (added </dev/tty for read)
+  - Suppressed kernel messages (dmesg -n 1)
+  - Once all commands verified working, consolidated into script
+  - Then destroyed VM and recreated via workflow to test full automation
+
+4. TEMPLATE VERIFICATION
+------------------------
+Need to verify golden image template works correctly with cloud-init:
+
+  Test Clone Infrastructure:
+  - Terraform module: terraform/dev/proxmox/vms/test-clones/
+  - Creates 2 test VMs from template on different VLANs
+  - Applies cloud-init configuration (hostname, root password, network)
+  - Workflow verifies: hostname set correctly, cloud-init completed
+  - Auto-cleanup after successful test
+
+  Test Actions:
+  - plan   : Show what would be created
+  - apply  : Create test VMs
+  - test   : Create VMs, verify cloud-init, destroy
+  - destroy: Remove test VMs
+
+5. SECRETS MANAGEMENT
+---------------------
+Multiple approaches considered for storing credentials:
+
+  Hardcoded in Terraform (REJECTED):
+  - Security risk, visible in state files
+  - No rotation capability
+
+  Terraform Variables (REJECTED):
+  - Requires passing secrets via CLI or tfvars
+  - Risk of accidental commit
+
+  AWS Secrets Manager (CHOSEN):
+  - Secrets stored securely in AWS
+  - Fetched at runtime via data source
+  - OIDC authentication from GitHub Actions
+  - Easy rotation without code changes
+  - Centralized secret management
+
+6. SSH ACCESS FOR SNIPPETS
+--------------------------
+Proxmox provider needs SSH to upload cloud-init snippets:
+
+  Root SSH (REJECTED):
+  - Security risk
+  - Against best practices
+
+  admin_dev User (CHOSEN):
+  - Dedicated admin user with sudo
+  - Password stored in AWS Secrets Manager
+  - Can upload to /var/lib/vz/snippets/
+
+
+================================================================================
+TEST CLONE WORKFLOW
+================================================================================
+
+Workflow: .github/workflows/dev-proxmox-test-clones.yml
+
+Trigger workflow (push to dev or manual):
+
+    gh workflow run "Dev - Test Golden Image Clones" --ref dev
+
+Workflow flow:
+  1. Deploy test VMs (terraform apply)
+  2. Wait for both VMs to shutdown (polls every 30 seconds)
+  3. Cleanup (terraform destroy)
+
+Test VMs Created:
+  - test-vm-01: VMID 101, VLAN 64, IP 10.0.64.99
+  - test-vm-02: VMID 102, VLAN 63, IP 10.0.63.99
+
+Manual Verification (SSH to VMs before shutdown):
+  - Check hostname: hostname
+  - Check cloud-init: cat /var/log/cloud-init-done.log
+  - Check timezone: timedatectl
+  - Check network: ping google.com
+  - Shutdown when done: shutdown -h now
+
+VERIFIED TEST RESULTS (2026-02-14):
+-----------------------------------
+test-vm-01 (VLAN 64, 10.0.64.99):
+  ✓ Hostname: test-vm-01.lab.local
+  ✓ IP/Gateway: 10.0.64.99/24 via 10.0.64.1
+  ✓ Cross-VLAN ping to test-vm-02: OK
+  ✓ Internet (google.com): OK
+  ✓ Timezone: Africa/Cairo (EET)
+  ✓ Cloud-init: Completed
+  ✓ qemu-guest-agent: Running
+
+test-vm-02 (VLAN 63, 10.0.63.99):
+  ✓ Hostname: test-vm-02.lab.local
+  ✓ IP/Gateway: 10.0.63.99/24 via 10.0.63.1
+  ✓ Cross-VLAN ping to test-vm-01: OK
+  ✓ Internet (google.com): OK
+  ✓ Timezone: Africa/Cairo (EET)
+  ✓ Cloud-init: Completed
+  ✓ qemu-guest-agent: Running
+
+
+================================================================================
