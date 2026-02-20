@@ -117,7 +117,7 @@ jobs:
           echo "Plan output is available above for auditor review"
           sleep 180
           echo "✅ Review window ended at $(date)"
-          echo "scp infrastructure/compute/golden-image-setup.sh root@10.0.63.99:/tmp/"
+          echo "scp proxmox/scripts/golden-vm-setup.sh root@10.0.63.99:/tmp/"
 
       # 8. Apply the planned content inside tfplan file    
       - name: Terraform Apply
