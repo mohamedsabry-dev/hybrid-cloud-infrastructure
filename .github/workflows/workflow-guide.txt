@@ -1,0 +1,172 @@
+================================================================================
+                         WORKFLOW WRITING GUIDE
+================================================================================
+
+Step-by-step checklist for creating GitHub Actions workflows.
+
+================================================================================
+                         STEP 1: NAME & TRIGGER
+================================================================================
+
+name: "{Env} - {What it does}"
+
+on:
+  push:
+    branches:
+      - {branch}
+    paths:
+      - 'terraform/{env}/{path}/**'
+      - '.github/workflows/{this-file}.yml'
+
+  workflow_dispatch:
+
+Checklist:
+├── Name describes environment + action
+├── Branch matches environment (dev/prod)
+├── Paths point to correct Terraform folder
+├── Include workflow file itself in paths
+└── Add workflow_dispatch for manual trigger
+
+================================================================================
+                         STEP 2: PERMISSIONS
+================================================================================
+
+permissions:
+  id-token: write   # For OIDC
+  contents: read    # For checkout
+
+Checklist:
+└── Always include both for OIDC workflows
+
+================================================================================
+                         STEP 3: ENVIRONMENT VARIABLES
+================================================================================
+
+env:
+  ENVIRONMENT: {env}
+  TF_WORKING_DIR: terraform/{env}/{path}
+
+Checklist:
+├── ENVIRONMENT matches branch (dev/prod)
+└── TF_WORKING_DIR matches paths trigger
+
+================================================================================
+                         STEP 4: JOB SETUP
+================================================================================
+
+jobs:
+  deploy:
+    name: "Display Name"
+    runs-on: macOS
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.{RESOURCE}_{ENV}_LOCKED != 'true' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+Checklist:
+├── runs-on: macOS (your runner)
+├── Add lock variable check in if:
+├── Set defaults.run.working-directory
+└── Create lock variable in GitHub Settings if needed
+
+================================================================================
+                         STEP 5: CHECKOUT
+================================================================================
+
+    steps:
+      - uses: actions/checkout@v4
+
+Checklist:
+└── Always first step
+
+================================================================================
+                         STEP 6: AWS AUTHENTICATION
+================================================================================
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_{ENV} }}:role/GitHubActions-{RoleName}-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+Checklist:
+├── Use correct AWS_ACCOUNT_ID variable (DEV/PROD)
+├── Use correct IAM role name
+└── Double colon after iam:: in ARN
+
+================================================================================
+                         STEP 7: FETCH SECRETS (IF NEEDED)
+================================================================================
+
+      - name: Fetch Secrets
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id {env}/path/to/secret \
+            --query SecretString --output text)
+
+          # Mask before use
+          echo "::add-mask::${SECRET}"
+
+          # Set as TF_VAR
+          echo "TF_VAR_variable_name=${SECRET}" >> $GITHUB_ENV
+
+Checklist:
+├── Correct secret path in Secrets Manager
+├── Mask ALL secrets with ::add-mask::
+└── Use TF_VAR_ prefix for Terraform variables
+
+================================================================================
+                         STEP 8: TERRAFORM STEPS
+================================================================================
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        timeout-minutes: 10
+        run: terraform plan -out=tfplan
+
+      - name: Lock Cleanup Instructions
+        if: failure() || cancelled()
+        run: |
+          echo "State may be locked. Check DynamoDB."
+
+      - name: Review Window
+        run: |
+          echo "Review window - 3 minutes"
+          sleep 180
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+Checklist:
+├── Add timeout-minutes to plan
+├── Save plan to file (-out=tfplan)
+├── Add lock cleanup on failure
+├── Add review window if needed
+└── Apply uses saved plan file
+
+================================================================================
+                         COMMON MISTAKES
+================================================================================
+
+Mistake                          │ Fix
+─────────────────────────────────┼─────────────────────────────────────────────
+arn:aws:iam:${{                  │ arn:aws:iam::${{ (double colon)
+canceled                         │ cancelled (British spelling)
+{{ vars.NAME }}                  │ ${{ vars.NAME }} (missing $)
+Wrong indentation                │ uses: and with: indent under - name:
+Forgot to mask secrets           │ Always ::add-mask:: before using
+
+================================================================================
+                         QUICK REFERENCE
+================================================================================
+
+Order:
+name → on → permissions → env → jobs → defaults → steps
+
+Steps:
+checkout → aws auth → fetch secrets → tf init → tf plan → review → tf apply
+
+================================================================================
