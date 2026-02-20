@@ -8,7 +8,7 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "Dev - IAM"
+name: "[DEV] IAM"
 on:
   push:
     branches:
