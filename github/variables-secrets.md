@@ -18,11 +18,14 @@ Settings → Secrets and variables → Actions → Variables
 
 | Variable Name | Value | Purpose |
 |---------------|-------|---------|
-| `GOLDEN_IMAGE_DEV_LOCKED` | false | Lock DEV golden image workflow |
+| `GOLDEN_IMAGE_DEV_LOCKED` | true | Lock DEV golden image workflow |
 | `GOLDEN_IMAGE_PROD_LOCKED` | true | Lock PROD golden image workflow |
-| `GOLDEN_LXC_DEV_LOCKED` | true | Lock DEV LXC workflow |
-| `TEST_CLONES_DEV_LOCKED` | true | Lock DEV test clones workflow |
-| `TEST_CLONES_PROD_LOCKED` | true | Lock PROD test clones workflow |
+| `GOLDEN_LXC_DEV_LOCKED` | true | Lock DEV golden LXC workflow |
+| `GOLDEN_LXC_PROD_LOCKED` | true | Lock PROD golden LXC workflow |
+| `FREEIPA_DEV_LOCKED` | true | Lock DEV FreeIPA workflow |
+| `FREEIPA_PROD_LOCKED` | true | Lock PROD FreeIPA workflow |
+| `ANSIBLE_DEV_LOCKED` | true | Lock DEV Ansible workflow |
+| `ANSIBLE_PROD_LOCKED` | true | Lock PROD Ansible workflow |
 
 ### Why Workflow Locks? (Safe Trigger Mechanism)
 
@@ -52,6 +55,48 @@ jobs:
 1. Set variable to `false` in GitHub UI
 2. Push to branch (workflow runs)
 3. Set variable back to `true` (re-lock)
+
+### Auto-Lock Pattern (Golden Templates Only)
+
+For golden templates (VM and LXC), workflows auto-lock after successful deployment.
+These are "create once" resources that shouldn't be recreated accidentally.
+
+**Which workflows auto-lock:**
+
+| Workflow | Auto-lock? | Reason |
+|----------|------------|--------|
+| golden-vm | Yes | Template, create once |
+| golden-lxc | Yes | Template, create once |
+| freeipa | No | May need updates |
+| ansible | No | May need updates |
+| iam | No | May need policy changes |
+| secrets | No | May add new secrets |
+
+**Implementation:**
+
+1. Add permission:
+```yaml
+permissions:
+  id-token: write
+  contents: read
+  actions: write      # Required for gh variable set
+```
+
+2. Add step after Terraform Apply:
+```yaml
+- name: Lock after success
+  if: success()
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    gh variable set GOLDEN_IMAGE_DEV_LOCKED --body "true"
+```
+
+**Why auto-lock golden templates:**
+- One-time creation (template used many times)
+- Prevents accidental recreation
+- No need to manually re-lock after deployment
+- Stateful workloads (FreeIPA, Ansible) keep manual control
 
 ---
 
