@@ -1,8 +1,8 @@
 # Dev IAM module deployment#
 # Triggers on push to dev branch when IAM files change
 
+#### Define Block ####
 name: "Dev - IAM"
-
 on:
   push:
     branches:
@@ -10,15 +10,13 @@ on:
     paths:
       - 'terraform/dev/aws/iam/**'
       - '.github/workflows/dev-iam.yml'
-
 permissions:
   id-token: write
   contents: read
-
 env:
   ENVIRONMENT: dev
   TF_WORKING_DIR: terraform/dev/aws/iam
-
+#####################
 
 jobs:
   deploy:
@@ -30,7 +28,8 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
