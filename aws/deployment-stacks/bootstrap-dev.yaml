@@ -1,0 +1,243 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Dev Account Bootstrap: OIDC + Admin Role with Permissions Boundary + State Bucket'
+
+# ============================================================================
+# IMPORTANT: Deploy this stack to eu-west-2 (London) region ONLY
+# Command: aws cloudformation deploy --template-file bootstrap-dev.yaml \
+#          --stack-name dev-bootstrap --capabilities CAPABILITY_NAMED_IAM \
+#          --region eu-west-2
+# ============================================================================
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Deployment Configuration"
+        Parameters:
+          - Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+
+  StateBucketName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-tf-state-dev
+
+  LockTableName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-tf-state-lock-dev
+
+Rules:
+  RegionCheck:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", "eu-west-2"]
+        AssertDescription: "This stack must be deployed in eu-west-2 (London) only"
+
+Resources:
+  # ============================================================================
+  # 1. GitHub OIDC Provider
+  # ============================================================================
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [1c58a3a8518e8759bf075b76b750d4f2df264fcd]
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 2. Permissions Boundary (Limits ALL roles/users created by Terraform)
+  # ============================================================================
+  TerraformPermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: TerraformPermissionsBoundary
+      Description: Prevents modification of bootstrap resources - applied to all Terraform-created roles
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow everything by default
+          - Sid: AllowAllActions
+            Effect: Allow
+            Action: '*'
+            Resource: '*'
+          # Deny modifying OIDC Provider
+          - Sid: DenyModifyOIDC
+            Effect: Deny
+            Action:
+              - iam:DeleteOpenIDConnectProvider
+              - iam:UpdateOpenIDConnectProviderThumbprint
+              - iam:RemoveClientIDFromOpenIDConnectProvider
+            Resource: !Ref GitHubOIDCProvider
+          # Deny modifying this permissions boundary
+          - Sid: DenyModifyPermissionsBoundary
+            Effect: Deny
+            Action:
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:CreatePolicyVersion
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/TerraformPermissionsBoundary"
+          # Deny modifying the Terraform admin role
+          - Sid: DenyModifyTerraformRole
+            Effect: Deny
+            Action:
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+              - iam:DetachRolePolicy
+              - iam:AttachRolePolicy
+              - iam:UpdateAssumeRolePolicy
+              - iam:DeleteRolePermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-dev"
+          # Deny modifying Lock Table
+          - Sid: DenyModifyLockTable
+            Effect: Deny
+            Action:
+              - dynamodb:DeleteTable
+              - dynamodb:UpdateTable
+            Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LockTableName}"
+          # Deny modifying State Bucket
+          - Sid: DenyModifyStateBucket
+            Effect: Deny
+            Action:
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+
+  # ============================================================================
+  # 3. Terraform State Bucket (Dev Account)
+  # ============================================================================
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref StateBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TerraformStateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TerraformStateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ============================================================================
+  # 4. GitHub Actions Terraform Admin Role
+  # ============================================================================
+  GitHubActionsTerraformRole:
+    Type: AWS::IAM::Role
+    DependsOn: TerraformPermissionsBoundary
+    Properties:
+      RoleName: GitHubActions-TerraformAdmin-dev
+      Description: Full admin access with permissions boundary protecting bootstrap resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/dev-security
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+      PermissionsBoundary: !Ref TerraformPermissionsBoundary
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 4. Terraform State Lock Table
+  # ============================================================================
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref LockTableName
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+# ============================================================================
+# Outputs
+# ============================================================================
+Outputs:
+  OIDCProviderArn:
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: dev-GitHubOIDCProviderArn
+
+  PermissionsBoundaryArn:
+    Value: !Ref TerraformPermissionsBoundary
+    Export:
+      Name: dev-TerraformPermissionsBoundaryArn
+
+  GitHubActionsRoleArn:
+    Value: !GetAtt GitHubActionsTerraformRole.Arn
+    Export:
+      Name: dev-GitHubActionsRoleArn
+
+  LockTableName:
+    Value: !Ref TerraformLockTable
+    Export:
+      Name: dev-TerraformLockTableName
+
+  LockTableArn:
+    Value: !GetAtt TerraformLockTable.Arn
+    Export:
+      Name: dev-TerraformLockTableArn
+
+  StateBucketName:
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: dev-TerraformStateBucketName
+
+  StateBucketArn:
+    Value: !GetAtt TerraformStateBucket.Arn
+    Export:
+      Name: dev-TerraformStateBucketArn
+

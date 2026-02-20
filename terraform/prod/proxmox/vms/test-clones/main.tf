@@ -10,7 +10,7 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
   node_name = var.node_name
   vm_id     = var.test_vm.vmid
   name      = var.test_vm.name
-  tags      = ["test", "clone", "dev"]
+  tags      = ["test", "clone", "prod"]
 
   description = "Test VM cloned from ${var.template_name} golden image"
 
@@ -56,7 +56,7 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
   }
 
   # Network
-  network_device {
+  network_prodice {
     bridge  = var.test_vm.bridge
     model   = "virtio"
     vlan_id = var.test_vm.vlan_id
