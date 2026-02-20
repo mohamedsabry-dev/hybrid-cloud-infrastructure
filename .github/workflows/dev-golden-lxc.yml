@@ -8,14 +8,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "Dev - Proxmox Golden LXC Template"
+name: "[DEV] Golden LXC"
 on:
   push:
     branches:
       - dev
     paths:
       - 'terraform/dev/proxmox/lxc/golden-template/**'
-      - '.github/workflows/dev-proxmox-golden-lxc-template.yml'
+      - '.github/workflows/dev-golden-lxc.yml'
   workflow_dispatch:
 permissions:
   id-token: write
@@ -88,7 +88,7 @@ jobs:
 
           echo "TF_VAR_lxc_root_password=${LXC_PWD}" >> $GITHUB_ENV
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
-          
+
       - name: Terraform Init
         run: terraform init
 
@@ -109,10 +109,23 @@ jobs:
         if: steps.apply.outcome == 'success'
         run: |
           echo "=============================================="
-          echo " ✅ LXC CONTAINER CREATED"
+          echo " LXC CONTAINER CREATED"
           echo "=============================================="
-          echo "Next Steps:"
-          echo "1. Log in with the root password from AWS."
-          echo "2. Run your final hardening/update scripts."
-          echo "3. Convert to template: 'pct template <ID>'"
+          echo ""
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp bash-scripts/lxc-golden-setup.sh admin_dev@pve-dev.lab.local:/tmp/"
+          echo ""
+          echo "Step 2: Push script into container (on Proxmox host)"
+          echo "  pct push 9001 /tmp/lxc-golden-setup.sh /tmp/lxc-golden-setup.sh"
+          echo ""
+          echo "Step 3: Enter container and run setup"
+          echo "  pct enter 9001"
+          echo "  chmod +x /tmp/lxc-golden-setup.sh"
+          echo "  /tmp/lxc-golden-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, exit and convert to template"
+          echo "  exit"
+          echo "  pct stop 9001"
+          echo "  pct template 9001"
+          echo ""
           echo "=============================================="

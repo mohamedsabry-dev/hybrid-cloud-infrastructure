@@ -1,204 +1,190 @@
 #!/bin/bash
 #===============================================================================
-# LXC Golden Image Setup Script
-# Run on Proxmox host to create a golden LXC template
+# LXC Golden Template Setup & Cleanup Script
+# Run INSIDE the LXC container, BEFORE converting to template
+# Supports: Rocky Linux 10.x / RHEL-based
 #
-# Creates container, installs packages, cleans up, converts to template
+# Installs: Basic tools, network utilities, IPA client (package only),
+#           gandalf break-glass user
 #
-# Usage: ./lxc-golden-setup.sh [CTID] [STORAGE]
-#   CTID    - Container ID for template (default: 9001)
-#   STORAGE - Storage for rootfs (default: local-lvm)
+# Usage: ./lxc-golden-setup.sh
 #===============================================================================
 
 set -e
 
-# Configuration
-CTID=${1:-9001}
-STORAGE=${2:-local-lvm}
-TEMPLATE_FILE="/var/lib/vz/template/cache/rockylinux-10-default_20251001_amd64.tar.xz"
-HOSTNAME="rocky10-lxc-golden"
-MEMORY=2048
-CORES=2
-ROOTFS_SIZE=8
-BRIDGE="vmbr0"
-VLAN=65
-IP="10.0.65.98/24"
-GATEWAY="10.0.65.1"
-
 echo "==============================================================================="
-echo "         LXC GOLDEN TEMPLATE SETUP - Rocky Linux 10"
+echo "         LXC GOLDEN TEMPLATE SETUP - Rocky Linux 10.x"
 echo "==============================================================================="
-echo ""
-echo "Configuration:"
-echo "  CTID:     $CTID"
-echo "  Storage:  $STORAGE"
-echo "  Hostname: $HOSTNAME"
-echo "  Network:  $IP (VLAN $VLAN)"
-echo ""
 
 #-------------------------------------------------------------------------------
-# 1. Check Prerequisites
+# 1. System Update
 #-------------------------------------------------------------------------------
-echo ">>> [1/7] Checking prerequisites..."
+echo ""
+echo ">>> [1/9] Updating system packages..."
+dnf update -y
 
-if [ ! -f "$TEMPLATE_FILE" ]; then
-    echo "ERROR: Template not found: $TEMPLATE_FILE"
-    echo "Download it first:"
-    echo "  pveam download local rockylinux-10-default_20251001_amd64.tar.xz"
-    exit 1
+#-------------------------------------------------------------------------------
+# 2. Enable EPEL Repository
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [2/9] Enabling EPEL repository..."
+dnf install -y epel-release
+
+#-------------------------------------------------------------------------------
+# 3. Install Essential Packages
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [3/9] Installing essential packages..."
+dnf install -y \
+    curl \
+    wget \
+    vim \
+    htop \
+    git \
+    tree \
+    ca-certificates \
+    sudo \
+    bash-completion \
+    tar \
+    unzip \
+    jq \
+    yum-utils \
+    policycoreutils-python-utils
+
+#-------------------------------------------------------------------------------
+# 4. Install SSH & Security Tools
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [4/9] Installing SSH and security tools..."
+dnf install -y \
+    openssh-server \
+    openssh-clients \
+    rsyslog
+
+#-------------------------------------------------------------------------------
+# 5. Install Network Tools
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [5/9] Installing network tools..."
+dnf install -y \
+    net-tools \
+    traceroute \
+    bind-utils \
+    tcpdump \
+    nmap-ncat \
+    iputils \
+    iproute
+
+#-------------------------------------------------------------------------------
+# 6. Install IPA Client (Package Only - Configure via Ansible)
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [6/9] Installing IPA client package..."
+dnf install -y ipa-client
+echo "NOTE: IPA client installed but NOT configured. Use Ansible to enroll containers."
+
+#-------------------------------------------------------------------------------
+# 7. Create Gandalf Break-Glass User
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [7/9] Creating gandalf break-glass user..."
+
+if id "gandalf" &>/dev/null; then
+    echo "User gandalf already exists"
+else
+    useradd -m -s /bin/bash -c "Emergency Break-Glass User" gandalf
+
+    # Add to wheel group for sudo
+    usermod -aG wheel gandalf
+
+    # Lock account until password is set via Ansible
+    passwd -l gandalf
+
+    echo "NOTE: gandalf user created but locked. Set password via Ansible from AWS Secrets Manager."
 fi
 
-if pct status $CTID &>/dev/null; then
-    echo "ERROR: Container $CTID already exists"
-    echo "Remove it first: pct destroy $CTID"
-    exit 1
-fi
-
-echo "Prerequisites OK"
-
-#-------------------------------------------------------------------------------
-# 2. Create Container
-#-------------------------------------------------------------------------------
-echo ""
-echo ">>> [2/7] Creating container $CTID..."
-
-pct create $CTID "$TEMPLATE_FILE" \
-    --hostname "$HOSTNAME" \
-    --storage "$STORAGE" \
-    --rootfs "$STORAGE:$ROOTFS_SIZE" \
-    --memory "$MEMORY" \
-    --cores "$CORES" \
-    --net0 "name=eth0,bridge=$BRIDGE,tag=$VLAN,ip=$IP,gw=$GATEWAY" \
-    --unprivileged 1 \
-    --features nesting=1 \
-    --onboot 0 \
-    --start 0
-
-echo "Container created"
-
-#-------------------------------------------------------------------------------
-# 3. Start Container
-#-------------------------------------------------------------------------------
-echo ""
-echo ">>> [3/7] Starting container..."
-pct start $CTID
-sleep 5  # Wait for container to fully start
-
-#-------------------------------------------------------------------------------
-# 4. Install Packages
-#-------------------------------------------------------------------------------
-echo ""
-echo ">>> [4/7] Installing packages inside container..."
-
-pct exec $CTID -- bash -c '
-    echo "Updating system..."
-    dnf update -y
-
-    echo "Installing EPEL..."
-    dnf install -y epel-release
-
-    echo "Installing essential packages..."
-    dnf install -y \
-        curl \
-        wget \
-        vim \
-        htop \
-        git \
-        tree \
-        ca-certificates \
-        sudo \
-        bash-completion \
-        tar \
-        unzip \
-        jq \
-        yum-utils \
-        policycoreutils-python-utils \
-        openssh-server \
-        openssh-clients \
-        rsyslog \
-        net-tools \
-        traceroute \
-        bind-utils \
-        tcpdump \
-        nmap-ncat \
-        iputils \
-        iproute \
-        ipa-client
-
-    echo "Enabling services..."
-    systemctl enable sshd
-    systemctl enable rsyslog
-
-    # Enable root SSH login
-    sed -i "s/^#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
-    sed -i "s/^PermitRootLogin no/PermitRootLogin yes/" /etc/ssh/sshd_config
-
-    echo "Creating gandalf break-glass user..."
-    if ! id "gandalf" &>/dev/null; then
-        useradd -m -s /bin/bash -c "Emergency Break-Glass User" gandalf
-        usermod -aG wheel gandalf
-        passwd -l gandalf
-    fi
-
-    # Ensure wheel group has sudo access
+# Ensure wheel group has sudo access
+if ! grep -q "^%wheel.*NOPASSWD" /etc/sudoers.d/wheel-nopasswd 2>/dev/null; then
     echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel-nopasswd
     chmod 440 /etc/sudoers.d/wheel-nopasswd
-
-    echo "Package installation complete"
-'
+fi
 
 #-------------------------------------------------------------------------------
-# 5. Cleanup Inside Container
+# 8. Enable Services
 #-------------------------------------------------------------------------------
 echo ""
-echo ">>> [5/7] Cleaning up container..."
+echo ">>> [8/9] Enabling services..."
+systemctl enable sshd
+systemctl enable rsyslog
 
-pct exec $CTID -- bash -c '
-    dnf clean all
-    rm -rf /var/cache/dnf/*
-    rm -rf /tmp/*
-    rm -rf /var/tmp/*
-    find /var/log -type f -exec truncate -s 0 {} \;
-    rm -f /etc/machine-id
-    truncate -s 0 /etc/machine-id
-    rm -f /root/.bash_history
-    rm -f /home/*/.bash_history
-'
-
-echo "Cleanup complete"
+# Enable root SSH login (can disable later via Ansible if using gandalf)
+sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 #-------------------------------------------------------------------------------
-# 6. Stop Container
+# Done with package installation - Prompt before cleanup
 #-------------------------------------------------------------------------------
-echo ""
-echo ">>> [6/7] Stopping container..."
-pct stop $CTID
-sleep 3
-
-#-------------------------------------------------------------------------------
-# 7. Convert to Template
-#-------------------------------------------------------------------------------
-echo ""
-echo ">>> [7/7] Converting to template..."
-pct template $CTID
-
 echo ""
 echo "==============================================================================="
-echo "  LXC GOLDEN TEMPLATE CREATED SUCCESSFULLY"
+echo "  PACKAGE INSTALLATION COMPLETE"
 echo "==============================================================================="
 echo ""
-echo "Template ID: $CTID"
-echo "Hostname:    $HOSTNAME"
-echo ""
-echo "Installed packages:"
-echo "  - curl, wget, vim, htop, git, tree, jq, bash-completion"
+echo "Installed:"
+echo "  - curl, wget, vim, htop, git, tree, jq"
 echo "  - openssh-server/clients, rsyslog"
 echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat"
 echo "  - ipa-client (package only, not configured)"
 echo "  - gandalf user (break-glass, in wheel group)"
 echo ""
-echo "To clone from this template:"
-echo "  pct clone $CTID <new-ctid> --hostname <name> --full"
+echo "WARNING: Next step will clear logs, cache, and machine-id."
 echo ""
-echo "Or use Terraform to deploy containers from this template."
+read -p "Proceed with cleanup? (y/n): " PROCEED </dev/tty
+if [ "$PROCEED" != "y" ]; then
+    echo "Aborted. Run script again when ready."
+    exit 0
+fi
+
+#-------------------------------------------------------------------------------
+# 9. Final Cleanup
+#-------------------------------------------------------------------------------
+echo ""
+echo ">>> [9/9] Final cleanup..."
+
+# Clean package cache
+dnf clean all
+rm -rf /var/cache/dnf/*
+
+# Clear logs
+find /var/log -type f -exec truncate -s 0 {} \;
+
+# Clear temp files
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+
+# Reset machine-id
+rm -f /etc/machine-id
+truncate -s 0 /etc/machine-id
+
+# Clear history
+unset HISTFILE
+rm -f /root/.bash_history
+rm -f /home/*/.bash_history
+history -c 2>/dev/null || true
+
+#-------------------------------------------------------------------------------
+# Done
+#-------------------------------------------------------------------------------
+echo ""
 echo "==============================================================================="
+echo "  CLEANUP COMPLETE"
+echo "==============================================================================="
+echo ""
+echo "Next steps:"
+echo "  1. Exit the container: exit"
+echo "  2. Stop the container: pct stop 9001"
+echo "  3. Convert to template: pct template 9001"
+echo ""
+echo "Or from Proxmox UI:"
+echo "  Right-click container > Convert to Template"
+echo "==============================================================================="
+echo ""
