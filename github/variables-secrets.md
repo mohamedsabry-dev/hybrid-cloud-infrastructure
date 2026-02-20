@@ -217,9 +217,13 @@ Proxmox API has limitations - some operations require SSH:
 
 | Workflow | Uses cloud-init snippets? | Needs SSH? |
 |----------|---------------------------|------------|
-| golden-image | No (ISO install) | No |
-| test-clones | Yes (source_raw) | Yes |
-| golden-lxc | Yes (source_raw) | Yes |
+| golden-vm | No (ISO install) | No |
+| golden-lxc | No (native init) | No |
+| freeipa | No (API initialization) | No |
+| ansible | No (API initialization) | No |
+
+> **Note:** SSH only needed if using `source_raw` for custom cloud-init scripts.
+> Basic initialization (IP, hostname, SSH keys) works via API.
 
 ---
 
@@ -230,6 +234,7 @@ Proxmox API has limitations - some operations require SSH:
 **Examples:**
 - `GOLDEN_IMAGE_DEV_LOCKED`
 - `GOLDEN_IMAGE_PROD_LOCKED`
-- `TEST_CLONES_DEV_LOCKED`
-- `INFRA_DEV_LOCKED` (future)
-- `IAM_DEV_LOCKED` (future)
+- `GOLDEN_LXC_DEV_LOCKED`
+- `FREEIPA_DEV_LOCKED`
+- `ANSIBLE_DEV_LOCKED`
+- `IAM_DEV_LOCKED`
