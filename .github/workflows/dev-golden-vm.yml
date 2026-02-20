@@ -8,14 +8,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permisions for OICD Use 
 # 6. Declare Env Variables for clean use
-name: "Dev - Proxmox Golden Image VM"
+name: "[DEV] Golden VM"
 on:
   push:
     branches:
       - dev
     paths:
       - 'terraform/dev/proxmox/vms/golden-image/**'
-      - '.github/workflows/dev-proxmox-golden-image.yml'
+      - '.github/workflows/dev-golden-vm.yml'
   workflow_dispatch:
 permissions:
   id-token: write

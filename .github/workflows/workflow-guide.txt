@@ -8,7 +8,7 @@ Step-by-step checklist for creating GitHub Actions workflows.
                          STEP 1: NAME & TRIGGER
 ================================================================================
 
-name: "{Env} - {What it does}"
+name: "[ENV] Resource Name"    # e.g. [DEV] Golden VM, [PROD] Secrets
 
 on:
   push:
@@ -176,7 +176,7 @@ Place at top of workflow, before name:
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "{Env} - {Resource}"
+name: "[ENV] Resource"
 on:
   ...
 #####################

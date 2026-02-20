@@ -11,13 +11,27 @@
 
 ## Workflows
 
+### Day 0 - Templates
 | Workflow | Branch | Purpose |
 |----------|--------|---------|
-| `dev-proxmox-golden-image` | dev | Create golden image VM |
-| `dev-proxmox-golden-lxc-template` | dev | Create golden LXC template |
-| `dev-proxmox-test-clones` | dev | Test VM from template |
+| `dev-golden-vm` | dev | Create golden image VM template |
+| `dev-golden-lxc` | dev | Create golden LXC template |
+
+### Day 0 - Control Plane
+| Workflow | Branch | Purpose |
+|----------|--------|---------|
+| `dev-freeipa` | dev | Deploy FreeIPA VM (identity/domain) |
+| `dev-ansible` | dev | Deploy Ansible LXC (configuration mgmt) |
+
+### AWS
+| Workflow | Branch | Purpose |
+|----------|--------|---------|
 | `dev-secrets` | dev | Deploy AWS secrets |
 | `dev-iam` | dev-security | Deploy IAM roles/policies |
+
+### Production
+| Workflow | Branch | Purpose |
+|----------|--------|---------|
 | `prod-*` | prod / prod-security | Same as dev, for production |
 
 ## Writing New Workflows
