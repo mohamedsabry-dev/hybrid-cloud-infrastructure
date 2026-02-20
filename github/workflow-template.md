@@ -160,4 +160,4 @@ jobs:
 | `{Resource Name}` | `Proxmox Golden Image` | Display name |
 | `{RESOURCE}` | `GOLDEN_IMAGE` | Lock variable prefix |
 | `{path}` | `vms/golden-image` | Path under proxmox/ |
-| `{workflow-file}` | `dev-proxmox-golden-image` | Workflow filename |
+| `{workflow-file}` | `dev-golden-vm` | Workflow filename |
