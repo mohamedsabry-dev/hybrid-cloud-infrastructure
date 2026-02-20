@@ -55,7 +55,10 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
   # Static IP via Proxmox native LXC config (not cloud-init)
   initialization {
     hostname = var.lxc_container.hostname
-    password = var.lxc_root_password
+
+    user_account {
+      password = var.lxc_root_password
+    }
 
     ip_config {
       ipv4 {
