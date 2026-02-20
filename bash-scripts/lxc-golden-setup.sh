@@ -104,6 +104,7 @@ pct exec $CTID -- bash -c '
         vim \
         htop \
         git \
+        tree \
         ca-certificates \
         sudo \
         bash-completion \
@@ -190,7 +191,7 @@ echo "Template ID: $CTID"
 echo "Hostname:    $HOSTNAME"
 echo ""
 echo "Installed packages:"
-echo "  - curl, wget, vim, htop, git, jq, bash-completion"
+echo "  - curl, wget, vim, htop, git, tree, jq, bash-completion"
 echo "  - openssh-server/clients, rsyslog"
 echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat"
 echo "  - ipa-client (package only, not configured)"

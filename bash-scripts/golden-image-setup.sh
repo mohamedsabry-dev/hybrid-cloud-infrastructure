@@ -46,6 +46,7 @@ dnf install -y \
     vim \
     htop \
     git \
+    tree \
     ca-certificates \
     sudo \
     bash-completion \
@@ -171,7 +172,7 @@ echo "==========================================================================
 echo ""
 echo "Installed:"
 echo "  - qemu-guest-agent, cloud-init"
-echo "  - curl, wget, vim, htop, git, jq"
+echo "  - curl, wget, vim, htop, git, tree, jq"
 echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat, nmcli"
 echo "  - openssh-server/clients, audit, rsyslog"
 echo "  - ipa-client (package only, not configured)"

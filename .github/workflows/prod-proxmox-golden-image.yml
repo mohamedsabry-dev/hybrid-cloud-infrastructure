@@ -1,8 +1,14 @@
-# prod Proxmox Golden Image VM deployment
+# Prod Proxmox Golden Image VM deployment
 # Creates VM from ISO for manual installation
 
-name: "prod - Proxmox Golden Image"
-
+#### Define Block ####
+# 1. Define the job name on GH UI
+# 2. Define the run condition "On push : Where ?"
+# 3. Define the working directory path on GH Level
+# 4. Declare if will use manual trigger later or not
+# 5. Declare the needed permissions for OIDC Use
+# 6. Declare Env Variables for clean use
+name: "Prod - Proxmox Golden Image VM"
 on:
   push:
     branches:
@@ -10,32 +16,45 @@ on:
     paths:
       - 'terraform/prod/proxmox/vms/golden-image/**'
       - '.github/workflows/prod-proxmox-golden-image.yml'
-
   workflow_dispatch:
-
 permissions:
   id-token: write
   contents: read
-
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/proxmox/vms/golden-image
+#####################
+#####################
+
 
 jobs:
-
-  #=============================================================================
-  # Create VM via Terraform
-  #=============================================================================
+##### Job 1 Core #####
+  # 1. Name the job on GH UI
+  # 2. Define which runner to use
+  # 3. Define the manual safe lock trigger for workflow_dispatch
+  # 4. Define the default working directory for all steps in this job
   create-vm:
     name: "Create Golden Image VM (prod)"
     runs-on: macOS
-    # Skip if locked (unless manual trigger)
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_prod_LOCKED != 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_PROD_LOCKED != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
+#####################
+#####################
 
+
+##### Steps #####
+  # 1. Copy Code to the work place
+  # 2. Authenticate with AWS for OIDC and Assume the iam role
+  # 3. Fetch the needed secrets expected inside the tf code variables
+  # 4. Initialize Tf working directory
+  # 5. Plan "dry run" the Tf code and out to tfplan
+  # 6. Only appear if plan fail to execute in middle and DB LockID Triggered
+  # 7. Give yourself small window to review the plan output before execute
+  # 8. Apply the planned content inside tfplan file
+  # 9. In case of previous success, display manual instructions for complete the Job
     steps:
       - uses: actions/checkout@v4
 
