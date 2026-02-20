@@ -17,8 +17,8 @@ output "lxc_container" {
     3. Stop container: pct stop ${var.lxc_container.ctid}
     4. Convert to template: pct template ${var.lxc_container.ctid}
 
-    Or run the automated script on Proxmox host:
-      ./infrastructure/compute/lxc-golden-setup.sh
+    Or run the automated script:
+      proxmox/scripts/golden-lxc-setup.sh
     EOT
 
     clone_command      = "pct clone ${var.lxc_container.ctid} <new-ctid> --hostname <name> --full"
