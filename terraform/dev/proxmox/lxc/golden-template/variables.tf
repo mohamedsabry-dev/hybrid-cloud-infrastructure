@@ -34,7 +34,7 @@ variable "lxc_container" {
 variable "template_file" {
   description = "Path to LXC template file on Proxmox"
   type        = string
-  default     = "local:vztmpl/rockylinux-10-default_20251001_amd64.tar.xz"
+  default     = "nas-iso:vztmpl/rockylinux-10-default_20251001_amd64.tar.xz"
 }
 
 #===============================================================================
@@ -57,24 +57,6 @@ variable "datastore_id" {
 # Proxmox Connection
 #===============================================================================
 
-variable "proxmox_secret_id" {
-  description = "AWS Secrets Manager secret ID for Proxmox API token"
-  type        = string
-  default     = "dev/proxmox/terraform-token"
-}
-
-variable "proxmox_ssh_secret_id" {
-  description = "AWS Secrets Manager secret ID for Proxmox SSH password"
-  type        = string
-  default     = "dev/proxmox/ssh-admin-password"
-}
-
-variable "proxmox_ssh_username" {
-  description = "Proxmox SSH username"
-  type        = string
-  default     = "admin_dev"
-}
-
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
   type        = string
@@ -89,6 +71,12 @@ variable "proxmox_tls_insecure" {
 
 variable "lxc_root_password" {
   description = "The root password for the LXC container, injected via CI/CD"
+  type        = string
+  sensitive   = true
+}
+
+variable "proxmox_api_token" {
+  description = "Proxmox API token"
   type        = string
   sensitive   = true
 }

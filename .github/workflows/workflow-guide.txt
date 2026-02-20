@@ -160,6 +160,64 @@ Wrong indentation                │ uses: and with: indent under - name:
 Forgot to mask secrets           │ Always ::add-mask:: before using
 
 ================================================================================
+                         COMMENT FORMAT (GUIDE BLOCKS)
+================================================================================
+
+Use these comment blocks to document each section of your workflow.
+
+#### Define Block ####
+─────────────────────────────────────────────────────────────────────────────────
+Place at top of workflow, before name:
+
+#### Define Block ####
+# 1. Define the job name on GH UI
+# 2. Define the run condition "On push : Where ?"
+# 3. Define the working directory path on GH Level
+# 4. Declare if will use manual trigger later or not
+# 5. Declare the needed permissions for OIDC Use
+# 6. Declare Env Variables for clean use
+name: "{Env} - {Resource}"
+on:
+  ...
+#####################
+#####################
+
+##### Job Core #####
+─────────────────────────────────────────────────────────────────────────────────
+Place before job definition:
+
+jobs:
+##### Job 1 Core #####
+  # 1. Name the job on GH UI
+  # 2. Define which runner to use
+  # 3. Define the manual safe lock trigger for workflow_dispatch
+  # 4. Define the default working directory for all steps in this job
+  deploy:
+    name: "Job Name"
+    runs-on: macOS
+    ...
+#####################
+#####################
+
+##### Steps #####
+─────────────────────────────────────────────────────────────────────────────────
+Place before steps, list what each step does:
+
+##### Steps #####
+  # 1. Copy Code to the work place
+  # 2. Authenticate with AWS for OIDC and Assume the iam role
+  # 3. Fetch the needed secrets expected inside the tf code variables
+  # 4. Initialize Tf working directory
+  # 5. Plan "dry run" the Tf code and out to tfplan
+  # 6. Only appear if plan fail to execute in middle and DB LockID Triggered
+  # 7. Give yourself small window to review the plan output before execute
+  # 8. Apply the planned content inside tfplan file
+  # 9. In case of previous success, display manual instructions
+    steps:
+      ...
+##################################################################################
+
+================================================================================
                          QUICK REFERENCE
 ================================================================================
 

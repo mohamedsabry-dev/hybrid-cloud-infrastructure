@@ -47,7 +47,7 @@ variable "secrets" {
       name        = "dev/lxc/root-password"
       description = "Default root password for LXC provisioning"
       tags = {
-        Purpose = "cloud-init-setup"
+        Purpose = "lxc-template-root-password"
         Environment = "dev"
         ManagedBy   = "terraform"
       }
