@@ -1,3 +1,55 @@
+
+The full flow of your first approach was:
+GitHub Actions
+  └─ assumes IAM role (GitHubActions-Infrastructure-dev)
+        ↓
+Terraform runs
+  └─ data "aws_secretsmanager_secret_version"
+      └─ uses the assumed role to call Secrets Manager API
+          └─ gets the secret value back
+              └─ stores it in terraform.tfstate  ← security problem
+                    ↓
+locals
+  └─ jsondecode(secret_string)
+      └─ parses JSON → token_id, token_secret
+            ↓
+provider "proxmox"
+  └─ api_token = "${local.proxmox_creds.token_id}=${local.proxmox_creds.token_secret}"
+
+API Token flow — Final approach:
+GitHub Actions runner
+  └─ assumes IAM role
+        └─ calls Secrets Manager: dev/proxmox/terraform-token
+            └─ gets JSON: {"token_id": "terraform@pam!mytoken", "token_secret": "xxxx"}
+                └─ parses with jq → TOKEN_ID, TOKEN_SECRET
+                    └─ masks both values in logs
+                        └─ writes TF_VAR_proxmox_api_token=TOKEN_ID=TOKEN_SECRET → $GITHUB_ENV
+                                ↓
+                        Terraform reads TF_VAR_proxmox_api_token
+                            └─ passes directly to provider "proxmox" api_token
+                                └─ never touches state
+
+SSH Password flow — Final approach:
+GitHub Actions runner
+  └─ assumes IAM role
+        └─ calls Secrets Manager: dev/proxmox/ssh-admin-password
+            └─ gets plain string: "yourpassword"
+                └─ masks value in logs
+                    └─ writes TF_VAR_proxmox_ssh_password → $GITHUB_ENV
+                            ↓
+                    Terraform reads TF_VAR_proxmox_ssh_password
+                        └─ passes directly to provider "proxmox" ssh.password
+                            └─ never touches state
+
+Key difference between the two secrets:
+API TokenSSH PasswordSecret formatJSON {"token_id": "...", "token_secret": "..."}Plain stringParsing neededYes — jq -r '.token_id' and jq -r '.token_secret'No — used directlyCombined before useYes — TOKEN_ID=TOKEN_SECRET (Proxmox format)NoMasks needed3 — TOKEN_ID, TOKEN_SECRET, and combined1 — just the passwordUsed in provider forapi_tokenssh.password
+
+
+
+
+
+
+
 Please summary what we discussed so i can take it in not . 
 
 ### DO WHAT U AFRAID OFF ###
