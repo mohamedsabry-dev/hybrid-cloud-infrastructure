@@ -58,12 +58,6 @@ variable "iso_file_id" {
 }
 
 
-variable "proxmox_ssh_username" {
-  description = "Proxmox SSH username for snippet uploads"
-  type        = string
-  default     = "admin_dev"
-}
-
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
   type        = string
@@ -77,11 +71,6 @@ variable "proxmox_tls_insecure" {
 }
 
 variable "proxmox_api_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "proxmox_ssh_password" {
   type      = string
   sensitive = true
 }
