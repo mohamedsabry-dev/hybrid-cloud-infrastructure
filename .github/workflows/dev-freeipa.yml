@@ -82,6 +82,7 @@ jobs:
           ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
             --secret-id dev/ansible/ssh-public-key \
             --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "TF_VAR_ansible_ssh_public_key=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
           # Fetch VM root password
