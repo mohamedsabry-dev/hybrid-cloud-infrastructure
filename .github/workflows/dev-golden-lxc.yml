@@ -7,7 +7,7 @@
 # 3. Define the working directory path on GH Level
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
+# 6. Declare Env Variables for clean use 
 name: "[DEV] Golden LXC"
 on:
   push:

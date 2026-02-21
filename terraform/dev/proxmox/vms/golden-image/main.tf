@@ -1,6 +1,6 @@
 #===============================================================================
 # Golden Image VM - Rocky Linux 10.1 (ISO Installation)
-# Manual installation from ISO, then convert to template
+# Manual installation from ISO, then convert to template 
 #===============================================================================
 
 resource "proxmox_virtual_environment_vm" "golden_image" {
