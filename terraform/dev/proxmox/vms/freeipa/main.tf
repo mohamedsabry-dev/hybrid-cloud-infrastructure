@@ -25,6 +25,15 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   on_boot         = false
   stop_on_destroy = true
 
+  disk {
+    datastore_id = var.datastore_id
+    interface    = "scsi0"
+    size         = 20
+    ssd          = true
+    discard      = "on"
+    file_format  = "raw"
+  }
+
   disk {                                                                                                      
       datastore_id = "nas-dev-data"                                                                              
       interface    = "scsi1"
