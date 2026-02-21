@@ -17,5 +17,7 @@ output "secret_names" {
     proxmox_ssh = aws_secretsmanager_secret.proxmox_ssh_admin.name
     vm_root     = aws_secretsmanager_secret.vm_root_password.name
     gandalf     = aws_secretsmanager_secret.gandalf_password.name
+    lxc_root    = aws_secretsmanager_secret.lxc_root_password.name
+    ansible_ssh = aws_secretsmanager_secret.ansible_ssh_public_key.name
   }
 }
