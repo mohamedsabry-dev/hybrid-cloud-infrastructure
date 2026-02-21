@@ -37,7 +37,7 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     dedicated = var.freeipa.memory
   }
 
-  # Cloud-Init configuration (API only - no snippets)
+  # Cloud-Init configuration (API only - no snippets).
   initialization {
     datastore_id = var.datastore_id
 
@@ -70,7 +70,7 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   serial_device {
     device = "socket"
   }
-  
+
   lifecycle {
     ignore_changes = [started]
   }
