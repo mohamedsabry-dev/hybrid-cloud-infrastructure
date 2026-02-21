@@ -40,10 +40,11 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   # Cloud-Init configuration (API only - no snippets).
   initialization {
     datastore_id = var.datastore_id
-    
+
     user_account {
         keys     = [var.ansible_ssh_public_key]
         username = "root"
+        password = var.vm_root_password
       }
 
     ip_config {

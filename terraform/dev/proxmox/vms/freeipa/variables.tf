@@ -87,3 +87,9 @@ variable "ansible_ssh_public_key" {
   type        = string
   sensitive   = true
 }
+
+variable "vm_root_password" {
+  description = "Root password for VM console access"
+  type        = string
+  sensitive   = true
+}
