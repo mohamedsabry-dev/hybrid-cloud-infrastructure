@@ -80,5 +80,10 @@ variable "proxmox_tls_insecure" {
 variable "proxmox_api_token" {
   type      = string
   sensitive = true
+}
 
+variable "ansible_ssh_public_key" {
+  description = "Ansible VM SSH public key for automated management"
+  type        = string
+  sensitive   = true
 }
