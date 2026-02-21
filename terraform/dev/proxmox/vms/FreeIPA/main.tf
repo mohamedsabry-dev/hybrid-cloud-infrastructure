@@ -66,6 +66,11 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     enabled = true
   }
 
+  # Serial console for qm terminal access
+  serial_device {
+    device = "socket"
+  }
+  
   lifecycle {
     ignore_changes = [started]
   }

@@ -138,9 +138,10 @@ systemctl enable cloud-init
 systemctl enable rsyslog
 systemctl enable auditd
 
-# Enable root SSH login (can disable later via Ansible if using gandalf)
+# Enable root SSH login and password auth (can disable later via Ansible)
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 systemctl restart sshd
 
 #-------------------------------------------------------------------------------
