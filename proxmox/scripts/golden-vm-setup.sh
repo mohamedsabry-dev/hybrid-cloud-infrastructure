@@ -3,11 +3,20 @@
 # Golden Image Setup & Cleanup Script
 # Run AFTER manual OS installation, BEFORE converting to template
 # Supports: Rocky Linux 10.x / RHEL-based
-#
-# Installs: Basic tools, network utilities, qemu-guest-agent, cloud-init,
-#           IPA client (package only), gandalf break-glass user
-#
 # Usage: ./golden-vm-setup.sh
+#===============================================================================
+# 1.  System Update
+# 2.  Enable EPEL Repository
+# 3.  Install Essential Packages
+# 4.  Install SSH & Security Tools
+# 5.  Install Network Tools
+# 6.  Install IPA Client Package
+# 7.  Create gandalf break-glass user
+# 8.  Enable Services
+# 9.  Clean Package Cache
+# 10. Clear Logs
+# 11. Clear Temp Files & History
+# 12. Final Cleanup & Shutdown
 #===============================================================================
 
 set -e

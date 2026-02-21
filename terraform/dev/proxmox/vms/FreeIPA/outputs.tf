@@ -1,10 +1,9 @@
-output "test_vm" {
-  description = "Test VM information"
+output "freeipa" {
+  description = "freeipa VM information"
   value = {
-    vm_id  = proxmox_virtual_environment_vm.test_vm.vm_id
-    name   = proxmox_virtual_environment_vm.test_vm.name
-    node   = proxmox_virtual_environment_vm.test_vm.node_name
-    ip     = var.test_vm.ip
-    ssh    = "ssh root@${split("/", var.test_vm.ip)[0]}"
+    vm_id  = proxmox_virtual_environment_vm.freeipa.vm_id
+    name   = proxmox_virtual_environment_vm.freeipa.name
+    node   = proxmox_virtual_environment_vm.freeipa.node_name
+    ip     = var.freeipa.ip
   }
 }

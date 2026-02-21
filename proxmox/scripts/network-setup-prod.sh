@@ -3,6 +3,13 @@
 # Proxmox PROD Server Network Setup
 # Run from console or storage network - NOT over WiFi!
 #===============================================================================
+# 1. Install wpa_supplicant
+# 2. Configure WiFi
+# 3. Test WiFi connection
+# 4. Configure /etc/network/interfaces
+# 5. Update /etc/hosts
+# 6. Regenerate SSL certificate
+#===============================================================================
 
 set -e
 
