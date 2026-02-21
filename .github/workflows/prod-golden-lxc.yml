@@ -1,0 +1,135 @@
+# PROD Proxmox Golden LXC Template deployment
+# Creates LXC container for manual setup, then convert to template
+
+#### Define Block ####
+# 1. Define the job name on GH UI
+# 2. Define the run condition "On push : Where ?"
+# 3. Define the working directory path on GH Level
+# 4. Declare if will use manual trigger later or not
+# 5. Declare the needed permissions for OIDC Use
+# 6. Declare Env Variables for clean use
+name: "[PROD] Golden LXC"
+on:
+  push:
+    branches:
+      - prod
+    paths:
+      - 'terraform/prod/proxmox/lxc/golden-template/**'
+      - '.github/workflows/prod-golden-lxc.yml'
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+  actions: write 
+env:
+  ENVIRONMENT: prod
+  TF_WORKING_DIR: terraform/prod/proxmox/lxc/golden-template
+#####################
+#####################
+
+
+jobs:
+##### Job 1 Core #####
+  # 1. Name the job on GH UI
+  # 2. Define which runner to use
+  # 3. Define the manual safe lock trigger for workflow_dispatch
+  # 4. Define the default working directory for all steps in this job
+  create-lxc-template:
+    name: "Create Golden LXC (PROD)"
+    runs-on: macOS
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_LXC_PROD_LOCKED != 'true' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+#####################
+#####################
+
+
+##### Steps #####
+  # 1. Copy Code to the work place
+  # 2. Authenticate with AWS for OIDC and Assume the iam role
+  # 3. Fetch the LXC root password from AWS Secrets Manager
+  # 4. Initialize Tf working directory
+  # 5. Plan "dry run" the Tf code and out to tfplan
+  # 6. Give yourself small window to review the plan output before execute
+  # 7. Apply the planned content inside tfplan file
+  # 8. In case of previous success, display manual instructions for complete the Job
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Authenticate with AWS via OIDC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+
+      # 3. Fetch the needed secrets expected inside the tf code variables
+      - name: Fetch Proxmox Secrets
+        run: |
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id prod/proxmox/terraform-token \
+            --query SecretString --output text)
+
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id prod/lxc/root-password \
+            --query SecretString --output text)
+
+            
+          TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+          # Mask BEFORE any use
+          echo "::add-mask::${LXC_PWD}"
+          echo "::add-mask::${TOKEN_SECRET}"
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+
+
+          echo "TF_VAR_lxc_root_password=${LXC_PWD}" >> $GITHUB_ENV
+          echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "⏳ 3-minute review window for LXC Template deployment"
+          sleep 180
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Post-Build Cleanup Instructions
+        if: steps.apply.outcome == 'success'
+        run: |
+          echo "=============================================="
+          echo " LXC CONTAINER CREATED"
+          echo "=============================================="
+          echo ""
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp proxmox/scripts/golden-lxc-setup.sh admin_prod@pve-prod.lab.local:/tmp/"
+          echo ""
+          echo "Step 2: Push script into container (on Proxmox host)"
+          echo "  pct push 9001 /tmp/golden-lxc-setup.sh /tmp/golden-lxc-setup.sh"
+          echo ""
+          echo "Step 3: Enter container and run setup"
+          echo "  pct enter 9001"
+          echo "  chmod +x /tmp/golden-lxc-setup.sh"
+          echo "  /tmp/golden-lxc-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, exit and convert to template"
+          echo "  exit"
+          echo "  pct stop 9001"
+          echo "  pct template 9001"
+          echo ""
+          echo "=============================================="
+
+##################################################################################
+##################################################################################

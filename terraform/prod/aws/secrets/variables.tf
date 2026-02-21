@@ -43,6 +43,24 @@ variable "secrets" {
         ManagedBy   = "terraform"
       }
     }
+    lxc_root = {
+      name        = "prod/lxc/root-password"
+      description = "Default root password for LXC provisioning"
+      tags = {
+        Purpose = "lxc-template-root-password"
+        Environment = "prod"
+        ManagedBy   = "terraform"
+      }
+    }
+    ansible_ssh = {
+      name        = "prod/ansible/ssh-public-key"
+      description = "Ansible VM SSH public key for automated management"
+      tags = {
+        Purpose     = "ansible-automation"
+        Environment = "prod"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 

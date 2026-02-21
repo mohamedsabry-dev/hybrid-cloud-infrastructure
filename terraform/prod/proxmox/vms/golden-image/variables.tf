@@ -27,7 +27,7 @@ variable "golden_image" {
     memory      = 2048
     disk_size   = 20
     bridge      = "vmbr0"
-    vlan_id     = 55
+    vlan_id     = 53
   }
 }
 
@@ -57,23 +57,6 @@ variable "iso_file_id" {
   default     = "nas-iso:iso/Rocky-10.1-x86_64-minimal.iso"
 }
 
-variable "proxmox_secret_id" {
-  description = "AWS Secrets Manager secret ID for Proxmox API token"
-  type        = string
-  default     = "prod/proxmox/terraform-token"
-}
-
-variable "proxmox_ssh_secret_id" {
-  description = "AWS Secrets Manager secret ID for Proxmox SSH password"
-  type        = string
-  default     = "prod/proxmox/ssh-admin-password"
-}
-
-variable "proxmox_ssh_username" {
-  description = "Proxmox SSH username for snippet uploads"
-  type        = string
-  default     = "admin_prod"
-}
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
@@ -85,4 +68,9 @@ variable "proxmox_tls_insecure" {
   description = "Skip TLS verification for Proxmox API (self-signed cert)"
   type        = bool
   default     = true
+}
+
+variable "proxmox_api_token" {
+  type      = string
+  sensitive = true
 }
