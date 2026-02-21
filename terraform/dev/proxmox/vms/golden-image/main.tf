@@ -74,7 +74,12 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
     type   = "std"
     memory = 16
   }
-  
+
+  # Serial console for qm terminal access
+  serial_device {
+    device = "socket"
+  }
+
   lifecycle {
     ignore_changes = [
       started,
