@@ -93,9 +93,3 @@ variable "vm_root_password" {
   type        = string
   sensitive   = true
 }
-
-variable "datastore_id" {
-  description = "Proxmox datastore ID for VM disk"
-  type        = string
-  default     = "local-lvm"
-}
