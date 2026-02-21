@@ -72,3 +72,36 @@ resource "aws_secretsmanager_secret_version" "gandalf_password" {
     ignore_changes = [secret_string]
   }
 }
+
+#-------------------------------------------------------------------------------
+# LXC Root Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "lxc_root_password" {
+  name        = var.secrets.lxc_root.name
+  description = var.secrets.lxc_root.description
+  tags        = var.secrets.lxc_root.tags
+}
+
+resource "aws_secretsmanager_secret_version" "lxc_root_password" {
+  secret_id     = aws_secretsmanager_secret.lxc_root_password.id
+  secret_string = var.secret_placeholder
+  
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+resource "aws_secretsmanager_secret" "ansible_ssh_public_key" {
+  name        = var.secrets.ansible_ssh.name
+  description = var.secrets.ansible_ssh.description
+  tags        = var.secrets.ansible_ssh.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ansible_ssh_public_key" {
+  secret_id     = aws_secretsmanager_secret.ansible_ssh_public_key.id
+  secret_string = var.secret_placeholder
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
