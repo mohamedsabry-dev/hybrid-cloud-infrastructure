@@ -1,6 +1,6 @@
 #===============================================================================
 # LXC Container - Rocky Linux 10 (Base Template)
-# Deploy container from downloaded template for golden image setup
+# Deploy container from downloaded template for golden image setup 
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "lxc_golden" {
