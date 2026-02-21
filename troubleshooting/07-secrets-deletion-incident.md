@@ -325,7 +325,7 @@ Checksum Details:
 ================================================================================
 
 Related Documentation:
-  - docs/01-aws-iam-bootstrap.txt (AWS setup)
+  - aws/bootstrap.md (AWS setup)
   - docs/02-cicd-workflows.txt (Workflow patterns)
   - .github/workflows/ (All workflow files)
 

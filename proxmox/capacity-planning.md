@@ -42,12 +42,15 @@
 | Loki | LXC | 15GB | 50GB | 0.5GB | 1 | Log aggregation |
 | NGINX Ingress | POD | - | - | 0.25GB | 0.5 | K8s Ingress |
 | Flux CD | POD | - | - | 0.5GB | 0.5 | GitOps CD |
+| Helm | POD | - | - | 0.5GB | 0.5 | Package mgmt |
 | **TOTALS** | | **340GB** | **330GB** | **20.5GB** | **22** | |
+
+*Note: POD RAM runs inside K8s workers (already allocated above)*
 
 **Summary:**
 - Local NVMe: ~340GB OS + 10GB ISOs = ~350GB used, ~150GB free (snapshots)
 - NAS (dev-storage): ~330GB data disks
-- RAM: 20.5GB VMs/LXCs + 0.75GB PODs + 2GB Proxmox = ~23GB, ~1GB buffer
+- RAM: 20.5GB VMs/LXCs + 2GB Proxmox = ~22.5GB, ~1.5GB buffer
 
 ---
 
@@ -73,12 +76,15 @@
 | Loki | LXC | 15GB | 70GB | 1GB | 1 | Log aggregation |
 | NGINX Ingress | POD | - | - | 0.5GB | 1 | K8s Ingress |
 | Flux CD | POD | - | - | 1GB | 1 | GitOps CD |
+| Helm | POD | - | - | 0.5GB | 0.5 | Package mgmt |
 | **TOTALS** | | **340GB** | **580GB** | **52GB** | **25** | |
+
+*Note: POD RAM runs inside K8s workers (already allocated above)*
 
 **Summary:**
 - Local NVMe: ~340GB OS + 10GB ISOs = ~350GB used, ~150GB free (snapshots)
 - NAS (prod-storage): ~580GB data disks
-- RAM: 52GB VMs/LXCs + 1.5GB PODs + 4GB Proxmox = ~57.5GB, ~6.5GB buffer
+- RAM: 52GB VMs/LXCs + 4GB Proxmox = ~56GB, ~8GB buffer
 
 ---
 

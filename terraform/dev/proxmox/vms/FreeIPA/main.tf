@@ -1,18 +1,18 @@
 #===============================================================================
-# Test VM Clone from Golden Image Template
+# FreeIPA VM Clone from Golden Image Template
 #===============================================================================
 
 
 #-------------------------------------------------------------------------------
 # Clone VM from Template
 #-------------------------------------------------------------------------------
-resource "proxmox_virtual_environment_vm" "test_vm" {
+resource "proxmox_virtual_environment_vm" "freeipa" {
   node_name = var.node_name
-  vm_id     = var.test_vm.vmid
-  name      = var.test_vm.name
-  tags      = ["test", "clone", "dev"]
+  vm_id     = var.freeipa.vmid
+  name      = var.freeipa.name
+  tags      = ["freeipa", "clone", "dev"]
 
-  description = "Test VM cloned from ${var.template_name} golden image"
+  description = "FreeIPA VM cloned from ${var.template_name} golden image"
 
   # Clone from template
   clone {
@@ -27,25 +27,24 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
 
   # CPU
   cpu {
-    cores   = var.test_vm.cores
+    cores   = var.freeipa.cores
     sockets = 1
     type    = "host"
   }
 
   # Memory
   memory {
-    dedicated = var.test_vm.memory
+    dedicated = var.freeipa.memory
   }
 
-  ##### Cloud-Init configuration #####
+  # Cloud-Init configuration (API only - no snippets)
   initialization {
-    datastore_id      = var.datastore_id
-    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+    datastore_id = var.datastore_id
 
     ip_config {
       ipv4 {
-        address = var.test_vm.ip
-        gateway = var.test_vm.gateway
+        address = var.freeipa.ip
+        gateway = var.freeipa.gateway
       }
     }
 
@@ -57,9 +56,9 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
 
   # Network
   network_device {
-    bridge  = var.test_vm.bridge
+    bridge  = var.freeipa.bridge
     model   = "virtio"
-    vlan_id = var.test_vm.vlan_id
+    vlan_id = var.freeipa.vlan_id
   }
 
   # Agent
@@ -70,6 +69,4 @@ resource "proxmox_virtual_environment_vm" "test_vm" {
   lifecycle {
     ignore_changes = [started]
   }
-
-  depends_on = [proxmox_virtual_environment_file.cloud_config]
 }
