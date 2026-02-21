@@ -138,11 +138,17 @@ systemctl enable cloud-init
 systemctl enable rsyslog
 systemctl enable auditd
 
-# Enable root SSH login and password auth (can disable later via Ansible)
-sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+# SSH: Allow root login with keys only (no password)
+# Keys will be injected via Terraform cloud-init initialization
+sed -i 's/^#PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin no/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
 systemctl restart sshd
+
+# Enable serial console for Proxmox qm terminal access (emergency)
+sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 /' /etc/default/grub
+grub2-mkconfig -o /boot/grub2/grub.cfg
+systemctl enable serial-getty@ttyS0.service
 
 #-------------------------------------------------------------------------------
 # 9. Clean Package Cache

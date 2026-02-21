@@ -13,14 +13,14 @@ on:
     branches:
       - prod
     paths:
-      - 'terraform/prod/proxmox/vms/FreeIPA/**'
+      - 'terraform/prod/proxmox/vms/freeipa/**'
       - '.github/workflows/prod-freeipa.yml'
 permissions:
   id-token: write
   contents: read
 env:
   ENVIRONMENT: prod
-  TF_WORKING_DIR: terraform/prod/proxmox/vms/FreeIPA
+  TF_WORKING_DIR: terraform/prod/proxmox/vms/freeipa
 #####################
 #####################
 

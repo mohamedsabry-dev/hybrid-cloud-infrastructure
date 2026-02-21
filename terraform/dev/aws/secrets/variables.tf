@@ -47,7 +47,16 @@ variable "secrets" {
       name        = "dev/lxc/root-password"
       description = "Default root password for LXC provisioning"
       tags = {
-        Purpose = "lxc-template-root-password"
+        Purpose     = "lxc-template-root-password"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
+    ansible_ssh = {
+      name        = "dev/ansible/ssh-public-key"
+      description = "Ansible VM SSH public key for automated management"
+      tags = {
+        Purpose     = "ansible-automation"
         Environment = "dev"
         ManagedBy   = "terraform"
       }
