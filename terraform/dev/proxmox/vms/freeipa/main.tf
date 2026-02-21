@@ -77,6 +77,12 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     device = "socket"
   }
 
+    disk {
+      datastore_id = "local-lvm"
+      interface    = "scsi0"
+      size         = 20  # match template size
+    }
+
    disk {                                                                                                      
       datastore_id = "nas-dev-data"                                                                              
       interface    = "scsi1"
