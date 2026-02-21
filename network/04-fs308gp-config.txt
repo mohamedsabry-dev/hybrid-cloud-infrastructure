@@ -1,0 +1,118 @@
+================================================================================
+                         FS308GP CONFIGURATION GUIDE
+================================================================================
+
+Device: Festa FS308GP
+Role: L2 Switch, PoE, VLAN Switching
+Management IP: 192.168.0.185 (via AX3000)
+Controller: Festa Cloud
+
+================================================================================
+                         1. INITIAL SETUP (Festa Cloud)
+================================================================================
+
+   ├── Connect switch to AX3000 (gets DHCP IP on 192.168.0.x)
+   ├── Login to Festa Cloud Controller
+   ├── Adopt device using Serial Number (SN)
+   └── Assign static management IP after adoption
+
+================================================================================
+                         2. MANAGEMENT INTERFACE
+================================================================================
+
+Path: VLAN Interface > Edit Interface
+
+   ┌────────────────────┬─────────────────────────────────────┐
+   │ Setting            │ Value                               │
+   ├────────────────────┼─────────────────────────────────────┤
+   │ Management VLAN    │ Enabled                             │
+   │ IP Address Mode    │ Static                              │
+   │ IP Address         │ 192.168.0.185                       │
+   │ Subnet Mask        │ 255.255.255.0                       │
+   │ Default Gateway    │ 192.168.0.1                         │
+   │ Primary DNS        │ 192.168.0.1                         │
+   │ Secondary DNS      │ 8.8.8.8                             │
+   │ DHCP Mode          │ None                                │
+   └────────────────────┴─────────────────────────────────────┘
+
+================================================================================
+                         3. PORT ASSIGNMENTS
+================================================================================
+
+   ┌───────┬─────────────┬─────────────────────────────────────────────────────┐
+   │ Port  │ Profile     │ Description                                         │
+   ├───────┼─────────────┼─────────────────────────────────────────────────────┤
+   │ Port1 │ LAN         │ Management Uplink (to AX3000)                       │
+   │ Port2 │ Prod_SVC_All│ Prod Services Uplink (to ER605 Port4)               │
+   │ Port3 │ Dev_SVC_All │ Dev Services Uplink (to ER605 Port5)                │
+   │ Port4 │ Dev_SVC_All │ Dev Server Trunk (svc0)                             │
+   │ Port5 │ Prod_SVC_All│ Prod Server Trunk (svc0)                            │
+   │ Port6 │ Storage     │ NAS (LAN 1)                                         │
+   │ Port7 │ Storage     │ Dev Server (stor0)                                  │
+   │ Port8 │ Storage     │ Prod Server (stor0)                                 │
+   └───────┴─────────────┴─────────────────────────────────────────────────────┘
+
+================================================================================
+                         4. VLAN NETWORKS
+================================================================================
+
+   ┌──────────────────┬─────────┬──────┬───────────────────────────────────────┐
+   │ Name             │ Purpose │ VLAN │ Notes                                 │
+   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
+   │ LAN              │Interface│ 1    │ 192.168.0.1/24 - Mgmt Interface       │
+   │ DUMP_VLAN        │ VLAN    │ 99   │ Unused/Isolation                      │
+   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
+   │ NAS_Storage_VLAN │ VLAN    │ 40   │ Storage Network                       │
+   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
+   │ Prod_SVC_50      │ VLAN    │ 50   │ Prod Identity (FreeIPA)               │
+   │ Prod_SVC_51      │ VLAN    │ 51   │ Prod K8s Masters                      │
+   │ Prod_SVC_52      │ VLAN    │ 52   │ Prod Vault                            │
+   │ Prod_SVC_53      │ VLAN    │ 53   │ Prod Mgmt                             │
+   │ Prod_SVC_54      │ VLAN    │ 54   │ Prod K8s Workers                      │
+   │ Prod_SVC_55      │ VLAN    │ 55   │ Prod DMZ                              │
+   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
+   │ Dev_SVC_VLAN_60  │ VLAN    │ 60   │ Dev Identity (FreeIPA)                │
+   │ Dev_SVC_VLAN_61  │ VLAN    │ 61   │ Dev K8s Masters                       │
+   │ Dev_SVC_VLAN_62  │ VLAN    │ 62   │ Dev Vault                             │
+   │ Dev_SVC_VLAN_63  │ VLAN    │ 63   │ Dev Mgmt                              │
+   │ Dev_SVC_VLAN_64  │ VLAN    │ 64   │ Dev K8s Workers                       │
+   │ Dev_SVC_VLAN_65  │ VLAN    │ 65   │ Dev DMZ                               │
+   └──────────────────┴─────────┴──────┴───────────────────────────────────────┘
+
+================================================================================
+                         5. PORT PROFILES
+================================================================================
+
+   ┌─────────────┬─────────┬────────────────┬───────────┬───────────────────────┐
+   │ Profile     │ PoE     │ Native Network │ Isolation │ Tagged VLANs          │
+   ├─────────────┼─────────┼────────────────┼───────────┼───────────────────────┤
+   │ LAN         │ Default │ LAN            │ Off       │ 1                     │
+   │ DUMP_VLAN   │ Default │ DUMP_VLAN      │ Off       │ 99                    │
+   │ Storage     │ Default │ NAS_Storage    │ Off       │ 40                    │
+   │ Prod_SVC_All│ Disable │ DUMP_VLAN      │ Off       │ 50,51,52,53,54,55     │
+   │ Dev_SVC_All │ Disable │ DUMP_VLAN      │ Off       │ 60,61,62,63,64,65     │
+   └─────────────┴─────────┴────────────────┴───────────┴───────────────────────┘
+
+   NOTE: Only VLAN 1 (LAN) has Interface mode enabled.
+         All other VLANs operate in L2 switching mode.
+
+================================================================================
+                         6. ACL (Future)
+================================================================================
+
+   STATUS: Not configured yet
+
+   The FS308GP supports ACLs based on:
+   ├── Port-based rules
+   └── IP-based rules (L3 traffic inspection)
+
+   ACLs will be added as an additional security layer once the
+   infrastructure reaches a stable phase. This provides defense-in-depth
+   alongside the ER605 firewall rules.
+
+   TODO:
+   ├── Block inter-VLAN traffic at switch level
+   ├── Restrict management access to specific IPs
+   └── Rate limiting for sensitive ports
+
+================================================================================

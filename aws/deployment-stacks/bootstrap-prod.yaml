@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Prod Account Bootstrap: OIDC + Terraform State + Admin Role with Permissions Boundary'
+
+# ============================================================================
+# PROD Bootstrap Stack - ONE-TIME manual deployment via AWS Console
+# ============================================================================
+# 1. GitHub OIDC Provider        - Identity federation for GitHub Actions
+# 2. Permissions Boundary        - Protects bootstrap resources from modification
+# 3. Terraform State Bucket      - S3 bucket for Terraform state storage
+# 4. Terraform Lock Table        - DynamoDB table for state locking
+# 5. TerraformAdmin Role         - Admin role for prod-security branch
+# ============================================================================
+# Deploy: AWS Console → CloudFormation → Create Stack → Upload this file
+# Region: eu-west-2 (London) ONLY
+# ============================================================================
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Deployment Configuration"
+        Parameters:
+          - Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+
+Rules:
+  RegionCheck:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", "eu-west-2"]
+        AssertDescription: "This stack must be deployed in eu-west-2 (London) only"
+
+Resources:
+  # ============================================================================
+  # 1. GitHub OIDC Provider
+  # ============================================================================
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: [1c58a3a8518e8759bf075b76b750d4f2df264fcd]
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 2. Terraform State Bucket (Prod only)
+  # ============================================================================
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: hybrid-cloud-infrastructure-tf-state-prod
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 3. Terraform State Bucket Policy
+  # ============================================================================
+  TerraformStateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TerraformStateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyNonSSL
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt TerraformStateBucket.Arn
+              - !Sub "${TerraformStateBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ============================================================================
+  # 4. Terraform State Lock Table (Prod only)
+  # ============================================================================
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: hybrid-cloud-infrastructure-tf-state-lock-prod
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 5. Permissions Boundary (Limits ALL roles/users created by Terraform)
+  # ============================================================================
+  TerraformPermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: TerraformPermissionsBoundary
+      Description: Prevents modification of bootstrap resources - applied to all Terraform-created roles
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow everything by default
+          - Sid: AllowAllActions
+            Effect: Allow
+            Action: '*'
+            Resource: '*'
+          # Deny modifying OIDC Provider
+          - Sid: DenyModifyOIDC
+            Effect: Deny
+            Action:
+              - iam:DeleteOpenIDConnectProvider
+              - iam:UpdateOpenIDConnectProviderThumbprint
+              - iam:RemoveClientIDFromOpenIDConnectProvider
+            Resource: !Ref GitHubOIDCProvider
+          # Deny modifying Terraform State Bucket
+          - Sid: DenyModifyStateBucket
+            Effect: Deny
+            Action:
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+              - s3:PutBucketPolicy
+            Resource: !GetAtt TerraformStateBucket.Arn
+          # Deny modifying Lock Table
+          - Sid: DenyModifyLockTable
+            Effect: Deny
+            Action:
+              - dynamodb:DeleteTable
+              - dynamodb:UpdateTable
+            Resource: !GetAtt TerraformLockTable.Arn
+          # Deny modifying this permissions boundary
+          - Sid: DenyModifyPermissionsBoundary
+            Effect: Deny
+            Action:
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:CreatePolicyVersion
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/TerraformPermissionsBoundary"
+          # Deny modifying the Terraform admin role
+          - Sid: DenyModifyTerraformRole
+            Effect: Deny
+            Action:
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:PutRolePolicy
+              - iam:DetachRolePolicy
+              - iam:AttachRolePolicy
+              - iam:UpdateAssumeRolePolicy
+              - iam:DeleteRolePermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+            Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
+
+  # ============================================================================
+  # 6. GitHub Actions Terraform Admin Role
+  # ============================================================================
+  GitHubActionsTerraformRole:
+    Type: AWS::IAM::Role
+    DependsOn: TerraformPermissionsBoundary
+    Properties:
+      RoleName: GitHubActions-TerraformAdmin-prod
+      Description: Full admin access with permissions boundary protecting bootstrap resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: repo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/prod-security
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+      PermissionsBoundary: !Ref TerraformPermissionsBoundary
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+# ============================================================================
+# Outputs
+# ============================================================================
+Outputs:
+  OIDCProviderArn:
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: prod-GitHubOIDCProviderArn
+
+  StateBucketName:
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: prod-TerraformStateBucketName
+
+  StateBucketArn:
+    Value: !GetAtt TerraformStateBucket.Arn
+    Export:
+      Name: prod-TerraformStateBucketArn
+
+  LockTableName:
+    Value: !Ref TerraformLockTable
+    Export:
+      Name: prod-TerraformLockTableName
+
+  LockTableArn:
+    Value: !GetAtt TerraformLockTable.Arn
+    Export:
+      Name: prod-TerraformLockTableArn
+
+  PermissionsBoundaryArn:
+    Value: !Ref TerraformPermissionsBoundary
+    Export:
+      Name: prod-TerraformPermissionsBoundaryArn
+
+  GitHubActionsRoleArn:
+    Value: !GetAtt GitHubActionsTerraformRole.Arn
+    Export:
+      Name: prod-GitHubActionsRoleArn
