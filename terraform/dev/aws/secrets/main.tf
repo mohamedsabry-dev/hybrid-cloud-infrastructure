@@ -85,7 +85,25 @@ resource "aws_secretsmanager_secret" "lxc_root_password" {
 resource "aws_secretsmanager_secret_version" "lxc_root_password" {
   secret_id     = aws_secretsmanager_secret.lxc_root_password.id
   secret_string = var.secret_placeholder
-  
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Ansible SSH Public Key
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "ansible_ssh_public_key" {
+  name        = var.secrets.ansible_ssh.name
+  description = var.secrets.ansible_ssh.description
+  tags        = var.secrets.ansible_ssh.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ansible_ssh_public_key" {
+  secret_id     = aws_secretsmanager_secret.ansible_ssh_public_key.id
+  secret_string = var.secret_placeholder
+
   lifecycle {
     ignore_changes = [secret_string]
   }
