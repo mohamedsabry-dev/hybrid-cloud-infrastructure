@@ -1,11 +1,11 @@
 #===============================================================================
-# freeipa VM Configuration
+# Ansible LXC Configuration
 #===============================================================================
 
-variable "freeipa" {
-  description = "Configuration for freeipa VM cloned from golden image"
+variable "ansible" {
+  description = "Configuration for Ansible LXC container cloned from golden template"
   type = object({
-    vmid    = number
+    ctid    = number
     name    = string
     cores   = number
     memory  = number
@@ -16,31 +16,31 @@ variable "freeipa" {
   })
 
   default = {
-    vmid    = 1001
-    name    = "ipa"
-    cores   = 2
-    memory  = 1536
-    ip      = "10.0.60.10/24"
-    gateway = "10.0.60.1"
+    ctid    = 2001
+    name    = "ansible"
+    cores   = 1
+    memory  = 768
+    ip      = "10.0.63.10/24"
+    gateway = "10.0.63.1"
     bridge  = "vmbr0"
     vlan_id = 63
   }
 }
 
-variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+variable "template_ctid" {
+  description = "Container ID of the golden LXC template to clone from"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {
-  description = "Name of the golden image template (for documentation)"
+  description = "Name of the golden LXC template (for documentation)"
   type        = string
-  default     = "rocky10-golden-image"
+  default     = "rocky10-lxc-golden"
 }
 
 variable "dns_servers" {
-  description = "DNS servers for VMs"
+  description = "DNS servers for container"
   type        = list(string)
   default     = ["8.8.8.8", "1.1.1.1"]
 }
@@ -51,7 +51,7 @@ variable "search_domain" {
   default     = "lab.local"
 }
 
-# Reuse from golden-image module
+# Reuse from golden-template module
 variable "node_name" {
   description = "Proxmox node name"
   type        = string
@@ -59,11 +59,10 @@ variable "node_name" {
 }
 
 variable "datastore_id" {
-  description = "Datastore for cloud-init config"
+  description = "Datastore for container storage"
   type        = string
   default     = "local-lvm"
 }
-
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
@@ -80,5 +79,4 @@ variable "proxmox_tls_insecure" {
 variable "proxmox_api_token" {
   type      = string
   sensitive = true
-
 }

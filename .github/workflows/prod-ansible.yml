@@ -13,14 +13,14 @@ on:
     branches:
       - prod
     paths:
-      - 'terraform/prod/proxmox/lxc/Ansible/**'
+      - 'terraform/prod/proxmox/lxc/ansible/**'
       - '.github/workflows/prod-ansible.yml'
 permissions:
   id-token: write
   contents: read
 env:
   ENVIRONMENT: prod
-  TF_WORKING_DIR: terraform/prod/proxmox/lxc/Ansible
+  TF_WORKING_DIR: terraform/prod/proxmox/lxc/ansible
 #####################
 #####################
 
