@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# 1. Disable Sleep/Suspend
+# 2. Fix APT Repos
+# 3. APT Update & Upgrade
+# 4. Remove Subscription Nag
+# 5. Create admin_dev Management User (PAM)
+# 6. Create tf_dev Automation User
+
+
 set -e
 
 echo ""
@@ -10,59 +18,67 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
+
 # --- 1. Disable Sleep/Suspend ---
-echo "[1/7] Disabling sleep/suspend..."
+echo ""
+echo "[1/6] Disabling sleep/suspend..."
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 echo "Done."
-echo ""
-read -p "Press Enter to continue..."
+
+
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
 
 # --- 2. Fix APT Repos ---
 echo ""
-echo "[2/7] Fixing APT repositories..."
+echo "[2/6] Fixing APT repositories..."
+
 SOURCES_DIR="/etc/apt/sources.list.d"
-for f in ceph.sources pve-enterprise.list pve-enterprise.sources; do
-    [[ -f "${SOURCES_DIR}/$f" ]] && mv "${SOURCES_DIR}/$f" "${SOURCES_DIR}/${f}.disabled" && echo "Disabled: $f"
+ENTERPRISE_REPOS="ceph.sources pve-enterprise.list pve-enterprise.sources"
+FREE_REPO="deb http://download.proxmox.com/debian/pve trixie pve-no-subscription"
+
+# Disable enterprise repos (require paid subscription)
+for file in $ENTERPRISE_REPOS; do
+    if [[ -f "$SOURCES_DIR/$file" ]]; then
+        mv "$SOURCES_DIR/$file" "$SOURCES_DIR/${file}.disabled"
+        echo "Disabled: $file"
+    fi
 done
-# Only create if pve-install-repo.list doesn't already have trixie no-subscription
-if grep -q "trixie pve-no-subscription" "${SOURCES_DIR}/pve-install-repo.list" 2>/dev/null; then
-    echo "No-subscription repo already exists in pve-install-repo.list"
+
+# Add free no-subscription repo if not exists
+if grep -q "pve-no-subscription" "$SOURCES_DIR/pve-install-repo.list" 2>/dev/null; then
+    echo "Free repo already exists"
 else
-    echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > "${SOURCES_DIR}/pve-no-subscription.list"
+    echo "$FREE_REPO" > "$SOURCES_DIR/pve-no-subscription.list"
     echo "Created: pve-no-subscription.list"
 fi
-echo ""
-read -p "Press Enter to continue..."
 
-# --- 3. APT Update ---
-echo ""
-echo "[3/7] Running apt update..."
-apt update
-echo ""
-read -p "Press Enter to continue..."
 
-# --- 4. APT Upgrade ---
-echo ""
-echo "[4/7] Running apt upgrade..."
-apt upgrade -y
-echo ""
-read -p "Press Enter to continue..."
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
 
-# --- 5. Enable Snippets on Local Storage ---
-echo ""
-echo "[5/8] Enabling snippets on local storage..."
-mkdir -p /var/lib/vz/snippets
-/usr/sbin/pvesm set local --content backup,iso,vztmpl,snippets
-# Allow admin_dev to write snippets (for Terraform cloud-init)
-chown -R admin_dev:admin_dev /var/lib/vz/snippets
-chmod 775 /var/lib/vz/snippets
-echo "Done."
-echo ""
-read -p "Press Enter to continue..."
 
-# --- 6. Remove Subscription Nag ---
+# --- 3. APT Update & Upgrade ---
 echo ""
-echo "[6/8] Removing subscription nag..."
+echo "[3/6] Running apt update && upgrade..."
+apt update && apt upgrade -y
+
+
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
+
+# --- 4. Remove Subscription Nag ---
+echo ""
+echo "[4/6] Removing subscription nag..."
 PROXMOXLIB="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
 if [[ -f "$PROXMOXLIB" ]]; then
     sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" "$PROXMOXLIB"
@@ -70,12 +86,16 @@ if [[ -f "$PROXMOXLIB" ]]; then
 else
     echo "proxmoxlib.js not found, skipping"
 fi
-echo ""
-read -p "Press Enter to continue..."
 
-# --- 7. Create admin_dev Management User (PAM) ---
+
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
+
+# --- 5. Create admin_dev Management User (PAM) ---
 echo ""
-echo "[7/8] Creating admin_dev management user (PAM)..."
+echo "[5/6] Creating admin_dev management user (PAM)..."
 
 ADMIN_NAME="admin_dev"
 ADMIN_USER="${ADMIN_NAME}@pam"
@@ -102,19 +122,17 @@ fi
 pveum acl modify "/" --users "${ADMIN_USER}" --roles Administrator
 
 echo ""
-echo "==========================================="
 echo "  ADMIN USER CREATED (PAM)"
-echo "==========================================="
-echo "Username: ${ADMIN_USER}"
-echo "Scope: / (Full Admin)"
-echo "Can login via: Console, SSH, and Web GUI"
-echo "==========================================="
-echo ""
-read -p "Press Enter to continue..."
 
-# --- 8. Create tf_dev Automation User ---
+
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
+
+# --- 6. Create tf_dev Automation User ---
 echo ""
-echo "[8/8] Creating tf_dev automation user..."
+echo "[6/6] Creating tf_dev automation user..."
 
 USERNAME="tf_dev"
 REALM="pve"
@@ -136,27 +154,25 @@ if [[ -z "$SKIP_USER" ]]; then
     pveum user add "${FULL_USER}" --comment "Terraform Dev - Full Admin"
     pveum acl modify "/" --users "${FULL_USER}" --roles Administrator
 
-    echo ""
-    echo "==========================================="
     echo "  API TOKEN - SAVE THIS NOW!"
-    echo "==========================================="
     pveum user token add "${FULL_USER}" "${TOKEN_ID}" --privsep 0 --expire 0
     echo ""
     echo "Token ID: ${FULL_USER}!${TOKEN_ID}"
-    echo "Scope: / (Full Admin)"
-    echo "==========================================="
 fi
 
-echo ""
-echo "All configurations complete!"
-echo ""
-read -p "Press Enter to restart services (session may disconnect)..."
 
-# --- Restart Services (LAST STEP) ---
-echo ""
-echo "Restarting pveproxy..."
-systemctl restart pveproxy
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
 
 echo ""
-echo "=== Done! Clear browser cache and refresh web UI ==="
+echo "=== All configurations complete! ==="
 echo ""
+read -p "Restart pveproxy now? (y/N): " confirm
+if [[ "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Restarting pveproxy..."
+    systemctl restart pveproxy
+    echo "Done! Clear browser cache and refresh web UI."
+else
+    echo "Skipped. Run 'systemctl restart pveproxy' later to apply nag patch."
+fi

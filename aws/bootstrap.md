@@ -1,4 +1,4 @@
-# AWS IAM & Bootstrap Configuration
+# AWS Bootstrap Configuration
 
 Multi-account architecture with OIDC authentication for GitHub Actions.
 
@@ -27,8 +27,8 @@ all subsequent Terraform automation via GitHub Actions.
 
 | Account | Stack Name | Template File | Region |
 |---------|------------|---------------|--------|
-| Development | dev-bootstrap | `infrastructure/aws/bootstrap-dev.yaml` | eu-west-2 |
-| Production | prod-bootstrap | `infrastructure/aws/bootstrap-prod.yaml` | eu-west-2 |
+| Development | dev-bootstrap | `aws/deployment-stacks/bootstrap-dev.yaml` | eu-west-2 |
+| Production | prod-bootstrap | `aws/deployment-stacks/bootstrap-prod.yaml` | eu-west-2 |
 
 **Deployment Method:** AWS Console → CloudFormation → Create Stack → Upload YAML
 
@@ -55,7 +55,7 @@ all subsequent Terraform automation via GitHub Actions.
 
 **Alternative (CLI):**
 ```bash
-aws cloudformation deploy --template-file bootstrap-{env}.yaml \
+aws cloudformation deploy --template-file aws/deployment-stacks/bootstrap-{env}.yaml \
     --stack-name {env}-bootstrap --capabilities CAPABILITY_NAMED_IAM \
     --region eu-west-2
 ```
