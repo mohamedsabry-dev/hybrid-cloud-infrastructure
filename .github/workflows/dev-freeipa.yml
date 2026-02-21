@@ -84,6 +84,12 @@ jobs:
             --query SecretString --output text)
           echo "TF_VAR_ansible_ssh_public_key=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
+          # Fetch VM root password
+          VM_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/proxmox/vm-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${VM_ROOT_PASSWORD}"
+          echo "TF_VAR_vm_root_password=${VM_ROOT_PASSWORD}" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
