@@ -28,17 +28,19 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   disk {
     datastore_id = var.datastore_id
     interface    = "scsi0"
-    size         = 20
+    size         = 25
     ssd          = true
     discard      = "on"
     file_format  = "raw"
   }
 
-  disk {                                                                                                      
-      datastore_id = "nas-dev-data"                                                                              
-      interface    = "scsi1"
-      size         = 25  # GB
-      file_format  = "raw"
+  disk {
+    datastore_id = "nas-dev-data"
+    interface    = "scsi1"
+    size         = 25
+    ssd          = true
+    discard      = "on"
+    file_format  = "raw"
   }
 
   # CPU
@@ -58,10 +60,10 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     datastore_id = var.datastore_id
 
     user_account {
-        keys     = [var.ansible_ssh_public_key]
-        username = "root"
-        password = var.vm_root_password
-      }
+      keys     = [var.ansible_ssh_public_key]
+      username = "root"
+      password = var.vm_root_password
+    }
 
     ip_config {
       ipv4 {
