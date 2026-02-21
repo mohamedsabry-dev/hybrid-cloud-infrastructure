@@ -17,13 +17,13 @@ variable "freeipa" {
 
   default = {
     vmid    = 1001
-    name    = "ipa"
+    name    = "freeipa"
     cores   = 2
     memory  = 1536
     ip      = "10.0.60.10/24"
     gateway = "10.0.60.1"
     bridge  = "vmbr0"
-    vlan_id = 63
+    vlan_id = 60
   }
 }
 
