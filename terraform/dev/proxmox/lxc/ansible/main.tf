@@ -1,6 +1,6 @@
 #===============================================================================
 # Ansible LXC Container
-# Clone from golden LXC template and configure for Ansible control node
+# Clone from golden LXC template and configure for Ansible control node 
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "ansible" {
