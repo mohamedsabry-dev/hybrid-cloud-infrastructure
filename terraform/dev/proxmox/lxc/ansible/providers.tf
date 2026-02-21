@@ -4,21 +4,21 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0" # Pinned for offline runner
+      version = "6.28.0"  # Pinned for offline runner
     }
     proxmox = {
       source  = "bpg/proxmox"
-      version = "0.93.1" # Pinned for offline runner
+      version = "0.93.1"  # Pinned for offline runner
     }
     external = {
       source  = "hashicorp/external"
-      version = "2.3.4" # Pinned for offline runner
+      version = "2.3.4"  # Pinned for offline runner
     }
   }
 
   backend "s3" {
     bucket         = "hybrid-cloud-infrastructure-tf-state-dev"
-    key            = "dev/proxmox/vms/freeipa/terraform.tfstate"
+    key            = "dev/proxmox/lxc/ansible/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
     dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev"
@@ -32,7 +32,7 @@ provider "aws" {
     tags = {
       Environment = "dev"
       ManagedBy   = "terraform"
-      Module      = "proxmox-freeipa"
+      Module      = "proxmox-ansible-lxc"
     }
   }
 }
