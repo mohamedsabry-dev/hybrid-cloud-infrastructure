@@ -117,7 +117,6 @@ jobs:
           echo "Plan output is available above for auditor review"
           sleep 180
           echo "✅ Review window ended at $(date)"
-          echo "scp infrastructure/compute/golden-image-setup.sh root@10.0.53.99:/tmp/"
 
       # 8. Apply the planned content inside tfplan file    
       - name: Terraform Apply
@@ -125,28 +124,31 @@ jobs:
         run: terraform apply -auto-approve tfplan
 
       # 9. In case of previous success, display manual instructions for complete the Job
-      - name: Display Setup Instructions
+      - name: Post-Build Setup Instructions
         if: steps.apply.outcome == 'success'
         run: |
           echo "=============================================="
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
           echo "=============================================="
           echo ""
-          terraform output -json golden_image | jq -r '.setup_instructions'
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp proxmox/scripts/golden-vm-setup.sh admin_prod@pve-prod.lab.local:/tmp/"
           echo ""
-          echo "=============================================="
+          echo "Step 2: Copy script from Proxmox to Ansible LXC"
+          echo "  # On Proxmox host"
+          echo "  pct push 2001 /tmp/golden-vm-setup.sh /tmp/golden-vm-setup.sh"
           echo ""
-          echo "After completing setup and converting to template,"
-          echo "update the Terraform code to reference the template"
-          echo "for future VM cloning operations."
+          echo "Step 3: Open VM console in Proxmox UI and pull script from Ansible"
+          echo "  # Login as root in Proxmox web console"
+          echo "  scp root@10.0.53.10:/tmp/golden-vm-setup.sh /tmp/"
+          echo "  chmod +x /tmp/golden-vm-setup.sh"
+          echo "  /tmp/golden-vm-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, shutdown and convert to template"
+          echo "  shutdown -h now"
+          echo "  # On Proxmox: qm template 9000"
+          echo ""
           echo "=============================================="
 
-      # 10. Lock workflow after successful deployment
-      - name: Lock after success
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh variable set GOLDEN_IMAGE_PROD_LOCKED --body "true"
 ##################################################################################
 ##################################################################################

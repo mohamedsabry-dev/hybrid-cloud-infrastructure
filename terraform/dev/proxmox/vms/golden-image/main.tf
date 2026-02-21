@@ -1,6 +1,6 @@
 #===============================================================================
-# Golden Image VM - Rocky Linux 10.1 (ISO Installation)
-# Manual installation from ISO, then convert to template
+# Golden Image VM - Rocky Linux 10.1 (ISO Installation) #
+# Manual installation from ISO, then convert to template #
 #===============================================================================
 
 resource "proxmox_virtual_environment_vm" "golden_image" {
@@ -74,7 +74,12 @@ resource "proxmox_virtual_environment_vm" "golden_image" {
     type   = "std"
     memory = 16
   }
-  
+
+  # Serial console for qm terminal access
+  serial_device {
+    device = "socket"
+  }
+
   lifecycle {
     ignore_changes = [
       started,
