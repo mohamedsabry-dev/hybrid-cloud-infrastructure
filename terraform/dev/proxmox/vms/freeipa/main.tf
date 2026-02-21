@@ -77,7 +77,15 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     device = "socket"
   }
 
+   disk {                                                                                                      
+      datastore_id = "nas-dev-data"                                                                              
+      interface    = "scsi1"
+      size         = 20  # GB
+      file_format  = "raw"
+    }
+
   lifecycle {
     ignore_changes = [started]
   }
 }
+
