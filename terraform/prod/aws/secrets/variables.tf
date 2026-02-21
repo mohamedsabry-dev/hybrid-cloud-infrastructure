@@ -52,6 +52,15 @@ variable "secrets" {
         ManagedBy   = "terraform"
       }
     }
+    ansible_ssh = {
+      name        = "prod/ansible/ssh-public-key"
+      description = "Ansible VM SSH public key for automated management"
+      tags = {
+        Purpose     = "ansible-automation"
+        Environment = "prod"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 
