@@ -117,7 +117,6 @@ jobs:
           echo "Plan output is available above for auditor review"
           sleep 180
           echo "✅ Review window ended at $(date)"
-          echo "scp proxmox/scripts/golden-vm-setup.sh root@10.0.63.99:/tmp/"
 
       # 8. Apply the planned content inside tfplan file    
       - name: Terraform Apply
@@ -125,28 +124,30 @@ jobs:
         run: terraform apply -auto-approve tfplan
 
       # 9. In case of previous success, display manual instructions for complete the Job
-      - name: Display Setup Instructions
+      - name: Post-Build Setup Instructions
         if: steps.apply.outcome == 'success'
         run: |
           echo "=============================================="
           echo "  VM CREATED - MANUAL SETUP REQUIRED"
           echo "=============================================="
           echo ""
-          terraform output -json golden_image | jq -r '.setup_instructions'
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp proxmox/scripts/golden-vm-setup.sh admin_dev@pve-dev.lab.local:/tmp/"
           echo ""
-          echo "=============================================="
+          echo "Step 2: SSH to Proxmox and copy script to VM"
+          echo "  ssh admin_dev@pve-dev.lab.local"
+          echo "  sudo scp /tmp/golden-vm-setup.sh root@10.0.63.99:/tmp/"
           echo ""
-          echo "After completing setup and converting to template,"
-          echo "update the Terraform code to reference the template"
-          echo "for future VM cloning operations."
+          echo "Step 3: Open VM console in Proxmox UI (not SSH)"
+          echo "  - Login as root"
+          echo "  - Run: chmod +x /tmp/golden-vm-setup.sh"
+          echo "  - Run: /tmp/golden-vm-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, shutdown and convert to template"
+          echo "  shutdown -h now"
+          echo "  # On Proxmox: qm template 9000"
+          echo ""
           echo "=============================================="
 
-      # 10. Lock workflow after successful deployment
-      - name: Lock after success
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh variable set GOLDEN_IMAGE_DEV_LOCKED --body "true"
 ##################################################################################
 ##################################################################################
