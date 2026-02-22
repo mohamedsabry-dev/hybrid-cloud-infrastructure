@@ -103,6 +103,6 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   }
 
   lifecycle {
-    ignore_changes = [started]
+    ignore_changes = []
   }
 }
