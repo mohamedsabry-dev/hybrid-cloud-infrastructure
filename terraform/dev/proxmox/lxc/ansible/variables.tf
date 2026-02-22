@@ -96,7 +96,7 @@ variable "mount_points" {
   
   default = {
     mount_1 = {
-      volume = "local-lvm"
+      volume = "nas-dev-data"
       size   = "5G"
       path   = "/opt/ansible"
     }
