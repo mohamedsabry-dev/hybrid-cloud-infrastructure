@@ -40,8 +40,6 @@ resource "proxmox_virtual_environment_container" "ansible" {
     down_delay = var.ansible.shutdown_delay
   }
 
-  variable "start
-
 
   # Container Configuration
   cpu {

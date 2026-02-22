@@ -5,25 +5,37 @@
 variable "ansible" {
   description = "Configuration for Ansible LXC container cloned from golden template"
   type = object({
-    ctid    = number
-    name    = string
-    cores   = number
-    memory  = number
-    ip      = string
-    gateway = string
-    bridge  = string
-    vlan_id = number
+    ctid            = number
+    name            = string
+    cores           = number
+    memory          = number
+    ip              = string
+    gateway         = string
+    bridge          = string
+    vlan_id         = number
+    startup_delay   = number
+    shutdown_delay  = number
+    startup_order   = number
+    started         = bool
+    on_boot         = bool
+    stop_on_destroy = bool
   })
 
   default = {
-    ctid    = 2001
-    name    = "ansible"
-    cores   = 1
-    memory  = 768
-    ip      = "10.0.53.10/24"
-    gateway = "10.0.53.1"
-    bridge  = "vmbr0"
-    vlan_id = 53
+    ctid            = 2001
+    name            = "ansible"
+    cores           = 1
+    memory          = 768
+    ip              = "10.0.53.10/24"
+    gateway         = "10.0.53.1"
+    bridge          = "vmbr0"
+    vlan_id         = 53
+    startup_delay   = 60
+    shutdown_delay  = 60
+    startup_order   = 2
+    started         = true
+    on_boot         = true
+    stop_on_destroy = true
   }
 }
 
@@ -58,10 +70,36 @@ variable "node_name" {
   default     = "pve-prod"
 }
 
-variable "datastore_id" {
-  description = "Datastore for container storage"
-  type        = string
-  default     = "local-lvm"
+variable "disks" {
+  description = "Map of disk configurations for the LXC"
+  type = map(object({
+    datastore_id = string
+    size         = number
+  }))
+
+  default = {
+    os_disk = {
+      datastore_id = "local-lvm"
+      size         = 10
+    }
+  }
+}
+
+variable "mount_points" {
+  description = "Map of mount point configurations for the LXC"
+  type = map(object({
+    volume = string
+    size   = string
+    path   = string
+  }))
+
+  default = {
+    mount_1 = {
+      volume = "nas-prod-data"
+      size   = "5G"
+      path   = "/opt/ansible"
+    }
+  }
 }
 
 variable "proxmox_api_url" {
