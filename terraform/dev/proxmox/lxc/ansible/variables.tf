@@ -70,21 +70,13 @@ variable "node_name" {
   default     = "pve-dev"
 }
 
-#variable "datastore_id" {
-#  description = "Datastore for container storage"
-#  type        = string
-#  default     = "local-lvm"
-#}
-
-
 variable "disks" {
-  description = "Map of disk configurations for the VM"
+  description = "Map of disk configurations for the LXC"
   type = map(object({
     datastore_id = string
     size         = number
-    path         = string
   }))
-  
+
   default = {
     os_disk = {
       datastore_id = "local-lvm"
