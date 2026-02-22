@@ -93,7 +93,7 @@ jobs:
           echo "TF_VAR_vm_root_password=${VM_ROOT_PASSWORD}" >> $GITHUB_ENV
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
