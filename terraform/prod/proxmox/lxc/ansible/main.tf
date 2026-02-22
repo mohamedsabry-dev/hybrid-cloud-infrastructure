@@ -25,10 +25,9 @@ resource "proxmox_virtual_environment_container" "ansible" {
     path   = var.mount_points.mount_1.path
   }
 
-  # VM Settings
-  started         = var.ansible.started
-  on_boot         = var.ansible.on_boot
-  stop_on_destroy = var.ansible.stop_on_destroy
+  # Container Settings
+  started       = var.ansible.started
+  start_on_boot = var.ansible.on_boot
 
   # Setup Startup order
   startup {
