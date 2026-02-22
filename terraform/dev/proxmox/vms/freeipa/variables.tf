@@ -89,7 +89,7 @@ variable "disks" {
       ssd          = true
       discard      = "on"
       file_format  = "raw"
-    }, # <--- Comma goes here!
+    },
     data_disk = {
       datastore_id = "nas-dev-data"
       interface    = "scsi1"
@@ -100,12 +100,6 @@ variable "disks" {
     }
   }
 }
-
-#variable "datastore_id" {
-#  description = "Datastore for container storage"
-#  type        = string
-#  default     = "local-lvm"
-#}
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
