@@ -13,6 +13,12 @@ variable "ansible" {
     gateway = string
     bridge  = string
     vlan_id = number
+    startup_delay = number
+    shutdown_delay = number
+    startup_order = number
+    started = bool
+    on_boot = bool
+    stop_on_destroy = bool
   })
 
   default = {
@@ -24,6 +30,12 @@ variable "ansible" {
     gateway = "10.0.63.1"
     bridge  = "vmbr0"
     vlan_id = 63
+    startup_delay = 60
+    shutdown_delay = 60
+    startup_order = 2
+    started = true
+    on_boot = true
+    stop_on_destroy = true
   }
 }
 
@@ -58,11 +70,36 @@ variable "node_name" {
   default     = "pve-dev"
 }
 
-variable "datastore_id" {
-  description = "Datastore for container storage"
-  type        = string
-  default     = "local-lvm"
+#variable "datastore_id" {
+#  description = "Datastore for container storage"
+#  type        = string
+#  default     = "local-lvm"
+#}
+
+
+variable "disks" {
+  description = "Map of disk configurations for the VM"
+  type = map(object({
+    datastore_id = string
+    size         = number
+  }))
+  
+  default = {
+    os_disk = {
+      datastore_id = "local-lvm"
+      size         = 10
+      ssd          = true
+    },
+    data_disk = {
+      datastore_id = "nas-dev-data"
+      size         = 5
+    }
+  }
 }
+
+
+
+
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
