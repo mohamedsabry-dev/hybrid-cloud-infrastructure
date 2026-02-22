@@ -10,13 +10,19 @@ resource "proxmox_virtual_environment_container" "ansible" {
   vm_id     = var.ansible.ctid
 
   clone {
-    #datastore_id = var.datastore_id
+    datastore_id = var.disks.os_disk.datastore_id
     vm_id        = var.template_ctid
   }
 
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
+  }
+
+  mount_point {
+      volume = var.mount_points.mount_1.volume
+      size   = var.mount_points.mount_1.size
+      path   = var.mount_points.mount_1.path
   }
 
 
