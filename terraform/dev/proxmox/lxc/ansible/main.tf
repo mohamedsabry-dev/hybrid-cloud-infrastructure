@@ -10,9 +10,32 @@ resource "proxmox_virtual_environment_container" "ansible" {
   vm_id     = var.ansible.ctid
 
   clone {
-    datastore_id = var.datastore_id
+    #datastore_id = var.datastore_id
     vm_id        = var.template_ctid
   }
+
+  disk {
+    datastore_id = var.disks.os_disk.datastore_id
+    size         = var.disks.os_disk.size
+  }
+
+
+  
+  # VM Settings
+  started         = var.ansible.started
+  on_boot         = var.ansible.on_boot
+  stop_on_destroy = var.ansible.stop_on_destroy
+
+  # Setup Startup order
+
+  startup {
+    order = var.ansible.startup_order
+    up_delay = var.ansible.startup_delay
+    down_delay = var.ansible.shutdown_delay
+  }
+
+  variable "start
+
 
   # Container Configuration
   cpu {
@@ -47,10 +70,6 @@ resource "proxmox_virtual_environment_container" "ansible" {
       domain  = var.search_domain
     }
   }
-
-  # Start on boot
-  started       = true
-  start_on_boot = true
 
   # Prevent Terraform from managing runtime state
   lifecycle {

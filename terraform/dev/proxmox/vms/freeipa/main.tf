@@ -21,26 +21,34 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   }
 
   # VM Settings
-  started         = true
-  on_boot         = false
-  stop_on_destroy = true
+  started         = var.freeipa.started
+  on_boot         = var.freeipa.on_boot
+  stop_on_destroy = var.freeipa.stop_on_destroy
 
-  disk {
-    datastore_id = var.datastore_id
-    interface    = "scsi0"
-    size         = 25
-    ssd          = true
-    discard      = "on"
-    file_format  = "raw"
+  # Setup Startup order
+
+  startup {
+    order = var.freeipa.startup_order
+    up_delay = var.freeipa.startup_delay
+    down_delay = var.freeipa.shutdown_delay
   }
 
   disk {
-    datastore_id = "nas-dev-data"
-    interface    = "scsi1"
-    size         = 25
-    ssd          = true
-    discard      = "on"
-    file_format  = "raw"
+    datastore_id = var.disks.os_disk.datastore_id
+    interface    = var.disks.os_disk.interface
+    size         = var.disks.os_disk.size
+    ssd          = var.disks.os_disk.ssd
+    discard      = var.disks.os_disk.discard
+    file_format  = var.disks.os_disk.file_format
+  }
+
+  disk {
+    datastore_id = var.disks.data_disk.datastore_id
+    interface    = var.disks.data_disk.interface
+    size         = var.disks.data_disk.size
+    ssd          = var.disks.data_disk.ssd
+    discard      = var.disks.data_disk.discard
+    file_format  = var.disks.data_disk.file_format
   }
 
   # CPU
@@ -57,7 +65,7 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
 
   # Cloud-Init configuration (API only - no snippets).
   initialization {
-    datastore_id = var.datastore_id
+    datastore_id = var.disks.os_disk.datastore_id
 
     user_account {
       keys     = [var.ansible_ssh_public_key]
