@@ -96,7 +96,7 @@ variable "mount_points" {
   
   default = {
     mount_1 = {
-      volume = "local-lvm:vm-2001-disk-1"
+      volume = "local-lvm"
       size   = "5G"
       path   = "/opt/ansible"
     }
