@@ -82,22 +82,34 @@ variable "disks" {
   type = map(object({
     datastore_id = string
     size         = number
+    path         = string
   }))
   
   default = {
     os_disk = {
       datastore_id = "local-lvm"
       size         = 10
-      ssd          = true
-    },
-    data_disk = {
-      datastore_id = "nas-dev-data"
-      size         = 5
     }
   }
 }
 
 
+variable "mount_points" {
+  description = "Map of mount point configurations for the VM"
+  type = map(object({
+    volume   = string
+    size = string
+    path  = string
+  }))
+  
+  default = {
+    mount_1 = {
+      volume   = "nas-dev-data"
+      size = "5G"
+      path  = "/opt/ansible"
+    }
+  }
+}
 
 
 
