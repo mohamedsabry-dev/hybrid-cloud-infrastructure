@@ -55,12 +55,10 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   }
 
   # Cloud-init style initialization (API-only)
+  # Note: user_account removed - not supported for cloned LXC (Proxmox API limitation)
+  # Password inherited from golden template, SSH keys added manually post-deploy
   initialization {
     hostname = var.local_runner.name
-
-    user_account {
-      password = var.root_password
-    }
 
     ip_config {
       ipv4 {

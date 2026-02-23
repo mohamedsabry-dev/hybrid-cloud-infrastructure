@@ -54,13 +54,10 @@ resource "proxmox_virtual_environment_container" "ansible" {
   }
 
   # Cloud-init style initialization (API-only)
+  # Note: user_account removed - not supported for cloned LXC (Proxmox API limitation)
+  # Password inherited from golden template, SSH keys added manually post-deploy
   initialization {
     hostname = var.ansible.name
-
-    user_account {
-      password = var.root_password
-      keys     = [var.local_runner_ssh_pubkey]
-    }
 
     ip_config {
       ipv4 {
