@@ -1,0 +1,120 @@
+#===============================================================================
+# local_runner LXC Configuration
+#===============================================================================
+
+variable "local_runner" {
+  description = "Configuration for local_runner LXC container cloned from golden template"
+  type = object({
+    ctid    = number
+    name    = string
+    cores   = number
+    memory  = number
+    ip      = string
+    gateway = string
+    bridge  = string
+    vlan_id = number
+    startup_delay = number
+    shutdown_delay = number
+    startup_order = number
+    started = bool
+    on_boot = bool
+    stop_on_destroy = bool
+  })
+
+  default = {
+    ctid    = 2002
+    name    = "local-runner"
+    cores   = 1
+    memory  = 768
+    ip      = "10.0.53.20/24"
+    gateway = "10.0.53.1"
+    bridge  = "vmbr0"
+    vlan_id = 53
+    startup_delay = 60
+    shutdown_delay = 60
+    startup_order = 2
+    started = true
+    on_boot = true
+    stop_on_destroy = true
+  }
+}
+
+variable "template_ctid" {
+  description = "Container ID of the golden LXC template to clone from"
+  type        = number
+  default     = 9001
+}
+
+variable "template_name" {
+  description = "Name of the golden LXC template (for documentation)"
+  type        = string
+  default     = "rocky10-lxc-golden"
+}
+
+variable "dns_servers" {
+  description = "DNS servers for container"
+  type        = list(string)
+  default     = ["8.8.8.8", "1.1.1.1"]
+}
+
+variable "search_domain" {
+  description = "DNS search domain"
+  type        = string
+  default     = "lab.local"
+}
+
+# Reuse from golden-template module
+variable "node_name" {
+  description = "Proxmox node name"
+  type        = string
+  default     = "pve-prod"
+}
+
+variable "disks" {
+  description = "Map of disk configurations for the LXC"
+  type = map(object({
+    datastore_id = string
+    size         = number
+  }))
+
+  default = {
+    os_disk = {
+      datastore_id = "local-lvm"
+      size         = 15
+    }
+  }
+}
+
+variable "mount_points" {
+  description = "Map of mount point configurations for the LXC"
+  type = map(object({
+    volume   = string
+    size = string
+    path  = string
+  }))
+
+  default = {
+    mount_1 = {
+      volume = "nas-prod-data"
+      size   = "5G"
+      path   = "/opt/local_runner"
+    }
+  }
+}
+
+variable "proxmox_api_url" {
+  description = "Proxmox API endpoint URL"
+  type        = string
+  default     = "https://pve-prod.lab.local:8006"
+}
+
+variable "proxmox_tls_insecure" {
+  description = "Skip TLS verification for Proxmox API"
+  type        = bool
+  default     = true
+}
+
+variable "proxmox_api_token" {
+  type      = string
+  sensitive = true
+}
