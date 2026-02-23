@@ -85,7 +85,6 @@ variable "disks" {
   }
 }
 
-
 variable "mount_points" {
   description = "Map of mount point configurations for the LXC"
   type = map(object({
@@ -93,7 +92,7 @@ variable "mount_points" {
     size = string
     path  = string
   }))
-  
+
   default = {
     mount_1 = {
       volume = "nas-dev-data"
@@ -102,8 +101,6 @@ variable "mount_points" {
     }
   }
 }
-
-
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
@@ -121,4 +118,3 @@ variable "proxmox_api_token" {
   type      = string
   sensitive = true
 }
-
