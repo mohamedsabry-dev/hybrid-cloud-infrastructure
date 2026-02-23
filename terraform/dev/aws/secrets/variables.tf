@@ -17,7 +17,7 @@ variable "secrets_config" {
       }
     }
     proxmox_ssh_admin = {
-      name        = "dev/proxmox/ssh-admin-password"
+      name        = "dev/proxmox/ssh-admin-dev-password"
       description = "Proxmox host SSH password for admin_dev user"
       tags = {
         Purpose     = "snippets-upload"
@@ -26,7 +26,7 @@ variable "secrets_config" {
       }
     }
     vm_root_password = {
-      name        = "dev/proxmox/vm-root-password"
+      name        = "dev/golden-image/vm-root-password"
       description = "Default root password for cloud-init VM provisioning"
       tags = {
         Purpose     = "cloud-init-setup"
@@ -35,7 +35,7 @@ variable "secrets_config" {
       }
     }
     break_glass_password = {
-      name        = "dev/vm/gandalf-password"
+      name        = "dev/vm/break-glass-password"
       description = "Emergency break-glass account password for VM recovery"
       tags = {
         Purpose     = "break-glass-user"
@@ -44,7 +44,7 @@ variable "secrets_config" {
       }
     }
     lxc_root_password = {
-      name        = "dev/lxc/root-password"
+      name        = "dev/golden-image/lxc-root-password"
       description = "Default root password for LXC provisioning"
       tags = {
         Purpose     = "lxc-template-root-password"
@@ -62,7 +62,7 @@ variable "secrets_config" {
       }
     }
     mac_mini_ssh_pubkey = {
-      name        = "dev/mac_mini/ssh-public-key"
+      name        = "dev/mac-mini/ssh-public-key"
       description = "Mac Mini SSH public key for Ansible CICD management"
       tags = {
         Purpose     = "mac-mini-ansible-cicd"
