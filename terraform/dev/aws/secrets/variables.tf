@@ -61,11 +61,11 @@ variable "secrets_config" {
         ManagedBy   = "terraform"
       }
     }
-    mac_mini_ssh_pubkey = {
-      name        = "dev/mac-mini/ssh-public-key"
-      description = "Mac Mini SSH public key for Ansible CICD management"
+    local_runner_ssh_pubkey = {
+      name        = "dev/local-runner/ssh-public-key"
+      description = "Internal LXC runner SSH public key for Ansible LXC access"
       tags = {
-        Purpose     = "mac-mini-ansible-cicd"
+        Purpose     = "gh-runner-ansible-trigger"
         Environment = "dev"
         ManagedBy   = "terraform"
       }

@@ -32,7 +32,7 @@ variable "ansible" {
     vlan_id = 63
     startup_delay = 60
     shutdown_delay = 60
-    startup_order = 2
+    startup_order = 3
     started = true
     on_boot = true
     stop_on_destroy = true
@@ -120,4 +120,16 @@ variable "proxmox_tls_insecure" {
 variable "proxmox_api_token" {
   type      = string
   sensitive = true
+}
+
+variable "local_runner_ssh_pubkey" {
+  description = "Local LXC runner SSH public key for Ansible LXC access"
+  type        = string
+  sensitive   = true
+}
+
+variable "root_password" {
+  description = "Root password for the LXC container (for initial setup)"
+  type        = string
+  sensitive   = true
 }
