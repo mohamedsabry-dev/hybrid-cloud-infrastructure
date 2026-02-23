@@ -58,6 +58,7 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
 
     user_account {
       password = var.lxc_root_password
+      keys     = []
     }
 
     ip_config {

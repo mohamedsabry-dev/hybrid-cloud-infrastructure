@@ -2,18 +2,18 @@
 # Proxmox API Token
 #-------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "proxmox_terraform" {
-  name        = var.secrets.proxmox_api.name
-  description = var.secrets.proxmox_api.description
-  tags        = var.secrets.proxmox_api.tags
+  name        = var.secrets_config.proxmox_api.name
+  description = var.secrets_config.proxmox_api.description
+  tags        = var.secrets_config.proxmox_api.tags
 }
 
 resource "aws_secretsmanager_secret_version" "proxmox_terraform" {
   secret_id = aws_secretsmanager_secret.proxmox_terraform.id
   secret_string = jsonencode({
-    token_id     = var.proxmox_api_token.token_id
-    token_secret = var.proxmox_api_token.token_secret
+    token_id     = var.proxmox_api_credentials.token_id
+    token_secret = var.proxmox_api_credentials.token_secret
   })
-  
+
   lifecycle {
     ignore_changes = [secret_string]
   }
@@ -23,15 +23,15 @@ resource "aws_secretsmanager_secret_version" "proxmox_terraform" {
 # Proxmox SSH Admin Password
 #-------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "proxmox_ssh_admin" {
-  name        = var.secrets.proxmox_ssh.name
-  description = var.secrets.proxmox_ssh.description
-  tags        = var.secrets.proxmox_ssh.tags
+  name        = var.secrets_config.proxmox_ssh_admin.name
+  description = var.secrets_config.proxmox_ssh_admin.description
+  tags        = var.secrets_config.proxmox_ssh_admin.tags
 }
 
 resource "aws_secretsmanager_secret_version" "proxmox_ssh_admin" {
   secret_id     = aws_secretsmanager_secret.proxmox_ssh_admin.id
-  secret_string = var.secret_placeholder
-  
+  secret_string = var.secret_initial_value
+
   lifecycle {
     ignore_changes = [secret_string]
   }
@@ -41,33 +41,33 @@ resource "aws_secretsmanager_secret_version" "proxmox_ssh_admin" {
 # VM Root Password
 #-------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "vm_root_password" {
-  name        = var.secrets.vm_root.name
-  description = var.secrets.vm_root.description
-  tags        = var.secrets.vm_root.tags
+  name        = var.secrets_config.vm_root_password.name
+  description = var.secrets_config.vm_root_password.description
+  tags        = var.secrets_config.vm_root_password.tags
 }
 
 resource "aws_secretsmanager_secret_version" "vm_root_password" {
   secret_id     = aws_secretsmanager_secret.vm_root_password.id
-  secret_string = var.secret_placeholder
-  
+  secret_string = var.secret_initial_value
+
   lifecycle {
     ignore_changes = [secret_string]
   }
 }
 
 #-------------------------------------------------------------------------------
-# Gandalf Break-Glass User Password
+# Break-Glass User Password
 #-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "gandalf_password" {
-  name        = var.secrets.gandalf.name
-  description = var.secrets.gandalf.description
-  tags        = var.secrets.gandalf.tags
+resource "aws_secretsmanager_secret" "break_glass_password" {
+  name        = var.secrets_config.break_glass_password.name
+  description = var.secrets_config.break_glass_password.description
+  tags        = var.secrets_config.break_glass_password.tags
 }
 
-resource "aws_secretsmanager_secret_version" "gandalf_password" {
-  secret_id     = aws_secretsmanager_secret.gandalf_password.id
-  secret_string = var.secret_placeholder
-  
+resource "aws_secretsmanager_secret_version" "break_glass_password" {
+  secret_id     = aws_secretsmanager_secret.break_glass_password.id
+  secret_string = var.secret_initial_value
+
   lifecycle {
     ignore_changes = [secret_string]
   }
@@ -77,14 +77,14 @@ resource "aws_secretsmanager_secret_version" "gandalf_password" {
 # LXC Root Password
 #-------------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "lxc_root_password" {
-  name        = var.secrets.lxc_root.name
-  description = var.secrets.lxc_root.description
-  tags        = var.secrets.lxc_root.tags
+  name        = var.secrets_config.lxc_root_password.name
+  description = var.secrets_config.lxc_root_password.description
+  tags        = var.secrets_config.lxc_root_password.tags
 }
 
 resource "aws_secretsmanager_secret_version" "lxc_root_password" {
   secret_id     = aws_secretsmanager_secret.lxc_root_password.id
-  secret_string = var.secret_placeholder
+  secret_string = var.secret_initial_value
 
   lifecycle {
     ignore_changes = [secret_string]
@@ -94,15 +94,33 @@ resource "aws_secretsmanager_secret_version" "lxc_root_password" {
 #-------------------------------------------------------------------------------
 # Ansible SSH Public Key
 #-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "ansible_ssh_public_key" {
-  name        = var.secrets.ansible_ssh.name
-  description = var.secrets.ansible_ssh.description
-  tags        = var.secrets.ansible_ssh.tags
+resource "aws_secretsmanager_secret" "ansible_ssh_pubkey" {
+  name        = var.secrets_config.ansible_ssh_pubkey.name
+  description = var.secrets_config.ansible_ssh_pubkey.description
+  tags        = var.secrets_config.ansible_ssh_pubkey.tags
 }
 
-resource "aws_secretsmanager_secret_version" "ansible_ssh_public_key" {
-  secret_id     = aws_secretsmanager_secret.ansible_ssh_public_key.id
-  secret_string = var.secret_placeholder
+resource "aws_secretsmanager_secret_version" "ansible_ssh_pubkey" {
+  secret_id     = aws_secretsmanager_secret.ansible_ssh_pubkey.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Local Runner SSH Public Key
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "local_runner_ssh_pubkey" {
+  name        = var.secrets_config.local_runner_ssh_pubkey.name
+  description = var.secrets_config.local_runner_ssh_pubkey.description
+  tags        = var.secrets_config.local_runner_ssh_pubkey.tags
+}
+
+resource "aws_secretsmanager_secret_version" "local_runner_ssh_pubkey" {
+  secret_id     = aws_secretsmanager_secret.local_runner_ssh_pubkey.id
+  secret_string = var.secret_initial_value
 
   lifecycle {
     ignore_changes = [secret_string]
