@@ -58,10 +58,6 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   initialization {
     hostname = var.local_runner.name
 
-    user_account {
-      password = var.root_password
-    }
-
     ip_config {
       ipv4 {
         address = var.local_runner.ip
