@@ -105,3 +105,21 @@ resource "aws_secretsmanager_secret_version" "ansible_ssh_public_key" {
     ignore_changes = [secret_string]
   }
 }
+
+#-------------------------------------------------------------------------------
+# Local Runner SSH Public Key
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "local_runner_ssh_pubkey" {
+  name        = var.secrets.local_runner_ssh.name
+  description = var.secrets.local_runner_ssh.description
+  tags        = var.secrets.local_runner_ssh.tags
+}
+
+resource "aws_secretsmanager_secret_version" "local_runner_ssh_pubkey" {
+  secret_id     = aws_secretsmanager_secret.local_runner_ssh_pubkey.id
+  secret_string = var.secret_placeholder
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
