@@ -128,8 +128,3 @@ variable "local_runner_ssh_pubkey" {
   sensitive   = true
 }
 
-variable "root_password" {
-  description = "Root password for the LXC container (for initial setup)"
-  type        = string
-  sensitive   = true
-}
