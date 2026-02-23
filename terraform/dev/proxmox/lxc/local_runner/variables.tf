@@ -23,7 +23,7 @@ variable "local_runner" {
 
   default = {
     ctid    = 2002
-    name    = "local_runner"
+    name    = "local-runner"
     cores   = 1
     memory  = 768
     ip      = "10.0.63.20/24"
