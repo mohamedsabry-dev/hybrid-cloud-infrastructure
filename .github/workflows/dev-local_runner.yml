@@ -1,5 +1,4 @@
-# Dev Proxmox Golden LXC Template deployment
-# Creates LXC container for manual setup, then convert to template
+# Dev Proxmox local_runner LXC - Setup Core & Verify Golden Image Template
 
 #### Define Block ####
 # 1. Define the job name on GH UI
@@ -7,37 +6,35 @@
 # 3. Define the working directory path on GH Level
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use 
-name: "[DEV] Golden LXC"
+# 6. Declare Env Variables for clean use
+name: "[DEV] local_runner LXC"
 on:
   push:
     branches:
       - dev
     paths:
-      - 'terraform/dev/proxmox/lxc/golden-template/**'
-      - '.github/workflows/dev-golden-lxc.yml'
-  workflow_dispatch:
+      - 'terraform/dev/proxmox/lxc/local_runner/**'
+      - '.github/workflows/dev-local_runner.yml'
 permissions:
   id-token: write
   contents: read
-  actions: write 
 env:
   ENVIRONMENT: dev
-  TF_WORKING_DIR: terraform/dev/proxmox/lxc/golden-template
+  TF_WORKING_DIR: terraform/dev/proxmox/lxc/local_runner
 #####################
 #####################
 
 
 jobs:
-##### Job 1 Core #####
+##### Job 1: Deploy local_runner LXC #####
   # 1. Name the job on GH UI
   # 2. Define which runner to use
   # 3. Define the manual safe lock trigger for workflow_dispatch
   # 4. Define the default working directory for all steps in this job
-  create-lxc-template:
-    name: "Create Golden LXC (dev)"
+  deploy:
+    name: "Deploy local_runner LXC"
     runs-on: macOS
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_LXC_DEV_LOCKED != 'true' }}
+    if: ${{ vars.LOCAL_RUNNER_DEV_LOCKED != 'true' }}
 
     defaults:
       run:
@@ -46,26 +43,25 @@ jobs:
 #####################
 
 
-##### Steps #####
+##### Steps (Job 1) #####
   # 1. Copy Code to the work place
   # 2. Authenticate with AWS for OIDC and Assume the iam role
-  # 3. Fetch the LXC root password from AWS Secrets Manager
-  # 4. Initialize Tf working directory
-  # 5. Plan "dry run" the Tf code and out to tfplan
+  # 3. Initialize Tf working directory
+  # 4. Plan "dry run" the Tf code and out to tfplan
+  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
   # 6. Give yourself small window to review the plan output before execute
   # 7. Apply the planned content inside tfplan file
-  # 8. In case of previous success, display manual instructions for complete the Job
+  # 8. In case of previous success, display test instructions
     steps:
-      - uses: actions/checkout@v4
+      - name: Code Checkout
+        uses: actions/checkout@v4
 
-      # 1. Authenticate with AWS via OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
-
-
+ 
       # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
@@ -77,60 +73,50 @@ jobs:
             --secret-id dev/golden-image/lxc-root-password \
             --query SecretString --output text)
 
-            
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
-          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${LXC_PWD}"
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
-          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
-
-          echo "TF_VAR_lxc_root_password=${LXC_PWD}" >> $GITHUB_ENV
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
+
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      - name: Lock Cleanup Instructions
+        if: failure() || cancelled()
+        run: |
+          echo "=============================================="
+          echo "  Workflow cancelled or timed out"
+          echo "=============================================="
+          echo ""
+          echo "State may be locked. To release:"
+          echo ""
+          echo "AWS Console -> DynamoDB -> Tables"
+          echo "-> hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "-> Explore items >> Find the Locked ID"
+          echo "-> Delete item"
+          echo ""
+          echo "=============================================="
+
       - name: Review Window
         run: |
-          echo "⏳ 3-minute review window for LXC Template deployment"
+          echo "⏳ 3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
           sleep 180
+          echo "✅ Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
-
-      - name: Post-Build Cleanup Instructions
-        if: steps.apply.outcome == 'success'
-        run: |
-          echo "=============================================="
-          echo " LXC CONTAINER CREATED"
-          echo "=============================================="
-          echo ""
-          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
-          echo "  scp proxmox/scripts/golden-lxc-setup.sh admin_dev@pve-dev.lab.local:/tmp/"
-          echo ""
-          echo "Step 2: Push script into container (on Proxmox host)"
-          echo "  pct push 9001 /tmp/golden-lxc-setup.sh /tmp/golden-lxc-setup.sh"
-          echo ""
-          echo "Step 3: Enter container and run setup"
-          echo "  pct enter 9001"
-          echo "  chmod +x /tmp/golden-lxc-setup.sh"
-          echo "  /tmp/golden-lxc-setup.sh"
-          echo ""
-          echo "Step 4: After setup completes, exit and convert to template"
-          echo "  exit"
-          echo "  pct stop 9001"
-          echo "  pct template 9001"
-          echo ""
-          echo "=============================================="
-
-##################################################################################
-##################################################################################

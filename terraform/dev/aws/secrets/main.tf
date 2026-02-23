@@ -110,16 +110,16 @@ resource "aws_secretsmanager_secret_version" "ansible_ssh_pubkey" {
 }
 
 #-------------------------------------------------------------------------------
-# Mac Mini SSH Public Key
+# Local Runner SSH Public Key
 #-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "mac_mini_ssh_pubkey" {
-  name        = var.secrets_config.mac_mini_ssh_pubkey.name
-  description = var.secrets_config.mac_mini_ssh_pubkey.description
-  tags        = var.secrets_config.mac_mini_ssh_pubkey.tags
+resource "aws_secretsmanager_secret" "local_runner_ssh_pubkey" {
+  name        = var.secrets_config.local_runner_ssh_pubkey.name
+  description = var.secrets_config.local_runner_ssh_pubkey.description
+  tags        = var.secrets_config.local_runner_ssh_pubkey.tags
 }
 
-resource "aws_secretsmanager_secret_version" "mac_mini_ssh_pubkey" {
-  secret_id     = aws_secretsmanager_secret.mac_mini_ssh_pubkey.id
+resource "aws_secretsmanager_secret_version" "local_runner_ssh_pubkey" {
+  secret_id     = aws_secretsmanager_secret.local_runner_ssh_pubkey.id
   secret_string = var.secret_initial_value
 
   lifecycle {

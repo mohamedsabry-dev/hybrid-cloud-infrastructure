@@ -73,6 +73,7 @@ jobs:
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
 
@@ -87,7 +88,7 @@ jobs:
 
           # Fetch VM root password
           VM_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/vm-root-password \
+            --secret-id dev/golden-image/vm-root-password \
             --query SecretString --output text)
           echo "::add-mask::${VM_ROOT_PASSWORD}"
           echo "TF_VAR_vm_root_password=${VM_ROOT_PASSWORD}" >> $GITHUB_ENV
