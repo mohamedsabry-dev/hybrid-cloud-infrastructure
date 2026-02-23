@@ -30,6 +30,7 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   start_on_boot = var.local_runner.on_boot
 
   # Setup Startup order
+
   startup {
     order      = var.local_runner.startup_order
     up_delay   = var.local_runner.startup_delay
