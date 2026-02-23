@@ -26,10 +26,10 @@ variable "local_runner" {
     name    = "local-runner"
     cores   = 1
     memory  = 768
-    ip      = "10.0.63.20/24"
-    gateway = "10.0.63.1"
+    ip      = "10.0.53.20/24"
+    gateway = "10.0.53.1"
     bridge  = "vmbr0"
-    vlan_id = 63
+    vlan_id = 53
     startup_delay = 60
     shutdown_delay = 60
     startup_order = 2
@@ -67,7 +67,7 @@ variable "search_domain" {
 variable "node_name" {
   description = "Proxmox node name"
   type        = string
-  default     = "pve-dev"
+  default     = "pve-prod"
 }
 
 variable "disks" {
@@ -85,7 +85,6 @@ variable "disks" {
   }
 }
 
-
 variable "mount_points" {
   description = "Map of mount point configurations for the LXC"
   type = map(object({
@@ -93,22 +92,20 @@ variable "mount_points" {
     size = string
     path  = string
   }))
-  
+
   default = {
     mount_1 = {
-      volume = "nas-dev-data"
+      volume = "nas-prod-data"
       size   = "5G"
       path   = "/opt/local_runner"
     }
   }
 }
 
-
-
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
   type        = string
-  default     = "https://pve-dev.lab.local:8006"
+  default     = "https://pve-prod.lab.local:8006"
 }
 
 variable "proxmox_tls_insecure" {
@@ -127,5 +124,3 @@ variable "root_password" {
   type        = string
   sensitive   = true
 }
-
-

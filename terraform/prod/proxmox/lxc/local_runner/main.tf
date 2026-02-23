@@ -1,6 +1,6 @@
 #===============================================================================
 # local_runner LXC Container
-# Clone from golden LXC template and configure for local_runner control node 
+# Clone from golden LXC template and configure for local_runner control node
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "local_runner" {
@@ -30,7 +30,6 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   start_on_boot = var.local_runner.on_boot
 
   # Setup Startup order
-
   startup {
     order      = var.local_runner.startup_order
     up_delay   = var.local_runner.startup_delay

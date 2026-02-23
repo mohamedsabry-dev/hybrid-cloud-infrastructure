@@ -5,36 +5,36 @@
 variable "ansible" {
   description = "Configuration for Ansible LXC container cloned from golden template"
   type = object({
-    ctid            = number
-    name            = string
-    cores           = number
-    memory          = number
-    ip              = string
-    gateway         = string
-    bridge          = string
-    vlan_id         = number
-    startup_delay   = number
-    shutdown_delay  = number
-    startup_order   = number
-    started         = bool
-    on_boot         = bool
+    ctid    = number
+    name    = string
+    cores   = number
+    memory  = number
+    ip      = string
+    gateway = string
+    bridge  = string
+    vlan_id = number
+    startup_delay = number
+    shutdown_delay = number
+    startup_order = number
+    started = bool
+    on_boot = bool
     stop_on_destroy = bool
   })
 
   default = {
-    ctid            = 2001
-    name            = "ansible"
-    cores           = 1
-    memory          = 768
-    ip              = "10.0.53.10/24"
-    gateway         = "10.0.53.1"
-    bridge          = "vmbr0"
-    vlan_id         = 53
-    startup_delay   = 60
-    shutdown_delay  = 60
-    startup_order   = 2
-    started         = true
-    on_boot         = true
+    ctid    = 2001
+    name    = "ansible"
+    cores   = 1
+    memory  = 768
+    ip      = "10.0.53.10/24"
+    gateway = "10.0.53.1"
+    bridge  = "vmbr0"
+    vlan_id = 53
+    startup_delay = 60
+    shutdown_delay = 60
+    startup_order = 3
+    started = true
+    on_boot = true
     stop_on_destroy = true
   }
 }
@@ -88,9 +88,9 @@ variable "disks" {
 variable "mount_points" {
   description = "Map of mount point configurations for the LXC"
   type = map(object({
-    volume = string
-    size   = string
-    path   = string
+    volume   = string
+    size = string
+    path  = string
   }))
 
   default = {
@@ -117,4 +117,16 @@ variable "proxmox_tls_insecure" {
 variable "proxmox_api_token" {
   type      = string
   sensitive = true
+}
+
+variable "local_runner_ssh_pubkey" {
+  description = "Local LXC runner SSH public key for Ansible LXC access"
+  type        = string
+  sensitive   = true
+}
+
+variable "root_password" {
+  description = "Root password for the LXC container"
+  type        = string
+  sensitive   = true
 }
