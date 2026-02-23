@@ -5,25 +5,37 @@
 variable "freeipa" {
   description = "Configuration for freeipa VM cloned from golden image"
   type = object({
-    vmid    = number
-    name    = string
-    cores   = number
-    memory  = number
-    ip      = string
-    gateway = string
-    bridge  = string
-    vlan_id = number
+    vmid            = number
+    name            = string
+    cores           = number
+    memory          = number
+    ip              = string
+    gateway         = string
+    bridge          = string
+    vlan_id         = number
+    startup_delay   = number
+    shutdown_delay  = number
+    startup_order   = number
+    started         = bool
+    on_boot         = bool
+    stop_on_destroy = bool
   })
 
   default = {
-    vmid    = 1001
-    name    = "freeipa"
-    cores   = 2
-    memory  = 1536
-    ip      = "10.0.50.10/24"
-    gateway = "10.0.50.1"
-    bridge  = "vmbr0"
-    vlan_id = 50
+    vmid            = 1001
+    name            = "freeipa"
+    cores           = 2
+    memory          = 1536
+    ip              = "10.0.50.10/24"
+    gateway         = "10.0.50.1"
+    bridge          = "vmbr0"
+    vlan_id         = 50
+    startup_delay   = 60
+    shutdown_delay  = 60
+    startup_order   = 1
+    started         = true
+    on_boot         = true
+    stop_on_destroy = true
   }
 }
 
@@ -58,12 +70,36 @@ variable "node_name" {
   default     = "pve-prod"
 }
 
-variable "datastore_id" {
-  description = "Datastore for cloud-init config"
-  type        = string
-  default     = "local-lvm"
-}
+variable "disks" {
+  description = "Map of disk configurations for the VM"
+  type = map(object({
+    datastore_id = string
+    interface    = string
+    size         = number
+    ssd          = bool
+    discard      = string
+    file_format  = string
+  }))
 
+  default = {
+    os_disk = {
+      datastore_id = "local-lvm"
+      interface    = "scsi0"
+      size         = 25
+      ssd          = true
+      discard      = "on"
+      file_format  = "raw"
+    },
+    data_disk = {
+      datastore_id = "nas-prod-data"
+      interface    = "scsi1"
+      size         = 25
+      ssd          = true
+      discard      = "on"
+      file_format  = "raw"
+    }
+  }
+}
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"

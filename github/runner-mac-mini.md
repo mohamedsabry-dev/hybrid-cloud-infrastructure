@@ -64,7 +64,7 @@ Cached locally at `$HOME/.terraform.d/providers-mirror`
 | Provider | Version | Size |
 |----------|---------|------|
 | hashicorp/aws | v6.28.0 | ~650MB |
-| bpg/proxmox | v0.93.1 | - |
+| bpg/proxmox | v0.96.0 | - |
 | hashicorp/external | v2.3.4 | - |
 
 ---

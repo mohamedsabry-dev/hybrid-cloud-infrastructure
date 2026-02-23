@@ -73,6 +73,7 @@ jobs:
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
 
@@ -82,17 +83,18 @@ jobs:
           ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
             --secret-id dev/ansible/ssh-public-key \
             --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "TF_VAR_ansible_ssh_public_key=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
           # Fetch VM root password
           VM_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/vm-root-password \
+            --secret-id dev/golden-image/vm-root-password \
             --query SecretString --output text)
           echo "::add-mask::${VM_ROOT_PASSWORD}"
           echo "TF_VAR_vm_root_password=${VM_ROOT_PASSWORD}" >> $GITHUB_ENV
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
@@ -119,7 +121,7 @@ jobs:
           echo "⏳ 3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 180
+          sleep 30
           echo "✅ Review window ended at $(date)"
 
       - name: Terraform Apply

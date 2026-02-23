@@ -1,6 +1,6 @@
 #===============================================================================
 # Ansible LXC Container
-# Clone from golden LXC template and configure for Ansible control node 
+# Clone from golden LXC template and configure for Ansible control node
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "ansible" {
@@ -10,8 +10,30 @@ resource "proxmox_virtual_environment_container" "ansible" {
   vm_id     = var.ansible.ctid
 
   clone {
-    datastore_id = var.datastore_id
+    datastore_id = var.disks.os_disk.datastore_id
     vm_id        = var.template_ctid
+  }
+
+  disk {
+    datastore_id = var.disks.os_disk.datastore_id
+    size         = var.disks.os_disk.size
+  }
+
+  mount_point {
+    volume = var.mount_points.mount_1.volume
+    size   = var.mount_points.mount_1.size
+    path   = var.mount_points.mount_1.path
+  }
+
+  # Container Settings
+  started       = var.ansible.started
+  start_on_boot = var.ansible.on_boot
+
+  # Setup Startup order
+  startup {
+    order      = var.ansible.startup_order
+    up_delay   = var.ansible.startup_delay
+    down_delay = var.ansible.shutdown_delay
   }
 
   # Container Configuration
@@ -32,6 +54,8 @@ resource "proxmox_virtual_environment_container" "ansible" {
   }
 
   # Cloud-init style initialization (API-only)
+  # Note: user_account removed - not supported for cloned LXC (Proxmox API limitation)
+  # Password inherited from golden template, SSH keys added manually post-deploy
   initialization {
     hostname = var.ansible.name
 
@@ -47,10 +71,6 @@ resource "proxmox_virtual_environment_container" "ansible" {
       domain  = var.search_domain
     }
   }
-
-  # Start on boot
-  started       = true
-  start_on_boot = true
 
   # Prevent Terraform from managing runtime state
   lifecycle {
