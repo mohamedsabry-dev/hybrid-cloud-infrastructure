@@ -30,6 +30,7 @@ resource "proxmox_virtual_environment_container" "ansible" {
   start_on_boot = var.ansible.on_boot
 
   # Setup Startup order
+
   startup {
     order      = var.ansible.startup_order
     up_delay   = var.ansible.startup_delay
