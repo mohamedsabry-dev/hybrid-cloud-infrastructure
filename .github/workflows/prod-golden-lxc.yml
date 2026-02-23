@@ -74,7 +74,7 @@ jobs:
             --query SecretString --output text)
 
           LXC_PWD=$(aws secretsmanager get-secret-value \
-            --secret-id prod/lxc/root-password \
+            --secret-id prod/golden-image/lxc-root-password \
             --query SecretString --output text)
 
             
@@ -82,6 +82,7 @@ jobs:
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${LXC_PWD}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
