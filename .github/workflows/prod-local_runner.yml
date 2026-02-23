@@ -1,4 +1,4 @@
-# Dev Proxmox local_runner LXC - Setup Core & Verify Golden Image Template
+# Prod Proxmox local_runner LXC - Setup Core & Verify Golden Image Template
 
 #### Define Block ####
 # 1. Define the job name on GH UI
@@ -7,20 +7,20 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] local_runner LXC"
+name: "[PROD] local_runner LXC"
 on:
   push:
     branches:
-      - dev
+      - prod
     paths:
-      - 'terraform/dev/proxmox/lxc/local_runner/**'
-      - '.github/workflows/dev-local_runner.yml'
+      - 'terraform/prod/proxmox/lxc/local_runner/**'
+      - '.github/workflows/prod-local_runner.yml'
 permissions:
   id-token: write
   contents: read
 env:
-  ENVIRONMENT: dev
-  TF_WORKING_DIR: terraform/dev/proxmox/lxc/local_runner
+  ENVIRONMENT: prod
+  TF_WORKING_DIR: terraform/prod/proxmox/lxc/local_runner
 #####################
 #####################
 
@@ -34,7 +34,7 @@ jobs:
   deploy:
     name: "Deploy local_runner LXC"
     runs-on: macOS
-    if: ${{ vars.LOCAL_RUNNER_DEV_LOCKED != 'true' }}
+    if: ${{ vars.LOCAL_RUNNER_PROD_LOCKED != 'true' }}
 
     defaults:
       run:
@@ -59,18 +59,18 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
- 
+
       # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/terraform-token \
+            --secret-id prod/proxmox/terraform-token \
             --query SecretString --output text)
 
           LXC_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/golden-image/lxc-root-password \
+            --secret-id prod/lxc/root-password \
             --query SecretString --output text)
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
@@ -87,7 +87,7 @@ jobs:
 
 
       - name: Terraform Init
-        run: terraform init -upgrade
+        run: terraform init
 
       - name: Terraform Plan
         timeout-minutes: 3
@@ -103,7 +103,7 @@ jobs:
           echo "State may be locked. To release:"
           echo ""
           echo "AWS Console -> DynamoDB -> Tables"
-          echo "-> hybrid-cloud-infrastructure-tf-state-lock-dev"
+          echo "-> hybrid-cloud-infrastructure-tf-state-lock-prod"
           echo "-> Explore items >> Find the Locked ID"
           echo "-> Delete item"
           echo ""
@@ -122,11 +122,11 @@ jobs:
         run: terraform apply -auto-approve tfplan
 
       # Post-deploy: Generate SSH key on local_runner and store in AWS Secrets Manager
-      # Node IP: 10.0.63.20
+      # Node IP: 10.0.53.20
       #
-      # ssh root@10.0.63.20
+      # ssh root@10.0.53.20
       # ssh-keygen -t ed25519 -C "local-runner" -f ~/.ssh/id_ed25519 -N ""
       # cat ~/.ssh/id_ed25519.pub
       #
       # Then store in AWS Secrets Manager:
-      # aws secretsmanager create-secret --name dev/local-runner/ssh-public-key --secret-string "$(cat ~/.ssh/id_ed25519.pub)"
+      # aws secretsmanager create-secret --name prod/local-runner/ssh-public-key --secret-string "$(cat ~/.ssh/id_ed25519.pub)"

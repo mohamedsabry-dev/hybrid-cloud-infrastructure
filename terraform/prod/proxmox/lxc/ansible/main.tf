@@ -57,6 +57,12 @@ resource "proxmox_virtual_environment_container" "ansible" {
   initialization {
     hostname = var.ansible.name
 
+    user_account {
+      username = "root"
+      password = var.root_password
+      keys     = [var.local_runner_ssh_pubkey]
+    }
+
     ip_config {
       ipv4 {
         address = var.ansible.ip
