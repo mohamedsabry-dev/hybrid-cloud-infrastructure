@@ -69,26 +69,14 @@ jobs:
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
 
-          LOCAL_RUNNER_SSH_KEY=$(aws secretsmanager get-secret-value \
-            --secret-id dev/local-runner/ssh-public-key \
-            --query SecretString --output text)
-
-          LXC_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/golden-image/lxc-root-password \
-            --query SecretString --output text)
-
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
-          echo "::add-mask::${LXC_ROOT_PASSWORD}"
-          echo "::add-mask::${LOCAL_RUNNER_SSH_KEY}"
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
-          echo "TF_VAR_root_password=${LXC_ROOT_PASSWORD}" >> $GITHUB_ENV
-          echo "TF_VAR_local_runner_ssh_pubkey=${LOCAL_RUNNER_SSH_KEY}" >> $GITHUB_ENV
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
 
@@ -127,11 +115,16 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-      # Post-deploy: Verify SSH access from local_runner to ansible
+      # Post-deploy: Manual SSH key setup required (Proxmox API limitation)
+      # See: troubleshooting/14-terraform-proxmox-lxc-clone-ssh-keys.md
+      #
       # Ansible Node IP: 10.0.63.10
       #
-      # From local_runner (10.0.63.20):
-      # ssh root@10.0.63.10
+      # From local_runner (10.0.63.20), copy SSH key to ansible:
+      # ssh-copy-id root@10.0.63.10
       #
-      # The local_runner SSH public key is injected during creation from:
-      # AWS Secrets Manager: dev/local-runner/ssh-public-key
+      # Or manually on ansible LXC:
+      # ssh root@10.0.63.10 (use password from golden template)
+      # mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      # echo "ssh-ed25519 AAAA... local-runner" >> ~/.ssh/authorized_keys
+      # chmod 600 ~/.ssh/authorized_keys

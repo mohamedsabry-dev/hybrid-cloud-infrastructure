@@ -118,9 +118,3 @@ variable "proxmox_api_token" {
   type      = string
   sensitive = true
 }
-
-variable "root_password" {
-  description = "Root password for the LXC container"
-  type        = string
-  sensitive   = true
-}
