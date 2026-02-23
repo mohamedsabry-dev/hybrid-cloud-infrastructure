@@ -101,7 +101,7 @@ jobs:
       - name: Review Window
         run: |
           echo "⏳ 3-minute review window for LXC Template deployment"
-          sleep 30
+          sleep 180
 
       - name: Terraform Apply
         id: apply
