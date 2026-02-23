@@ -61,6 +61,15 @@ variable "secrets" {
         ManagedBy   = "terraform"
       }
     }
+    local_runner_ssh = {
+      name        = "prod/local-runner/ssh-public-key"
+      description = "Internal LXC runner SSH public key for Ansible LXC access"
+      tags = {
+        Purpose     = "gh-runner-ansible-trigger"
+        Environment = "prod"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 
