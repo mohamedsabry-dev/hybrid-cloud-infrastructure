@@ -57,7 +57,6 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     hostname = var.lxc_container.hostname
 
     user_account {
-      username = "root"
       password = var.lxc_root_password
       keys     = ["ssh-ed25519 PLACEHOLDER_KEY_WILL_BE_REPLACED_IN_CLONES placeholder@golden-template"]
     }
