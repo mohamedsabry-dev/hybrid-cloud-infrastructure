@@ -59,7 +59,6 @@ resource "proxmox_virtual_environment_container" "ansible" {
     hostname = var.ansible.name
 
     user_account {
-      username = "root"
       password = var.root_password
       keys     = [var.local_runner_ssh_pubkey]
     }
