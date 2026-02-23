@@ -68,15 +68,29 @@ jobs:
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
-            
+
+          LOCAL_RUNNER_SSH_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id dev/local-runner/ssh-public-key \
+            --query SecretString --output text)
+
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${LXC_PWD}"
+          echo "::add-mask::${LOCAL_RUNNER_SSH_KEY}"
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
-          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
+          echo "TF_VAR_local_runner_ssh_pubkey=${LOCAL_RUNNER_SSH_KEY}" >> $GITHUB_ENV
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
+
 
       - name: Terraform Init
         run: terraform init -upgrade
