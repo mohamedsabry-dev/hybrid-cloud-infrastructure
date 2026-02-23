@@ -68,18 +68,20 @@ jobs:
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
-            
+
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
-          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
+
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
@@ -106,9 +108,23 @@ jobs:
           echo "⏳ 3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 180
+          sleep 30
           echo "✅ Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
+
+      # Post-deploy: Manual SSH key setup required (Proxmox API limitation)
+      # See: troubleshooting/14-terraform-proxmox-lxc-clone-ssh-keys.md
+      #
+      # Ansible Node IP: 10.0.63.10
+      #
+      # From local_runner (10.0.63.20), copy SSH key to ansible:
+      # ssh-copy-id root@10.0.63.10
+      #
+      # Or manually on ansible LXC:
+      # ssh root@10.0.63.10 (use password from golden template)
+      # mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      # echo "ssh-ed25519 AAAA... local-runner" >> ~/.ssh/authorized_keys
+      # chmod 600 ~/.ssh/authorized_keys

@@ -4,17 +4,21 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"
+      version = "6.28.0"  # Pinned for offline runner
     }
     proxmox = {
       source  = "bpg/proxmox"
       version = "0.96.0"  # Fixed mount_point bug (issue #2507)
     }
+    external = {
+      source  = "hashicorp/external"
+      version = "2.3.4"  # Pinned for offline runner
+    }
   }
 
   backend "s3" {
     bucket         = "hybrid-cloud-infrastructure-tf-state-dev"
-    key            = "dev/proxmox/lxc/golden-template/terraform.tfstate"
+    key            = "dev/proxmox/lxc/local_runner/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
     dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev"
@@ -28,16 +32,20 @@ provider "aws" {
     tags = {
       Environment = "dev"
       ManagedBy   = "terraform"
-      Module      = "proxmox-lxc-golden"
+      Module      = "proxmox-local_runner-lxc"
     }
   }
 }
 
 
 
+#===============================================================================
+# Proxmox Provider
+#===============================================================================
+
 provider "proxmox" {
   endpoint  = var.proxmox_api_url
   api_token = var.proxmox_api_token
   insecure  = var.proxmox_tls_insecure
-  # No SSH needed - API can access storage directly
+
 }
