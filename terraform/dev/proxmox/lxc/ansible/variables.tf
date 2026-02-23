@@ -122,15 +122,3 @@ variable "proxmox_api_token" {
   sensitive = true
 }
 
-variable "local_runner_ssh_pubkey" {
-  description = "Local LXC runner SSH public key for Ansible LXC access"
-  type        = string
-  sensitive   = true
-}
-
-variable "root_password" {
-  description = "Root password for the LXC container"
-  type        = string
-  sensitive   = true
-}
-
