@@ -20,13 +20,11 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   }
 
   mount_point {
-      volume = var.mount_points.mount_1.volume
-      size   = var.mount_points.mount_1.size
-      path   = var.mount_points.mount_1.path
+    volume = var.mount_points.mount_1.volume
+    size   = var.mount_points.mount_1.size
+    path   = var.mount_points.mount_1.path
   }
 
-
-  
   # Container Settings
   started       = var.local_runner.started
   start_on_boot = var.local_runner.on_boot
@@ -34,11 +32,10 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   # Setup Startup order
 
   startup {
-    order = var.local_runner.startup_order
-    up_delay = var.local_runner.startup_delay
+    order      = var.local_runner.startup_order
+    up_delay   = var.local_runner.startup_delay
     down_delay = var.local_runner.shutdown_delay
   }
-
 
   # Container Configuration
   cpu {

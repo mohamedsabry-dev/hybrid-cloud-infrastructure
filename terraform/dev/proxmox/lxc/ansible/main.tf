@@ -20,13 +20,11 @@ resource "proxmox_virtual_environment_container" "ansible" {
   }
 
   mount_point {
-      volume = var.mount_points.mount_1.volume
-      size   = var.mount_points.mount_1.size
-      path   = var.mount_points.mount_1.path
+    volume = var.mount_points.mount_1.volume
+    size   = var.mount_points.mount_1.size
+    path   = var.mount_points.mount_1.path
   }
 
-
-  
   # Container Settings
   started       = var.ansible.started
   start_on_boot = var.ansible.on_boot
@@ -34,11 +32,10 @@ resource "proxmox_virtual_environment_container" "ansible" {
   # Setup Startup order
 
   startup {
-    order = var.ansible.startup_order
-    up_delay = var.ansible.startup_delay
+    order      = var.ansible.startup_order
+    up_delay   = var.ansible.startup_delay
     down_delay = var.ansible.shutdown_delay
   }
-
 
   # Container Configuration
   cpu {
