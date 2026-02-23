@@ -87,7 +87,7 @@ variable "disks" {
 
 
 variable "mount_points" {
-  description = "Map of mount point configurations for the VM"
+  description = "Map of mount point configurations for the LXC"
   type = map(object({
     volume   = string
     size = string
