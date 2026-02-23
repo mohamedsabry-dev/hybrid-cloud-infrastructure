@@ -59,7 +59,6 @@ resource "proxmox_virtual_environment_container" "local_runner" {
     hostname = var.local_runner.name
 
     user_account {
-      username = "root"
       password = var.root_password
     }
 
