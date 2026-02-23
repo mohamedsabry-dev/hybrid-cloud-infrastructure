@@ -123,8 +123,3 @@ variable "proxmox_api_token" {
 }
 
 
-variable "root_password" {
-  description = "Root password for the LXC container (for initial setup)"
-  type        = string
-  sensitive   = true
-}

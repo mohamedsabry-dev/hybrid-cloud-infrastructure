@@ -73,15 +73,10 @@ jobs:
             --secret-id dev/local-runner/ssh-public-key \
             --query SecretString --output text)
 
-          LXC_PWD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/golden-image/lxc-root-password \
-            --query SecretString --output text)
-
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
-          echo "::add-mask::${LXC_PWD}"
           echo "::add-mask::${LOCAL_RUNNER_SSH_KEY}"
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
@@ -89,7 +84,6 @@ jobs:
 
           echo "TF_VAR_local_runner_ssh_pubkey=${LOCAL_RUNNER_SSH_KEY}" >> $GITHUB_ENV
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
-          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
 
 
       - name: Terraform Init
