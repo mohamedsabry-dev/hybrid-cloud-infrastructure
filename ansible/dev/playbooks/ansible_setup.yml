@@ -1,6 +1,6 @@
 ---
 - name: Install Common Packages
-  hosts: localhost
+  hosts: local
   become: yes
   tasks:
     - name: Install Packages
