@@ -1,0 +1,25 @@
+name: "[DEV] FreeIPA Service Install"
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'ansible/dev/**'
+      - '.github/workflows/dev-service_freeipa.yml'
+
+env:
+  ENVIRONMENT: dev
+
+jobs:
+  deploy:
+    name: "Deploy FreeIPA Service Install"
+    runs-on: dev-local-runner
+
+    steps:
+      - name: Pull latest code
+        run: |
+          sudo ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && git pull origin dev"
+
+      - name: Run FreeIPA playbook
+        run: |
+          sudo ssh root@10.0.63.10 "cd /opt/ansible/infrastructure/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/freeipa_setup.yml"
