@@ -18,12 +18,12 @@ jobs:
     steps:
       - name: Install Ansible
         run: |
-          ssh root@10.0.63.10 "dnf install -y ansible-core python3-pip"
+          sudo ssh root@10.0.63.10 "dnf install -y ansible-core python3-pip"
 
       - name: Pull latest code
         run: |
-          ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && git pull origin dev"
+          sudo ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && git pull origin dev"
 
       - name: Run Ansible playbook
         run: |
-          ssh root@10.0.63.10 "cd /opt/ansible/infrastructure/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible_setup.yml"
+          sudo ssh root@10.0.63.10 "cd /opt/ansible/infrastructure/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible_setup.yml"
