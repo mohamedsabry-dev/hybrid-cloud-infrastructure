@@ -1,0 +1,35 @@
+name: "[DEV] bootstrap-ansible-service"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ansible/dev/**'
+      - '.github/workflows/dev-bootstrap-ansible-service.yml'
+  workflow_dispatch:
+
+env:
+  ENVIRONMENT: dev
+  ANSIBLE_INVENTORY: ansible/dev/inventory/inventory.ini
+  ANSIBLE_PLAYBOOK: ansible/dev/playbooks/bootstrap-ansible-service.yml
+
+jobs:
+  bootstrap-ansible-lxc:
+    runs-on: dev-local-runner
+
+    steps:
+      - name: Install Ansible Core
+        run: ssh root@10.0.63.10 "dnf update -y && dnf install -y ansible"
+
+        # dnf search epel-release
+        # If it's not available yet, alternative is to install ansible-core via pip:
+        # ssh root@10.0.63.10 "dnf install -y python3-pip && pip3 install ansible-core"
+      
+      - name: Git pull dev branch
+        run: ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && git pull origin dev"
+
+      - name: Run Bootstrap Playbook
+        run: |
+          ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && \
+          ansible-playbook -i ${{ env.ANSIBLE_INVENTORY }} ${{ env.ANSIBLE_PLAYBOOK }}"
