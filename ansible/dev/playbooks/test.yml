@@ -1,0 +1,17 @@
+---
+- name: Verify my Lab Infrastructure
+  hosts: freeipa
+  # This tells Ansible to use sudo if it's not root (needed for your local_runner)
+  become: true 
+  
+  tasks:
+    - name: Ping all nodes
+      ansible.builtin.ping:
+
+    - name: Get the OS distribution name
+      ansible.builtin.command: cat /etc/os-release
+      register: os_info
+
+    - name: Show the OS info in the terminal
+      ansible.builtin.debug:
+        msg: "This node is running: {{ os_info.stdout_lines[0] }}"
