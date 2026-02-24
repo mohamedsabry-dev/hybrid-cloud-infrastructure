@@ -1,22 +1,39 @@
 ---
-- name: Install freeipa
+- name: Install FreeIPA Server
   hosts: freeipa
   become: yes
-  tasks: 
-    - name: Check OS 
-      ansible.builtin.command:
-        cmd: cat /etc/os-release
-      register: os_info
-    
-    - name: Show OS info
-      ansible.builtin.debug:
-        msg: "{{ os_info.stdout }}"
+  collections:
+    - freeipa.ansible_freeipa
 
-    - name: Ping Google
-      ansible.builtin.command:
-        cmd: ping -c 1 google.com
-      register: ping_result
-    
-    - name: Show ping result
-      ansible.builtin.debug:
-        msg: "{{ ping_result.stdout }}"
+  vars:
+    # Domain settings
+    ipaserver_domain: lab.local
+    ipaserver_realm: LAB.LOCAL
+    ipaserver_hostname: freeipa.lab.local
+
+    # DNS
+    ipaserver_setup_dns: yes
+    ipaserver_auto_forwarders: yes
+    ipaserver_no_dnssec_validation: yes
+    ipaserver_forwarders:
+      - 8.8.8.8
+      - 1.1.1.1
+
+    ***REMOVED*** (Inject from AWS Secrets)
+    ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
+    ipadm_password: "{{ lookup('env', 'IPA_DM_PASSWORD') }}"
+
+  tasks:
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: freeipa.lab.local
+
+    - name: Add hostname to /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_default_ipv4.address }} freeipa.lab.local freeipa"
+        state: present
+
+    - name: Install FreeIPA Server
+      ansible.builtin.include_role:
+        name: ipaserver
