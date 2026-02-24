@@ -1,0 +1,5 @@
+collections:
+  - freeipa.ansible_freeipa
+  - community.hashi_vault
+  - community.general
+  - community.crypto
