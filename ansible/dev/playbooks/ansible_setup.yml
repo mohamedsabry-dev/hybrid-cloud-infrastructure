@@ -1,0 +1,18 @@
+---
+- name: Install Common Packages
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Install Packages
+      ansible.builtin.dnf:
+        name:
+          - vim
+          - git
+          - curl
+          - htop
+        state: present
+
+    - name: Install Ansible Collections
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install -r /opt/ansible/infrastructure/ansible/dev/requirements.yml --upgrade
+      changed_when: true
