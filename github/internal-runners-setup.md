@@ -138,3 +138,8 @@ cd /opt/actions-runner
 |-------------|------------|-------------|-------|
 | Dev | 10.0.63.20 | dev-local-runner | dev-local-runner |
 | Prod | 10.0.53.20 | prod-local-runner | prod-local-runner |
+
+
+  # Add runner to sudoers with no password                                                                      
+  echo "runner ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/runner
+  chmod 440 /etc/sudoers.d/runner 
