@@ -29,12 +29,10 @@
         immediate: yes
       loop: "{{ freeipa_firewall_services }}"
 
-    - name: Install FreeIPA server packages
-      ansible.builtin.dnf:
-        name:
-          - ipa-server
-          - ipa-server-dns
-        state: present
+    - name: Check if FreeIPA is already installed                                              
+      ansible.builtin.stat:                                                                           
+        path: /etc/ipa/default.conf                                                            
+      register: ipa_installed    
 
     - name: Install FreeIPA Server
       ansible.builtin.include_role:
