@@ -35,12 +35,32 @@
         immediate: yes
       loop: "{{ freeipa_firewall_services }}"
 
-    - name: Ensure /etc/ipa directory exists
-      ansible.builtin.file:
-        path: /etc/ipa
-        state: directory
-        mode: '0755'
+    - name: Install FreeIPA server packages
+      ansible.builtin.dnf:
+        name:
+          - ipa-server
+          - ipa-server-dns
+        state: present
+
+    - name: Check if FreeIPA is already installed
+      ansible.builtin.command:
+        cmd: ipactl status
+      register: ipa_status
+      ignore_errors: yes
+      changed_when: false
 
     - name: Install FreeIPA Server
-      ansible.builtin.include_role:
-        name: freeipa.ansible_freeipa.ipaserver
+      ansible.builtin.command:
+        cmd: >
+          ipa-server-install
+          --hostname={{ ipaserver_hostname }}
+          --domain={{ ipaserver_domain }}
+          --realm={{ ipaserver_realm }}
+          --ds-password={{ ipadm_password }}
+          --admin-password={{ ipaadmin_password }}
+          --setup-dns
+          --forwarder=8.8.8.8
+          --forwarder=1.1.1.1
+          --ntp-server=pool.ntp.org
+          --unattended
+      when: ipa_status.rc != 0
