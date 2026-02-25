@@ -42,7 +42,7 @@
           - ipa-server-dns
         state: present
 
-    - name: Ensure IPA directories exist
+    - name: Ensure required directories exist
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
@@ -51,6 +51,7 @@
         - /etc/ipa
         - /var/lib/ipa
         - /var/lib/ipa/sysrestore
+        - /var/lib/sss/pubconf/krb5.include.d
 
     - name: Check if FreeIPA is already installed
       ansible.builtin.command:
@@ -72,5 +73,6 @@
           --forwarder=8.8.8.8
           --forwarder=1.1.1.1
           --ntp-server=pool.ntp.org
+          --skip-mem-check
           --unattended
       when: ipa_status.rc != 0
