@@ -42,6 +42,16 @@
           - ipa-server-dns
         state: present
 
+    - name: Ensure IPA directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/ipa
+        - /var/lib/ipa
+        - /var/lib/ipa/sysrestore
+
     - name: Check if FreeIPA is already installed
       ansible.builtin.command:
         cmd: ipactl status
