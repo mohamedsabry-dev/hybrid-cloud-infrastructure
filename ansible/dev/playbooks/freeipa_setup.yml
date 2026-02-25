@@ -9,6 +9,12 @@
       ansible.builtin.hostname:
         name: "{{ ipaserver_hostname }}"
 
+    - name: Remove localhost entries for FreeIPA hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^(127\\.0\\.0\\.1|::1).*{{ freeipa_alias }}.*"
+        state: absent
+
     - name: Add hostname to /etc/hosts
       ansible.builtin.lineinfile:
         path: /etc/hosts
