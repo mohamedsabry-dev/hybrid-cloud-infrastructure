@@ -1,3 +1,4 @@
+# /playbooks/ansible_setup.yml
 ---
 - name: Install Common Packages
   hosts: local
@@ -5,11 +6,7 @@
   tasks:
     - name: Install Packages
       ansible.builtin.dnf:
-        name:
-          - vim
-          - git
-          - curl
-          - htop
+        name: "{{ initial_packages }}"
         state: present
 
     - name: Install Ansible Collections
