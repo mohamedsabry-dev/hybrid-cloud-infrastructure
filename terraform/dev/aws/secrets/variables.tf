@@ -83,7 +83,7 @@ variable "secrets_config" {
       name        = "dev/freeipa/dm-password"
       description = "IPA LDAP Password for FreeIPA server"
       tags = {
-        Purpose     = IPA LDAP Password for FreeIPA server"
+        Purpose     = "IPA LDAP Password for FreeIPA server"
         Environment = "dev"
         ManagedBy   = "terraform"
       }
