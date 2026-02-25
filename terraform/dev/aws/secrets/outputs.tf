@@ -10,6 +10,8 @@ output "secret_arns" {
     lxc_root_password      = aws_secretsmanager_secret.lxc_root_password.arn
     ansible_ssh_pubkey     = aws_secretsmanager_secret.ansible_ssh_pubkey.arn
     local_runner_ssh_pubkey = aws_secretsmanager_secret.local_runner_ssh_pubkey.arn
+    ipa_admin_password      = aws_secretsmanager_secret.ipa_admin_password.arn
+    ipa_dm_password         = aws_secretsmanager_secret.ipa_dm_password.arn
   }
 }
 
@@ -23,5 +25,7 @@ output "secret_names" {
     lxc_root_password      = aws_secretsmanager_secret.lxc_root_password.name
     ansible_ssh_pubkey     = aws_secretsmanager_secret.ansible_ssh_pubkey.name
     local_runner_ssh_pubkey = aws_secretsmanager_secret.local_runner_ssh_pubkey.name
+    ipa_admin_password      = aws_secretsmanager_secret.ipa_admin_password.name
+    ipa_dm_password        = aws_secretsmanager_secret.ipa_dm_password.name
   }
 }
