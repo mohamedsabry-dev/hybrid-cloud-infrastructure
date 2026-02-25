@@ -1,0 +1,53 @@
+# Users
+# Hosts
+# Host Groups 
+
+---
+- name: Setup Domain
+  hosts: local
+  become: yes
+  tasks:
+    - name: Add Node To IPA 
+
+## Add the command to add local runner to ipa via workflow 
+
+- name: Setup Domain
+  hosts: freeipa
+  become: yes
+  tasks:
+    - name: Setup Host Groups
+      freeipa.ansible_freeipa.ipahostgroup:
+          ipaadmin_principal: admin
+          ipaadmin_password: "{{ ipaadmin_password }}"
+          name: automation_group
+          description: "All server hosts managed by Bot User"
+          host:
+            - ansible.lab.local
+            - local-runner.lab.local
+          state: present
+      
+    # - name: Add Hosts to Host Groups
+    - name: Create Bot Users
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: super_bot
+        description: "Super Bot user for automation"
+
+    - name: Setup Bot User Privilage !Auth
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: super_bot
+        description: "Allow ansible to sudo automation_group with no password"
+        user:
+          - super_bot
+        hostgroup:
+          - automation_group
+        cmdcat: all
+        runasuser: root
+        option:
+          - "!authenticate"
+        state: present
+
+
