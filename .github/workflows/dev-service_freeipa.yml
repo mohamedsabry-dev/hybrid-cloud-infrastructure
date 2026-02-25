@@ -6,7 +6,6 @@ on:
     paths:
       - 'ansible/dev/**'
       - '.github/workflows/dev-service_freeipa.yml'
-  # workflow_dispatch:
 permissions:
   id-token: write
   contents: read
@@ -18,6 +17,8 @@ jobs:
   deploy:
     name: "Deploy FreeIPA Service Install"
     runs-on: dev-local-runner
+    if: ${{ vars.FREEIPA_SERVICE_DEV != 'true' }}
+
 
     steps:
 
@@ -42,7 +43,7 @@ jobs:
             --query SecretString --output text)
           
           echo "::add-mask::${IPA_LDAP_PASS}"
-          echo "IPA_DM_PASSWORD=${IPA_LDAP_PASS=}" >> $GITHUB_ENV
+          echo "IPA_DM_PASSWORD=${IPA_LDAP_PASS}" >> $GITHUB_ENV
 
 
       - name: Pull latest code

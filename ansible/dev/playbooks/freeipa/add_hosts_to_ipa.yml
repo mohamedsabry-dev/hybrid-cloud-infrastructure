@@ -1,0 +1,15 @@
+  - name: Join hosts to FreeIPA domain
+    hosts: local
+    become: yes
+    roles:
+      - role: freeipa.ansible_freeipa.ipaclient
+        state: present
+
+    vars:
+      ipaserver_domain: lab.local
+      ipaserver_realm: LAB.LOCAL
+      ipasserver: freeipa.lab.local
+      ipaadmin_principal: admin
+      ipaadmin_password: "{{ ipaadmin_password }}"
+      ipaclient_mkhomedir: yes
+      ipaclient_configure_dns_resolver: yes
