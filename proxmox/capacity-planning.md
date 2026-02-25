@@ -24,32 +24,32 @@
 
 | Resource | Type | OS Disk | Data Disk | RAM | vCPU | Purpose |
 |----------|------|---------|-----------|-----|------|---------|
-| FreeIPA | VM | 25GB | 30GB | 1.5GB | 1 | Identity mgmt |
+| FreeIPA | VM | 25GB | 30GB | 2GB | 1 | Identity mgmt |
 | K8s Master 1 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 2GB | 2 | Control plane |
-| K8s Worker 1 | VM | 25GB | 50GB | 2.25GB | 2 | Workloads |
-| K8s Worker 2 | VM | 25GB | 50GB | 2.25GB | 2 | Workloads |
-| K8s Worker 3 | VM | 25GB | 50GB | 2.25GB | 2 | Workloads |
-| Vault 1 | VM | 25GB | 20GB | 1GB | 1 | Secrets mgmt |
-| Vault 2 | VM | 25GB | 20GB | 1GB | 1 | Secrets mgmt |
-| Vault 3 | VM | 25GB | 20GB | 1GB | 1 | Secrets mgmt |
+| K8s Worker 1 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads + monitoring |
+| K8s Worker 2 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads + monitoring |
+| K8s Worker 3 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads + monitoring |
+| Vault 1 | VM | 25GB | 20GB | 1.25GB | 1 | Secrets mgmt |
+| Vault 2 | VM | 25GB | 20GB | 1.25GB | 1 | Secrets mgmt |
+| Vault 3 | VM | 25GB | 20GB | 1.25GB | 1 | Secrets mgmt |
 | NGINX | LXC | 15GB | - | 0.5GB | 1 | Reverse proxy |
 | Ansible | LXC | 15GB | - | 0.75GB | 1 | Automation |
-| GH Runner | LXC | 15GB | 20GB | 1GB | 2 | GitHub Actions |
-| Prometheus | LXC | 15GB | 30GB | 0.5GB | 1 | Metrics |
-| Grafana | LXC | 15GB | 10GB | 0.5GB | 1 | Dashboards |
-| Loki | LXC | 15GB | 50GB | 0.5GB | 1 | Log aggregation |
+| GH Runner | LXC | 15GB | 20GB | 0.75GB | 2 | GitHub Actions |
 | NGINX Ingress | POD | - | - | 0.25GB | 0.5 | K8s Ingress |
 | Flux CD | POD | - | - | 0.5GB | 0.5 | GitOps CD |
 | Helm | POD | - | - | 0.5GB | 0.5 | Package mgmt |
-| **TOTALS** | | **340GB** | **330GB** | **20.5GB** | **22** | |
+| Prometheus | POD | - | 30GB PV | 0.5GB | 1 | Metrics |
+| Grafana | POD | - | 10GB PV | 0.5GB | 0.5 | Dashboards |
+| Loki | POD | - | 50GB PV | 0.5GB | 1 | Log aggregation |
+| **TOTALS** | | **295GB** | **340GB** | **20.5GB** | **19** | |
 
-*Note: POD RAM runs inside K8s workers (already allocated above)*
+*Note: POD RAM runs inside K8s workers (already allocated above). PV = PersistentVolume on NAS.*
 
 **Summary:**
-- Local NVMe: ~340GB OS + 10GB ISOs = ~350GB used, ~150GB free (snapshots)
-- NAS (dev-storage): ~330GB data disks
+- Local NVMe: ~295GB OS + 10GB ISOs = ~305GB used, ~195GB free (snapshots)
+- NAS (dev-storage): ~340GB data disks (includes 90GB monitoring PVs)
 - RAM: 20.5GB VMs/LXCs + 2GB Proxmox = ~22.5GB, ~1.5GB buffer
 
 ---
@@ -62,29 +62,29 @@
 | K8s Master 1 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 4GB | 2 | Control plane |
-| K8s Worker 1 | VM | 25GB | 100GB | 8GB | 2 | Workloads |
-| K8s Worker 2 | VM | 25GB | 100GB | 8GB | 2 | Workloads |
-| K8s Worker 3 | VM | 25GB | 100GB | 8GB | 2 | Workloads |
+| K8s Worker 1 | VM | 25GB | 150GB | 9GB | 2 | Workloads + monitoring |
+| K8s Worker 2 | VM | 25GB | 150GB | 9GB | 2 | Workloads + monitoring |
+| K8s Worker 3 | VM | 25GB | 150GB | 9GB | 2 | Workloads + monitoring |
 | Vault 1 | VM | 25GB | 25GB | 2GB | 1 | Secrets mgmt |
 | Vault 2 | VM | 25GB | 25GB | 2GB | 1 | Secrets mgmt |
 | Vault 3 | VM | 25GB | 25GB | 2GB | 1 | Secrets mgmt |
 | NGINX | LXC | 15GB | - | 1GB | 2 | Reverse proxy |
 | Ansible | LXC | 15GB | - | 1GB | 1 | Automation |
 | GH Runner | LXC | 15GB | 30GB | 2GB | 2 | GitHub Actions |
-| Prometheus | LXC | 15GB | 50GB | 1GB | 1 | Metrics |
-| Grafana | LXC | 15GB | 15GB | 1GB | 1 | Dashboards |
-| Loki | LXC | 15GB | 70GB | 1GB | 1 | Log aggregation |
 | NGINX Ingress | POD | - | - | 0.5GB | 1 | K8s Ingress |
 | Flux CD | POD | - | - | 1GB | 1 | GitOps CD |
 | Helm | POD | - | - | 0.5GB | 0.5 | Package mgmt |
-| **TOTALS** | | **340GB** | **580GB** | **52GB** | **25** | |
+| Prometheus | POD | - | 50GB PV | 1GB | 1 | Metrics |
+| Grafana | POD | - | 15GB PV | 1GB | 0.5 | Dashboards |
+| Loki | POD | - | 70GB PV | 1GB | 1 | Log aggregation |
+| **TOTALS** | | **295GB** | **580GB** | **53GB** | **22** | |
 
-*Note: POD RAM runs inside K8s workers (already allocated above)*
+*Note: POD RAM runs inside K8s workers (already allocated above). PV = PersistentVolume on NAS.*
 
 **Summary:**
-- Local NVMe: ~340GB OS + 10GB ISOs = ~350GB used, ~150GB free (snapshots)
-- NAS (prod-storage): ~580GB data disks
-- RAM: 52GB VMs/LXCs + 4GB Proxmox = ~56GB, ~8GB buffer
+- Local NVMe: ~295GB OS + 10GB ISOs = ~305GB used, ~195GB free (snapshots)
+- NAS (prod-storage): ~580GB data disks (includes 135GB monitoring PVs)
+- RAM: 53GB VMs/LXCs + 4GB Proxmox = ~57GB, ~7GB buffer
 
 ---
 
