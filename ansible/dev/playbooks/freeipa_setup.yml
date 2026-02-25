@@ -15,6 +15,12 @@
         line: "{{ ansible_default_ipv4.address }} {{ ipaserver_hostname }} {{ freeipa_alias }}"
         state: present
 
+    - name: Start and enable firewalld service
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
     - name: Allow FreeIPA Firewall Services
       ansible.posix.firewalld:
         service: "{{ item }}"
