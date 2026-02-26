@@ -3,13 +3,7 @@
 # Host Groups 
 
 ---
-- name: Setup Domain
-  hosts: local
-  become: yes
-  tasks:
-    - name: Add Node To IPA 
-
-## Add the command to add local runner to ipa via workflow 
+# TODO: Add play to join local runner to IPA via workflow
 
 - name: Setup Domain
   hosts: freeipa
@@ -22,8 +16,8 @@
           name: automation_group
           description: "All server hosts managed by Bot User"
           host:
-            - ansible.lab.local
-            - local-runner.lab.local
+            # - ansible.lab.local
+            # - local-runner.lab.local
           state: present
       
     # - name: Add Hosts to Host Groups
@@ -32,6 +26,8 @@
         ipaadmin_principal: admin
         ipaadmin_password: "{{ ipaadmin_password }}"
         name: super_bot
+        first: Super          # Required
+        last: Bot             # Required
         description: "Super Bot user for automation"
 
     - name: Setup Bot User Privilage !Auth
@@ -49,5 +45,16 @@
         option:
           - "!authenticate"
         state: present
+
+    - name: Create User Group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: automation_users
+        description: "Automation service accounts"
+        user:
+          - super_bot
+        state: present
+
 
 
