@@ -1,0 +1,16 @@
+# i copy the key of ansible into all lxc "upon creation via gh runner via commad ? like ssh and pass the password and pass the the paste key "
+# after set the key now we have unified way while all ansible lxc access everysingle lxc and vm via normal ssh 
+# then make the playbook of fix repo and tools
+# then make the playbook to add the targets to domain
+# then make playbook of setup hjosts and users and groups
+# Then establish bot user connectipn 
+# then make polaybook of ensure sudo 
+# Then make playbook to clean ssh keys
+# update the inventory file 
+# Complete the IPA Setup phase .
+# Phase 1 >> Config vault and its related integrations
+# Phase 2 >> Config K8s master and workers 
+# Phase 3 >> External Nginx + VPN 
+# Phase 4 >> Service tools and Pod (6 Pods (helm,nginx,prom,graf,flux,loki) ) and their learning based on just basic use and intrative learning 
+# Phase 5 >> Proxmox Backups & DR
+# Phase 6 >> Incidents Simulation  
