@@ -20,25 +20,90 @@
 
 ---
 
-Development Environment (24GB RAM, 500GB NVMe)
-ResourceTypeOS DiskData DiskRAMvCPUPurposeFreeIPAVM25GB30GB2GB1Identity mgmtK8s Master 1VM25GB-2GB2Control planeK8s Master 2VM25GB-2GB2Control planeK8s Master 3VM25GB-2GB2Control planeK8s Worker 1VM25GB80GB2.75GB2Prom + GrafanaK8s Worker 2VM25GB80GB2.75GB2NGINX Ingress + LokiK8s Worker 3VM25GB80GB2.75GB2Helm + FluxCDVault 1LXC15GB20GB0.75GB1Secrets mgmtVault 2LXC15GB20GB0.75GB1Secrets mgmtVault 3LXC15GB20GB0.75GB1Secrets mgmtNGINXLXC15GB-0.5GB1Reverse proxyAnsibleLXC15GB-0.75GB1AutomationGH RunnerLXC15GB20GB0.75GB2GitHub Actions
+## Development Environment (24GB RAM, 500GB NVMe)
 
-Pod Distribution:
-PodWorkerRAMPurposePrometheusWorker 10.5GBMetricsGrafanaWorker 10.5GBDashboardsNGINX IngressWorker 20.25GBK8s IngressLokiWorker 20.5GBLog aggregationHelmWorker 30.5GBPackage mgmtFluxCDWorker 30.5GBGitOps CD
+| Resource | Type | OS Disk | Data Disk | RAM | vCPU | Purpose |
+|----------|------|---------|-----------|-----|------|---------|
+| FreeIPA | VM | 25GB | 30GB | 2GB | 1 | Identity mgmt |
+| K8s Master 1 | VM | 25GB | - | 2GB | 2 | Control plane |
+| K8s Master 2 | VM | 25GB | - | 2GB | 2 | Control plane |
+| K8s Master 3 | VM | 25GB | - | 2GB | 2 | Control plane |
+| K8s Worker 1 | VM | 25GB | 80GB | 2.75GB | 2 | Prom + Grafana |
+| K8s Worker 2 | VM | 25GB | 80GB | 2.75GB | 2 | NGINX Ingress + Loki |
+| K8s Worker 3 | VM | 25GB | 80GB | 2.75GB | 2 | Helm + FluxCD |
+| Vault 1 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 2 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 3 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
+| NGINX | LXC | 15GB | - | 0.5GB | 1 | Reverse proxy |
+| Ansible | LXC | 15GB | - | 0.75GB | 1 | Automation |
+| GH Runner | LXC | 15GB | 20GB | 0.75GB | 2 | GitHub Actions |
 
-Summary:
-BeforeAfterOS Disk295GB265GBData Disk340GB340GBRAM (VMs/LXCs)20.5GB19GBProxmox host2GB2GBTotal RAM used~22.5GB~21GBBuffer~1.5GB~3GBvCPU1919
+### Pod Distribution
+
+| Pod | Worker | RAM | Purpose |
+|-----|--------|-----|---------|
+| Prometheus | Worker 1 | 0.5GB | Metrics |
+| Grafana | Worker 1 | 0.5GB | Dashboards |
+| NGINX Ingress | Worker 2 | 0.25GB | K8s Ingress |
+| Loki | Worker 2 | 0.5GB | Log aggregation |
+| Helm | Worker 3 | 0.5GB | Package mgmt |
+| FluxCD | Worker 3 | 0.5GB | GitOps CD |
+
+### Summary
+
+| | Before | After |
+|---|--------|-------|
+| OS Disk | 295GB | 265GB |
+| Data Disk | 340GB | 340GB |
+| RAM (VMs/LXCs) | 20.5GB | 19GB |
+| Proxmox host | 2GB | 2GB |
+| Total RAM used | ~22.5GB | ~21GB |
+| Buffer | ~1.5GB | ~3GB |
+| vCPU | 19 | 19 |
 
 ---
 
-Production Environment (64GB RAM)
-ResourceTypeOS DiskData DiskRAMvCPUPurposeFreeIPAVM25GB30GB4GB2Identity mgmtK8s Master 1VM25GB-4GB2Control planeK8s Master 2VM25GB-4GB2Control planeK8s Master 3VM25GB-4GB2Control planeK8s Worker 1VM25GB150GB8GB4Prom + GrafanaK8s Worker 2VM25GB150GB8GB4NGINX Ingress + LokiK8s Worker 3VM25GB150GB8GB4Helm + FluxCDVault 1LXC15GB30GB2GB2Secrets mgmtVault 2LXC15GB30GB2GB2Secrets mgmtVault 3LXC15GB30GB2GB2Secrets mgmtNGINXLXC15GB-1GB2Reverse proxyAnsibleLXC15GB-1.5GB2AutomationGH RunnerLXC15GB30GB1.5GB4GitHub Actions
+## Production Environment (64GB RAM)
 
-Pod Distribution:
-PodWorkerRAMvCPUPurposePrometheusWorker 11.5GB1MetricsGrafanaWorker 11GB0.5DashboardsNGINX IngressWorker 20.5GB1K8s IngressLokiWorker 21.5GB1Log aggregationHelmWorker 31GB0.5Package mgmtFluxCDWorker 31GB0.5GitOps CD
+| Resource | Type | OS Disk | Data Disk | RAM | vCPU | Purpose |
+|----------|------|---------|-----------|-----|------|---------|
+| FreeIPA | VM | 25GB | 30GB | 4GB | 2 | Identity mgmt |
+| K8s Master 1 | VM | 25GB | - | 4GB | 2 | Control plane |
+| K8s Master 2 | VM | 25GB | - | 4GB | 2 | Control plane |
+| K8s Master 3 | VM | 25GB | - | 4GB | 2 | Control plane |
+| K8s Worker 1 | VM | 25GB | 150GB | 8GB | 4 | Prom + Grafana |
+| K8s Worker 2 | VM | 25GB | 150GB | 8GB | 4 | NGINX Ingress + Loki |
+| K8s Worker 3 | VM | 25GB | 150GB | 8GB | 4 | Helm + FluxCD |
+| Vault 1 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
+| Vault 2 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
+| Vault 3 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
+| NGINX | LXC | 15GB | - | 1GB | 2 | Reverse proxy |
+| Ansible | LXC | 15GB | - | 1.5GB | 2 | Automation |
+| GH Runner | LXC | 15GB | 30GB | 1.5GB | 4 | GitHub Actions |
 
-Summary:
-Dev (24GB)Prod (64GB)OS Disk265GB265GBData Disk340GB570GBRAM allocated19GB49GBProxmox host2GB4GBTotal used~21GB~53GBBuffer~3GB~11GBvCPU1935
+### Pod Distribution
+
+| Pod | Worker | RAM | vCPU | Purpose |
+|-----|--------|-----|------|---------|
+| Prometheus | Worker 1 | 1.5GB | 1 | Metrics |
+| Grafana | Worker 1 | 1GB | 0.5 | Dashboards |
+| NGINX Ingress | Worker 2 | 0.5GB | 1 | K8s Ingress |
+| Loki | Worker 2 | 1.5GB | 1 | Log aggregation |
+| Helm | Worker 3 | 1GB | 0.5 | Package mgmt |
+| FluxCD | Worker 3 | 1GB | 0.5 | GitOps CD |
+
+### Summary
+
+| | Dev (24GB) | Prod (64GB) |
+|---|------------|-------------|
+| OS Disk | 265GB | 265GB |
+| Data Disk | 340GB | 570GB |
+| RAM allocated | 19GB | 49GB |
+| Proxmox host | 2GB | 4GB |
+| Total used | ~21GB | ~53GB |
+| Buffer | ~3GB | ~11GB |
+| vCPU | 19 | 35 |
+
 ---
 
 ## NAS Storage Allocation (1.8TB Total)
