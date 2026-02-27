@@ -1,6 +1,0 @@
-  sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo && \
-  sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo && \
-  sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo && \              
-  dnf config-manager --set-disabled extras && \
-  dnf clean all && \                                                                                            
-  dnf makecache    
