@@ -25,14 +25,14 @@ variable "local_runner" {
     ctid    = 2002
     name    = "local-runner"
     cores   = 1
-    memory  = 768
+    memory  = 512
     ip      = "10.0.63.20/24"
     gateway = "10.0.63.1"
     bridge  = "vmbr0"
     vlan_id = 63
     startup_delay = 60
     shutdown_delay = 60
-    startup_order = 2
+    startup_order = 3
     started = true
     on_boot = true
     stop_on_destroy = true

@@ -1,0 +1,45 @@
+name: "[DEV] Svc - Add Ansible Deploy Key"
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+env:
+  ENVIRONMENT: dev
+
+jobs:
+##### Job 1: Add Ansible SSH Key as Deploy Key #####
+  # Allows Ansible LXC to clone/pull this repo via SSH
+  setup:
+    name: "Add Ansible Deploy Key"
+    runs-on: macOS
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch Ansible SSH Public Key
+        run: |
+          ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/ssh-public-key \
+            --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+          echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
+
+      - name: Add Deploy Key to Repo
+        # Uses gh CLI already authenticated on mac-mini runner
+        run: |
+          # Add deploy key (read-only)
+          # Note: Will fail if key with same title exists - delete manually from GitHub if needed
+          gh api repos/${{ github.repository }}/keys \
+            -f title="ansible-dev" \
+            -f key="${ANSIBLE_SSH_KEY}" \
+            -F read_only=true
+
+          echo "Deploy key 'ansible-dev' added successfully"
+          echo "Ansible can now clone via: git clone git@github.com:${{ github.repository }}.git"
+

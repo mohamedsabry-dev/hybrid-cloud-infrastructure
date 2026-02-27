@@ -1,0 +1,79 @@
+name: "[DEV] Svc - GH Runner Setup"
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/dev-svc-gh_deploy_key.yml'
+permissions:
+  id-token: write
+  contents: read
+env:
+  ENVIRONMENT: dev
+
+jobs:
+##### Job 1: Setup GH Runner #####
+  # Variables required in GitHub repo settings:
+  # - GH_RUNNER_TOKEN: Fresh token from Settings > Actions > Runners (update before running)
+  # - GH_RUNNER_NAME: Runner name (default: dev-local-runner)
+  # - GH_RUNNER_LABELS: Runner labels (default: dev-local-runner)
+  setup:
+    name: "Setup GH Runner"
+    runs-on: mac-mini
+    if: ${{ vars.GH_RUNNER_DEV_LOCKED != 'true' }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch LXC root password
+        run: |
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
+      - name: Install GitHub Runner on LXC
+        env:
+          RUNNER_TOKEN: ${{ vars.GH_RUNNER_TOKEN }}
+          RUNNER_NAME: ${{ vars.GH_RUNNER_NAME }}
+          RUNNER_LABELS: ${{ vars.GH_RUNNER_LABELS }}
+        run: |
+          # Mask token in logs
+          echo "::add-mask::${RUNNER_TOKEN}"
+
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.20 "
+            # Create runner user
+            id runner || useradd -m runner
+
+            # Setup directory
+            mkdir -p /opt/actions-runner
+            cd /opt/actions-runner
+
+            # Download if not exists
+            [ -f actions-runner-linux-x64-2.331.0.tar.gz ] || \
+              curl -o actions-runner-linux-x64-2.331.0.tar.gz -L \
+              https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-linux-x64-2.331.0.tar.gz
+
+            # Extract
+            tar xzf ./actions-runner-linux-x64-2.331.0.tar.gz
+
+            # Set ownership
+            chown -R runner:runner /opt/actions-runner
+
+            # Configure (non-interactive)
+            su - runner -c \"cd /opt/actions-runner && ./config.sh --unattended \
+              --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
+              --token '${RUNNER_TOKEN}' \
+              --name '${RUNNER_NAME}' \
+              --labels '${RUNNER_LABELS}' \
+              --work '_work'\"
+
+            # Install and start service
+            ./svc.sh install runner
+            ./svc.sh start
+          "
