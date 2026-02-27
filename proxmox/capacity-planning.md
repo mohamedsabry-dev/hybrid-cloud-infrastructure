@@ -35,8 +35,8 @@
 | Vault 2 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
 | Vault 3 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
 | NGINX | LXC | 15GB | - | 0.5GB | 1 | Reverse proxy |
-| Ansible | LXC | 15GB | - | 0.75GB | 1 | Automation |
-| GH Runner | LXC | 15GB | 20GB | 0.75GB | 2 | GitHub Actions |
+| Ansible | LXC | 15GB | - | 0.5GB | 1 | Automation |
+| GH Runner | LXC | 15GB | 20GB | 0.5GB | 2 | GitHub Actions |
 
 ### Pod Distribution
 
