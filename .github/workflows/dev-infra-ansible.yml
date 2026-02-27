@@ -7,14 +7,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] Ansible LXC"
+name: "[DEV] Infra - Ansible LXC"
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'terraform/dev/proxmox/lxc/ansible/**'
-      - '.github/workflows/dev-ansible.yml'
+      - '.github/workflows/dev-infra-ansible.yml'
 permissions:
   id-token: write
   contents: read
@@ -79,6 +79,12 @@ jobs:
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
+          # Fetch LXC root password for SSH access
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init -upgrade
@@ -115,16 +121,25 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-      # Post-deploy: Manual SSH key setup required (Proxmox API limitation)
-      # See: troubleshooting/14-terraform-proxmox-lxc-clone-ssh-keys.md
-      #
-      # Ansible Node IP: 10.0.63.10
-      #
-      # From local_runner (10.0.63.20), copy SSH key to ansible:
-      # ssh-copy-id root@10.0.63.10
-      #
-      # Or manually on ansible LXC:
-      # ssh root@10.0.63.10 (use password from golden template)
-      # mkdir -p ~/.ssh && chmod 700 ~/.ssh
-      # echo "ssh-ed25519 AAAA... local-runner" >> ~/.ssh/authorized_keys
-      # chmod 600 ~/.ssh/authorized_keys
+      - name: Generate Ansible SSH Key and Store in AWS
+        run: |
+          # Generate SSH key on Ansible LXC (skip if exists)
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 \
+            "test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -C 'ansible' -f ~/.ssh/id_ed25519 -N ''"
+
+          # Fetch the public key from Ansible LXC
+          ANSIBLE_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "cat ~/.ssh/id_ed25519.pub")
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+
+          # Store in AWS Secrets Manager (create or update)
+          if aws secretsmanager describe-secret --secret-id dev/ansible/ssh-public-key 2>/dev/null; then
+            aws secretsmanager put-secret-value \
+              --secret-id dev/ansible/ssh-public-key \
+              --secret-string "${ANSIBLE_SSH_KEY}"
+            echo "Updated existing secret dev/ansible/ssh-public-key"
+          else
+            aws secretsmanager create-secret \
+              --name dev/ansible/ssh-public-key \
+              --secret-string "${ANSIBLE_SSH_KEY}"
+            echo "Created new secret dev/ansible/ssh-public-key"
+          fi
