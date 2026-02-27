@@ -7,14 +7,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] local_runner LXC"
+name: "[DEV] Infra - Local Runner LXC"
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'terraform/dev/proxmox/lxc/local_runner/**'
-      - '.github/workflows/dev-local_runner.yml'
+      - '.github/workflows/dev-infra-local_runner.yml'
 permissions:
   id-token: write
   contents: read
@@ -79,6 +79,20 @@ jobs:
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
+          # Fetch Ansible SSH public key
+          ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/ssh-public-key \
+            --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+          echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
+
+          # Fetch LXC root password for SSH access
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+          
 
       - name: Terraform Init
         run: terraform init -upgrade
@@ -115,12 +129,37 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-      # Post-deploy: Generate SSH key on local_runner and store in AWS Secrets Manager
-      # Node IP: 10.0.63.20
-      #
-      # ssh root@10.0.63.20
-      # ssh-keygen -t ed25519 -C "local-runner" -f ~/.ssh/id_ed25519 -N ""
-      # cat ~/.ssh/id_ed25519.pub
-      #
-      # Then store in AWS Secrets Manager:
-      # aws secretsmanager create-secret --name dev/local-runner/ssh-public-key --secret-string "$(cat ~/.ssh/id_ed25519.pub)"
+      - name: Copy Ansible SSH Key to local_runner
+        run: |
+          # Wait for LXC to be fully ready
+          echo "Waiting for LXC to be ready..."
+          sleep 30
+
+          # Add Ansible public key to authorized_keys on local_runner LXC
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@10.0.63.20 \
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${ANSIBLE_SSH_KEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'Ansible SSH key added successfully'"
+
+      - name: Generate local_runner SSH Key and Store in AWS
+        run: |
+          # Generate SSH key on local_runner (skip if exists)
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.20 \
+            "test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -C 'local-runner' -f ~/.ssh/id_ed25519 -N ''"
+
+          # Fetch the public key
+          LOCAL_RUNNER_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.20 "cat ~/.ssh/id_ed25519.pub")
+          echo "::add-mask::${LOCAL_RUNNER_SSH_KEY}"
+
+          # Update AWS secret
+          aws secretsmanager put-secret-value \
+            --secret-id dev/local-runner/ssh-public-key \
+            --secret-string "${LOCAL_RUNNER_SSH_KEY}"
+          echo "Updated dev/local-runner/ssh-public-key"
+
+          echo "LOCAL_RUNNER_SSH_KEY=${LOCAL_RUNNER_SSH_KEY}" >> $GITHUB_ENV
+
+      - name: Copy local_runner SSH Key to Ansible LXC
+        run: |
+          # Add local_runner key to Ansible's authorized_keys
+          # Allows GH runner to SSH into Ansible to trigger playbooks
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@10.0.63.10 \
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${LOCAL_RUNNER_SSH_KEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'local_runner SSH key added to Ansible'"

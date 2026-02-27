@@ -1,40 +1,40 @@
 #===============================================================================
-# Ansible LXC Configuration
+# Nginx LXC Configuration
 #===============================================================================
 
-variable "ansible" {
-  description = "Configuration for Ansible LXC container cloned from golden template"
+variable "nginx" {
+  description = "Configuration for Nginx LXC container cloned from golden template"
   type = object({
-    ctid    = number
-    name    = string
-    cores   = number
-    memory  = number
-    ip      = string
-    gateway = string
-    bridge  = string
-    vlan_id = number
-    startup_delay = number
+    ctid           = number
+    name           = string
+    cores          = number
+    memory         = number
+    ip             = string
+    gateway        = string
+    bridge         = string
+    vlan_id        = number
+    startup_delay  = number
     shutdown_delay = number
-    startup_order = number
-    started = bool
-    on_boot = bool
+    startup_order  = number
+    started        = bool
+    on_boot        = bool
     stop_on_destroy = bool
   })
 
   default = {
-    ctid    = 2001
-    name    = "ansible"
-    cores   = 1
-    memory  = 512
-    ip      = "10.0.63.10/24"
-    gateway = "10.0.63.1"
-    bridge  = "vmbr0"
-    vlan_id = 63
-    startup_delay = 60
+    ctid           = 2003
+    name           = "ex-nginx"
+    cores          = 1
+    memory         = 512
+    ip             = "10.0.65.10/24"
+    gateway        = "10.0.65.1"
+    bridge         = "vmbr0"
+    vlan_id        = 65
+    startup_delay  = 60
     shutdown_delay = 60
-    startup_order = 2
-    started = true
-    on_boot = true
+    startup_order  = 4
+    started        = true
+    on_boot        = true
     stop_on_destroy = true
   }
 }
@@ -88,16 +88,16 @@ variable "disks" {
 variable "mount_points" {
   description = "Map of mount point configurations for the LXC"
   type = map(object({
-    volume   = string
-    size = string
-    path  = string
+    volume = string
+    size   = string
+    path   = string
   }))
 
   default = {
     mount_1 = {
       volume = "nas-dev-data"
       size   = "5G"
-      path   = "/opt/ansible"
+      path   = "/opt/nginx"
     }
   }
 }

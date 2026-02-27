@@ -56,6 +56,7 @@ runs-on: macOS
 | Ansible | 2.20.1 | Configuration management |
 | Node.js | 25.4.0 | GitHub Actions runner |
 | PowerShell | 7.5.4 | VMware/Windows automation |
+| sshpass | 1.10 | SSH password authentication for LXC provisioning |
 
 ### Provider Mirror
 
@@ -78,7 +79,7 @@ Cached locally at `$HOME/.terraform.d/providers-mirror`
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install required tools
-brew install python@3.14 node terraform ansible awscli
+brew install python@3.14 node terraform ansible awscli sshpass
 brew install --cask docker powershell
 ```
 
