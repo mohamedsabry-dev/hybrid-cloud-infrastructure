@@ -11,7 +11,7 @@ name: "[DEV] Infra - Local Runner LXC"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/lxc/local_runner/**'
       - '.github/workflows/dev-infra-local_runner.yml'
@@ -26,32 +26,17 @@ env:
 
 
 jobs:
-##### Job 1: Deploy local_runner LXC #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the manual safe lock trigger for workflow_dispatch
-  # 4. Define the default working directory for all steps in this job
+
   deploy:
     name: "Deploy local_runner LXC"
-    runs-on: macOS
-    if: ${{ vars.LOCAL_RUNNER_DEV_LOCKED != 'true' }}
+    runs-on: mac-mini
+    if: ${{ vars.DEV_INFRA_LOCAL_RUNNER_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
 
-##### Steps (Job 1) #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the iam role
-  # 3. Initialize Tf working directory
-  # 4. Plan "dry run" the Tf code and out to tfplan
-  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
-  # 6. Give yourself small window to review the plan output before execute
-  # 7. Apply the planned content inside tfplan file
-  # 8. In case of previous success, display test instructions
     steps:
       - name: Code Checkout
         uses: actions/checkout@v4
@@ -85,6 +70,7 @@ jobs:
             --query SecretString --output text)
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
+          echo "TF_VAR_ssh_public_keys=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
           # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
@@ -92,8 +78,9 @@ jobs:
             --query SecretString --output text)
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
-          
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
 
+          
       - name: Terraform Init
         run: terraform init -upgrade
 
@@ -101,25 +88,9 @@ jobs:
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
-      - name: Lock Cleanup Instructions
-        if: failure() || cancelled()
-        run: |
-          echo "=============================================="
-          echo "  Workflow cancelled or timed out"
-          echo "=============================================="
-          echo ""
-          echo "State may be locked. To release:"
-          echo ""
-          echo "AWS Console -> DynamoDB -> Tables"
-          echo "-> hybrid-cloud-infrastructure-tf-state-lock-dev"
-          echo "-> Explore items >> Find the Locked ID"
-          echo "-> Delete item"
-          echo ""
-          echo "=============================================="
-
       - name: Review Window
         run: |
-          echo "⏳ 3-minute review window started at $(date)"
+          echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
@@ -128,16 +99,6 @@ jobs:
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
-
-      - name: Copy Ansible SSH Key to local_runner
-        run: |
-          # Wait for LXC to be fully ready
-          echo "Waiting for LXC to be ready..."
-          sleep 30
-
-          # Add Ansible public key to authorized_keys on local_runner LXC
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@10.0.63.20 \
-            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${ANSIBLE_SSH_KEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'Ansible SSH key added successfully'"
 
       - name: Generate local_runner SSH Key and Store in AWS
         run: |

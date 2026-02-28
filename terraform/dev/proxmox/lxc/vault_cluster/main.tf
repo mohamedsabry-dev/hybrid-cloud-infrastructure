@@ -1,6 +1,6 @@
 #===============================================================================
 # Vault Cluster LXC Containers
-# Clone from golden LXC template and configure for HashiCorp Vault HA cluster
+# Deploy from golden template with SSH key injection for HashiCorp Vault HA cluster
 #===============================================================================
 
 #-------------------------------------------------------------------------------
@@ -11,17 +11,28 @@ resource "proxmox_virtual_environment_container" "vault1" {
 
   node_name = var.node_name
   vm_id     = var.vault1.ctid
+  tags      = ["lxc", "vault", "ha-cluster"]
 
-  clone {
-    datastore_id = var.disks.os_disk.datastore_id
-    vm_id        = var.template_ctid
+  # Unprivileged container with nesting
+  unprivileged = true
+
+  features {
+    nesting = true
   }
 
+  # Operating System Template
+  operating_system {
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
+  }
+
+  # Root filesystem
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
   }
 
+  # Additional mount point
   mount_point {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
@@ -29,8 +40,9 @@ resource "proxmox_virtual_environment_container" "vault1" {
   }
 
   # Container Settings
-  started       = var.vault1.started
-  start_on_boot = var.vault1.on_boot
+  started         = var.vault1.started
+  start_on_boot   = var.vault1.on_boot
+  stop_on_destroy = var.vault1.stop_on_destroy
 
   # Setup Startup order
   startup {
@@ -46,6 +58,7 @@ resource "proxmox_virtual_environment_container" "vault1" {
 
   memory {
     dedicated = var.vault1.memory
+    swap      = var.vault1.swap
   }
 
   # Network Configuration
@@ -56,8 +69,14 @@ resource "proxmox_virtual_environment_container" "vault1" {
     firewall = true
   }
 
+  # Initialization with SSH key injection (supported with template approach)
   initialization {
     hostname = var.vault1.name
+
+    user_account {
+      keys     = var.ssh_public_keys
+      password = var.root_password
+    }
 
     ip_config {
       ipv4 {
@@ -88,17 +107,28 @@ resource "proxmox_virtual_environment_container" "vault2" {
 
   node_name = var.node_name
   vm_id     = var.vault2.ctid
+  tags      = ["lxc", "vault", "ha-cluster"]
 
-  clone {
-    datastore_id = var.disks.os_disk.datastore_id
-    vm_id        = var.template_ctid
+  # Unprivileged container with nesting
+  unprivileged = true
+
+  features {
+    nesting = true
   }
 
+  # Operating System Template
+  operating_system {
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
+  }
+
+  # Root filesystem
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
   }
 
+  # Additional mount point
   mount_point {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
@@ -106,8 +136,9 @@ resource "proxmox_virtual_environment_container" "vault2" {
   }
 
   # Container Settings
-  started       = var.vault2.started
-  start_on_boot = var.vault2.on_boot
+  started         = var.vault2.started
+  start_on_boot   = var.vault2.on_boot
+  stop_on_destroy = var.vault2.stop_on_destroy
 
   # Setup Startup order
   startup {
@@ -123,6 +154,7 @@ resource "proxmox_virtual_environment_container" "vault2" {
 
   memory {
     dedicated = var.vault2.memory
+    swap      = var.vault2.swap
   }
 
   # Network Configuration
@@ -133,8 +165,14 @@ resource "proxmox_virtual_environment_container" "vault2" {
     firewall = true
   }
 
+  # Initialization with SSH key injection (supported with template approach)
   initialization {
     hostname = var.vault2.name
+
+    user_account {
+      keys     = var.ssh_public_keys
+      password = var.root_password
+    }
 
     ip_config {
       ipv4 {
@@ -165,17 +203,28 @@ resource "proxmox_virtual_environment_container" "vault3" {
 
   node_name = var.node_name
   vm_id     = var.vault3.ctid
+  tags      = ["lxc", "vault", "ha-cluster"]
 
-  clone {
-    datastore_id = var.disks.os_disk.datastore_id
-    vm_id        = var.template_ctid
+  # Unprivileged container with nesting
+  unprivileged = true
+
+  features {
+    nesting = true
   }
 
+  # Operating System Template
+  operating_system {
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
+  }
+
+  # Root filesystem
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
   }
 
+  # Additional mount point
   mount_point {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
@@ -183,8 +232,9 @@ resource "proxmox_virtual_environment_container" "vault3" {
   }
 
   # Container Settings
-  started       = var.vault3.started
-  start_on_boot = var.vault3.on_boot
+  started         = var.vault3.started
+  start_on_boot   = var.vault3.on_boot
+  stop_on_destroy = var.vault3.stop_on_destroy
 
   # Setup Startup order
   startup {
@@ -200,6 +250,7 @@ resource "proxmox_virtual_environment_container" "vault3" {
 
   memory {
     dedicated = var.vault3.memory
+    swap      = var.vault3.swap
   }
 
   # Network Configuration
@@ -210,8 +261,14 @@ resource "proxmox_virtual_environment_container" "vault3" {
     firewall = true
   }
 
+  # Initialization with SSH key injection (supported with template approach)
   initialization {
     hostname = var.vault3.name
+
+    user_account {
+      keys     = var.ssh_public_keys
+      password = var.root_password
+    }
 
     ip_config {
       ipv4 {
