@@ -37,16 +37,6 @@ jobs:
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
 
-      - name: Debug token
-        env:
-          RUNNER_TOKEN: ${{ secrets.DEV_GH_RUNNER_TOKEN }}
-        run: |
-          echo "Token length: ${#RUNNER_TOKEN}"
-          if [ -z "$RUNNER_TOKEN" ]; then
-            echo "ERROR: RUNNER_TOKEN is empty!"
-            exit 1
-          fi
-
       - name: Install GitHub Runner on LXC
         env:
           RUNNER_TOKEN: ${{ secrets.DEV_GH_RUNNER_TOKEN }}
