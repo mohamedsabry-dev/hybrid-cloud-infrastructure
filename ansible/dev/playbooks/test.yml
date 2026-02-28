@@ -7,7 +7,7 @@
       ansible.builtin.command:
         cmd: hostnamectl
       register: hostname_output
-
+# Test
     - name: Display Hostname
       ansible.builtin.debug:
         msg: "{{ hostname_output.stdout_lines }}"
