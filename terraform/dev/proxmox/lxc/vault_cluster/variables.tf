@@ -20,9 +20,8 @@ variable "vault1" {
     startup_delay   = number
     shutdown_delay  = number
     startup_order   = number
-    started         = bool
-    on_boot         = bool
-    stop_on_destroy = bool
+    started = bool
+    on_boot = bool
   })
 
   default = {
@@ -38,9 +37,8 @@ variable "vault1" {
     startup_delay   = 60
     shutdown_delay  = 60
     startup_order   = 5
-    started         = true
-    on_boot         = true
-    stop_on_destroy = true
+    started = true
+    on_boot = true
   }
 }
 
@@ -62,9 +60,8 @@ variable "vault2" {
     startup_delay   = number
     shutdown_delay  = number
     startup_order   = number
-    started         = bool
-    on_boot         = bool
-    stop_on_destroy = bool
+    started = bool
+    on_boot = bool
   })
 
   default = {
@@ -80,9 +77,8 @@ variable "vault2" {
     startup_delay   = 60
     shutdown_delay  = 60
     startup_order   = 6
-    started         = true
-    on_boot         = true
-    stop_on_destroy = true
+    started = true
+    on_boot = true
   }
 }
 
@@ -104,9 +100,8 @@ variable "vault3" {
     startup_delay   = number
     shutdown_delay  = number
     startup_order   = number
-    started         = bool
-    on_boot         = bool
-    stop_on_destroy = bool
+    started = bool
+    on_boot = bool
   })
 
   default = {
@@ -122,9 +117,8 @@ variable "vault3" {
     startup_delay   = 60
     shutdown_delay  = 60
     startup_order   = 7
-    started         = true
-    on_boot         = true
-    stop_on_destroy = true
+    started = true
+    on_boot = true
   }
 }
 

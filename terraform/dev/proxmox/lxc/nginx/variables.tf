@@ -17,9 +17,8 @@ variable "nginx" {
     startup_delay   = number
     shutdown_delay  = number
     startup_order   = number
-    started         = bool
-    on_boot         = bool
-    stop_on_destroy = bool
+    started = bool
+    on_boot = bool
   })
 
   default = {
@@ -35,9 +34,8 @@ variable "nginx" {
     startup_delay   = 60
     shutdown_delay  = 60
     startup_order   = 4
-    started         = true
-    on_boot         = true
-    stop_on_destroy = true
+    started = true
+    on_boot = true
   }
 }
 
