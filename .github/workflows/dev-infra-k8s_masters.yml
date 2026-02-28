@@ -11,7 +11,7 @@ name: "[DEV] Infra - K8s Masters"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/vms/k8s_masters/**'
       - '.github/workflows/dev-infra-k8s_masters.yml'
@@ -34,7 +34,7 @@ jobs:
   deploy:
     name: "Deploy K8s Masters"
     runs-on: mac-mini
-    if: ${{ vars.K8S_MASTERS_DEV_LOCKED != 'true' }}
+    if: ${{ vars.DEV_INFRA_K8S_MASTERS_LOCK != 'true' }}
 
     defaults:
       run:

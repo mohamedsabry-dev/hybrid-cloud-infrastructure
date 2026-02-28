@@ -11,7 +11,7 @@ name: "[DEV] Infra - K8s Workers"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/vms/k8s_workers/**'
       - '.github/workflows/dev-infra-k8s_workers.yml'
@@ -34,7 +34,7 @@ jobs:
   deploy:
     name: "Deploy K8s Workers"
     runs-on: mac-mini
-    if: ${{ vars.K8S_WORKERS_DEV_LOCKED != 'true' }}
+    if: ${{ vars.DEV_INFRA_K8S_WORKERS_LOCK != 'true' }}
 
     defaults:
       run:

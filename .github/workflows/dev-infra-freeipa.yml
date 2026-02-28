@@ -7,14 +7,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] FreeIPA VM"
+name: "[DEV] Infra - FreeIPA VM"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/vms/freeipa/**'
-      - '.github/workflows/dev-freeipa.yml'
+      - '.github/workflows/dev-infra-freeipa.yml'
 permissions:
   id-token: write
   contents: read
@@ -34,7 +34,7 @@ jobs:
   deploy:
     name: "Deploy FreeIPA VM"
     runs-on: mac-mini
-    if: ${{ vars.FREEIPA_DEV_LOCKED != 'true' }}
+    if: ${{ vars.DEV_INFRA_FREEIPA_LOCK != 'true' }}
 
     defaults:
       run:
@@ -96,7 +96,7 @@ jobs:
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
