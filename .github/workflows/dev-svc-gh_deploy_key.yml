@@ -1,6 +1,11 @@
 name: "[DEV] Svc - Add Ansible Deploy Key"
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - '.github/workflows/dev-svc-gh_deploy_key.yml'
 
 permissions:
   id-token: write
@@ -14,6 +19,7 @@ jobs:
   setup:
     name: "Add Ansible Deploy Key"
     runs-on: mac-mini
+    if: ${{ vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
 
     steps:
       - name: Configure AWS Credentials
