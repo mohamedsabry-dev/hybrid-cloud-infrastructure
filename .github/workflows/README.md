@@ -71,6 +71,67 @@ su - runner -c "cd /opt/actions-runner && ./config.sh remove --token ANY_TOKEN"
 rm -f /opt/actions-runner/.runner /opt/actions-runner/.credentials /opt/actions-runner/.credentials_rsaparams
 ```
 
+## LXC SSH Key Injection Limitation
+
+### The Problem
+The bpg/proxmox Terraform provider's **clone method** for LXC containers does NOT support SSH key injection via the `user_account {}` block. Keys specified during clone are silently ignored.
+
+### Solutions
+
+**Option 1: Template Conversion (Recommended)**
+
+Convert your golden LXC to a proper template file using vzdump:
+
+```bash
+# 1. Stop the container
+pct stop 9001
+
+# 2. Create backup
+vzdump 9001 --compress gzip --storage local --mode stop
+
+# 3. Move to template directory
+mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
+
+# 4. Delete source container
+pct destroy 9001
+```
+
+Then in Terraform, use `operating_system { template_file_id }` instead of `clone {}`:
+
+```hcl
+operating_system {
+  template_file_id = "nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
+  type             = "centos"
+}
+
+initialization {
+  user_account {
+    keys     = var.ssh_public_keys  # Works with template method
+    password = var.root_password
+  }
+}
+```
+
+**Option 2: Post-Creation SSH Injection**
+
+Keep using clone method but inject keys via workflow using sshpass:
+
+```yaml
+- name: Inject SSH Keys
+  run: |
+    sshpass -p "${ROOT_PASSWORD}" ssh root@<LXC_IP> \
+      "mkdir -p ~/.ssh && echo '${SSH_PUBLIC_KEY}' >> ~/.ssh/authorized_keys"
+```
+
+### Which to Choose?
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Template Conversion | Clean, native support, keys work at boot | Extra conversion step |
+| Post-Creation SSH | Works with existing clones | Requires password auth initially |
+
+**We use Template Conversion** for all LXCs to ensure SSH keys are available immediately at first boot.
+
 ## Writing New Workflows
 
 See **[workflow-guide.txt](workflow-guide.txt)** for:

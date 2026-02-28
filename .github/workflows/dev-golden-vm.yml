@@ -37,7 +37,7 @@ jobs:
   create-vm:
     name: "Create Golden Image VM (dev)"
     runs-on: mac-mini
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_DEV_LOCKED != 'true' }}
+    if: ${{ vars.DEV_INFRA_GOLDEN_VM_LOCK != 'true' }}
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
