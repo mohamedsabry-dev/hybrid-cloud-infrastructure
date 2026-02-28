@@ -37,12 +37,25 @@ jobs:
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
 
+      - name: Debug token
+        env:
+          RUNNER_TOKEN: ${{ secrets.DEV_GH_RUNNER_TOKEN }}
+        run: |
+          echo "Token length: ${#RUNNER_TOKEN}"
+          if [ -z "$RUNNER_TOKEN" ]; then
+            echo "ERROR: RUNNER_TOKEN is empty!"
+            exit 1
+          fi
+
       - name: Install GitHub Runner on LXC
         env:
           RUNNER_TOKEN: ${{ secrets.DEV_GH_RUNNER_TOKEN }}
           RUNNER_NAME: ${{ vars.DEV_GH_RUNNER_NAME }}
           RUNNER_LABELS: ${{ vars.DEV_GH_RUNNER_LABELS }}
         run: |
+          # Stop existing service if running
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+            "/opt/actions-runner/svc.sh stop 2>/dev/null || true; /opt/actions-runner/svc.sh uninstall 2>/dev/null || true"
 
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 "
             # Create runner user (as root)
@@ -62,16 +75,12 @@ jobs:
 
             # Set ownership (as root)
             chown -R runner:runner /opt/actions-runner
-
-            # Configure runner (as runner user) - use --replace to handle existing runner
-            su - runner -c \"cd /opt/actions-runner && ./config.sh --unattended --replace \
-              --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
-              --token '${RUNNER_TOKEN}' \
-              --name '${RUNNER_NAME}' \
-              --labels '${RUNNER_LABELS}' \
-              --work _work\"
-
-            # Install and start service (as root, use absolute paths)
-            /opt/actions-runner/svc.sh install runner
-            /opt/actions-runner/svc.sh start
           "
+
+          # Configure runner separately to avoid quoting issues
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+            "su - runner -c 'cd /opt/actions-runner && ./config.sh --unattended --replace --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure --token ${RUNNER_TOKEN} --name ${RUNNER_NAME} --labels ${RUNNER_LABELS} --work _work'"
+
+          # Install and start service
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+            "/opt/actions-runner/svc.sh install runner && /opt/actions-runner/svc.sh start"
