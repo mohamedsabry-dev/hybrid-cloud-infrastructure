@@ -1,6 +1,6 @@
 #===============================================================================
 # local_runner LXC Container
-# Clone from golden LXC template and configure for local_runner control node 
+# Deploy from golden template with SSH key injection
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "local_runner" {
@@ -8,17 +8,28 @@ resource "proxmox_virtual_environment_container" "local_runner" {
 
   node_name = var.node_name
   vm_id     = var.local_runner.ctid
+  tags      = ["lxc", "local-runner", "infrastructure"]
 
-  clone {
-    datastore_id = var.disks.os_disk.datastore_id
-    vm_id        = var.template_ctid
+  # Unprivileged container with nesting
+  unprivileged = true
+
+  features {
+    nesting = true
   }
 
+  # Operating System Template
+  operating_system {
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
+  }
+
+  # Root filesystem
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
   }
 
+  # Additional mount point
   mount_point {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
@@ -26,11 +37,11 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   }
 
   # Container Settings
-  started       = var.local_runner.started
-  start_on_boot = var.local_runner.on_boot
+  started         = var.local_runner.started
+  start_on_boot   = var.local_runner.on_boot
+  stop_on_destroy = var.local_runner.stop_on_destroy
 
   # Setup Startup order
-
   startup {
     order      = var.local_runner.startup_order
     up_delay   = var.local_runner.startup_delay
@@ -44,6 +55,7 @@ resource "proxmox_virtual_environment_container" "local_runner" {
 
   memory {
     dedicated = var.local_runner.memory
+    swap      = var.local_runner.swap
   }
 
   # Network Configuration
@@ -54,11 +66,14 @@ resource "proxmox_virtual_environment_container" "local_runner" {
     firewall = true
   }
 
-  # Cloud-init style initialization (API-only)
-  # Note: user_account removed - not supported for cloned LXC (Proxmox API limitation)
-  # Password inherited from golden template, SSH keys added manually post-deploy
+  # Initialization with SSH key injection (supported with template approach)
   initialization {
     hostname = var.local_runner.name
+
+    user_account {
+      keys     = var.ssh_public_keys
+      password = var.root_password
+    }
 
     ip_config {
       ipv4 {

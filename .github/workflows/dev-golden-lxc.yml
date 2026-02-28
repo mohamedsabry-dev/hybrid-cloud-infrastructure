@@ -12,7 +12,7 @@ name: "[DEV] Golden LXC"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/proxmox/lxc/golden-template/**'
       - '.github/workflows/dev-golden-lxc.yml'
@@ -29,34 +29,19 @@ env:
 
 
 jobs:
-##### Job 1 Core #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the manual safe lock trigger for workflow_dispatch
-  # 4. Define the default working directory for all steps in this job
+
   create-lxc-template:
     name: "Create Golden LXC (dev)"
-    runs-on: macOS
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_LXC_DEV_LOCKED != 'true' }}
+    runs-on: mac-mini
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEV_INFRA_GOLDEN_LXC_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
-
-##### Steps #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the iam role
-  # 3. Fetch the LXC root password from AWS Secrets Manager
-  # 4. Initialize Tf working directory
-  # 5. Plan "dry run" the Tf code and out to tfplan
-  # 6. Give yourself small window to review the plan output before execute
-  # 7. Apply the planned content inside tfplan file
-  # 8. In case of previous success, display manual instructions for complete the Job
     steps:
-      - uses: actions/checkout@v4
+      - name: Code Checkout
+        uses: actions/checkout@v4
 
       # 1. Authenticate with AWS via OIDC
       - name: Configure AWS Credentials
@@ -73,23 +58,23 @@ jobs:
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
 
-          LXC_PWD=$(aws secretsmanager get-secret-value \
-            --secret-id dev/golden-image/lxc-root-password \
-            --query SecretString --output text)
-
-            
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
-          echo "::add-mask::${LXC_PWD}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
-
-
-          echo "TF_VAR_lxc_root_password=${LXC_PWD}" >> $GITHUB_ENV
+          
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          
+          echo "::add-mask::${LXC_PWD}"
+
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
@@ -100,8 +85,11 @@ jobs:
 
       - name: Review Window
         run: |
-          echo "⏳ 3-minute review window for LXC Template deployment"
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
           sleep 180
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
@@ -128,8 +116,18 @@ jobs:
           echo "Step 4: After setup completes, exit and convert to template"
           echo "  exit"
           echo "  pct stop 9001"
-          echo "  pct template 9001"
           echo ""
+          echo "Step 5: Create template using vzdump (supports SSH key injection)"
+          echo "  vzdump 9001 --compress gzip --storage nas-iso --mode stop"
+          echo ""
+          echo "Step 6: Rename the backup to template format"
+          echo "  cd /mnt/pve/nas-iso/template/cache/"
+          echo "  mv vzdump-lxc-9001-*.tar.gz rocky-9-lxc-golden.tar.gz"
+          echo ""
+          echo "Step 7: Verify template is available"
+          echo "  pveam list nas-iso"
+          echo ""
+          echo "Note: The template will be at: nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
           echo "=============================================="
 
 ##################################################################################
