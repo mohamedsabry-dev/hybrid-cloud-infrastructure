@@ -2,9 +2,9 @@ name: "[DEV] Svc - GH Runner Setup"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
-      - '.github/workflows/dev-svc-gh_deploy_key.yml'
+      - '.github/workflows/dev-svc-gh-local_runner.yml'
 permissions:
   id-token: write
   contents: read
@@ -20,7 +20,7 @@ jobs:
   setup:
     name: "Setup GH Runner"
     runs-on: mac-mini
-    if: ${{ vars.GH_RUNNER_DEV_LOCKED != 'true' }}
+    if: ${{ vars.DEV_SVC_GH_RUNNER_LOCK != 'true' }}
 
     steps:
       - name: Configure AWS Credentials
@@ -39,41 +39,42 @@ jobs:
 
       - name: Install GitHub Runner on LXC
         env:
-          RUNNER_TOKEN: ${{ vars.GH_RUNNER_TOKEN }}
-          RUNNER_NAME: ${{ vars.GH_RUNNER_NAME }}
-          RUNNER_LABELS: ${{ vars.GH_RUNNER_LABELS }}
+          RUNNER_TOKEN: ${{ vars.DEV_GH_RUNNER_TOKEN }}
+          RUNNER_NAME: ${{ vars.DEV_GH_RUNNER_NAME }}
+          RUNNER_LABELS: ${{ vars.DEV_GH_RUNNER_LABELS }}
         run: |
           # Mask token in logs
           echo "::add-mask::${RUNNER_TOKEN}"
 
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.20 "
-            # Create runner user
-            id runner || useradd -m runner
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 "
+            # Create runner user (as root)
+            id runner > /dev/null 2>&1 || useradd -m runner
 
-            # Setup directory
+            # Setup directory (as root)
             mkdir -p /opt/actions-runner
             cd /opt/actions-runner
 
-            # Download if not exists
+            # Download if not exists (as root)
             [ -f actions-runner-linux-x64-2.331.0.tar.gz ] || \
-              curl -o actions-runner-linux-x64-2.331.0.tar.gz -L \
+              curl -sL -o actions-runner-linux-x64-2.331.0.tar.gz \
               https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-linux-x64-2.331.0.tar.gz
 
-            # Extract
+            # Extract (as root)
             tar xzf ./actions-runner-linux-x64-2.331.0.tar.gz
 
-            # Set ownership
+            # Set ownership (as root)
             chown -R runner:runner /opt/actions-runner
 
-            # Configure (non-interactive)
+            # Configure runner (as runner user)
             su - runner -c \"cd /opt/actions-runner && ./config.sh --unattended \
               --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
               --token '${RUNNER_TOKEN}' \
               --name '${RUNNER_NAME}' \
               --labels '${RUNNER_LABELS}' \
-              --work '_work'\"
+              --work _work\"
 
-            # Install and start service
+            # Install and start service (as root, from correct directory)
+            cd /opt/actions-runner
             ./svc.sh install runner
             ./svc.sh start
           "
