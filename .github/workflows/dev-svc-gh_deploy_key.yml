@@ -60,10 +60,14 @@ jobs:
       - name: Test Pull Dev
         run: |
           ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "
-            mkdir -p /opt/ansible
-            if [ ! -d /opt/ansible/repo/.git ]; then
-              rm -rf /opt/ansible/repo
-              git clone -b dev --single-branch git@github.com:${{ github.repository }}.git /opt/ansible/repo
+            # Add GitHub host key to known_hosts
+            mkdir -p ~/.ssh
+            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+            # Clone or pull repo
+            if [ ! -d /srv/repo/.git ]; then
+              rm -rf /srv/repo
+              git clone -b dev --single-branch git@github.com:${{ github.repository }}.git /srv/repo
             fi
-            cd /opt/ansible/repo && git pull origin dev
+            cd /srv/repo && git pull origin dev
           "
