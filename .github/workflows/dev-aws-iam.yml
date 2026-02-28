@@ -8,14 +8,14 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] IAM"
+name: "[DEV] AWS - IAM"
 on:
   push:
     branches:
       - dev-security
     paths:
       - 'terraform/dev/aws/iam/**'
-      - '.github/workflows/dev-iam.yml'
+      - '.github/workflows/dev-aws-iam.yml'
 permissions:
   id-token: write
   contents: read
