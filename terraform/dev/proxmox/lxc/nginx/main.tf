@@ -37,9 +37,8 @@ resource "proxmox_virtual_environment_container" "nginx" {
   }
 
   # Container Settings
-  started         = var.nginx.started
-  start_on_boot   = var.nginx.on_boot
-  stop_on_destroy = var.nginx.stop_on_destroy
+  started       = var.nginx.started
+  start_on_boot = var.nginx.on_boot
 
   # Setup Startup order
   startup {

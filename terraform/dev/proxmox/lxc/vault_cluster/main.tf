@@ -40,9 +40,8 @@ resource "proxmox_virtual_environment_container" "vault1" {
   }
 
   # Container Settings
-  started         = var.vault1.started
-  start_on_boot   = var.vault1.on_boot
-  stop_on_destroy = var.vault1.stop_on_destroy
+  started       = var.vault1.started
+  start_on_boot = var.vault1.on_boot
 
   # Setup Startup order
   startup {
@@ -136,9 +135,8 @@ resource "proxmox_virtual_environment_container" "vault2" {
   }
 
   # Container Settings
-  started         = var.vault2.started
-  start_on_boot   = var.vault2.on_boot
-  stop_on_destroy = var.vault2.stop_on_destroy
+  started       = var.vault2.started
+  start_on_boot = var.vault2.on_boot
 
   # Setup Startup order
   startup {
@@ -232,9 +230,8 @@ resource "proxmox_virtual_environment_container" "vault3" {
   }
 
   # Container Settings
-  started         = var.vault3.started
-  start_on_boot   = var.vault3.on_boot
-  stop_on_destroy = var.vault3.stop_on_destroy
+  started       = var.vault3.started
+  start_on_boot = var.vault3.on_boot
 
   # Setup Startup order
   startup {
