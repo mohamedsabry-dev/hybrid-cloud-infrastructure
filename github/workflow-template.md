@@ -7,7 +7,7 @@ Reusable blocks for building GitHub Actions workflows.
 ## Block 1: Trigger Configuration
 
 ```yaml
-name: "{ENV} - {Resource Name}"
+name: "[{ENV}] Infra - {Resource Name}"
 
 on:
   push:
@@ -15,9 +15,7 @@ on:
       - {env}
     paths:
       - 'terraform/{env}/proxmox/{path}/**'
-      - '.github/workflows/{workflow-file}.yml'
-
-  workflow_dispatch:
+      - '.github/workflows/{env}-infra-{name}.yml'
 
 permissions:
   id-token: write   # Required for OIDC authentication with AWS
@@ -36,16 +34,16 @@ env:
 jobs:
   deploy:
     name: "Deploy {Resource}"
-    runs-on: macOS
-    # Skip if locked (unless manual trigger)
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.{RESOURCE}_{ENV}_LOCKED != 'true' }}
+    runs-on: mac-mini
+    # Skip if locked
+    if: ${{ vars.{ENV}_INFRA_{NAME}_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 ```
 
-> **Note:** Create lock variable in GitHub Settings → Variables → `{RESOURCE}_{ENV}_LOCKED`
+> **Note:** Create lock variable in GitHub Settings → Variables → `{ENV}_INFRA_{NAME}_LOCK`
 
 ---
 
@@ -120,25 +118,25 @@ jobs:
         if: failure() || cancelled()
         run: |
           echo "=============================================="
-          echo "⚠️  Workflow cancelled or timed out"
+          echo "Workflow cancelled or timed out"
           echo "=============================================="
           echo ""
           echo "State may be locked. To release:"
           echo ""
-          echo "AWS Console → DynamoDB → Tables"
-          echo "→ hybrid-cloud-infrastructure-tf-state-lock-{env}"
-          echo "→ Explore items >> Find the Locked ID"
-          echo "→ Delete item"
+          echo "AWS Console > DynamoDB > Tables"
+          echo "> hybrid-cloud-infrastructure-tf-state-lock-{env}"
+          echo "> Explore items >> Find the Locked ID"
+          echo "> Delete item"
           echo ""
           echo "=============================================="
 
       - name: Review Window
         run: |
-          echo "⏳ 3-minute review window started at $(date)"
+          echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -155,9 +153,18 @@ jobs:
 
 | Placeholder | Example | Description |
 |-------------|---------|-------------|
-| `{ENV}` | `DEV` | Uppercase for variables |
+| `{ENV}` | `DEV` | Uppercase for display/variables |
 | `{env}` | `dev` | Lowercase for paths/branches |
-| `{Resource Name}` | `Proxmox Golden Image` | Display name |
-| `{RESOURCE}` | `GOLDEN_IMAGE` | Lock variable prefix |
-| `{path}` | `vms/golden-image` | Path under proxmox/ |
-| `{workflow-file}` | `dev-golden-vm` | Workflow filename |
+| `{Resource Name}` | `FreeIPA VM` | Display name |
+| `{NAME}` | `FREEIPA` | Lock variable name portion |
+| `{name}` | `freeipa` | Lowercase for filename |
+| `{path}` | `vms/freeipa` | Path under proxmox/ |
+
+## Naming Conventions
+
+| Item | Pattern | Example |
+|------|---------|---------|
+| Workflow file | `{env}-infra-{name}.yml` | `dev-infra-freeipa.yml` |
+| Workflow name | `[{ENV}] Infra - {Name}` | `[DEV] Infra - FreeIPA VM` |
+| Lock variable | `{ENV}_INFRA_{NAME}_LOCK` | `DEV_INFRA_FREEIPA_LOCK` |
+| Runner | `mac-mini` | `runs-on: mac-mini` |
