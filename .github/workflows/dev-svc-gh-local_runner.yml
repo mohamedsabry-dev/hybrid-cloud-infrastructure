@@ -65,6 +65,12 @@ jobs:
 
             # Set ownership (as root)
             chown -R runner:runner /opt/actions-runner
+
+            # Copy root SSH keys to runner user (allows runner to SSH to other LXCs)
+            mkdir -p /home/runner/.ssh
+            cp /root/.ssh/id_ed25519 /root/.ssh/id_ed25519.pub /home/runner/.ssh/ 2>/dev/null || true
+            chown -R runner:runner /home/runner/.ssh
+            chmod 600 /home/runner/.ssh/id_ed25519 2>/dev/null || true
           "
 
           # Configure runner
