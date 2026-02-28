@@ -57,7 +57,7 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     hostname = var.lxc_container.hostname
 
     user_account {
-      password = var.lxc_root_password
+      password = var.root_password
       keys     = []
     }
 
