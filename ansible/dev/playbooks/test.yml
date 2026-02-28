@@ -6,9 +6,9 @@
     - name: Get Hostname
       ansible.builtin.command:
         cmd: hostnamectl
-        register: hostname_output
+      register: hostname_output
 
     - name: Display Hostname
       ansible.builtin.debug:
-        msg: "{{ hostname_output.stdout.lines }}"
+        msg: "{{ hostname_output.stdout_lines }}"
 
