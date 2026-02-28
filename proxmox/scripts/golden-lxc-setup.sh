@@ -156,6 +156,17 @@ fi
 echo ""
 echo ">>> [9/9] Final cleanup..."
 
+# Clean network configuration (prevents IP inheritance on clone)
+echo "Cleaning network configuration..."
+rm -f /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null || true
+rm -f /etc/sysconfig/network-scripts/ifcfg-eth* 2>/dev/null || true
+rm -rf /var/lib/NetworkManager/* 2>/dev/null || true
+rm -f /var/lib/dhclient/* 2>/dev/null || true
+
+# Remove SSH host keys (regenerated on first boot)
+echo "Removing SSH host keys..."
+rm -f /etc/ssh/ssh_host_*
+
 # Clean package cache
 dnf clean all
 rm -rf /var/cache/dnf/*
