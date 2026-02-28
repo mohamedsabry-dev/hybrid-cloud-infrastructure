@@ -74,3 +74,4 @@ jobs:
           # Install and start service
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
             "cd /opt/actions-runner && ./svc.sh install runner && ./svc.sh start"
+
