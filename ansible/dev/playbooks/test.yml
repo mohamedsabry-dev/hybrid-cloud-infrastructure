@@ -3,6 +3,12 @@
   hosts: all
   become: yes
   tasks:
-    - name: Display hostname
+    - name: Get Hostname
       ansible.builtin.command:
         cmd: hostnamectl
+        register: hostname_output
+
+    - name: Display Hostname
+      anisble/builtin.debug:
+        msg: "{{ hostname_output.stdout.lines }}"
+
