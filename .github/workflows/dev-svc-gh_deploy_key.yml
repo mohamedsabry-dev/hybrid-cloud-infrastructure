@@ -40,15 +40,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_ADMIN_PAT }}
         run: |
-          # Add deploy key (read-only)
-          # Note: Will fail if key with same title exists - delete manually from GitHub if needed
-          gh api repos/${{ github.repository }}/keys \
+          # Add deploy key (read-only) - skip if already exists
+          if gh api repos/${{ github.repository }}/keys \
             -f title="ansible-dev" \
             -f key="${ANSIBLE_SSH_KEY}" \
-            -F read_only=true
-
-          echo "Deploy key 'ansible-dev' added successfully"
-          echo "Ansible can now clone via: git clone git@github.com:${{ github.repository }}.git"
+            -F read_only=true 2>&1; then
+            echo "Deploy key 'ansible-dev' added successfully"
+          else
+            echo "Deploy key already exists or failed - continuing"
+          fi
+          echo "Ansible can clone via: git clone git@github.com:${{ github.repository }}.git"
 
   test:
     name: "Test Ansible Git Pull"
