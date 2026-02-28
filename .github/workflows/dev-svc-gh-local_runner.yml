@@ -67,9 +67,9 @@ jobs:
             chown -R runner:runner /opt/actions-runner
           "
 
-          # Configure runner separately to avoid quoting issues
+          # Configure runner
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
-            "su - runner -c 'cd /opt/actions-runner && ./config.sh --unattended --replace --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure --token ${RUNNER_TOKEN} --name ${RUNNER_NAME} --labels ${RUNNER_LABELS} --work _work'"
+            "su - runner -c 'cd /opt/actions-runner && ./config.sh --unattended --replace --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure --token ${{ secrets.DEV_GH_RUNNER_TOKEN }} --name ${{ vars.DEV_GH_RUNNER_NAME }} --labels ${{ vars.DEV_GH_RUNNER_LABELS }} --work _work'"
 
           # Install and start service
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
