@@ -43,9 +43,9 @@ jobs:
           RUNNER_NAME: ${{ vars.DEV_GH_RUNNER_NAME }}
           RUNNER_LABELS: ${{ vars.DEV_GH_RUNNER_LABELS }}
         run: |
-          # Stop existing service if running
+          # Stop existing service and clean old config (handles orphaned configs)
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
-            "/opt/actions-runner/svc.sh stop 2>/dev/null || true; /opt/actions-runner/svc.sh uninstall 2>/dev/null || true"
+            "cd /opt/actions-runner 2>/dev/null && ./svc.sh stop 2>/dev/null; ./svc.sh uninstall 2>/dev/null; rm -f .runner .credentials .credentials_rsaparams .service 2>/dev/null; exit 0"
 
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 "
             # Create runner user (as root)
