@@ -37,7 +37,8 @@ jobs:
           echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
       - name: Add Deploy Key to Repo
-        # Uses gh CLI already authenticated on mac-mini runner
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_PAT }}
         run: |
           # Add deploy key (read-only)
           # Note: Will fail if key with same title exists - delete manually from GitHub if needed
