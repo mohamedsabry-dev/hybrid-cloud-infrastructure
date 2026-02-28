@@ -37,9 +37,8 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   }
 
   # Container Settings
-  started         = var.local_runner.started
-  start_on_boot   = var.local_runner.on_boot
-  stop_on_destroy = var.local_runner.stop_on_destroy
+  started       = var.local_runner.started
+  start_on_boot = var.local_runner.on_boot
 
   # Setup Startup order
   startup {
