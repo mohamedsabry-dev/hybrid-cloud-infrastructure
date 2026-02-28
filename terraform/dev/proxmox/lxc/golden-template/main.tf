@@ -23,8 +23,8 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
 
   # Operating System Template
   operating_system {
-    template_file_id = var.template_file
-    type             = "centos"
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
   }
 
   # CPU
