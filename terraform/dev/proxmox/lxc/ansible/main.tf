@@ -37,9 +37,8 @@ resource "proxmox_virtual_environment_container" "ansible" {
   }
 
   # Container Settings
-  started         = var.ansible.started
-  start_on_boot   = var.ansible.on_boot
-  stop_on_destroy = var.ansible.stop_on_destroy
+  started       = var.ansible.started
+  start_on_boot = var.ansible.on_boot
 
   # Setup Startup order
 
