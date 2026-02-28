@@ -9,6 +9,6 @@
         register: hostname_output
 
     - name: Display Hostname
-      anisble/builtin.debug:
+      ansible.builtin.debug:
         msg: "{{ hostname_output.stdout.lines }}"
 
