@@ -69,7 +69,7 @@ jobs:
             --secret-id dev/ansible/ssh-public-key \
             --query SecretString --output text)
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
-          echo "TF_VAR_ssh_public_keys=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
+          echo "TF_VAR_ssh_public_keys=[\"${ANSIBLE_SSH_KEY}\"]" >> $GITHUB_ENV
 
           # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
