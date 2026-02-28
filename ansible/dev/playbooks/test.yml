@@ -1,0 +1,8 @@
+---
+- name: Test Ansible
+  hosts: all
+  become: yes
+  tasks:
+    - name: Display hostname
+      ansible.builtin.command:
+        cmd: hostnamectl
