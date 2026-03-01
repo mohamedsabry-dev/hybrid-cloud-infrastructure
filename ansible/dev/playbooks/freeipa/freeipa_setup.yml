@@ -1,0 +1,15 @@
+# playbooks/freeipa_setup.yml
+---
+- name: Install FreeIPA Server
+  hosts: freeipa
+  become: yes
+
+  tasks:
+    - name: Uninstall IPA client if present
+      ansible.builtin.command:
+        cmd: ipa-client-install --uninstall --unattended
+      ignore_errors: yes
+      changed_when: false
+
+  roles:
+    - role: freeipa.ansible_freeipa.ipaserver
