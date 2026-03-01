@@ -19,10 +19,10 @@ jobs:
     steps:
       - name: Pull latest code
         run: |
-          sudo ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+          ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
 
       - name: Run setup_tools playbook
         run: |
-          sudo ssh root@10.0.63.10 "\
+          ssh root@10.0.63.10 "\
             cd /srv/repo/ansible/dev && \
             ansible-playbook -i inventory/inventory.ini playbooks/local-runner/setup_tools.yml"
