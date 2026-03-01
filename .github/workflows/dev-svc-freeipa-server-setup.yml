@@ -2,10 +2,10 @@ name: "[DEV] FreeIPA Service Install"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'ansible/dev/**'
-      - '.github/workflows/dev-service_freeipa.yml'
+      - '.github/workflows/dev-svc-freeipa-server-setup.yml'
 permissions:
   id-token: write
   contents: read
@@ -17,7 +17,7 @@ jobs:
   deploy:
     name: "Deploy FreeIPA Service Install"
     runs-on: dev-local-runner
-    if: ${{ vars.FREEIPA_SERVICE_DEV != 'true' }}
+    if: ${{ vars.DEV_SVC_FREEIPA_SETUP != 'true' }}
 
 
     steps:
@@ -48,12 +48,12 @@ jobs:
 
       - name: Pull latest code
         run: |
-          sudo ssh root@10.0.63.10 "cd /opt/ansible/infrastructure && git pull origin dev"
+          sudo ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
 
       - name: Run FreeIPA playbook
         run: |
            sudo ssh root@10.0.63.10 "\
               export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
               export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
-              cd /opt/ansible/infrastructure/ansible/dev && \
-              ansible-playbook -i inventory/inventory.ini playbooks/freeipa_setup.yml"
+              cd /srv/repo/ansible/dev/ && \
+              ansible-playbook -i inventory/inventory.ini playbooks/freeipa/freeipa_setup.yml"
