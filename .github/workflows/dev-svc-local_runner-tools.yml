@@ -1,0 +1,28 @@
+name: "[DEV] Local Runner - Install Tools"
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'ansible/dev/playbooks/local-runner/setup_tools.yml'
+      - '.github/workflows/dev-svc-local_runner-tools.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: read
+
+jobs:
+  install-tools:
+    name: "Install Tools on Local Runner"
+    runs-on: dev-local-runner
+
+    steps:
+      - name: Pull latest code
+        run: |
+          sudo ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+
+      - name: Run setup_tools playbook
+        run: |
+          sudo ssh root@10.0.63.10 "\
+            cd /srv/repo/ansible/dev && \
+            ansible-playbook -i inventory/inventory.ini playbooks/local-runner/setup_tools.yml"
