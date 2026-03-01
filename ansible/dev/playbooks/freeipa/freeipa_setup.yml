@@ -17,18 +17,16 @@
         regexp: 'manage_etc_hosts'
         line: "manage_etc_hosts: False"
 
-    - name: Fix /etc/hosts for FreeIPA
+    - name: Remove all existing freeipa entries from /etc/hosts
+      ansible.builtin.shell: |
+        sed -i '/freeipa/d' /etc/hosts
+      changed_when: true
+
+    - name: Add correct /etc/hosts entry for FreeIPA
       ansible.builtin.lineinfile:
         path: /etc/hosts
-        regexp: '.*freeipa\.lab\.local.*'
         line: "{{ ansible_default_ipv4.address }} {{ ipaserver_hostname }} {{ freeipa_alias }}"
         state: present
-
-    - name: Remove IPv6 freeipa entry
-      ansible.builtin.lineinfile:
-        path: /etc/hosts
-        regexp: '::1.*freeipa'
-        state: absent
 
   roles:
     - role: freeipa.ansible_freeipa.ipaserver
