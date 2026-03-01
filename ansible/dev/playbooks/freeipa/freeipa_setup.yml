@@ -4,7 +4,7 @@
   hosts: freeipa
   become: yes
 
-  tasks:
+  pre_tasks:
     - name: Uninstall IPA client if present
       ansible.builtin.command:
         cmd: ipa-client-install --uninstall --unattended
