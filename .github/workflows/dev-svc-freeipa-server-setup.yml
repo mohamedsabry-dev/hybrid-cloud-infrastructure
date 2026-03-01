@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  ENVIRONMENT: main
+  ENVIRONMENT: dev
 
 jobs:
   deploy:
