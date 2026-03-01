@@ -48,11 +48,11 @@ jobs:
 
       - name: Pull latest code
         run: |
-          sudo ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+           ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
 
       - name: Run FreeIPA playbook
         run: |
-           sudo ssh root@10.0.63.10 "\
+            ssh root@10.0.63.10 "\
               export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
               export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
               cd /srv/repo/ansible/dev/ && \
