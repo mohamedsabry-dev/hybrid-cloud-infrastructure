@@ -11,5 +11,24 @@
       ignore_errors: yes
       changed_when: false
 
+    - name: Disable cloud-init hosts management
+      ansible.builtin.lineinfile:
+        path: /etc/cloud/cloud.cfg
+        regexp: 'manage_etc_hosts'
+        line: "manage_etc_hosts: False"
+
+    - name: Fix /etc/hosts for FreeIPA
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '.*freeipa\.lab\.local.*'
+        line: "{{ ansible_default_ipv4.address }} {{ ipaserver_hostname }} {{ freeipa_alias }}"
+        state: present
+
+    - name: Remove IPv6 freeipa entry
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '::1.*freeipa'
+        state: absent
+
   roles:
     - role: freeipa.ansible_freeipa.ipaserver
