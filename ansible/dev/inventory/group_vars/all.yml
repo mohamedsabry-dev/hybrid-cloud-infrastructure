@@ -5,3 +5,12 @@ initial_packages:
   - curl
   - htop
   - unzip
+
+
+ipaclient_domain: lab.local
+ipaclient_realm: LAB.LOCAL
+ipaclient_servers:
+    - freeipa.lab.local
+ipaadmin_principal: admin
+ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
+ipaclient_mkhomedir: yes
