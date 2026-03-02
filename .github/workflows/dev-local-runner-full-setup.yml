@@ -131,7 +131,7 @@ jobs:
     name: "2. Setup GH Runner"
     runs-on: mac-mini
     needs: deploy
-    if: ${{ (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') && vars.DEV_SVC_GH_RUNNER_LOCK != 'true' }}
+    if: ${{ always() && needs.deploy.result != 'failure' && needs.deploy.result != 'cancelled' && vars.DEV_SVC_GH_RUNNER_LOCK != 'true' }}
 
     steps:
       - name: Configure AWS Credentials
@@ -198,7 +198,7 @@ jobs:
     name: "3. Install Tools on Local Runner"
     runs-on: dev-local-runner
     needs: setup
-    if: ${{ (needs.setup.result == 'success' || needs.setup.result == 'skipped') && vars.DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK != 'true' }}
+    if: ${{ always() && needs.setup.result != 'failure' && needs.setup.result != 'cancelled' && vars.DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK != 'true' }}
 
     steps:
       - name: Pull latest code
