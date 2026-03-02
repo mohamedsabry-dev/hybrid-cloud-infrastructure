@@ -108,7 +108,7 @@ jobs:
     name: "2. Add Deploy Key"
     runs-on: mac-mini
     needs: deploy-lxc
-    if: ${{ (needs.deploy-lxc.result == 'success' || needs.deploy-lxc.result == 'skipped') && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
+    if: ${{ always() && needs.deploy-lxc.result != 'failure' && needs.deploy-lxc.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
 
     steps:
       - name: Configure AWS Credentials
@@ -147,7 +147,7 @@ jobs:
     name: "3. Test Git Clone"
     runs-on: dev-local-runner
     needs: add-deploy-key
-    if: ${{ (needs.add-deploy-key.result == 'success' || needs.add-deploy-key.result == 'skipped') && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
+    if: ${{ always() && needs.add-deploy-key.result != 'failure' && needs.add-deploy-key.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
 
     steps:
       - name: Test Pull Dev
@@ -172,7 +172,7 @@ jobs:
     name: "4. Setup Ansible"
     runs-on: dev-local-runner
     needs: test-deploy-key
-    if: ${{ (needs.test-deploy-key.result == 'success' || needs.test-deploy-key.result == 'skipped') && vars.DEV_SVC_ANSIBLE_SETUP_LOCK != 'true' }}
+    if: ${{ always() && needs.test-deploy-key.result != 'failure' && needs.test-deploy-key.result != 'cancelled' && vars.DEV_SVC_ANSIBLE_SETUP_LOCK != 'true' }}
 
     steps:
       - name: Install Ansible

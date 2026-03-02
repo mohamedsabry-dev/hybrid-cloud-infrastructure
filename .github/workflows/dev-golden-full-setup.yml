@@ -132,7 +132,7 @@ jobs:
     name: "2. Create Golden LXC"
     runs-on: mac-mini
     needs: create-vm
-    if: ${{ (needs.create-vm.result == 'success' || needs.create-vm.result == 'skipped') && vars.DEV_INFRA_GOLDEN_LXC_LOCK != 'true' }}
+    if: ${{ always() && needs.create-vm.result != 'failure' && needs.create-vm.result != 'cancelled' && vars.DEV_INFRA_GOLDEN_LXC_LOCK != 'true' }}
 
 
     defaults:
