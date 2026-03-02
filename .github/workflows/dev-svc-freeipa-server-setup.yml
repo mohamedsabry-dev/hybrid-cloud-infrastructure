@@ -2,7 +2,7 @@ name: "[DEV] FreeIPA Service Install"
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'ansible/dev/**'
       - '.github/workflows/dev-svc-freeipa-server-setup.yml'
