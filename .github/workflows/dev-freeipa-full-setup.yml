@@ -1,38 +1,31 @@
-# Dev Proxmox FreeIPA VM - Setup Core & Verify Golden Image Template
+# Dev FreeIPA Full Setup - Combined Workflow
+# Combines: infra-freeipa, svc-freeipa-server-setup
+# Each job has its own lock - locked jobs skip to next, not fail whole workflow
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
-name: "[DEV] Infra - FreeIPA VM"
+name: "[DEV] FreeIPA - Full Setup"
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev
     paths:
       - 'terraform/dev/proxmox/vms/freeipa/**'
-      - '.github/workflows/dev-infra-freeipa.yml'
+      - 'ansible/dev/**'
+      - '.github/workflows/dev-freeipa-full-setup.yml'
+
 permissions:
   id-token: write
   contents: read
+
 env:
   ENVIRONMENT: dev
   TF_WORKING_DIR: terraform/dev/proxmox/vms/freeipa
-#####################
-#####################
-
 
 jobs:
 ##### Job 1: Deploy FreeIPA VM #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the manual safe lock trigger for workflow_dispatch
-  # 4. Define the default working directory for all steps in this job
-  deploy:
-    name: "Deploy FreeIPA VM"
+  # Lock: DEV_INFRA_FREEIPA_LOCK
+  deploy-vm:
+    name: "1. Deploy FreeIPA VM"
     runs-on: mac-mini
     if: ${{ vars.DEV_INFRA_FREEIPA_LOCK != 'true' }}
 
@@ -51,14 +44,14 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
- 
+
       # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
-            
+
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
@@ -101,3 +94,51 @@ jobs:
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
+
+##### Job 2: Install FreeIPA Service #####
+  # Lock: DEV_SVC_FREEIPA_SETUP
+  # Runs if Job 1 succeeded or was skipped (locked), NOT if failed
+  install-freeipa:
+    name: "2. Install FreeIPA Service"
+    runs-on: dev-local-runner
+    needs: deploy-vm
+    if: ${{ (needs.deploy-vm.result == 'success' || needs.deploy-vm.result == 'skipped') && vars.DEV_SVC_FREEIPA_SETUP != 'true' }}
+
+
+    steps:
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch IPA Credentials
+        run: |
+          IPA_ADMIN_PASS=$(aws secretsmanager get-secret-value \
+            --secret-id dev/freeipa/admin-password \
+            --query SecretString --output text)
+
+          echo "::add-mask::${IPA_ADMIN_PASS}"
+          echo "IPA_ADMIN_PASSWORD=${IPA_ADMIN_PASS}" >> $GITHUB_ENV
+
+
+          IPA_LDAP_PASS=$(aws secretsmanager get-secret-value \
+            --secret-id dev/freeipa/dm-password \
+            --query SecretString --output text)
+
+          echo "::add-mask::${IPA_LDAP_PASS}"
+          echo "IPA_DM_PASSWORD=${IPA_LDAP_PASS}" >> $GITHUB_ENV
+
+
+      - name: Pull latest code
+        run: |
+           ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+
+      - name: Run FreeIPA playbook
+        run: |
+            ssh root@10.0.63.10 "\
+              export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
+              export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
+              cd /srv/repo/ansible/dev/ && \
+              ansible-playbook -i inventory/inventory.ini playbooks/freeipa/freeipa_setup.yml"
