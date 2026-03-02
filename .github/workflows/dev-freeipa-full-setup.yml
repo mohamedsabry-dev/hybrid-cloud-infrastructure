@@ -102,7 +102,7 @@ jobs:
     name: "2. Install FreeIPA Service"
     runs-on: dev-local-runner
     needs: deploy-vm
-    if: ${{ (needs.deploy-vm.result == 'success' || needs.deploy-vm.result == 'skipped') && vars.DEV_SVC_FREEIPA_SETUP != 'true' }}
+    if: ${{ always() && needs.deploy-vm.result != 'failure' && needs.deploy-vm.result != 'cancelled' && vars.DEV_SVC_FREEIPA_SETUP != 'true' }}
 
 
     steps:
