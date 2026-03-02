@@ -1,4 +1,4 @@
-# Dev Proxmox Ansible LXC - Setup Core & Verify Golden Image Template
+# Dev Proxmox Vault Cluster LXC - HashiCorp Vault HA Cluster
 
 #### Define Block ####
 # 1. Define the job name on GH UI
@@ -7,34 +7,29 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] Infra - Ansible LXC"
+name: "[DEV] Infra - Vault Cluster LXC"
 on:
   push:
     branches:
       - dev
     paths:
-      - 'terraform/dev/proxmox/lxc/ansible/**'
-      - '.github/workflows/dev-infra-ansible.yml'
+      - 'terraform/dev/proxmox/lxc/vault_cluster/**'
+      - '.github/workflows/dev-vault-full-setup.yml'
 permissions:
   id-token: write
   contents: read
 env:
   ENVIRONMENT: dev
-  TF_WORKING_DIR: terraform/dev/proxmox/lxc/ansible
+  TF_WORKING_DIR: terraform/dev/proxmox/lxc/vault_cluster
 #####################
 #####################
 
 
 jobs:
-##### Job 1: Deploy Ansible LXC #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the manual safe lock trigger for workflow_dispatch
-  # 4. Define the default working directory for all steps in this job
   deploy:
-    name: "Deploy Ansible LXC"
+    name: "Deploy Vault Cluster LXC"
     runs-on: mac-mini
-    if: ${{ vars.DEV_INFRA_ANSIBLE_LOCK != 'true' }}
+    if: ${{ vars.DEV_INFRA_VAULT_CLUSTER_LOCK != 'true' }}
 
     defaults:
       run:
@@ -42,16 +37,6 @@ jobs:
 #####################
 #####################
 
-
-##### Steps (Job 1) #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the iam role
-  # 3. Initialize Tf working directory
-  # 4. Plan "dry run" the Tf code and out to tfplan
-  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
-  # 6. Give yourself small window to review the plan output before execute
-  # 7. Apply the planned content inside tfplan file
-  # 8. In case of previous success, display test instructions
     steps:
       - name: Code Checkout
         uses: actions/checkout@v4
@@ -61,7 +46,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
- 
+
       # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
@@ -79,12 +64,18 @@ jobs:
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
+          # Fetch Ansible SSH public key
+          ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/ssh-public-key \
+            --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+          echo "TF_VAR_ssh_public_keys=[\"${ANSIBLE_SSH_KEY}\"]" >> $GITHUB_ENV
+
           # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id dev/golden-image/lxc-root-password \
             --query SecretString --output text)
           echo "::add-mask::${LXC_PWD}"
-          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
           echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
 
       - name: Terraform Init
@@ -100,23 +91,8 @@ jobs:
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
-
-      - name: Generate Ansible SSH Key and Store in AWS
-        run: |
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 \
-            "test -f ~/.ssh/id_ed25519 || ssh-keygen -q -t ed25519 -C 'ansible' -f ~/.ssh/id_ed25519 -N ''"
-
-          # Fetch the public key from Ansible LXC
-          ANSIBLE_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "cat ~/.ssh/id_ed25519.pub")
-          echo "::add-mask::${ANSIBLE_SSH_KEY}"
-
-          # Store in AWS Secrets Manager (update existing secret)
-          aws secretsmanager put-secret-value \
-            --secret-id dev/ansible/ssh-public-key \
-            --secret-string "${ANSIBLE_SSH_KEY}" > /dev/null
-          echo "Updated secret dev/ansible/ssh-public-key"
