@@ -32,3 +32,6 @@ terraform.tfvars
 # Keys
 key*
 Key*
+
+# vault ansible
+.ansible_vault 
