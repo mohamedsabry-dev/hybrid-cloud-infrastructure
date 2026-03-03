@@ -1,7 +1,0 @@
----
-- name: Register hosts as FreeIPA clients
-  hosts: all:![freeipa]
-  become: yes
-
-  roles: 
-    - role: freeipa.ansible_freeipa.ipaclient

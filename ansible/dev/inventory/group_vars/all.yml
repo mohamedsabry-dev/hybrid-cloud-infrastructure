@@ -1,4 +1,4 @@
-# /group_vars/local.yml
+# /group_vars/all.yml
 initial_packages:
   - vim
   - git
@@ -6,11 +6,27 @@ initial_packages:
   - htop
   - unzip
 
+#### Join Hosts to Domain ####
 
 ipaclient_domain: lab.local
 ipaclient_realm: LAB.LOCAL
 ipaclient_servers:
-    - freeipa.lab.local
+  - freeipa.lab.local
 ipaadmin_principal: admin
-ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
+# ipaadmin_password will be added below after vault setup
 ipaclient_mkhomedir: yes
+ipaclient_configure_dns_resolver: yes
+ipaclient_ntp_servers:
+  - freeipa.lab.local
+ipaclient_configure_ntp: true
+
+# ansible-vault encrypt_string 'YourIpaAdminPassword' --name 'ipaadmin_password'
+# ipaadmin_password: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   61383036343436343364626561653561623437306338323263616634653762663437306562653738
+#   ...
+# echo 'YourVaultPassword' > ~/.ansible_vault 
+# chmod 600 ~/.ansible_vault 
+
+# ansible-playbook site.yml --vault-password-file ~/.ansible_vault 
+    # also common
