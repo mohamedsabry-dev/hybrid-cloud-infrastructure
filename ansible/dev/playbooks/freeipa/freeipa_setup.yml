@@ -4,6 +4,25 @@
   hosts: freeipa
   become: yes
 
+  vars:
+    # FreeIPA Server Configuration
+    ipaserver_domain: lab.local
+    ipaserver_realm: LAB.LOCAL
+    ipaserver_hostname: freeipa.lab.local
+
+    # DNS Configuration
+    ipaserver_setup_dns: yes
+    ipaserver_auto_forwarders: yes
+    ipaserver_no_dnssec_validation: yes
+    ipaserver_forwarders:
+      - 8.8.8.8
+      - 1.1.1.1
+
+    ***REMOVED*** (Injected from AWS Secrets via CI/CD)
+    ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
+    ipadm_password: "{{ lookup('env', 'IPA_DM_PASSWORD') }}"
+    freeipa_alias: freeipa
+
   pre_tasks:
     - name: Uninstall IPA client if present
       ansible.builtin.command:
