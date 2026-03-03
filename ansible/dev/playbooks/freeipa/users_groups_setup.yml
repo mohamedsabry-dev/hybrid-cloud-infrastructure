@@ -8,19 +8,7 @@
 - name: Setup Domain
   hosts: freeipa
   become: yes
-  tasks:
-    - name: Setup Host Groups
-      freeipa.ansible_freeipa.ipahostgroup:
-          ipaadmin_principal: admin
-          ipaadmin_password: "{{ ipaadmin_password }}"
-          name: automation_group
-          description: "All server hosts managed by Bot User"
-          host:
-            # - ansible.lab.local
-            # - local-runner.lab.local
-          state: present
-      
-    # - name: Add Hosts to Host Groups
+  tasks:      
     - name: Create Bot Users
       freeipa.ansible_freeipa.ipauser:
         ipaadmin_principal: admin
