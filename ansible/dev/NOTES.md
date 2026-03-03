@@ -31,3 +31,54 @@ ipaclient_configure_ntp: false        # Also set for completeness
 **TODO:** Configure NTP separately with direct Ansible playbooks:
 - VMs: Configure chronyd pointing to FreeIPA server
 - LXC: Skip NTP config (inherits from Proxmox host)
+
+## Git Push from Ansible Node
+
+The ansible node needs write access to push changes back to the repository.
+
+### Deploy Key Configuration
+
+The GitHub deploy key was initially set as **read-only**. Updated the workflow to use write access:
+
+```yaml
+# .github/workflows/dev-ansible-full-setup.yml (line ~135)
+# Changed from:
+-F read_only=true
+# To:
+-F read_only=false
+```
+
+To apply the change:
+1. Delete existing deploy key on GitHub (Settings → Deploy keys → Delete `ansible-dev`)
+2. Set `DEV_SVC_DEPLOY_KEY_LOCK` to `false` in repo variables
+3. Re-run the workflow to re-add key with write access
+
+### Git Pull Strategy
+
+Configure rebase as default pull strategy on the ansible node to avoid merge commits:
+
+```bash
+git config --global pull.rebase true
+```
+
+This ensures `git pull` automatically rebases local commits on top of remote changes, keeping a clean linear history.
+
+### Typical Workflow for Ansible Admin
+
+```bash
+# SSH to ansible node
+ssh root@ansible.lab.local
+
+# Pull latest changes
+cd /srv/repo
+git pull origin dev
+
+# Make edits, test playbooks
+vim ansible/dev/inventory/group_vars/all.yml
+ansible-playbook ansible/dev/playbooks/freeipa/join-domain.yml
+
+# Commit and push changes back
+git add -A
+git commit -m "Update configuration"
+git push origin dev
+```
