@@ -133,7 +133,7 @@ jobs:
           if gh api repos/${{ github.repository }}/keys \
             -f title="ansible-dev" \
             -f key="${ANSIBLE_SSH_KEY}" \
-            -F read_only=true 2>&1; then
+            -F read_only=false 2>&1; then
             echo "Deploy key 'ansible-dev' added successfully"
           else
             echo "Deploy key already exists or failed - continuing"
