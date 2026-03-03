@@ -1,5 +1,4 @@
 ---
-
 - name: Setup Local Runner
   hosts: local_runner
   become: yes

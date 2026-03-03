@@ -1,15 +1,13 @@
-  - name: Join hosts to FreeIPA domain
-    hosts: local
-    become: yes
-    roles:
-      - role: freeipa.ansible_freeipa.ipaclient
-        state: present
+---
+- name: Join hosts to FreeIPA domain
+  hosts: all:!freeipa
+  become: yes
 
-    vars:
-      ipaserver_domain: lab.local
-      ipaserver_realm: LAB.LOCAL
-      ipasserver: freeipa.lab.local
-      ipaadmin_principal: admin
-      ipaadmin_password: "{{ ipaadmin_password }}"
-      ipaclient_mkhomedir: yes
-      ipaclient_configure_dns_resolver: yes
+  pre_tasks:
+    - name: Add FreeIPA to /etc/hosts for DNS bootstrap
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "10.0.60.10 freeipa.lab.local freeipa"
+        state: present
+  roles:
+    - role: freeipa.ansible_freeipa.ipaclient
