@@ -13,20 +13,33 @@ ipaclient_realm: LAB.LOCAL
 ipaclient_servers:
   - freeipa.lab.local
 ipaadmin_principal: admin
-# ipaadmin_password will be added below after vault setup
+# ipaadmin_password: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   61383036343436343364626561653561623437306338323263616634653762663437306562653738
+#   ...
 ipaclient_mkhomedir: yes
 ipaclient_configure_dns_resolver: yes
 ipaclient_ntp_servers:
   - freeipa.lab.local
 ipaclient_configure_ntp: true
 
-# ansible-vault encrypt_string 'YourIpaAdminPassword' --name 'ipaadmin_password'
-# ipaadmin_password: !vault |
-#   $ANSIBLE_VAULT;1.1;AES256
-#   61383036343436343364626561653561623437306338323263616634653762663437306562653738
-#   ...
+#  ansible-vault encrypt_string 'YourIpaAdminPassword' --name 'ipaadmin_password'
 # echo 'YourVaultPassword' > ~/.ansible_vault 
 # chmod 600 ~/.ansible_vault 
 
 # ansible-playbook site.yml --vault-password-file ~/.ansible_vault 
     # also common
+
+ipa_managed_hosts:
+  - k8s-master1.lab.local
+  - k8s-master2.lab.local
+  - k8s-master3.lab.local
+  - k8s-worker1.lab.local
+  - k8s-worker2.lab.local
+  - k8s-worker3.lab.local
+  - vault1.lab.local
+  - vault2.lab.local
+  - vault3.lab.local
+  - ansible.lab.local
+  - local-runner.lab.local
+  - ex-nginx.lab.local
