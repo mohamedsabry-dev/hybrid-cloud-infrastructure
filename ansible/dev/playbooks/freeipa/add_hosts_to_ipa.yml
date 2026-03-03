@@ -4,10 +4,23 @@
   become: yes
 
   pre_tasks:
+    - name: Set FQDN hostname
+      ansible.builtin.hostname:
+        name: "{{ ansible_hostname }}.lab.local"
+
+    - name: Set FQDN in /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^{{ ansible_default_ipv4.address }}"
+        line: "{{ ansible_default_ipv4.address }} {{ ansible_hostname }}.lab.local {{ ansible_hostname }}"
+        state: present
+
     - name: Add FreeIPA to /etc/hosts for DNS bootstrap
       ansible.builtin.lineinfile:
         path: /etc/hosts
         line: "10.0.60.10 freeipa.lab.local freeipa"
         state: present
+
+        
   roles:
     - role: freeipa.ansible_freeipa.ipaclient
