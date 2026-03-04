@@ -49,3 +49,32 @@
 
   roles:
     - role: freeipa.ansible_freeipa.ipaserver
+
+  post_tasks:
+    - name: Configure DNS forwarders
+      freeipa.ansible_freeipa.ipadnsconfig:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        forwarders:
+          - 8.8.8.8
+          - 1.1.1.1
+        forward_policy: first
+        allow_sync_ptr: yes
+
+    - name: Allow DNS recursion from internal networks
+      ansible.builtin.blockinfile:
+        path: /etc/named/ipa-options-ext.conf
+        block: |
+          allow-recursion { 127.0.0.1; 10.0.0.0/8; };
+          allow-query-cache { 127.0.0.1; 10.0.0.0/8; };
+        marker: "# {mark} ANSIBLE MANAGED - DNS RECURSION"
+        create: yes
+        owner: root
+        group: named
+        mode: '0640'
+      notify: Restart named
+
+  handlers:
+    - name: Restart named
+      ansible.builtin.service:
+        name: named
+        state: restarted
