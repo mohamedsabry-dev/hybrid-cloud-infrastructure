@@ -1,0 +1,54 @@
+---
+- name: Setup Domain
+  hosts: freeipa
+  become: yes
+  tasks:
+    - name: Setup Host Groups
+      freeipa.ansible_freeipa.ipahostgroup:
+          ipaadmin_principal: "{{ ipaadmin_principal }}"
+          ipaadmin_password: "{{ ipaadmin_password }}"
+          name: automation_group
+          description: "All server hosts managed by Bot User"
+          host: "{{ ipa_managed_hosts }}"
+          state: present
+
+
+- name: Setup User and Privilage
+  hosts: freeipa
+  become: yes
+  tasks:      
+    - name: Create Bot Users
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: super_bot
+        first: Super          # Required
+        last: Bot             # Required
+        description: "Super Bot user for automation"
+
+    - name: Setup Bot User Privilage !Auth
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: super_bot
+        description: "Allow ansible to sudo automation_group with no password"
+        user:
+          - super_bot
+        hostgroup:
+          - automation_group
+        cmdcat: all
+        runasuser: root
+        option:
+          - "!authenticate"
+        state: present
+
+    - name: Create User Group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: admin
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: automation_users
+        description: "Automation service accounts"
+        user:
+          - super_bot
+        state: present
+
