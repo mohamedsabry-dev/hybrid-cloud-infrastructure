@@ -16,15 +16,6 @@ variable "secrets_config" {
         ManagedBy   = "terraform"
       }
     }
-    proxmox_api_root = {
-      name        = "dev/proxmox/terraform-token-root"
-      description = "Proxmox API token for Terraform Root operations"
-      tags = {
-        Purpose     = "proxmox-automation"
-        Environment = "dev"
-        ManagedBy   = "terraform"
-      }
-    }
     proxmox_ssh_admin = {
       name        = "dev/proxmox/ssh-admin-dev-password"
       description = "Proxmox host SSH password for admin_dev user"
@@ -109,21 +100,6 @@ variable "proxmox_api_credentials" {
 
   default = {
     token_id     = "tf_dev@pve!terraform"
-    token_secret = "REPLACE_ME"
-  }
-
-  sensitive = true
-}
-
-variable "proxmox_api_root_credentials" {
-  description = "Proxmox API token credentials"
-  type = object({
-    token_id     = string
-    token_secret = string
-  })
-
-  default = {
-    token_id     = "root@pam!terraform"
     token_secret = "REPLACE_ME"
   }
 
