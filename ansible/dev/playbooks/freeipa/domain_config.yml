@@ -27,6 +27,7 @@
         last: "{{ item.last }}"
         title: "{{ item.description }}"
         password: "{{ default_bot_user_password }}"
+        loginshell: /bin/bash
         update_password: on_create
       loop: "{{ domain_bot_users }}"
 
@@ -54,6 +55,7 @@
         last: "{{ item.last }}"
         title: "{{ item.description }}"
         password: "{{ default_admin_user_password }}"
+        loginshell: /bin/bash
         update_password: on_create
       loop: "{{ ipa_admin_users }}"
 
