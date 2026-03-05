@@ -99,6 +99,7 @@
         ipaadmin_password: "{{ ipaadmin_password }}"
         name: automation_users
         maxlife: 1460
+        cospriority: 10
 
     - name: Set password policy for admin users (1 year)
       freeipa.ansible_freeipa.ipapwpolicy:
@@ -106,6 +107,7 @@
         ipaadmin_password: "{{ ipaadmin_password }}"
         name: admin_users
         maxlife: 360
+        cospriority: 20
 
     - name: Create HBAC SSH Rule for Bot Users
       freeipa.ansible_freeipa.ipahbacrule:
