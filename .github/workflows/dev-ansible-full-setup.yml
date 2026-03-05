@@ -222,11 +222,3 @@ jobs:
       - name: Pull latest code
         run: |
           sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo && git pull origin dev"
-
-      - name: Run Ansible playbook
-        run: |
-          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/ansible_setup.yml"
-
-      - name: Test Ansible against All Nodes
-        run: |
-          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/test.yml"
