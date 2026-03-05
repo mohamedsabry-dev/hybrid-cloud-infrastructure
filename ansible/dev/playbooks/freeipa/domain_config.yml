@@ -25,7 +25,7 @@
         name: "{{ item.name }}"
         first: "{{ item.first }}"
         last: "{{ item.last }}"
-        description: "{{ item.description }}"
+        title: "{{ item.description }}"
       loop: "{{ domain_bot_users }}"
 
     - name: Setup Bot User Privilage !Auth
@@ -50,7 +50,7 @@
         name: "{{ item.name }}"
         first: "{{ item.first }}"
         last: "{{ item.last }}"
-        description: "{{ item.description }}"
+        title: "{{ item.description }}"
       loop: "{{ ipa_admin_users }}"
 
     - name: Setup Admin User Sudo Rules (with password)
