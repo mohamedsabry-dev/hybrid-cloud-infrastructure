@@ -202,46 +202,97 @@ fatal: initgroups: super_bot: Invalid argument
 ```
 
 **Root Cause:**
-Unprivileged LXC containers use UID/GID mapping (e.g., container UID 0 → host UID 100000). FreeIPA uses high UIDs (1719400000+) which are outside the default mapping range (0-65535).
+Unprivileged LXC containers use UID/GID mapping (e.g., container UID 0 → host UID 100000). FreeIPA by default uses high UIDs (1719400000+) which are outside the default mapping range (0-65535).
 
 **Explanation:**
-- Unprivileged containers: More secure, but limited UID range
-- Privileged containers: Less secure, but all UIDs work (including FreeIPA's high UIDs)
-
 ```
 # Default unprivileged mapping:
 Container UID 0-65535 → Host UID 100000-165535
 Container UID 1719400000 → NOT MAPPED → fails with "Invalid argument"
 ```
 
-**Solution:**
-Change LXC containers to privileged mode. In Terraform:
-```hcl
-# terraform/dev/proxmox/lxc/vault_cluster/main.tf
-unprivileged = false
-```
+#### Failed Approaches
 
-Then recreate the containers:
+**1. Manual config edit (unprivileged → privileged)**
 ```bash
-terraform destroy -target=module.vault_cluster
-terraform apply -target=module.vault_cluster
+# Attempted: Edit /etc/pve/lxc/<id>.conf
+unprivileged: 0  # Changed from 1
 ```
+**Result:** Container became inaccessible. File permissions broke because UID mappings changed but files were already created with mapped UIDs.
 
-**Alternative (manual fix without recreate):**
-Add custom UID mappings on Proxmox host:
+**2. Custom UID mapping on Proxmox host**
 ```bash
-# Add to /etc/subuid and /etc/subgid
+# Attempted: Add FreeIPA UID range to subuid/subgid
 echo "root:1719400000:65536" >> /etc/subuid
 echo "root:1719400000:65536" >> /etc/subgid
 
-# Add to container config /etc/pve/lxc/<id>.conf
+# Add to container config
 lxc.idmap: u 0 100000 1719400000
 lxc.idmap: g 0 100000 1719400000
 lxc.idmap: u 1719400000 1719400000 65536
 lxc.idmap: g 1719400000 1719400000 65536
 ```
+**Result:** Complex to manage, prone to errors, requires manual steps per container.
 
-**Note:** For this lab environment, using privileged containers is acceptable. For production, consider the security implications or use proper UID mapping.
+**3. Privileged containers via Terraform with root@pam API token**
+```bash
+# Created root@pam API token with privsep=0
+pveum user token add root@pam terraform --privsep=0
+```
+```hcl
+# Terraform config
+unprivileged = false
+features { nesting = true }
+```
+**Result:** Failed with `Permission check failed (changing feature flags for privileged container is only allowed for root@pam)`. Even with privsep=0, API tokens cannot create privileged containers with feature flags - only password auth for root@pam works.
 
+**4. Privileged containers with nesting disabled**
+```hcl
+# Terraform config
+unprivileged = false
+features { nesting = false }
+```
+**Result:** Container was created but Terraform failed with warning: `WARN: Systemd 257 detected. You may need to enable nesting.` Terraform treats warnings as failures, corrupting state.
 
+**5. Password auth for root@pam in Terraform**
+```hcl
+provider "proxmox" {
+  username = "root@pam"
+  password = var.proxmox_root_password
+}
+```
+**Result:** Would work but requires changing entire Terraform provider config and all workflows - too disruptive.
+
+#### Working Solution: Custom FreeIPA UID Range
+
+Configure FreeIPA to use UIDs within the unprivileged container's mapped range (0-65535).
+
+**In `ansible/dev/playbooks/freeipa/freeipa_setup.yml`:**
+```yaml
+vars:
+  # ID Range Configuration (fits within LXC unprivileged UID mapping 0-65535)
+  # Range 50000-60000 avoids conflicts with local users (typically 1000-9999)
+  ipaserver_idstart: 50000
+  ipaserver_idmax: 60000
+```
+
+**Keep containers unprivileged with nesting:**
+```hcl
+# All LXC containers
+unprivileged = true
+features { nesting = true }
+```
+
+**Result:**
+- Containers stay unprivileged (more secure)
+- FreeIPA users get UIDs 50000-60000 (within mapped range)
+- No Terraform permission issues
+- No initgroups errors
+- No workflow changes needed
+
+## Utility Commands
+
+**Clear SSH known_hosts after recreating infrastructure:**
+```bash
 for ip in 10.0.60.10 10.0.61.11 10.0.61.12 10.0.61.13 10.0.61.21 10.0.61.22 10.0.61.23 10.0.62.10 10.0.62.11 10.0.62.12 10.0.63.10 10.0.63.20 10.0.64.10; do ssh-keygen -R "$ip" 2>/dev/null; done
+```
