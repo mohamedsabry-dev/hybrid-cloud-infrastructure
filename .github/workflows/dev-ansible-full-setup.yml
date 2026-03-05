@@ -46,7 +46,7 @@ jobs:
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/terraform-token \
+            --secret-id dev/proxmox/terraform-token-root \
             --query SecretString --output text)
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
@@ -129,7 +129,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_ADMIN_PAT }}
         run: |
-          # Add deploy key (read-only) - skip if already exists
+          # Add deploy key (read-write) - skip if already exists
           if gh api repos/${{ github.repository }}/keys \
             -f title="ansible-dev" \
             -f key="${ANSIBLE_SSH_KEY}" \
@@ -145,7 +145,7 @@ jobs:
   # Runs even if Job 2 was skipped (locked)
   test-deploy-key:
     name: "3. Test Git Clone"
-    runs-on: dev-local-runner
+    runs-on: mac-mini
     needs: add-deploy-key
     if: ${{ always() && needs.add-deploy-key.result != 'failure' && needs.add-deploy-key.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
 
@@ -170,7 +170,7 @@ jobs:
   # Runs even if previous jobs were skipped (locked)
   setup-ansible:
     name: "4. Setup Ansible"
-    runs-on: dev-local-runner
+    runs-on: mac-mini
     needs: test-deploy-key
     if: ${{ always() && needs.test-deploy-key.result != 'failure' && needs.test-deploy-key.result != 'cancelled' && vars.DEV_SVC_ANSIBLE_SETUP_LOCK != 'true' }}
 
