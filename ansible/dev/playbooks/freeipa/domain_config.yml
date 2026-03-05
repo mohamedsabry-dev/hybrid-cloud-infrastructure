@@ -26,6 +26,8 @@
         first: "{{ item.first }}"
         last: "{{ item.last }}"
         title: "{{ item.description }}"
+        password: "{{ default_bot_user_password }}"
+        update_password: on_create
       loop: "{{ domain_bot_users }}"
 
     - name: Setup Bot User Privilage !Auth
@@ -38,7 +40,7 @@
         hostgroup: "{{ item.hostgroups }}"
         cmdcat: all
         runasuser: root
-        option: "{{ item.options }}"
+        sudooption: "{{ item.options }}"
         state: present
       loop: "{{ domain_bot_users }}"
 
@@ -51,6 +53,8 @@
         first: "{{ item.first }}"
         last: "{{ item.last }}"
         title: "{{ item.description }}"
+        password: "{{ default_admin_user_password }}"
+        update_password: on_create
       loop: "{{ ipa_admin_users }}"
 
     - name: Setup Admin User Sudo Rules (with password)
@@ -85,3 +89,30 @@
         description: "Admin service accounts"
         user: "{{ ipa_admin_users | map(attribute='name') | list }}"
         state: present
+
+
+    - name: Create HBAC SSH Rule for Bot Users
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_ssh"
+        description: "Allow {{ item.name }} SSH access to {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        hbacsvc:
+          - sshd
+        state: present
+      loop: "{{ domain_bot_users }}"
+
+    - name: Create HBAC SSH Rule for Admin Users
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_ssh"
+        description: "Allow {{ item.name }} SSH access to {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        hbacsvc:
+          - sshd
+        state: present
+      loop: "{{ ipa_admin_users }}"
