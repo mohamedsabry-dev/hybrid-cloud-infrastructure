@@ -290,9 +290,201 @@ features { nesting = true }
 - No initgroups errors
 - No workflow changes needed
 
+---
+
+## FreeIPA DNS Forwarders - Dictionary Syntax Error
+
+**Symptom:**
+```
+TASK [Configure DNS forwarders]
+fatal: [freeipa.lab.local]: FAILED! => "msg": "dictionary requested, could not parse JSON or key=value"
+```
+
+**Root Cause:**
+The `freeipa.ansible_freeipa.ipadnsconfig` module expects forwarders as a list of dictionaries with `ip_address` keys, not plain strings.
+
+**Wrong:**
+```yaml
+forwarders:
+  - 8.8.8.8
+  - 1.1.1.1
+```
+
+**Correct:**
+```yaml
+forwarders:
+  - ip_address: 8.8.8.8
+  - ip_address: 1.1.1.1
+```
+
+---
+
+## Kerberos/GSSAPI Auth Requires Hostnames, Not IPs
+
+**Symptom:**
+```bash
+# Using IP - FAILS
+ansible all -m ping
+# super_bot@10.0.64.11: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password)
+
+# Using hostname - WORKS
+ssh super_bot@k8s-worker1.lab.local
+# Successfully connects with Kerberos ticket
+```
+
+**Root Cause:**
+Kerberos authentication validates service principals using hostnames. When connecting via IP, GSSAPI cannot verify the service principal (`host/hostname@REALM`).
+
+**Solution:**
+Remove `ansible_host=IP` from inventory and use FQDNs directly. FreeIPA provides DNS resolution.
+
+**Before:**
+```ini
+[k8s_workers]
+k8s-worker1.lab.local ansible_host=10.0.64.10
+```
+
+**After:**
+```ini
+[k8s_workers]
+k8s-worker1.lab.local
+```
+
+**Pre-requisite:** Run `kinit super_bot` before running Ansible commands.
+
+---
+
+## FreeIPA Password Policy - cospriority Required
+
+**Symptom:**
+```
+TASK [Set password policy for automation users (4 years)]
+fatal: [freeipa.lab.local]: FAILED! => "msg": "pwpolicy_add: automation_users: 'cospriority' is required"
+```
+
+**Root Cause:**
+Group-based password policies require `cospriority` (Class of Service Priority) to determine which policy wins when a user belongs to multiple groups.
+
+**Solution:**
+Add `cospriority` to password policy tasks (lower number = higher priority):
+
+```yaml
+- name: Set password policy for automation users (4 years)
+  freeipa.ansible_freeipa.ipapwpolicy:
+    ipaadmin_principal: "{{ ipaadmin_principal }}"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+    name: automation_users
+    maxlife: 1460
+    cospriority: 10
+
+- name: Set password policy for admin users (1 year)
+  freeipa.ansible_freeipa.ipapwpolicy:
+    ipaadmin_principal: "{{ ipaadmin_principal }}"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+    name: admin_users
+    maxlife: 360
+    cospriority: 20
+```
+
+---
+
+## FreeIPA Server Doesn't Use SSSD for Sudo
+
+**Symptom:**
+```bash
+# On FreeIPA server
+ansible freeipa -m command -a "id -u"
+freeipa.lab.local | FAILED | rc=-1 >> Missing sudo password
+
+# Checking sudo rules shows nothing
+sudo -l -U super_bot
+User super_bot is not allowed to run sudo on freeipa.
+```
+
+But all other hosts (IPA clients) work fine.
+
+**Root Cause:**
+The FreeIPA **server** (IPA master) is the identity provider, not a client. It does not use SSSD for sudo lookups - sudo rules via SSSD only apply to IPA **clients**.
+
+**Verification:**
+```bash
+# Host is in the hostgroup
+ipa hostgroup-show automation_group
+# Shows freeipa.lab.local as member
+
+# Sudo rule exists
+ipa sudorule-show super_bot
+# Shows correct configuration
+
+# But SSSD doesn't apply it on the server itself
+sudo -l -U super_bot
+# "not allowed to run sudo"
+```
+
+**Solution:**
+Manage the FreeIPA server separately with root access in inventory:
+
+```ini
+[freeipa]
+freeipa.lab.local ansible_user=root
+
+[managed_hosts:children]
+k8s_masters
+k8s_workers
+vault_cluster
+ansible
+local_runners
+nginx
+
+[managed_hosts:vars]
+ansible_user=super_bot
+ansible_become=yes
+ansible_become_method=sudo
+```
+
+Use `ansible managed_hosts` for normal operations and `ansible freeipa` for IPA server management.
+
+---
+
+## FreeIPA UID Range - Must Be Above UID_MAX
+
+**Symptom:**
+```
+TASK [freeipa.ansible_freeipa.ipaserver]
+fatal: "ipaserver_idstart must be larger than UID_MAX"
+```
+
+**Root Cause:**
+FreeIPA requires `ipaserver_idstart` to be higher than `UID_MAX` from `/etc/login.defs` (default 60000) to avoid conflicts with local users.
+
+**Solution:**
+Set UID range above 60000 but below 65536 (for LXC unprivileged container compatibility):
+
+```yaml
+# In freeipa_setup.yml
+vars:
+  # Must be > UID_MAX (60000) but < 65536 for LXC
+  ipaserver_idstart: 60001
+  ipaserver_idmax: 65500
+```
+
+---
+
 ## Utility Commands
 
 **Clear SSH known_hosts after recreating infrastructure:**
 ```bash
-for ip in 10.0.60.10 10.0.61.11 10.0.61.12 10.0.61.13 10.0.61.21 10.0.61.22 10.0.61.23 10.0.62.10 10.0.62.11 10.0.62.12 10.0.63.10 10.0.63.20 10.0.64.10; do ssh-keygen -R "$ip" 2>/dev/null; done
+for ip in 10.0.60.10 10.0.61.10 10.0.61.11 10.0.61.12 10.0.62.10 10.0.62.11 10.0.62.12 10.0.63.10 10.0.63.20 10.0.64.10 10.0.64.11 10.0.64.12 10.0.65.10; do ssh-keygen -R "$ip" 2>/dev/null; done
+```
+
+**Create vault-encrypted variable:**
+```bash
+ansible-vault encrypt_string 'your_secret_password' --name 'variable_name'
+```
+
+**Test Ansible connectivity with Kerberos:**
+```bash
+kinit super_bot
+ansible managed_hosts -m command -a "id -u"
+# All should return 0 (root)
 ```
