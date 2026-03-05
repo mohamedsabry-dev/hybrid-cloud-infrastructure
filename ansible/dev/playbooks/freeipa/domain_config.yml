@@ -17,7 +17,8 @@
 - name: Setup User and Privilage
   hosts: freeipa
   become: yes
-  tasks:      
+  tasks:
+  
     - name: Create Bot Users
       freeipa.ansible_freeipa.ipauser:
         ipaadmin_principal: "{{ ipaadmin_principal }}"
@@ -92,6 +93,19 @@
         user: "{{ ipa_admin_users | map(attribute='name') | list }}"
         state: present
 
+    - name: Set password policy for automation users (4 years)
+      freeipa.ansible_freeipa.ipapwpolicy:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: automation_users
+        maxlife: 1460
+
+    - name: Set password policy for admin users (1 year)
+      freeipa.ansible_freeipa.ipapwpolicy:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_users
+        maxlife: 360
 
     - name: Create HBAC SSH Rule for Bot Users
       freeipa.ansible_freeipa.ipahbacrule:
