@@ -86,6 +86,18 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
+      - name: Wait for LXC SSH to be ready
+        run: |
+          echo "Waiting for SSH on 10.0.63.10..."
+          for i in {1..30}; do
+            if sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@10.0.63.10 "echo SSH ready"; then
+              echo "SSH is ready after ${i} attempts"
+              break
+            fi
+            echo "Attempt $i: SSH not ready, waiting 10s..."
+            sleep 10
+          done
+
       - name: Generate Ansible SSH Key and Store in AWS
         run: |
           sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 \
