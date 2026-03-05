@@ -10,11 +10,11 @@ resource "proxmox_virtual_environment_container" "ansible" {
   vm_id     = var.ansible.ctid
   tags      = ["lxc", "ansible", "infrastructure"]
 
-  # Privileged container (required for FreeIPA high UIDs)
-  unprivileged = false
+  # Unprivileged container with nesting
+  unprivileged = true
 
   features {
-    nesting = false
+    nesting = true
   }
 
   # Operating System Template
