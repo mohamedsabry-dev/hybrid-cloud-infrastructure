@@ -150,9 +150,23 @@ jobs:
     if: ${{ always() && needs.add-deploy-key.result != 'failure' && needs.add-deploy-key.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
 
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch LXC Password
+        run: |
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
       - name: Test Pull Dev
         run: |
-          ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "
             # Add GitHub host key to known_hosts
             mkdir -p ~/.ssh
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -175,18 +189,32 @@ jobs:
     if: ${{ always() && needs.test-deploy-key.result != 'failure' && needs.test-deploy-key.result != 'cancelled' && vars.DEV_SVC_ANSIBLE_SETUP_LOCK != 'true' }}
 
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch LXC Password
+        run: |
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
       - name: Install Ansible
         run: |
-          ssh -o StrictHostKeyChecking=no root@10.0.63.10 "dnf install -y ansible-core python3-pip"
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "dnf install -y ansible-core python3-pip"
 
       - name: Pull latest code
         run: |
-          ssh root@10.0.63.10 "cd /srv/repo && git pull origin dev"
+          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo && git pull origin dev"
 
       - name: Run Ansible playbook
         run: |
-          ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/ansible_setup.yml"
+          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/ansible_setup.yml"
 
       - name: Test Ansible against All Nodes
         run: |
-          ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/test.yml"
+          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/inventory.ini playbooks/ansible/test.yml"
