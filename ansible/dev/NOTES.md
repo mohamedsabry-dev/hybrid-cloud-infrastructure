@@ -1,5 +1,37 @@
 # Ansible Dev Environment Notes
 
+## Quick Start - Manual Steps After Provisioning
+
+After the ansible node is provisioned, run these manual steps to complete setup:
+
+```bash
+# 1. SSH to ansible node
+ssh root@ansible.lab.local
+
+# 2. Set Ansible config location (persists across reboots)
+echo 'export ANSIBLE_CONFIG=/srv/repo/ansible/dev/ansible.cfg' >> ~/.bashrc
+source ~/.bashrc
+
+# 3. Create vault password file (get password from AWS Secrets Manager or team)
+echo 'YOUR_VAULT_PASSWORD_HERE' > ~/.ansible_vault
+chmod 600 ~/.ansible_vault
+
+# 4. Configure git pull strategy
+git config --global pull.rebase true
+
+# 5. Verify setup
+cd /srv/repo
+ansible --version  # Should show config file path
+ansible all -m ping  # Should ping all hosts
+```
+
+**Note:** The vault password file path is configured in `ansible/dev/ansible.cfg`:
+```ini
+vault_password_file = ~/.ansible_vault
+```
+
+---
+
 ## Ansible Config Location
 
 We used the export approach to ensure Ansible picks up the correct config file regardless of the current working directory:
@@ -121,3 +153,95 @@ post_tasks:
 ```
 
 **Important:** Use `/etc/named/ipa-options-ext.conf` (included inside BIND options block), NOT `/etc/named/ipa-ext.conf` which is outside the options context.
+
+## FreeIPA User SSH Login Issues
+
+### Issue 1: VMs - SSH Permission Denied for IPA Users
+
+**Symptoms:**
+```bash
+ssh super_bot@k8s-master1.lab.local
+super_bot@k8s-master1.lab.local: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).
+```
+
+**Root Cause:**
+Cloud-init sets `PasswordAuthentication no` in `/etc/ssh/sshd_config.d/50-cloud-init.conf`, which overrides the main sshd_config. GSSAPI (Kerberos) authentication requires a valid ticket and proper configuration.
+
+**Solution:**
+Enable password authentication on VMs:
+```bash
+# Via Ansible
+ansible k8s_masters,k8s_workers -m replace -a "path=/etc/ssh/sshd_config.d/50-cloud-init.conf regexp='PasswordAuthentication no' replace='PasswordAuthentication yes'" --become
+ansible k8s_masters,k8s_workers -m service -a "name=sshd state=restarted" --become
+```
+
+Or use GSSAPI with Kerberos ticket:
+```bash
+kinit super_bot
+ssh super_bot@k8s-master1.lab.local
+```
+
+**Verification:**
+```bash
+# Check sshd config
+cat /etc/ssh/sshd_config.d/*.conf | grep PasswordAuthentication
+
+# Test HBAC from FreeIPA server
+ipa hbactest --user=super_bot --host=k8s-master1.lab.local --service=sshd
+```
+
+### Issue 2: LXC Containers - initgroups Invalid Argument
+
+**Symptoms:**
+```bash
+ssh super_bot@vault1.lab.local
+Connection to vault1.lab.local closed by remote host.
+
+# In sshd logs:
+fatal: initgroups: super_bot: Invalid argument
+```
+
+**Root Cause:**
+Unprivileged LXC containers use UID/GID mapping (e.g., container UID 0 → host UID 100000). FreeIPA uses high UIDs (1719400000+) which are outside the default mapping range (0-65535).
+
+**Explanation:**
+- Unprivileged containers: More secure, but limited UID range
+- Privileged containers: Less secure, but all UIDs work (including FreeIPA's high UIDs)
+
+```
+# Default unprivileged mapping:
+Container UID 0-65535 → Host UID 100000-165535
+Container UID 1719400000 → NOT MAPPED → fails with "Invalid argument"
+```
+
+**Solution:**
+Change LXC containers to privileged mode. In Terraform:
+```hcl
+# terraform/dev/proxmox/lxc/vault_cluster/main.tf
+unprivileged = false
+```
+
+Then recreate the containers:
+```bash
+terraform destroy -target=module.vault_cluster
+terraform apply -target=module.vault_cluster
+```
+
+**Alternative (manual fix without recreate):**
+Add custom UID mappings on Proxmox host:
+```bash
+# Add to /etc/subuid and /etc/subgid
+echo "root:1719400000:65536" >> /etc/subuid
+echo "root:1719400000:65536" >> /etc/subgid
+
+# Add to container config /etc/pve/lxc/<id>.conf
+lxc.idmap: u 0 100000 1719400000
+lxc.idmap: g 0 100000 1719400000
+lxc.idmap: u 1719400000 1719400000 65536
+lxc.idmap: g 1719400000 1719400000 65536
+```
+
+**Note:** For this lab environment, using privileged containers is acceptable. For production, consider the security implications or use proper UID mapping.
+
+
+for ip in 10.0.60.10 10.0.61.11 10.0.61.12 10.0.61.13 10.0.61.21 10.0.61.22 10.0.61.23 10.0.62.10 10.0.62.11 10.0.62.12 10.0.63.10 10.0.63.20 10.0.64.10; do ssh-keygen -R "$ip" 2>/dev/null; done

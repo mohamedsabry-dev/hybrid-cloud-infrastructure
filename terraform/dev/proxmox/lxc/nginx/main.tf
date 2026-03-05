@@ -11,7 +11,7 @@ resource "proxmox_virtual_environment_container" "nginx" {
   tags      = ["lxc", "nginx", "reverse-proxy"]
 
   # Unprivileged container with nesting
-  unprivileged = true
+  unprivileged = false
 
   features {
     nesting = true
