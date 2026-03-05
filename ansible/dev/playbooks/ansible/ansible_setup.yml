@@ -1,7 +1,8 @@
 # /playbooks/ansible_setup.yml
 ---
 - name: Install Common Packages
-  hosts: local
+  hosts: localhost
+  connection: local
   become: yes
   tasks:
     - name: Install Packages
