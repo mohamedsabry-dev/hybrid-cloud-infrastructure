@@ -21,7 +21,7 @@ env:
   ENVIRONMENT: dev
 
 jobs:
-##### Job 1: Deploy K8s Masters #####
+###### Job 1: Deploy K8s Masters ######
   # 1. Name the job on GH UI
   # 2. Define which runner to use
   # 3. Define the manual safe lock trigger for workflow_dispatch
