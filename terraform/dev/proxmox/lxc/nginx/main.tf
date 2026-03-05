@@ -10,11 +10,11 @@ resource "proxmox_virtual_environment_container" "nginx" {
   vm_id     = var.nginx.ctid
   tags      = ["lxc", "nginx", "reverse-proxy"]
 
-  # Unprivileged container with nesting
+  # Privileged container (required for FreeIPA high UIDs)
   unprivileged = false
 
   features {
-    nesting = true
+    nesting = false
   }
 
   # Operating System Template
