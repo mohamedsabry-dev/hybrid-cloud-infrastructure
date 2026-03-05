@@ -13,11 +13,11 @@ resource "proxmox_virtual_environment_container" "vault1" {
   vm_id     = var.vault1.ctid
   tags      = ["lxc", "vault", "ha-cluster"]
 
-  # Privileged container (required for FreeIPA high UIDs)
-  unprivileged = false
+  # Unprivileged container with nesting
+  unprivileged = true
 
   features {
-    nesting = false
+    nesting = true
   }
 
   # Operating System Template
@@ -108,11 +108,11 @@ resource "proxmox_virtual_environment_container" "vault2" {
   vm_id     = var.vault2.ctid
   tags      = ["lxc", "vault", "ha-cluster"]
 
-  # Privileged container (required for FreeIPA high UIDs)
-  unprivileged = false
+  # Unprivileged container with nesting
+  unprivileged = true
 
   features {
-    nesting = false
+    nesting = true
   }
 
   # Operating System Template
@@ -203,11 +203,11 @@ resource "proxmox_virtual_environment_container" "vault3" {
   vm_id     = var.vault3.ctid
   tags      = ["lxc", "vault", "ha-cluster"]
 
-  # Privileged container (required for FreeIPA high UIDs)
-  unprivileged = false
+  # Unprivileged container with nesting
+  unprivileged = true
 
   features {
-    nesting = false
+    nesting = true
   }
 
   # Operating System Template

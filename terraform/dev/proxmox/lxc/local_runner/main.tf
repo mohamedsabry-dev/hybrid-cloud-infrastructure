@@ -10,11 +10,11 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   vm_id     = var.local_runner.ctid
   tags      = ["lxc", "local-runner", "infrastructure"]
 
-  # Privileged container (required for FreeIPA high UIDs)
-  unprivileged = false
+  # Unprivileged container with nesting
+  unprivileged = true
 
   features {
-    nesting = false
+    nesting = true
   }
 
   # Operating System Template
