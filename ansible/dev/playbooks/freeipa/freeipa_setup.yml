@@ -11,9 +11,9 @@
     ipaserver_hostname: freeipa.lab.local
 
     # ID Range Configuration (fits within LXC unprivileged UID mapping 0-65535)
-    # Range 50000-60000 avoids conflicts with local users (typically 1000-9999)
-    ipaserver_idstart: 50000
-    ipaserver_idmax: 60000
+    # Must be above UID_MAX (60000) from /etc/login.defs, but below 65536 for LXC
+    ipaserver_idstart: 60001
+    ipaserver_idmax: 65500
 
     # DNS Configuration
     ipaserver_setup_dns: yes
