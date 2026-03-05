@@ -164,23 +164,3 @@ resource "aws_secretsmanager_secret_version" "ipa_dm_password" {
   }
 }
 
-#-------------------------------------------------------------------------------
-# Proxmox API Token
-#-------------------------------------------------------------------------------
-resource "aws_secretsmanager_secret" "proxmox_terraform_root" {
-  name        = var.secrets_config.proxmox_api_root.name
-  description = var.secrets_config.proxmox_api_root.description
-  tags        = var.secrets_config.proxmox_api_root.tags
-}
-
-resource "aws_secretsmanager_secret_version" "proxmox_terraform_root" {
-  secret_id = aws_secretsmanager_secret.proxmox_terraform_root.id
-  secret_string = jsonencode({
-    token_id     = var.proxmox_api_root_credentials.token_id
-    token_secret = var.proxmox_api_root_credentials.token_secret
-  })
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
-}
