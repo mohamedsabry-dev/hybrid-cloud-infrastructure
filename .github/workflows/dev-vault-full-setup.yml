@@ -51,7 +51,7 @@ jobs:
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/terraform-token \
+            --secret-id dev/proxmox/terraform-token-root \
             --query SecretString --output text)
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
