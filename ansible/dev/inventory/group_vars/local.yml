@@ -1,6 +1,0 @@
-# /group_vars/local.yml
-initial_packages:
-  - vim
-  - git
-  - curl
-  - htop
