@@ -14,7 +14,7 @@ resource "proxmox_virtual_environment_container" "vault1" {
   tags      = ["lxc", "vault", "ha-cluster"]
 
   # Unprivileged container with nesting
-  unprivileged = true
+  unprivileged = false
 
   features {
     nesting = true

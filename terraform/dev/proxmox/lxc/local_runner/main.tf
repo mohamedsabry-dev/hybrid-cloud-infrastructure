@@ -11,7 +11,7 @@ resource "proxmox_virtual_environment_container" "local_runner" {
   tags      = ["lxc", "local-runner", "infrastructure"]
 
   # Unprivileged container with nesting
-  unprivileged = true
+  unprivileged = false
 
   features {
     nesting = true
