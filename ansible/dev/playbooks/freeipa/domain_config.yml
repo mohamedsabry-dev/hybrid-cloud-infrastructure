@@ -1,16 +1,17 @@
 ---
-- name: Setup Domain
+- name: Setup Domain Groups
   hosts: freeipa
   become: yes
   tasks:
-    - name: Setup Host Groups
-      freeipa.ansible_freeipa.ipahostgroup:
+      - name: Setup Host Groups
+        freeipa.ansible_freeipa.ipahostgroup:
           ipaadmin_principal: "{{ ipaadmin_principal }}"
           ipaadmin_password: "{{ ipaadmin_password }}"
-          name: automation_group
-          description: "All server hosts managed by Bot User"
-          host: "{{ ipa_managed_hosts }}"
+          name: "{{ item.name }}"
+          description: "{{ item.description }}"
+          host: "{{ item.hosts }}"
           state: present
+        loop: "{{ ipa_host_groups }}"
 
 
 - name: Setup User and Privilage
@@ -19,36 +20,68 @@
   tasks:      
     - name: Create Bot Users
       freeipa.ansible_freeipa.ipauser:
-        ipaadmin_principal: admin
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
         ipaadmin_password: "{{ ipaadmin_password }}"
-        name: super_bot
-        first: Super          # Required
-        last: Bot             # Required
-        description: "Super Bot user for automation"
+        name: "{{ item.name }}"
+        first: "{{ item.first }}"
+        last: "{{ item.last }}"
+        description: "{{ item.description }}"
+      loop: "{{ domain_bot_users }}"
 
     - name: Setup Bot User Privilage !Auth
       freeipa.ansible_freeipa.ipasudorule:
-        ipaadmin_principal: admin
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
         ipaadmin_password: "{{ ipaadmin_password }}"
-        name: super_bot
-        description: "Allow ansible to sudo automation_group with no password"
-        user:
-          - super_bot
-        hostgroup:
-          - automation_group
+        name: "{{ item.name }}"
+        description: "Allow {{ item.name }} passwordless sudo"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
         cmdcat: all
         runasuser: root
-        option:
-          - "!authenticate"
+        option: "{{ item.options }}"
         state: present
+      loop: "{{ domain_bot_users }}"
 
-    - name: Create User Group
+
+    - name: Create Admin Users
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        first: "{{ item.first }}"
+        last: "{{ item.last }}"
+        description: "{{ item.description }}"
+      loop: "{{ ipa_admin_users }}"
+
+    - name: Setup Admin User Sudo Rules (with password)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_sudo"
+        description: "Allow {{ item.name }} to sudo on {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        cmdcat: all
+        runasuser: root
+        state: present
+      loop: "{{ ipa_admin_users }}"
+
+
+    - name: Create Automation User Group
       freeipa.ansible_freeipa.ipagroup:
-        ipaadmin_principal: admin
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
         ipaadmin_password: "{{ ipaadmin_password }}"
         name: automation_users
         description: "Automation service accounts"
-        user:
-          - super_bot
+        user: "{{ domain_bot_users | map(attribute='name') | list }}"
         state: present
 
+
+    - name: Create Admin User Group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_users
+        description: "Admin service accounts"
+        user: "{{ ipa_admin_users | map(attribute='name') | list }}"
+        state: present
