@@ -207,13 +207,19 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Fetch LXC Password
+      - name: Fetch LXC Password and Vault Password
         run: |
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id dev/golden-image/lxc-root-password \
             --query SecretString --output text)
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
+          VAULT_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/vault-password \
+            --query SecretString --output text)
+          echo "::add-mask::${VAULT_PWD}"
+          echo "VAULT_PWD=${VAULT_PWD}" >> $GITHUB_ENV
 
       - name: Install Ansible
         run: |
@@ -222,7 +228,11 @@ jobs:
       - name: Pull latest code
         run: |
           sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo && git pull origin dev"
-      
+
+      - name: Setup Vault Password File
+        run: |
+          sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "echo '${VAULT_PWD}' > ~/.ansible_vault && chmod 600 ~/.ansible_vault"
+
       - name: Setup Ansible
         run: |
           sshpass -p "${LXC_PWD}" ssh root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/first_setup_inventory.ini playbooks/ansible/ansible_setup.yml"
