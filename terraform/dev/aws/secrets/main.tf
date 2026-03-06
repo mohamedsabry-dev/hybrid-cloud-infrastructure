@@ -164,3 +164,23 @@ resource "aws_secretsmanager_secret_version" "ipa_dm_password" {
   }
 }
 
+#-------------------------------------------------------------------------------
+# Super Bot Keytab
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "super_bot_keytab" {
+  name        = var.secrets_config.super_bot_keytab.name
+  description = var.secrets_config.super_bot_keytab.description
+  tags        = var.secrets_config.super_bot_keytab.tags
+}
+
+resource "aws_secretsmanager_secret_version" "super_bot_keytab" {
+  secret_id     = aws_secretsmanager_secret.super_bot_keytab.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+
+
