@@ -133,12 +133,12 @@ jobs:
 
       - name: Pull latest code
         run: |
-           ssh root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+           ssh -o StrictHostKeyChecking=no root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
 
       - name: Run FreeIPA playbook
         run: |
-            ssh root@10.0.63.10 "\
+            ssh -o StrictHostKeyChecking=no root@10.0.63.10 "\
               export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
               export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
               cd /srv/repo/ansible/dev/ && \
-              ansible-playbook -i inventory/inventory.ini playbooks/freeipa/freeipa_setup.yml"
+              ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml"
