@@ -97,6 +97,15 @@ variable "secrets_config" {
         ManagedBy   = "terraform"
       }
     }
+    ansible_vault_password = {
+      name        = "dev/ansible/vault-password"
+      description = "Ansible vault password for decrypting encrypted variables"
+      tags = {
+        Purpose     = "ansible-vault-decryption"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 
