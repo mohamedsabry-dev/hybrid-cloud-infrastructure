@@ -25,7 +25,7 @@ variable "freeipa" {
     vmid            = 1001
     name            = "freeipa"
     cores           = 2
-    memory          = 1536
+    memory          = 3072
     ip              = "10.0.50.10/24"
     gateway         = "10.0.50.1"
     bridge          = "vmbr0"
