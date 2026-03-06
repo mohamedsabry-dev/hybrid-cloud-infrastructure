@@ -182,5 +182,23 @@ resource "aws_secretsmanager_secret_version" "super_bot_keytab" {
   }
 }
 
+#-------------------------------------------------------------------------------
+# Ansible Vault Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "ansible_vault_password" {
+  name        = var.secrets_config.ansible_vault_password.name
+  description = var.secrets_config.ansible_vault_password.description
+  tags        = var.secrets_config.ansible_vault_password.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ansible_vault_password" {
+  secret_id     = aws_secretsmanager_secret.ansible_vault_password.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 
 
