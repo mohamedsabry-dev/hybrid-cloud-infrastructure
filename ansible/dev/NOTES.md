@@ -487,4 +487,32 @@ ansible-vault encrypt_string 'your_secret_password' --name 'variable_name'
 kinit super_bot
 ansible managed_hosts -m command -a "id -u"
 # All should return 0 (root)
-```
+```                                                                                                           
+⏺ ================================================================================                           
+  KEYTAB SETUP - super_bot                                                                                 
+  ================================================================================                           
+                                                                                                             
+  CREATE (one-time, manual):                                                                                 
+                                                                                                             
+    ssh root@freeipa.lab.local                                                                               
+    ipa-getkeytab -s freeipa.lab.local -p super_bot -k /tmp/sb.keytab
+    base64 -w 0 /tmp/sb.keytab          # copy output
+    rm /tmp/sb.keytab
+
+    aws secretsmanager create-secret --name dev/super_bot/keytab \
+      --secret-string "PASTE_BASE64"
+
+  --------------------------------------------------------------------------------
+
+  FETCH (workflow usage):
+
+    KEYTAB=$(aws secretsmanager get-secret-value --secret-id dev/super_bot/keytab \
+      --query SecretString --output text)
+    echo "$KEYTAB" | base64 -d > /tmp/sb.keytab && chmod 600 /tmp/sb.keytab
+
+    kinit -kt /tmp/sb.keytab super_bot   # get ticket
+    ansible-playbook ...                  # run playbook
+    rm /tmp/sb.keytab && kdestroy        # cleanup
+
+  ================================================================================
+
