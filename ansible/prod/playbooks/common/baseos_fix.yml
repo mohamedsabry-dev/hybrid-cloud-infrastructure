@@ -1,0 +1,20 @@
+---
+- name: Fix Mirror Library
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Update Rocky Linux repo configuration
+      ansible.builtin.shell: |
+        sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo
+        sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo
+        sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo
+
+    - name: Disable extras repo
+      ansible.builtin.command: dnf config-manager --set-disabled extras
+
+    - name: Clean DNF Cache
+      ansible.builtin.command: dnf clean all
+
+    - name: Rebuild DNF Cache
+      ansible.builtin.command:   dnf makecache
