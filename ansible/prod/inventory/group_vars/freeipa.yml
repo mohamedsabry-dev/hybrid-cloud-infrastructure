@@ -1,0 +1,107 @@
+ipa_host_groups:
+    - name: automation_group
+      description: "All server hosts managed by Bot User"
+      hosts: "{{ ipa_managed_hosts }}"
+
+    - name: k8s_masters
+      description: "Kubernetes master nodes"
+      hosts:
+        - k8s-master1.lab.local
+        - k8s-master2.lab.local
+        - k8s-master3.lab.local
+
+    - name: k8s_workers
+      description: "Kubernetes worker nodes"
+      hosts:
+        - k8s-worker1.lab.local
+        - k8s-worker2.lab.local
+        - k8s-worker3.lab.local
+
+    - name: vault_cluster
+      description: "HashiCorp Vault cluster"
+      hosts:
+        - vault1.lab.local
+        - vault2.lab.local
+        - vault3.lab.local
+
+    - name: ansible_nodes
+      description: "Ansible control nodes"
+      hosts:
+        - ansible.lab.local
+
+    - name: runner_nodes
+      description: "CI/CD runner nodes"
+      hosts:
+        - local-runner.lab.local
+
+    - name: nginx_nodes
+      description: "Nginx reverse proxy"
+      hosts:
+        - ex-nginx.lab.local
+
+domain_bot_users:
+    - name: super_bot
+      first: Super
+      last: Bot
+      description: "Automation Bot User"
+      hostgroups:
+        - automation_group
+      options:
+        - "!authenticate"
+
+
+ipa_admin_users:
+
+    - name: k8s_admin
+      first: K8s
+      last: Admin
+      description: "K8s cluster admin"
+      hostgroups:
+        - k8s_masters
+        - k8s_workers
+
+    - name: vault_admin
+      first: Vault
+      last: Admin
+      description: "Vault cluster admin"
+      hostgroups:
+        - vault_cluster
+
+    - name: nginx_admin
+      first: Nginx
+      last: Admin
+      description: "Nginx admin"
+      hostgroups:
+        - nginx_nodes
+
+    - name: ansible_admin
+      first: Ansible
+      last: Admin
+      description: "Ansible node admin"
+      hostgroups:
+        - ansible_nodes
+
+    - name: runner_admin
+      first: Runner
+      last: Admin
+      description: "Runner node admin"
+      hostgroups:
+        - runner_nodes
+
+default_admin_user_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          00000000000000000000000000000000000000000000000000000000000000000000000000000000
+          0000000000000000000000000000000000000000000000000000000000000000000a000000000000
+          00000000000000000000000000000000000000000000000000000000000000000000000000000000
+          0000000000000000000a000000000000000000000000000000000000000000000000000000000000
+          0000
+
+default_bot_user_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          00000000000000000000000000000000000000000000000000000000000000000000000000000000
+          0000000000000000000000000000000000000000000000000000000000000000000a000000000000
+          00000000000000000000000000000000000000000000000000000000000000000000000000000000
+          0000000000000000000a000000000000000000000000000000000000000000000000000000000000
+          0000
+
+# ansible-vault encrypt_string 'Put password' --name 'default_bot_user_password'
