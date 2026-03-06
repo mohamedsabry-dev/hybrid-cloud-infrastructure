@@ -33,12 +33,15 @@
 | `self-hosted` | Identifies as self-hosted runner |
 | `macOS` | Operating system |
 | `ARM64` | CPU architecture |
+| `mac-mini` | Custom label for easy reference |
 
 **Workflow Usage:**
 ```yaml
+# Recommended (simple, clear)
+runs-on: mac-mini
+
+# Alternative (explicit labels)
 runs-on: [self-hosted, macOS, ARM64]
-# or simply:
-runs-on: macOS
 ```
 
 ---
@@ -56,6 +59,7 @@ runs-on: macOS
 | Ansible | 2.20.1 | Configuration management |
 | Node.js | 25.4.0 | GitHub Actions runner |
 | PowerShell | 7.5.4 | VMware/Windows automation |
+| sshpass | 1.10 | SSH password authentication for LXC provisioning |
 
 ### Provider Mirror
 
@@ -78,7 +82,7 @@ Cached locally at `$HOME/.terraform.d/providers-mirror`
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install required tools
-brew install python@3.14 node terraform ansible awscli
+brew install python@3.14 node terraform ansible awscli sshpass
 brew install --cask docker powershell
 ```
 
@@ -101,10 +105,10 @@ tar xzf ./actions-runner-osx-arm64.tar.gz
 ```bash
 # Get token from: GitHub Repo > Settings > Actions > Runners > New self-hosted runner
 
-# Configure runner with labels
+# Configure runner with labels (include mac-mini for easy workflow reference)
 ./config.sh --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure \
   --token YOUR_RUNNER_TOKEN \
-  --labels self-hosted,macOS,ARM64 \
+  --labels self-hosted,macOS,ARM64,mac-mini \
   --name Mohameds-Mac-mini
 ```
 
