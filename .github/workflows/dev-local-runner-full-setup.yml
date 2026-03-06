@@ -209,4 +209,4 @@ jobs:
         run: |
           ssh root@10.0.63.10 "\
             cd /srv/repo/ansible/dev && \
-            ansible-playbook -i inventory/inventory.ini playbooks/local-runner/setup_tools.yml"
+            ansible-playbook -i inventory/first_setup_inventory.ini playbooks/local-runner/setup_tools.yml"
