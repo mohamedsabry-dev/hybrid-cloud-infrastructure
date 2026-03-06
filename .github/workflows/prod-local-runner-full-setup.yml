@@ -203,10 +203,10 @@ jobs:
     steps:
       - name: Pull latest code
         run: |
-          ssh root@10.0.53.10 "cd /srv/repo/ && git pull origin prod"
+          ssh -o StrictHostKeyChecking=no root@10.0.53.10 "cd /srv/repo/ && git pull origin prod"
 
       - name: Run setup_tools playbook
         run: |
-          ssh root@10.0.53.10 "\
+          ssh -o StrictHostKeyChecking=no root@10.0.53.10 "\
             cd /srv/repo/ansible/prod && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/local-runner/setup_tools.yml"
