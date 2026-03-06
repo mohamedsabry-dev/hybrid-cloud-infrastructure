@@ -1,6 +1,6 @@
 #===============================================================================
 # Ansible LXC Container
-# Clone from golden LXC template and configure for Ansible control node
+# Deploy from golden template with SSH key injection
 #===============================================================================
 
 resource "proxmox_virtual_environment_container" "ansible" {
@@ -8,17 +8,28 @@ resource "proxmox_virtual_environment_container" "ansible" {
 
   node_name = var.node_name
   vm_id     = var.ansible.ctid
+  tags      = ["lxc", "ansible", "infrastructure"]
 
-  clone {
-    datastore_id = var.disks.os_disk.datastore_id
-    vm_id        = var.template_ctid
+  # Unprivileged container with nesting
+  unprivileged = true
+
+  features {
+    nesting = true
   }
 
+  # Operating System Template
+  operating_system {
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
+  }
+
+  # Root filesystem
   disk {
     datastore_id = var.disks.os_disk.datastore_id
     size         = var.disks.os_disk.size
   }
 
+  # Additional mount point
   mount_point {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
@@ -44,6 +55,7 @@ resource "proxmox_virtual_environment_container" "ansible" {
 
   memory {
     dedicated = var.ansible.memory
+    swap      = var.ansible.swap
   }
 
   # Network Configuration
@@ -54,11 +66,14 @@ resource "proxmox_virtual_environment_container" "ansible" {
     firewall = true
   }
 
-  # Cloud-init style initialization (API-only)
-  # Note: user_account removed - not supported for cloned LXC (Proxmox API limitation)
-  # Password inherited from golden template, SSH keys added manually post-deploy
+  # Initialization with SSH key injection (supported with template approach)
   initialization {
     hostname = var.ansible.name
+
+    user_account {
+      keys     = var.ssh_public_keys
+      password = var.root_password
+    }
 
     ip_config {
       ipv4 {
