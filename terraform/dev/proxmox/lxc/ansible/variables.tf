@@ -3,52 +3,40 @@
 #===============================================================================
 
 variable "ansible" {
-  description = "Configuration for Ansible LXC container cloned from golden template"
+  description = "Configuration for Ansible LXC container from golden template"
   type = object({
-    ctid    = number
-    name    = string
-    cores   = number
-    memory  = number
-    ip      = string
-    gateway = string
-    bridge  = string
-    vlan_id = number
-    startup_delay = number
-    shutdown_delay = number
-    startup_order = number
+    ctid            = number
+    name            = string
+    cores           = number
+    memory          = number
+    swap            = number
+    ip              = string
+    gateway         = string
+    bridge          = string
+    vlan_id         = number
+    startup_delay   = number
+    shutdown_delay  = number
+    startup_order   = number
     started = bool
     on_boot = bool
-    stop_on_destroy = bool
   })
 
   default = {
-    ctid    = 2001
-    name    = "ansible"
-    cores   = 1
-    memory  = 768
-    ip      = "10.0.63.10/24"
-    gateway = "10.0.63.1"
-    bridge  = "vmbr0"
-    vlan_id = 63
-    startup_delay = 60
-    shutdown_delay = 60
-    startup_order = 3
+    ctid            = 2001
+    name            = "ansible"
+    cores           = 1
+    memory          = 512
+    swap            = 512
+    ip              = "10.0.63.10/24"
+    gateway         = "10.0.63.1"
+    bridge          = "vmbr0"
+    vlan_id         = 63
+    startup_delay   = 60
+    shutdown_delay  = 60
+    startup_order   = 2
     started = true
     on_boot = true
-    stop_on_destroy = true
   }
-}
-
-variable "template_ctid" {
-  description = "Container ID of the golden LXC template to clone from"
-  type        = number
-  default     = 9001
-}
-
-variable "template_name" {
-  description = "Name of the golden LXC template (for documentation)"
-  type        = string
-  default     = "rocky10-lxc-golden"
 }
 
 variable "dns_servers" {
@@ -63,7 +51,6 @@ variable "search_domain" {
   default     = "lab.local"
 }
 
-# Reuse from golden-template module
 variable "node_name" {
   description = "Proxmox node name"
   type        = string
@@ -85,12 +72,37 @@ variable "disks" {
   }
 }
 
+variable "template" {
+  description = "LXC template configuration"
+  type = object({
+    file_id = string
+    os_type = string
+  })
+  default = {
+    file_id = "nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
+    os_type = "centos"
+  }
+}
+
+variable "ssh_public_keys" {
+  description = "List of SSH public keys to inject into the container"
+  type        = list(string)
+  default     = []
+}
+
+variable "root_password" {
+  description = "Root password for the container"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
 variable "mount_points" {
   description = "Map of mount point configurations for the LXC"
   type = map(object({
-    volume   = string
-    size = string
-    path  = string
+    volume = string
+    size   = string
+    path   = string
   }))
 
   default = {

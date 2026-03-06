@@ -126,3 +126,58 @@ resource "aws_secretsmanager_secret_version" "local_runner_ssh_pubkey" {
     ignore_changes = [secret_string]
   }
 }
+
+
+#-------------------------------------------------------------------------------
+# IPA Admin Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "ipa_admin_password" {
+  name        = var.secrets_config.ipa_admin_password.name
+  description = var.secrets_config.ipa_admin_password.description
+  tags        = var.secrets_config.ipa_admin_password.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ipa_admin_password" {
+  secret_id     = aws_secretsmanager_secret.ipa_admin_password.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+#-------------------------------------------------------------------------------
+# IPA DM Password
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "ipa_dm_password" {
+  name        = var.secrets_config.ipa_dm_password.name
+  description = var.secrets_config.ipa_dm_password.description
+  tags        = var.secrets_config.ipa_dm_password.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ipa_dm_password" {
+  secret_id     = aws_secretsmanager_secret.ipa_dm_password.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Super Bot Keytab
+#-------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "super_bot_keytab" {
+  name        = var.secrets_config.super_bot_keytab.name
+  description = var.secrets_config.super_bot_keytab.description
+  tags        = var.secrets_config.super_bot_keytab.tags
+}
+
+resource "aws_secretsmanager_secret_version" "super_bot_keytab" {
+  secret_id     = aws_secretsmanager_secret.super_bot_keytab.id
+  secret_string = var.secret_initial_value
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
