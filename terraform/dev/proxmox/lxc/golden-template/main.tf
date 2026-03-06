@@ -69,7 +69,7 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     }
 
     dns {
-      servers = ["10.0.5.1", "1.1.1.1"]
+      servers = ["8.8.8.8", "1.1.1.1"]
       domain  = "lab.local"
     }
   }
