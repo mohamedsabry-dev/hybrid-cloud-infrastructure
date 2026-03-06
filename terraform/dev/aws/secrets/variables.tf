@@ -70,6 +70,33 @@ variable "secrets_config" {
         ManagedBy   = "terraform"
       }
     }
+    ipa_admin_password = {
+      name        = "dev/freeipa/admin-password"
+      description = "IPA Admin password for FreeIPA server"
+      tags = {
+        Purpose     = "IPA Admin Password for FreeIPA server"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
+    ipa_dm_password = {
+      name        = "dev/freeipa/dm-password"
+      description = "IPA LDAP Password for FreeIPA server"
+      tags = {
+        Purpose     = "IPA LDAP Password for FreeIPA server"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
+    super_bot_keytab = {
+      name        = "dev/super_bot/keytab"
+      description = "Kerberos keytab for super_bot automation user (base64)"
+      tags = {
+        Purpose     = "workflow-kerberos-auth"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 

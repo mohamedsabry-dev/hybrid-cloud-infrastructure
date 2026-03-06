@@ -16,20 +16,33 @@ Settings → Secrets and variables → Actions → Variables
 
 ### Workflow Lock Variables
 
+**Pattern:** `{ENV}_INFRA_{NAME}_LOCK`
+
 | Variable Name | Value | Purpose |
 |---------------|-------|---------|
-| `GOLDEN_IMAGE_DEV_LOCKED` | true | Lock DEV golden image workflow |
-| `GOLDEN_IMAGE_PROD_LOCKED` | true | Lock PROD golden image workflow |
-| `GOLDEN_LXC_DEV_LOCKED` | true | Lock DEV golden LXC workflow |
-| `GOLDEN_LXC_PROD_LOCKED` | true | Lock PROD golden LXC workflow |
-| `FREEIPA_DEV_LOCKED` | true | Lock DEV FreeIPA workflow |
-| `FREEIPA_PROD_LOCKED` | true | Lock PROD FreeIPA workflow |
-| `ANSIBLE_DEV_LOCKED` | true | Lock DEV Ansible workflow |
-| `ANSIBLE_PROD_LOCKED` | true | Lock PROD Ansible workflow |
+| `DEV_INFRA_GOLDEN_VM_LOCK` | true | Lock DEV golden VM workflow |
+| `DEV_INFRA_GOLDEN_LXC_LOCK` | true | Lock DEV golden LXC workflow |
+| `DEV_INFRA_FREEIPA_LOCK` | true | Lock DEV FreeIPA workflow |
+| `DEV_INFRA_ANSIBLE_LOCK` | true | Lock DEV Ansible workflow |
+| `DEV_INFRA_K8S_MASTERS_LOCK` | true | Lock DEV K8s masters workflow |
+| `DEV_INFRA_K8S_WORKERS_LOCK` | true | Lock DEV K8s workers workflow |
+| `PROD_INFRA_GOLDEN_VM_LOCK` | true | Lock PROD golden VM workflow |
+| `PROD_INFRA_GOLDEN_LXC_LOCK` | true | Lock PROD golden LXC workflow |
+| `PROD_INFRA_FREEIPA_LOCK` | true | Lock PROD FreeIPA workflow |
+| `PROD_INFRA_ANSIBLE_LOCK` | true | Lock PROD Ansible workflow |
+
+### GitHub Runner Variables
+
+| Variable Name | Value | Purpose |
+|---------------|-------|---------|
+| `DEV_GH_RUNNER_NAME` | dev-local-runner | Runner name for config.sh |
+| `DEV_GH_RUNNER_LABELS` | dev-local-runner | Runner labels |
+| `PROD_GH_RUNNER_NAME` | prod-local-runner | Runner name for config.sh |
+| `PROD_GH_RUNNER_LABELS` | prod-local-runner | Runner labels |
 
 ### Why Workflow Locks? (Safe Trigger Mechanism)
 
-The `*_LOCKED` variables provide a safe trigger mechanism as a workaround for:
+The `*_LOCK` variables provide a safe trigger mechanism as a workaround for:
 
 - **workflow_dispatch limitation:** Manual trigger only works on default branch (main), cannot manually trigger workflows from dev/prod branches directly
 - **Environment approval gates:** Only available in GitHub Enterprise, not GitHub Pro
@@ -46,9 +59,9 @@ The `*_LOCKED` variables provide a safe trigger mechanism as a workaround for:
 ```yaml
 jobs:
   deploy:
-    runs-on: macOS
-    # Skip if locked (unless manual trigger)
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.GOLDEN_IMAGE_DEV_LOCKED != 'true' }}
+    runs-on: mac-mini
+    # Skip if locked
+    if: ${{ vars.DEV_INFRA_FREEIPA_LOCK != 'true' }}
 ```
 
 **To trigger a workflow:**
@@ -89,7 +102,7 @@ permissions:
   env:
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   run: |
-    gh variable set GOLDEN_IMAGE_DEV_LOCKED --body "true"
+    gh variable set DEV_INFRA_GOLDEN_VM_LOCK --body "true"
 ```
 
 **Why auto-lock golden templates:**
@@ -104,8 +117,14 @@ permissions:
 
 Settings → Secrets and variables → Actions → Secrets
 
-> **Note:** No secrets stored directly in GitHub.
-> All sensitive data retrieved from AWS Secrets Manager at runtime via OIDC.
+| Secret Name | Purpose |
+|-------------|---------|
+| `GH_ADMIN_PAT` | Fine-grained PAT with admin:repo permission (for deploy keys) |
+| `DEV_GH_RUNNER_TOKEN` | Fresh token from Settings > Actions > Runners (expires in ~1 hour) |
+| `PROD_GH_RUNNER_TOKEN` | Fresh token for prod runner setup |
+
+> **Note:** Most secrets are retrieved from AWS Secrets Manager at runtime via OIDC.
+> Only GitHub-specific secrets (PATs, runner tokens) are stored in GitHub Secrets.
 
 **Why:**
 - Secrets Manager provides audit trail (CloudTrail)
@@ -274,12 +293,20 @@ Proxmox API has limitations - some operations require SSH:
 
 ## Variable Naming Convention
 
-**Pattern:** `{RESOURCE}_{ENV}_LOCKED`
+**Lock Pattern:** `{ENV}_INFRA_{NAME}_LOCK`
 
 **Examples:**
-- `GOLDEN_IMAGE_DEV_LOCKED`
-- `GOLDEN_IMAGE_PROD_LOCKED`
-- `GOLDEN_LXC_DEV_LOCKED`
-- `FREEIPA_DEV_LOCKED`
-- `ANSIBLE_DEV_LOCKED`
-- `IAM_DEV_LOCKED`
+- `DEV_INFRA_GOLDEN_VM_LOCK`
+- `DEV_INFRA_GOLDEN_LXC_LOCK`
+- `DEV_INFRA_FREEIPA_LOCK`
+- `DEV_INFRA_ANSIBLE_LOCK`
+- `DEV_INFRA_K8S_MASTERS_LOCK`
+- `DEV_INFRA_K8S_WORKERS_LOCK`
+- `PROD_INFRA_FREEIPA_LOCK`
+
+**Runner Variables Pattern:** `{ENV}_GH_RUNNER_{FIELD}`
+
+**Examples:**
+- `DEV_GH_RUNNER_NAME`
+- `DEV_GH_RUNNER_LABELS`
+- `PROD_GH_RUNNER_NAME`

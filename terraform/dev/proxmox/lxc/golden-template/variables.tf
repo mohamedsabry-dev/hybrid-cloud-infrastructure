@@ -31,10 +31,16 @@ variable "lxc_container" {
   }
 }
 
-variable "template_file" {
-  description = "Path to LXC template file on Proxmox"
-  type        = string
-  default     = "nas-iso:vztmpl/rockylinux-10-default_20251001_amd64.tar.xz"
+variable "template" {
+  description = "LXC template configuration"
+  type = object({
+    file_id = string
+    os_type = string
+  })
+  default = {
+    file_id = "nas-iso:vztmpl/rockylinux-10-default_20251001_amd64.tar.xz"
+    os_type = "centos"
+  }
 }
 
 #===============================================================================
@@ -69,7 +75,7 @@ variable "proxmox_tls_insecure" {
   default     = true
 }
 
-variable "lxc_root_password" {
+variable "root_password" {
   description = "The root password for the LXC container, injected via CI/CD"
   type        = string
   sensitive   = true
