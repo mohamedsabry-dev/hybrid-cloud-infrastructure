@@ -88,6 +88,15 @@ variable "secrets_config" {
         ManagedBy   = "terraform"
       }
     }
+    super_bot_keytab = {
+      name        = "dev/super_bot/keytab"
+      description = "Kerberos keytab for super_bot automation user (base64)"
+      tags = {
+        Purpose     = "workflow-kerberos-auth"
+        Environment = "dev"
+        ManagedBy   = "terraform"
+      }
+    }
   }
 }
 
