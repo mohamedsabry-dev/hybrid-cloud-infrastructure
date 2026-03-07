@@ -1,6 +1,6 @@
 # Prod Proxmox Vault Cluster LXC - HashiCorp Vault HA Cluster
 
-name: "[PROD] Infra - Vault Cluster LXC"
+name: "[PROD] Vault - Full Setup"
 on:
   workflow_dispatch:
   push:
