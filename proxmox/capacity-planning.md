@@ -24,19 +24,19 @@
 
 | Resource | Type | OS Disk | Data Disk | RAM | vCPU | Purpose |
 |----------|------|---------|-----------|-----|------|---------|
-| FreeIPA | VM | 25GB | 30GB | 2GB | 1 | Identity mgmt |
+| FreeIPA | VM | 25GB | 25GB | 2GB | 2 | Identity mgmt |
 | K8s Master 1 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Worker 1 | VM | 25GB | 80GB | 2.75GB | 2 | Prom + Grafana |
 | K8s Worker 2 | VM | 25GB | 80GB | 2.75GB | 2 | NGINX Ingress + Loki |
 | K8s Worker 3 | VM | 25GB | 80GB | 2.75GB | 2 | Helm + FluxCD |
-| Vault 1 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
-| Vault 2 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
-| Vault 3 | LXC | 15GB | 20GB | 0.75GB | 1 | Secrets mgmt |
-| NGINX | LXC | 15GB | - | 0.5GB | 1 | Reverse proxy |
-| Ansible | LXC | 15GB | - | 0.5GB | 1 | Automation |
-| GH Runner | LXC | 15GB | 20GB | 0.5GB | 2 | GitHub Actions |
+| Vault 1 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 2 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 3 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| NGINX | LXC | 10GB | 5GB | 0.5GB | 1 | Reverse proxy |
+| Ansible | LXC | 10GB | 5GB | 0.5GB | 1 | Automation |
+| GH Runner | LXC | 15GB | 5GB | 0.5GB | 1 | GitHub Actions |
 
 ### Pod Distribution
 
@@ -51,15 +51,15 @@
 
 ### Summary
 
-| | Before | After |
-|---|--------|-------|
-| OS Disk | 295GB | 265GB |
-| Data Disk | 340GB | 340GB |
-| RAM (VMs/LXCs) | 20.5GB | 19GB |
-| Proxmox host | 2GB | 2GB |
-| Total RAM used | ~22.5GB | ~21GB |
-| Buffer | ~1.5GB | ~3GB |
-| vCPU | 19 | 19 |
+| | Value |
+|---|-------|
+| OS Disk (local-lvm) | 240GB |
+| Data Disk (NAS) | 295GB |
+| RAM allocated | 20GB |
+| Proxmox host | 2GB |
+| Total RAM used | ~22GB |
+| Buffer | ~2GB |
+| vCPU | 20 |
 
 ---
 
@@ -67,19 +67,19 @@
 
 | Resource | Type | OS Disk | Data Disk | RAM | vCPU | Purpose |
 |----------|------|---------|-----------|-----|------|---------|
-| FreeIPA | VM | 25GB | 30GB | 4GB | 2 | Identity mgmt |
+| FreeIPA | VM | 25GB | 25GB | 3GB | 2 | Identity mgmt |
 | K8s Master 1 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 4GB | 2 | Control plane |
-| K8s Worker 1 | VM | 25GB | 150GB | 8GB | 4 | Prom + Grafana |
-| K8s Worker 2 | VM | 25GB | 150GB | 8GB | 4 | NGINX Ingress + Loki |
-| K8s Worker 3 | VM | 25GB | 150GB | 8GB | 4 | Helm + FluxCD |
-| Vault 1 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
-| Vault 2 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
-| Vault 3 | LXC | 15GB | 30GB | 2GB | 2 | Secrets mgmt |
-| NGINX | LXC | 15GB | - | 1GB | 2 | Reverse proxy |
-| Ansible | LXC | 15GB | - | 1.5GB | 2 | Automation |
-| GH Runner | LXC | 15GB | 30GB | 1.5GB | 4 | GitHub Actions |
+| K8s Worker 1 | VM | 25GB | 80GB | 8GB | 4 | Prom + Grafana |
+| K8s Worker 2 | VM | 25GB | 80GB | 8GB | 4 | NGINX Ingress + Loki |
+| K8s Worker 3 | VM | 25GB | 80GB | 8GB | 4 | Helm + FluxCD |
+| Vault 1 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 2 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| Vault 3 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
+| NGINX | LXC | 10GB | 5GB | 0.5GB | 1 | Reverse proxy |
+| Ansible | LXC | 10GB | 5GB | 0.5GB | 1 | Automation |
+| GH Runner | LXC | 15GB | 5GB | 0.5GB | 1 | GitHub Actions |
 
 ### Pod Distribution
 
@@ -96,13 +96,13 @@
 
 | | Dev (24GB) | Prod (64GB) |
 |---|------------|-------------|
-| OS Disk | 265GB | 265GB |
-| Data Disk | 340GB | 570GB |
-| RAM allocated | 19GB | 49GB |
+| OS Disk (local-lvm) | 240GB | 240GB |
+| Data Disk (NAS) | 295GB | 295GB |
+| RAM allocated | 20GB | 42.75GB |
 | Proxmox host | 2GB | 4GB |
-| Total used | ~21GB | ~53GB |
-| Buffer | ~3GB | ~11GB |
-| vCPU | 19 | 35 |
+| Total used | ~22GB | ~47GB |
+| Buffer | ~2GB | ~17GB |
+| vCPU | 20 | 26 |
 
 ---
 
@@ -118,10 +118,10 @@ The NAS provides centralized storage for all resources:
 | Share | Environment | Size | Content |
 |-------|-------------|------|---------|
 | shared-iso | Both | 50GB | ISO images, templates |
-| dev-storage | Dev only | 360GB | Dev data disks |
-| prod-storage | Prod only | 600GB | Prod data disks |
+| dev-storage | Dev only | 300GB | Dev data disks |
+| prod-storage | Prod only | 300GB | Prod data disks |
 | PBS backups | Both | 650GB | Proxmox Backup Server |
-| **TOTAL** | | **1660GB** | ~140GB buffer on 1.8TB |
+| **TOTAL** | | **1300GB** | ~500GB buffer on 1.8TB |
 
 ---
 
