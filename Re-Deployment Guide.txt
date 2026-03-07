@@ -93,6 +93,67 @@ STEP 0.2: GITHUB SETUP
 
 --------------------------------------------------------------------------------
 
+STEP 0.2.5: NETWORK INFRASTRUCTURE
+|
+|   DOCUMENTATION: /network/
+|   +-- 00-ip-planning.txt      (VLAN/IP allocations)
+|   +-- 01-network-topology.txt (Physical diagram)
+|   +-- 02-er605-config.txt     (Router config)
+|   +-- 03-ap-wifi-config.txt   (WiFi/AP config)
+|   +-- 04-fs308gp-config.txt   (Switch config)
+|   +-- network-diagram.drawio  (Visual diagram)
+|
++-- A) ER605 ROUTER (192.168.0.175):
+|   |
+|   +-- Configure VLANs (Network > LAN > Network List):
+|   |   +-- VLAN 5:  10.0.5.1/24   (Management/WiFi)
+|   |   +-- VLAN 50: 10.0.50.1/24  (Prod Identity)
+|   |   +-- VLAN 51: 10.0.51.1/24  (Prod K8s Masters)
+|   |   +-- VLAN 52: 10.0.52.1/24  (Prod Vault)
+|   |   +-- VLAN 53: 10.0.53.1/24  (Prod Mgmt)
+|   |   +-- VLAN 54: 10.0.54.1/24  (Prod K8s Workers)
+|   |   +-- VLAN 55: 10.0.55.1/24  (Prod DMZ)
+|   |   +-- VLAN 60-65: Same pattern for Dev (10.0.6x.x)
+|   |
+|   +-- Port Assignments (Network > LAN > VLAN):
+|   |   +-- Port 3: VLAN 5 untagged (AP/WiFi)
+|   |   +-- Port 4: VLANs 60-65 tagged (Dev trunk to switch)
+|   |   +-- Port 5: VLANs 50-55 tagged (Prod trunk to switch)
+|   |
+|   +-- Firewall ACLs (Firewall > Access Control):
+|       +-- Allow Mac Mini (192.168.0.223) -> 10.0.0.0/16
+|       +-- Block SVC VLANs -> Mgmt VLANs
+|       +-- Block Prod <-> Dev cross-traffic
+|
++-- B) FS308GP SWITCH (192.168.0.185 via Festa Cloud):
+|   |
+|   +-- Create VLANs: 40 (Storage), 50-55 (Prod), 60-65 (Dev)
+|   |
+|   +-- Port Profiles:
+|   |   +-- Prod_SVC_All: Tagged 50,51,52,53,54,55
+|   |   +-- Dev_SVC_All:  Tagged 60,61,62,63,64,65
+|   |   +-- Storage:      Tagged 40
+|   |
+|   +-- Port Assignments:
+|       +-- Port 2: Prod_SVC_All (uplink to ER605 Port 4)
+|       +-- Port 3: Dev_SVC_All  (uplink to ER605 Port 5)
+|       +-- Port 4: Dev_SVC_All  (Dev server trunk)
+|       +-- Port 5: Prod_SVC_All (Prod server trunk)
+|       +-- Port 6-8: Storage (NAS, Dev stor0, Prod stor0)
+|
++-- C) AC750 ACCESS POINT (10.0.5.10):
+|   |
+|   +-- Mode: Access Point (Bridge)
+|   +-- SSID: unified_mgmt
+|   +-- Security: WPA2-PSK[AES]
+|   +-- AP Isolation: ENABLED (blocks client-to-client)
+|   +-- Connected to: ER605 Port 3 (VLAN 5 untagged)
+|
++-- D) MAC MINI STATIC ROUTE:
+    +-- sudo route -n add 10.0.0.0/16 192.168.0.175
+
+--------------------------------------------------------------------------------
+
 STEP 0.3: PROXMOX INSTALL (v9.1)
 |
 +-- Boot from: proxmox-ve_9.1-1.iso
@@ -327,10 +388,63 @@ STEP 2.1: ANSIBLE ADMIN SETUP
 |
 +-- git config --global pull.rebase true
 +-- cd /srv/repo && git pull origin dev
+|
++-- CREATE VAULT-ENCRYPTED PASSWORDS:
+|   |
+|   +-- Generate encrypted values (use same password as ~/.ansible_vault):
+|   |
+|   |   # IPA admin password (same as dev/freeipa/admin-password in AWS)
+|   |   ansible-vault encrypt_string --ask-vault-pass --name 'ipaadmin_password'
+|   |   # Type password, press Ctrl+D twice
+|   |
+|   |   # Default admin user password (for admin users created in IPA)
+|   |   ansible-vault encrypt_string --ask-vault-pass --name 'default_admin_user_password'
+|   |
+|   |   # Default bot user password (for service accounts)
+|   |   ansible-vault encrypt_string --ask-vault-pass --name 'default_bot_user_password'
+|   |
+|   +-- Update group_vars file with the output:
+|   |   vi /srv/repo/ansible/dev/inventory/group_vars/all.yml
+|   |
+|   +-- Paste each encrypted block:
+|       ipaadmin_password: !vault |
+|                 $ANSIBLE_VAULT;1.1;AES256
+|                 37356432393333386537616331...
+|       default_admin_user_password: !vault |
+|                 $ANSIBLE_VAULT;1.1;AES256
+|                 63636137613538623464613331...
+|       default_bot_user_password: !vault |
+|                 $ANSIBLE_VAULT;1.1;AES256
+|                 31376663356335363539373436...
+|
++-- COMMIT & PUSH:
+    git add inventory/group_vars/all.yml
+    git commit -m "Add vault-encrypted passwords for prod"
+    git push origin dev
 
 --------------------------------------------------------------------------------
 
-STEP 2.2: CREATE SUPER_BOT KEYTAB
+STEP 2.2: RUN PLAYBOOKS
+|
++-- cd /srv/repo/ansible/dev
+|
++-- # First run uses IPA admin (no super_bot yet)
++-- kinit admin   # Use ipaadmin_password
+|
++-- ansible-playbook -i inventory/inventory.ini playbooks/common/baseos_fix.yml
++-- ansible-playbook -i inventory/inventory.ini playbooks/common/initial_packages.yml
++-- ansible-playbook -i inventory/inventory.ini playbooks/common/enable_ssh_password_auth.yml
+|
++-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml
++-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/domain_config.yml  # Creates super_bot user
+|
++-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/fix_lxc_krb5_keyring.yml
+
+--------------------------------------------------------------------------------
+
+STEP 2.3: CREATE SUPER_BOT KEYTAB
+|
++-- NOTE: super_bot user was created by domain_config.yml in Step 2.2
 |
 +-- ssh root@freeipa.lab.local
 +-- ipa-getkeytab -s freeipa.lab.local -p super_bot -k /tmp/sb.keytab
@@ -339,23 +453,9 @@ STEP 2.2: CREATE SUPER_BOT KEYTAB
 |
 +-- aws secretsmanager put-secret-value --secret-id dev/super_bot/keytab \
       --secret-string "PASTE_BASE64"
-
---------------------------------------------------------------------------------
-
-STEP 2.3: RUN PLAYBOOKS
 |
-+-- kinit super_bot
-|
-+-- cd /srv/repo/ansible/dev
-|
-+-- ansible-playbook -i inventory/inventory.ini playbooks/common/baseos_fix.yml
-+-- ansible-playbook -i inventory/inventory.ini playbooks/common/initial_packages.yml
-+-- ansible-playbook -i inventory/inventory.ini playbooks/common/enable_ssh_password_auth.yml
-|
-+-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml
-+-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/domain_config.yml
-|
-+-- ansible-playbook -i inventory/inventory.ini playbooks/freeipa/fix_lxc_krb5_keyring.yml
++-- # Future ansible runs can now use:
++-- kinit super_bot   # Uses keytab for automation
 
 ================================================================================
                          IP MAP
