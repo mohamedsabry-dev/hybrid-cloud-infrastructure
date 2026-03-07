@@ -1,6 +1,6 @@
 # Prod Proxmox Nginx LXC - External Reverse Proxy
 
-name: "[PROD] Infra - Nginx LXC"
+name: "[PROD] Nginx - Full Setup"
 on:
   workflow_dispatch:
   push:
