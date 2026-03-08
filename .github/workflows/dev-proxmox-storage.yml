@@ -59,10 +59,10 @@ jobs:
       - name: Terraform Import
         run: |
           terraform state show proxmox_virtual_environment_storage_nfs.nas_iso > /dev/null 2>&1 || \
-          terraform import proxmox_virtual_environment_storage_nfs.nas_iso pve-dev:nas-iso
+          terraform import proxmox_virtual_environment_storage_nfs.nas_iso nas-iso
 
           terraform state show proxmox_virtual_environment_storage_nfs.nas_data > /dev/null 2>&1 || \
-          terraform import proxmox_virtual_environment_storage_nfs.nas_data pve-dev:nas-dev-data
+          terraform import proxmox_virtual_environment_storage_nfs.nas_data nas-dev-data
 
       - name: Terraform Plan
         timeout-minutes: 3
