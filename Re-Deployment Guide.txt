@@ -298,6 +298,9 @@ STEP 1.1: GOLDEN IMAGES
 
 STEP 1.2: ANSIBLE LXC
 |
++-- VERIFY SECRET (Settings -> Actions -> Secrets):
+|   +-- GH_ADMIN_PAT (fine-grained PAT with admin:repo for deploy keys)
+|
 +-- UNLOCK: DEV_INFRA_ANSIBLE_LOCK = false
 |           DEV_SVC_DEPLOY_KEY_LOCK = false
 |           DEV_SVC_ANSIBLE_SETUP_LOCK = false
@@ -308,7 +311,7 @@ STEP 1.2: ANSIBLE LXC
 |   +-- Clone LXC from template 9001
 |   +-- Generate SSH key pair
 |   +-- Store public key in AWS (dev/ansible/ssh-public-key)
-|   +-- Add deploy key to GitHub repo (write access)
+|   +-- Add deploy key to GitHub repo (uses GH_ADMIN_PAT)
 |   +-- Clone repo to /srv/repo
 |
 +-- RESULT: Ansible at 10.0.63.10, repo at /srv/repo
@@ -318,18 +321,24 @@ STEP 1.2: ANSIBLE LXC
 STEP 1.3: LOCAL RUNNER
 |
 +-- GET fresh token: GitHub -> Settings -> Actions -> Runners -> New
-+-- ADD SECRET: DEV_GH_RUNNER_TOKEN (expires in ~1 hour!)
+|
++-- ADD/UPDATE SECRET (Settings -> Actions -> Secrets):
+|   +-- DEV_GH_RUNNER_TOKEN (expires in ~1 hour, refresh before workflow!)
+|
++-- VERIFY VARIABLES (Settings -> Actions -> Variables):
+|   +-- DEV_GH_RUNNER_NAME   = dev-local-runner
+|   +-- DEV_GH_RUNNER_LABELS = dev-local-runner
 |
 +-- UNLOCK: DEV_INFRA_LOCAL_RUNNER_LOCK = false
 |           DEV_SVC_GH_RUNNER_LOCK = false
-|           DEV_SVC_RUNNER_TOOLS_LOCK = false
+|           DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK = false
 |
 +-- TRIGGER: dev-local-runner-full-setup.yml
 |
 +-- WORKFLOW:
 |   +-- Clone LXC from template 9001
 |   +-- Create runner user, install runner
-|   +-- Configure with: --name dev-local-runner --labels dev-local-runner
+|   +-- Configure with: --name $DEV_GH_RUNNER_NAME --labels $DEV_GH_RUNNER_LABELS
 |   +-- Install and start service
 |
 +-- RESULT: dev-local-runner online in GitHub
@@ -338,11 +347,15 @@ STEP 1.3: LOCAL RUNNER
 
 STEP 1.4: REMAINING LXCs
 |
-+-- UNLOCK + TRIGGER: dev-vault-full-setup.yml
-|   +-- vault1-3 at 10.0.62.10-12
++-- VAULT:
+|   +-- UNLOCK: DEV_INFRA_VAULT_CLUSTER_LOCK = false
+|   +-- TRIGGER: dev-vault-full-setup.yml
+|   +-- RESULT: vault1-3 at 10.0.62.10-12
 |
-+-- UNLOCK + TRIGGER: dev-nginx-full-setup.yml
-    +-- ex-nginx at 10.0.65.10
++-- NGINX:
+    +-- UNLOCK: DEV_INFRA_NGINX_LOCK = false
+    +-- TRIGGER: dev-nginx-full-setup.yml
+    +-- RESULT: ex-nginx at 10.0.65.10
 
 --------------------------------------------------------------------------------
 
@@ -538,9 +551,10 @@ Auto-Lock (golden templates only):
                       SECRET FLOW
 ================================================================================
 
-GitHub Secrets (stored in GitHub):
-  +-- GH_ADMIN_PAT        (PAT for deploy keys)
-  +-- DEV_GH_RUNNER_TOKEN (runner registration)
+GitHub Secrets (Settings -> Actions -> Secrets):
+  +-- GH_ADMIN_PAT         (Step 1.2 - Ansible deploy key, shared DEV/PROD)
+  +-- DEV_GH_RUNNER_TOKEN  (Step 1.3 - DEV runner registration, expires ~1h)
+  +-- PROD_GH_RUNNER_TOKEN (Step 1.3 - PROD runner registration, expires ~1h)
 
 AWS Secrets (fetched at runtime via OIDC):
   +-- dev/proxmox/terraform-token
@@ -550,6 +564,50 @@ AWS Secrets (fetched at runtime via OIDC):
 
 Flow:
   OIDC -> AWS -> Secrets Manager -> Mask -> TF_VAR -> Terraform -> Provider
+
+================================================================================
+                      GITHUB VARIABLES REFERENCE
+================================================================================
+
+Settings -> Actions -> Variables (Repository variables)
+
+ACCOUNT & REGION:
+  AWS_ACCOUNT_ID_DEV       = ############  (mask in UI)
+  AWS_ACCOUNT_ID_PROD      = ############  (mask in UI)
+  AWS_REGION               = eu-west-2
+
+ALL LOCK VARIABLES (default = true):
+  +-- DEV Environment:
+  |   DEV_INFRA_GOLDEN_VM_LOCK        (Step 1.1)
+  |   DEV_INFRA_GOLDEN_LXC_LOCK       (Step 1.1)
+  |   DEV_INFRA_ANSIBLE_LOCK          (Step 1.2)
+  |   DEV_SVC_DEPLOY_KEY_LOCK         (Step 1.2)
+  |   DEV_SVC_ANSIBLE_SETUP_LOCK      (Step 1.2)
+  |   DEV_INFRA_LOCAL_RUNNER_LOCK     (Step 1.3)
+  |   DEV_SVC_GH_RUNNER_LOCK          (Step 1.3)
+  |   DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK (Step 1.3)
+  |   DEV_INFRA_VAULT_CLUSTER_LOCK    (Step 1.4)
+  |   DEV_INFRA_NGINX_LOCK            (Step 1.4)
+  |   DEV_INFRA_FREEIPA_LOCK          (Step 1.5)
+  |   DEV_SVC_FREEIPA_SETUP           (Step 1.5)
+  |   DEV_INFRA_K8S_MASTERS_LOCK      (Step 1.6)
+  |   DEV_INFRA_K8S_WORKERS_LOCK      (Step 1.6)
+  |
+  +-- PROD Environment:
+      PROD_INFRA_GOLDEN_VM_LOCK
+      PROD_INFRA_GOLDEN_LXC_LOCK
+      PROD_INFRA_ANSIBLE_LOCK
+      PROD_SVC_DEPLOY_KEY_LOCK
+      PROD_SVC_ANSIBLE_SETUP_LOCK
+      PROD_INFRA_LOCAL_RUNNER_LOCK
+      PROD_SVC_GH_RUNNER_LOCK
+      PROD_SVC_LOCAL_RUNNER_TOOLS_LOCK
+      PROD_INFRA_VAULT_CLUSTER_LOCK
+      PROD_INFRA_NGINX_LOCK
+      PROD_INFRA_FREEIPA_LOCK
+      PROD_SVC_FREEIPA_SETUP
+      PROD_INFRA_K8S_MASTERS_LOCK
+      PROD_INFRA_K8S_WORKERS_LOCK
 
 ================================================================================
                       CODE ARCHITECTURE: COPY-PROMOTE PATTERN
