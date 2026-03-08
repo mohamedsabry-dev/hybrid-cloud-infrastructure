@@ -107,7 +107,7 @@ variable "mount_points" {
 
   default = {
     mount_1 = {
-      volume = "nas-dev-data"
+      volume = "local-lvm"
       size   = "5G"
       path   = "/opt/local_runner"
     }
