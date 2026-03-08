@@ -33,3 +33,21 @@ variable "nas_data" {
     keep_last = 1
   }
 }
+
+
+variable "proxmox_api_url" {
+  description = "Proxmox API endpoint URL"
+  type        = string
+  default     = "https://pve-dev.lab.local:8006"
+}
+
+variable "proxmox_tls_insecure" {
+  description = "Skip TLS verification for Proxmox API"
+  type        = bool
+  default     = true
+}
+
+variable "proxmox_api_token" {
+  type      = string
+  sensitive = true
+}
