@@ -100,6 +100,33 @@ variable "nas_data" {
 }
 ```
 
+### Email Notifications
+
+To receive backup status emails, configure Gmail SMTP relay on Proxmox:
+
+```bash
+# Run the setup script
+./proxmox/scripts/mail-config.sh
+```
+
+Or manually:
+```bash
+apt install libsasl2-modules -y
+echo "[smtp.gmail.com]:587 your-email@gmail.com:APP_PASSWORD" > /etc/postfix/sasl_passwd
+chmod 600 /etc/postfix/sasl_passwd
+postmap /etc/postfix/sasl_passwd
+postconf -e "relayhost = [smtp.gmail.com]:587"
+postconf -e "smtp_tls_security_level = encrypt"
+postconf -e "smtp_sasl_auth_enable = yes"
+postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
+postconf -e "smtp_sasl_security_options = noanonymous"
+systemctl restart postfix
+```
+
+> **Requires:** Gmail App Password (Google Account → Security → App passwords)
+
+See: [scripts/mail-config.sh](scripts/mail-config.sh) | [mail-config.md](mail-config.md)
+
 ---
 
 ## Snapshots
