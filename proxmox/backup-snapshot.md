@@ -1,108 +1,153 @@
 # Proxmox Backup & Snapshot Guide
-> Homelab Hybrid Cloud — Dev & Prod Environments
+
+## Quick Reference
+
+| Feature | Storage | Managed By |
+|---------|---------|------------|
+| Backups (vzdump) | NFS (NAS) | Terraform + PVE GUI |
+| Snapshots | local-lvm | PVE GUI (manual) |
 
 ---
 
-## Overview
+## Backups
 
-| Feature | Tool | Managed By |
-|---|---|---|
-| NFS Storage Mount | Terraform | Code |
-| Backup Retention Policy | Terraform | Code |
-| Backup Job Schedule | PVE GUI | Manual (one-time) |
-| Snapshots | PVE GUI | Manual (event-driven) |
+### Schedule
+```
+thu,sat 21:00
+```
 
----
+| Day | Purpose |
+|-----|---------|
+| Thursday 9 PM | Pre-change backup (before Fri/Sat work) |
+| Saturday 9 PM | Post-change backup (captures weekend work) |
 
-## 1. Backup
+### Configuration
 
-### Strategy
-- **Backup mode:** `snapshot` — VMs/LXCs stay running, no downtime
-- **Schedule:** Sunday 02:00 weekly
-- **Retention:** `keep_last = 1` per environment (storage constraint)
-- **Target:** NAS via NFS on VLAN 40 (storage network)
+| Setting | Value |
+|---------|-------|
+| Schedule | `thu,sat 21:00` |
+| Mode | `snapshot` |
+| Compression | `ZSTD` |
+| Storage | `nas-dev-data` / `nas-prod-data` |
+| Selection | All |
+| Retention | (empty - uses storage config) |
+| Repeat missed | Yes |
 
-### What Gets Backed Up
-All nodes — including stateless ones, because NAS storage carries the data disk partitions.
-
-### Backup Groups & Timing
-Workers are large (80GB data disk each) so they get dedicated slots:
-
-| Group | Nodes | Time |
-|---|---|---|
-| Group 1 | Vault 1,2,3 + Masters 1,2,3 | 01:00 |
-| Group 2 | Worker 1 | 02:00 |
-| Group 3 | Worker 2 | 02:30 |
-| Group 4 | Worker 3 | 03:00 |
-| Group 5 | IPA + NGINX + Ansible + GH Runner | 03:30 |
-
-### NFS Storage — Terraform Config
-
-**Storage allocation:**
-| Share | Size | Environment |
-|---|---|---|
-| `/volume1/shared-iso` | ~50GB | Both (ISO, CT templates) |
-| `/volume1/prod-storage` | ~600GB | Prod (disks + backups) |
-| `/volume1/dev-storage` | ~400GB | Dev (disks + backups) |
-
-
-### Backup Job — PVE GUI (One-Time Setup)
-Terraform provider (BPG 0.96.0) does not support backup job scheduling. Configure manually:
-
+### Setup (One-Time)
 ```
 Datacenter → Backup → Add
-  Schedule:  Sun 02:00
-  Mode:      snapshot
-  Storage:   nas-dev-data / nas-prod-data
-  Max Files: 1
-  Select:    All VMs/LXCs
+  Schedule:     thu,sat 21:00
+  Mode:         snapshot
+  Compression:  ZSTD
+  Storage:      nas-prod-data
+  Selection:    All
+  Retention:    (leave empty - uses Terraform config)
+  Advanced:     Check "Repeat missed"
 ```
 
-This config persists in `/etc/pve/jobs.cfg` permanently.
+### Observed Backup Performance (Prod)
 
-### Backup Mode Reference
-| Mode | VM State | Use Case |
-|---|---|---|
-| `snapshot` | Stays running | Standard — production pattern |
-| `suspend` | Briefly pauses | Avoid — worst of both worlds |
-| `stop` | Shuts down | Cleanest but causes downtime |
+| Resource | Type | Disk Size | Archive Size | Time |
+|----------|------|-----------|--------------|------|
+| FreeIPA | VM | 50GB | 1.63GB | 1:17 |
+| K8s Master | VM | 25GB | ~1.4GB | ~26s |
+| K8s Worker | VM | 105GB | 1.06GB | 2:46 |
+| LXC (Vault, Ansible, etc.) | LXC | ~15GB | ~300MB | ~1 min |
 
-> **Why snapshot mode is safe at 2AM:** Vault (raft), IPA (LDAP), and etcd have near-zero active writes. Low consistency risk.
+> **Note:** 90-97% sparse (empty space) = efficient compression
 
-> **QEMU Guest Agent:** Install on all VMs for application-consistent snapshots (flushes writes before PVE snapshots). Not applicable to LXCs.
+### Backup Behavior
+
+| Phase | Duration | What Happens |
+|-------|----------|--------------|
+| `fs-freeze` | 2-5 sec | Filesystem frozen, SSH may drop |
+| Snapshot | instant | LVM snapshot created |
+| `fs-thaw` | instant | Filesystem unfrozen |
+| Data transfer | minutes | VM fully running, data copied to NAS |
+
+> **Observation:** Brief SSH disconnection during `fs-freeze` is normal. CPU spike (~70%) during backup due to ZSTD compression. This is why backups run at 21:00 (low activity).
+
+### Retention Strategy
+
+**Why `keep_last = 2`?**
+
+| Backup | Purpose | Scenario |
+|--------|---------|----------|
+| Thursday | Pre-weekend restore point | Rollback if Fri/Sat changes break something |
+| Saturday | Captures weekend work | Latest state after changes |
+
+```
+Mon─Tue─Wed─Thu─────────Fri─Sat─────────Sun
+              ↓             ↓
+        [BACKUP 1]    [BACKUP 2]
+        pre-change    post-change
+```
+
+If Saturday's changes break something → restore Thursday's backup.
+
+**Storage cost:** ~24GB total (very light for NAS)
+
+### Terraform Config
+Storage retention managed via Terraform:
+```hcl
+# terraform/dev/proxmox/storage/nas/variables.tf
+variable "nas_data" {
+  default = {
+    id        = "nas-dev-data"
+    content   = ["images", "rootdir", "backup"]
+    keep_last = 2
+  }
+}
+```
 
 ---
 
-## 2. Snapshots
+## Snapshots
 
-### Strategy
-Snapshots are **event-driven, not scheduled** — taken manually before any risky operation.
+### Storage Requirements
 
-### When to Take a Snapshot
-- Before Vault setup begins
-- Before K8s cluster setup begins
-- Before any major Ansible playbook run on critical VMs
-- Before OS/kernel upgrades
+| Storage | Snapshots | Use For |
+|---------|-----------|---------|
+| local-lvm | Yes | OS disks, mount points |
+| ZFS | Yes | OS disks, mount points |
+| NFS | No | Backups, ISOs, templates |
 
-### How to Take a Snapshot
-```
-PVE GUI → VM/LXC → Snapshots → Take Snapshot
-  Name: pre-<phase>-<date>
-  Example: pre-vault-setup-2025-01-15
-           pre-k8s-setup-2025-01-20
-           pre-ipa-upgrade-2025-02-01
-```
+### LXC Snapshot Limitation
+LXC containers with NFS mount points **cannot take snapshots**.
 
-### Checkpoint Pattern (Learning Workflow)
-```
-VM provisioned + IPA enrolled + basics configured
-        ↓
-    SNAPSHOT  ←  "clean baseline"
-        ↓
-    Attempt setup (fail → learn → retry)
-        ↓
-    Revert to snapshot if needed → try again
+**Fix:** Move mount points to local-lvm:
+```bash
+pct stop <ctid>
+pct move-volume <ctid> mp0 local-lvm
+pct start <ctid>
+pct set <ctid> --delete unused0
 ```
 
-This avoids manually cleaning up failed attempts and gives a guaranteed clean state.
+See: [troubleshooting/proxmox/16-proxmox-lxc-snapshot-nfs-mount.md](../troubleshooting/proxmox/16-proxmox-lxc-snapshot-nfs-mount.md)
 
+### When to Snapshot
+Take snapshots **before risky operations**:
+- Major configuration changes
+- Vault/K8s cluster setup
+- OS/kernel upgrades
+- Ansible playbook runs
+
+### Naming Convention
+```
+pre-<operation>-YYYY-MM-DD
+Example: pre-vault-setup-2026-03-08
+```
+
+---
+
+## Backups vs Snapshots
+
+| | Backups | Snapshots |
+|---|---------|-----------|
+| Purpose | Disaster recovery | Quick rollback |
+| Storage | External (NAS) | Local (same disk) |
+| Speed | Minutes | Instant |
+| Schedule | Automated (thu,sat 21:00) | Manual, event-driven |
+| Survives disk failure | Yes | No |
+
+**Best Practice:** Use both. Snapshots for quick rollback during changes, backups for disaster recovery.
