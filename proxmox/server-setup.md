@@ -79,3 +79,4 @@ chmod +x /tmp/network-setup-{env}.sh
 |-------------|----------|---------------|---------|
 | DEV | pve-dev.lab.local | 10.0.5.110 | https://pve-dev.lab.local:8006 |
 | PROD | pve-prod.lab.local | 10.0.5.100 | https://pve-prod.lab.local:8006 |
+

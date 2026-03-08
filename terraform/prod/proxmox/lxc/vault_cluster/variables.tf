@@ -193,7 +193,7 @@ variable "mount_points" {
 
   default = {
     mount_1 = {
-      volume = "nas-prod-data"
+      volume = "local-lvm"
       size   = "5G"
       path   = "/opt/vault"
     }
