@@ -1,9 +1,9 @@
 # Shared ISO
 resource "proxmox_virtual_environment_storage_nfs" "nas_iso" {
-  id     = var.nas_iso.id
-  server = var.nas_iso.server
-  export = var.nas_iso.export
-  nodes  = var.nas_iso.nodes
+  id      = var.nas_iso.id
+  server  = var.nas_iso.server
+  export  = var.nas_iso.export
+  nodes   = var.nas_iso.nodes
   content = var.nas_iso.content
 }
 
