@@ -4,15 +4,15 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"  # Pinned for offline runner
+      version = "6.28.0" # Pinned for offline runner
     }
     proxmox = {
       source  = "bpg/proxmox"
-      version = "0.96.0"  # Fixed mount_point bug (issue #2507)
+      version = "0.96.0" # Fixed mount_point bug (issue #2507)
     }
     external = {
       source  = "hashicorp/external"
-      version = "2.3.4"  # Pinned for offline runner
+      version = "2.3.4" # Pinned for offline runner
     }
   }
 
