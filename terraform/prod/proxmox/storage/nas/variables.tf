@@ -30,7 +30,7 @@ variable "nas_data" {
     export    = "/volume1/prod-storage"
     nodes     = ["pve-prod"]
     content   = ["images", "rootdir", "backup"]
-    keep_last = 1
+    keep_last = 2
   }
 }
 
