@@ -17,10 +17,6 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_key_pair" "wireguard" {
-  key_name   = "dev-wireguard-key"
-  public_key = file("~/.ssh/id_rsa.pub")
-}
 
 resource "aws_security_group" "wireguard" {
   name        = "dev-wireguard-sg"
@@ -34,7 +30,7 @@ resource "aws_security_group" "wireguard" {
 
 resource "aws_vpc_security_group_ingress_rule" "wireguard_udp" {
   security_group_id = aws_security_group.wireguard.id
-  cidr_ipv4         = "197.x.x.x/32"
+  cidr_ipv4         = var.allowed_ip
   ip_protocol       = "udp"
   from_port         = 51820
   to_port           = 51820
@@ -42,7 +38,7 @@ resource "aws_vpc_security_group_ingress_rule" "wireguard_udp" {
 
 resource "aws_vpc_security_group_ingress_rule" "ssh" {
   security_group_id = aws_security_group.wireguard.id
-  cidr_ipv4         = "197.x.x.x/32"
+  cidr_ipv4         = var.allowed_ip
   ip_protocol       = "tcp"
   from_port         = 22
   to_port           = 22
@@ -60,7 +56,7 @@ resource "aws_instance" "wireguard" {
   availability_zone      = "eu-west-2a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
-  key_name               = aws_key_pair.wireguard.key_name
+  key_name               = "vpn-key-pair"
   source_dest_check      = false
 
   tags = {
