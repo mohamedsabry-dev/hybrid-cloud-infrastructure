@@ -28,20 +28,10 @@ resource "aws_security_group" "wireguard" {
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "wireguard_udp" {
+resource "aws_vpc_security_group_ingress_rule" "allow_all_from_home" {
   security_group_id = aws_security_group.wireguard.id
   cidr_ipv4         = var.allowed_ip
-  ip_protocol       = "udp"
-  from_port         = 51820
-  to_port           = 51820
-}
-
-resource "aws_vpc_security_group_ingress_rule" "ssh" {
-  security_group_id = aws_security_group.wireguard.id
-  cidr_ipv4         = var.allowed_ip
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
+  ip_protocol       = "-1"
 }
 
 resource "aws_vpc_security_group_egress_rule" "allow_all" {
