@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wait for network, then add route to 10.x networks
 
-GATEWAY="192.168.0.175"
+GATEWAY="192.168.100.175"
 NETWORK="10.0.0.0/8"
 
 # Wait up to 60 seconds for network
