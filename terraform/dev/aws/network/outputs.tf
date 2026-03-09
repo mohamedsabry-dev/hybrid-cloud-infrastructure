@@ -2,10 +2,6 @@ output "rt_public_id" {
   value = aws_route_table.rt_public.id
 }
 
-output "rt_public_id" {
-  value = aws_route_table.rt_public.id
-}
-
 output "vpc_id" {
   value = aws_vpc.vpc_main.id
 }
