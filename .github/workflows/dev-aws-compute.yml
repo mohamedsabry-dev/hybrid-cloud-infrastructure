@@ -12,7 +12,7 @@ name: "[DEV] AWS - Compute"
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'terraform/dev/aws/compute/**'
       - '.github/workflows/dev-aws-compute.yml'
