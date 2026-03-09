@@ -1,0 +1,252 @@
+WireGuard VPN Setup
+ER605 ↔ Dual AWS Accounts — Isolated Dev & Prod Tunnels
+Status: DRAFT — Pending Static IP from ISP
+
+1. Overview
+Two isolated WireGuard tunnels are configured on the ER605 router — one per AWS account. Each tunnel exposes only its designated home subnets to its corresponding AWS environment, ensuring dev and prod are fully isolated at the network level.
+
+	wg0 — Dev Tunnel	wg1 — Prod Tunnel
+AWS Account	Account 1 (Dev)	Account 2 (Prod)
+ER605 Tunnel IP	10.200.0.1/30	10.200.1.1/30
+AWS Peer Tunnel IP	10.200.0.2/30	10.200.1.2/30
+WG Port on EC2	UDP 51820	UDP 51820
+ER605 WAN IP	192.168.0.175 (static)	192.168.0.175 (static)
+Home subnets exposed	10.0.60-65/24 + 10.0.5.110/32	10.0.50-55/24 + 10.0.5.100/32
+AWS private CIDR	172.16.0.0/16 (example)	172.17.0.0/16 (example)
+
+NOTE: Replace 172.16.0.0/16 and 172.17.0.0/16 with your actual AWS VPC CIDRs. They must not overlap with each other or with 10.200.x.x tunnel IPs.
+
+
+2. Network Topology
+
+Component	Detail
+ISP Router	192.168.0.1 — upstream NAT
+AX3000 (main router)	WAN: from ISP | LAN: 192.168.100.1/24
+ER605 WAN	192.168.0.175 (static, assigned by AX3000 DHCP reservation)
+ER605 LAN	Gateway for all home VLANs — 10.0.0.0/16
+Dev subnets (wg0)	10.0.60.0/24 to 10.0.65.0/24 + host 10.0.5.110/32
+Prod subnets (wg1)	10.0.50.0/24 to 10.0.55.0/24 + host 10.0.5.100/32
+AWS Account 1 EC2 (Dev)	EIP: <DEV_EIP> | VPC: 172.16.0.0/16
+AWS Account 2 EC2 (Prod)	EIP: <PROD_EIP> | VPC: 172.17.0.0/16
+wg0 tunnel IPs	ER605: 10.200.0.1/30 | AWS Dev: 10.200.0.2/30
+wg1 tunnel IPs	ER605: 10.200.1.1/30 | AWS Prod: 10.200.1.2/30
+
+Traffic initiation model:
+ER605 (wg0, 10.200.0.1) ──outbound UDP 51820──> AWS Dev EC2 EIP  (10.200.0.2)
+ER605 (wg1, 10.200.1.1) ──outbound UDP 51820──> AWS Prod EC2 EIP (10.200.1.2)
+
+NOTE: ER605 WAN is 192.168.0.175 — static IP assigned via DHCP reservation on AX3000. ER605 initiates both tunnels outbound. No port forwarding needed on AX3000.
+
+
+3. ER605 WireGuard Configuration
+
+Two separate WireGuard interface configs are required on the ER605. If ER605 supports WireGuard natively via web UI, create two VPN profiles. If using CLI or a config file approach, create wg0.conf and wg1.conf separately.
+
+wg0 — Dev Tunnel Config (ER605 side)
+
+Generate Dev Key Pair
+wg genkey | tee er605_dev_private.key | wg pubkey > er605_dev_public.key
+cat er605_dev_public.key   # give this to AWS Dev EC2 wg0.conf [Peer]
+
+wg0.conf — ER605 Dev Interface
+[Interface]
+Address    = 10.200.0.1/30
+PrivateKey = <ER605_DEV_PRIVATE_KEY>
+ 
+[Peer]   # AWS Account 1 — Dev EC2
+PublicKey           = <AWS_DEV_PUBLIC_KEY>
+Endpoint            = <DEV_EIP>:51820
+AllowedIPs          = 10.200.0.2/32, 172.16.0.0/16
+PersistentKeepalive = 25
+
+NOTE: AllowedIPs on ER605 side only needs the AWS tunnel IP (10.200.0.2/32) and the AWS VPC CIDR (172.16.0.0/16). Home subnets are NOT listed here — they are routed via ER605 LAN interfaces, not the WireGuard interface itself.
+
+wg1 — Prod Tunnel Config (ER605 side)
+
+Generate Prod Key Pair
+wg genkey | tee er605_prod_private.key | wg pubkey > er605_prod_public.key
+cat er605_prod_public.key   # give this to AWS Prod EC2 wg0.conf [Peer]
+
+wg1.conf — ER605 Prod Interface
+[Interface]
+Address    = 10.200.1.1/30
+PrivateKey = <ER605_PROD_PRIVATE_KEY>
+ 
+[Peer]   # AWS Account 2 — Prod EC2
+PublicKey           = <AWS_PROD_PUBLIC_KEY>
+Endpoint            = <PROD_EIP>:51820
+AllowedIPs          = 10.200.1.2/32, 172.17.0.0/16
+PersistentKeepalive = 25
+
+
+4. AWS Account 1 — Dev EC2 WireGuard Setup
+
+4.1 Prerequisites
+•	EC2 instance (Amazon Linux 2 or Ubuntu 22.04) with EIP attached
+•	Security Group: UDP 51820 inbound from 192.168.0.175/32 (ER605 WAN static IP)
+•	Security Group: allow traffic from 10.200.0.0/30 within VPC
+•	VPC route table: add routes for 10.0.60.0/24 - 10.0.65.0/24 and 10.0.5.110/32 via ENI of this EC2
+
+4.2 Install WireGuard
+Amazon Linux 2:
+sudo amazon-linux-extras install epel -y
+sudo yum install wireguard-tools -y
+
+Ubuntu 22.04:
+sudo apt update && sudo apt install wireguard -y
+
+4.3 Generate Key Pair (Dev EC2)
+wg genkey | tee /etc/wireguard/dev_private.key | wg pubkey > /etc/wireguard/dev_public.key
+chmod 600 /etc/wireguard/dev_private.key
+cat /etc/wireguard/dev_public.key   # give this to ER605 wg0.conf [Peer]
+
+4.4 Enable IP Forwarding
+echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+4.5 /etc/wireguard/wg0.conf — AWS Dev EC2
+[Interface]
+Address    = 10.200.0.2/30
+ListenPort = 51820
+PrivateKey = <AWS_DEV_PRIVATE_KEY>
+ 
+PostUp   = iptables -A FORWARD -i wg0 -j ACCEPT; \
+           iptables -A FORWARD -o wg0 -j ACCEPT; \
+           iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; \
+           iptables -D FORWARD -o wg0 -j ACCEPT; \
+           iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+ 
+[Peer]   # ER605 Dev peer
+PublicKey  = <ER605_DEV_PUBLIC_KEY>
+AllowedIPs = 10.200.0.1/32, \
+             10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, \
+             10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24, \
+             10.0.5.110/32
+# No Endpoint — ER605 initiates, EC2 accepts
+
+4.6 Start WireGuard
+sudo systemctl enable wg-quick@wg0 && sudo systemctl start wg-quick@wg0
+sudo wg show
+
+
+5. AWS Account 2 — Prod EC2 WireGuard Setup
+
+5.1 Prerequisites
+•	EC2 instance with EIP attached in Account 2
+•	Security Group: UDP 51820 inbound from 192.168.0.175/32 (ER605 WAN static IP)
+•	Security Group: allow traffic from 10.200.1.0/30 within VPC
+•	VPC route table: add routes for 10.0.50.0/24 - 10.0.55.0/24 and 10.0.5.100/32 via ENI of this EC2
+
+5.2 Generate Key Pair (Prod EC2)
+wg genkey | tee /etc/wireguard/prod_private.key | wg pubkey > /etc/wireguard/prod_public.key
+chmod 600 /etc/wireguard/prod_private.key
+cat /etc/wireguard/prod_public.key   # give this to ER605 wg1.conf [Peer]
+
+5.3 /etc/wireguard/wg0.conf — AWS Prod EC2
+(Named wg0 on this EC2 as well — it is a separate machine in a separate account)
+[Interface]
+Address    = 10.200.1.2/30
+ListenPort = 51820
+PrivateKey = <AWS_PROD_PRIVATE_KEY>
+ 
+PostUp   = iptables -A FORWARD -i wg0 -j ACCEPT; \
+           iptables -A FORWARD -o wg0 -j ACCEPT; \
+           iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; \
+           iptables -D FORWARD -o wg0 -j ACCEPT; \
+           iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+ 
+[Peer]   # ER605 Prod peer
+PublicKey  = <ER605_PROD_PUBLIC_KEY>
+AllowedIPs = 10.200.1.1/32, \
+             10.0.50.0/24, 10.0.51.0/24, 10.0.52.0/24, \
+             10.0.53.0/24, 10.0.54.0/24, 10.0.55.0/24, \
+             10.0.5.100/32
+# No Endpoint — ER605 initiates, EC2 accepts
+
+5.4 Start WireGuard
+sudo systemctl enable wg-quick@wg0 && sudo systemctl start wg-quick@wg0
+sudo wg show
+
+
+6. Routing Summary
+
+wg0 — Dev Tunnel Routing
+
+Source	Destination	Path
+10.0.60-65.x / 10.0.5.110	172.16.0.0/16 (AWS Dev VPC)	via wg0 on ER605
+172.16.0.0/16 (AWS Dev)	10.0.60-65.x / 10.0.5.110	via wg0 on Dev EC2
+172.16.0.0/16 (AWS Dev)	10.0.50-55.x / 10.0.5.100	BLOCKED — not in AllowedIPs
+
+wg1 — Prod Tunnel Routing
+
+Source	Destination	Path
+10.0.50-55.x / 10.0.5.100	172.17.0.0/16 (AWS Prod VPC)	via wg1 on ER605
+172.17.0.0/16 (AWS Prod)	10.0.50-55.x / 10.0.5.100	via wg0 on Prod EC2
+172.17.0.0/16 (AWS Prod)	10.0.60-65.x / 10.0.5.110	BLOCKED — not in AllowedIPs
+
+NOTE: Isolation is enforced by AllowedIPs on each EC2 peer config. Dev EC2 has no knowledge of prod subnets and vice versa. The two tunnels use separate /30 tunnel CIDRs (10.200.0.x vs 10.200.1.x) so there is no overlap.
+
+
+7. Key Exchange Checklist
+
+Four key pairs total. Exchange public keys between ER605 and each EC2:
+
+Key	Generated On	Goes Into
+ER605 Dev public key	ER605 (wg0)	AWS Dev EC2 — [Peer] PublicKey
+AWS Dev EC2 public key	AWS Dev EC2	ER605 wg0.conf — [Peer] PublicKey
+ER605 Prod public key	ER605 (wg1)	AWS Prod EC2 — [Peer] PublicKey
+AWS Prod EC2 public key	AWS Prod EC2	ER605 wg1.conf — [Peer] PublicKey
+
+
+8. Verification Steps
+
+8.1 Check tunnel status on ER605
+sudo wg show wg0   # dev tunnel — should show latest handshake
+sudo wg show wg1   # prod tunnel — should show latest handshake
+
+8.2 Dev tunnel — ping tests
+# From a dev subnet host (e.g. 10.0.60.x):
+ping 10.200.0.2          # AWS Dev EC2 tunnel IP
+ping 172.16.x.x          # any EC2 in AWS Dev VPC
+ 
+# From AWS Dev EC2:
+ping 10.200.0.1          # ER605 wg0 tunnel IP
+ping 10.0.60.1           # device on dev subnet
+ping 10.0.5.110          # specific dev host
+
+8.3 Prod tunnel — ping tests
+# From a prod subnet host (e.g. 10.0.50.x):
+ping 10.200.1.2          # AWS Prod EC2 tunnel IP
+ping 172.17.x.x          # any EC2 in AWS Prod VPC
+ 
+# From AWS Prod EC2:
+ping 10.200.1.1          # ER605 wg1 tunnel IP
+ping 10.0.50.1           # device on prod subnet
+ping 10.0.5.100          # specific prod host
+
+8.4 Isolation check — these should FAIL
+# From AWS Dev EC2 — should NOT reach prod subnets:
+ping 10.0.50.1           # must time out
+ping 10.0.5.100          # must time out
+ 
+# From AWS Prod EC2 — should NOT reach dev subnets:
+ping 10.0.60.1           # must time out
+ping 10.0.5.110          # must time out
+
+
+9. Open Items / TODO
+
+Item	Status
+Confirm ER605 firmware supports WireGuard natively	TODO — check firmware version
+Provision AWS Dev EC2 + attach EIP in Account 1	TODO
+Provision AWS Prod EC2 + attach EIP in Account 2	TODO
+Generate all 4 WireGuard key pairs	TODO — do after EC2s are up
+Exchange public keys between ER605 and each EC2	TODO
+Add VPC route table entries in each AWS account	TODO — critical for return traffic
+Add SG rules: UDP 51820 from 192.168.0.175/32	TODO — on both EC2s
+Confirm AWS Dev VPC CIDR (replace 172.16.0.0/16)	TODO — update configs
+Confirm AWS Prod VPC CIDR (replace 172.17.0.0/16)	TODO — update configs
+Run isolation verification pings (section 8.4)	TODO — post-setup
+Store all private keys in Vault/Secrets Manager	TODO — align with Vault setup draft
+
