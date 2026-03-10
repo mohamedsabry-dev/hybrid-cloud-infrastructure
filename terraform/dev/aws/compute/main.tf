@@ -42,7 +42,7 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
 }
 
 resource "aws_instance" "wireguard" {
-  ami                    = "ami-02dfbd4ff395f2a1b"
+  ami                    = "ami-087c9ba923d9765d8"
   instance_type          = "t2.micro"
   availability_zone      = "eu-west-2a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
