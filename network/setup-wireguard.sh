@@ -80,7 +80,7 @@ Wants=wg-quick@wg0.service
 [Service]
 Type=simple
 User=root
-ExecStart=/bin/bash -c 'while true; do ping -c 1 $KEEPALIVE_TARGET > /dev/null 2>&1; sleep 30; done'
+ExecStart=/bin/bash -c 'while true; do ping -c 1 $KEEPALIVE_TARGET > /dev/null 2>&1; sleep 5; done'
 Restart=always
 RestartSec=10
 
