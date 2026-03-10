@@ -29,7 +29,7 @@ env:
 
 jobs:
   deploy:
-    name: "Plan & Apply (prod)"
+    name: "Deploy VPN EC2 (prod)"
     runs-on: macOS
 
     defaults:
@@ -74,10 +74,10 @@ jobs:
           echo "   terraform output wireguard_public_ip"
           echo ""
           echo "2. Copy setup script to EC2:"
-          echo "   scp -i vpn-key-pair.pem network/setup-wireguard.sh ec2-user@<EIP>:~/"
+          echo "   scp -i vpn-key-pair-prod.pem network/setup-wireguard.sh ec2-user@<EIP>:~/"
           echo ""
           echo "3. SSH into the instance:"
-          echo "   ssh -i vpn-key-pair.pem ec2-user@<EIP>"
+          echo "   ssh -i vpn-key-pair-prod.pem ec2-user@<EIP>"
           echo ""
           echo "4. Run the setup script:"
           echo "   chmod +x setup-wireguard.sh && ./setup-wireguard.sh prod"
