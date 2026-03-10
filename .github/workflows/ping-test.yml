@@ -28,5 +28,5 @@ jobs:
       - name: Run setup_tools playbook
         run: |
          ssh -o StrictHostKeyChecking=no root@10.0.63.10 "\
-            sudo ping -c 4 172.16.65.192 \
-            sudo ping -c 4 10.0.62.10 "
+            ping -c 4 172.16.65.192 \
+            ping -c 4 10.0.62.10 "
