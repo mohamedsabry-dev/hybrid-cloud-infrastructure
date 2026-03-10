@@ -7,16 +7,6 @@ data "terraform_remote_state" "network" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-}
-
 
 resource "aws_security_group" "wireguard" {
   name        = "prod-wireguard-sg"
@@ -53,12 +43,12 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
 }
 
 resource "aws_instance" "wireguard" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = "ami-02dfbd4ff395f2a1b"
   instance_type          = "t2.micro"
   availability_zone      = "eu-west-2a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
-  key_name               = "vpn-key-pair"
+  key_name               = "vpn-key-pair-prod"
   source_dest_check      = false
 
   user_data = <<-EOF
