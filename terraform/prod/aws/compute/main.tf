@@ -1,8 +1,8 @@
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket = "hybrid-cloud-infrastructure-tf-state-dev"
-    key    = "dev/aws/network/terraform.tfstate"
+    bucket = "hybrid-cloud-infrastructure-tf-state-prod"
+    key    = "prod/aws/network/terraform.tfstate"
     region = "eu-west-2"
   }
 }
@@ -19,12 +19,12 @@ data "aws_ami" "amazon_linux" {
 
 
 resource "aws_security_group" "wireguard" {
-  name        = "dev-wireguard-sg"
+  name        = "prod-wireguard-sg"
   description = "WireGuard VPN EC2 security group"
   vpc_id      = data.terraform_remote_state.network.outputs.vpc_id
 
   tags = {
-    Name = "dev-wireguard-sg"
+    Name = "prod-wireguard-sg"
   }
 }
 
@@ -74,7 +74,7 @@ resource "aws_instance" "wireguard" {
   EOF
 
   tags = {
-    Name = "dev-wireguard"
+    Name = "prod-wireguard"
   }
 }
 
@@ -82,7 +82,7 @@ resource "aws_eip" "wireguard" {
   domain = "vpc"
 
   tags = {
-    Name = "dev-wireguard-eip"
+    Name = "prod-wireguard-eip"
   }
 }
 
