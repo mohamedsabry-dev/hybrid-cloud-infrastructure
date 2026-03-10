@@ -63,3 +63,36 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
+      - name: WireGuard Setup Guide
+        if: success()
+        run: |
+          echo "=============================================="
+          echo "  WIREGUARD POST-DEPLOYMENT SETUP"
+          echo "=============================================="
+          echo ""
+          echo "1. Get the Elastic IP from Terraform output:"
+          echo "   terraform output wireguard_public_ip"
+          echo ""
+          echo "2. Copy setup script to EC2:"
+          echo "   scp -i vpn-key-pair.pem network/setup-wireguard.sh ec2-user@<EIP>:~/"
+          echo ""
+          echo "3. SSH into the instance:"
+          echo "   ssh -i vpn-key-pair.pem ec2-user@<EIP>"
+          echo ""
+          echo "4. Run the setup script:"
+          echo "   chmod +x setup-wireguard.sh && ./setup-wireguard.sh dev"
+          echo ""
+          echo "5. Copy the AWS Public Key shown by the script"
+          echo ""
+          echo "6. Update ER605 dev_tunnel peer:"
+          echo "   - VPN > WireGuard > Peers > dev_tunnel"
+          echo "   - Update Public Key with new AWS key"
+          echo "   - Endpoint: <NEW_EIP>:51820"
+          echo ""
+          echo "7. Enter ER605 dev_tunnel public key when prompted"
+          echo ""
+          echo "8. Verify tunnel:"
+          echo "   sudo wg show"
+          echo "   ping 10.0.65.1"
+          echo "=============================================="
+
