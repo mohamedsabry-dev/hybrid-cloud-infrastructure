@@ -1,0 +1,9 @@
+Simple script on AWS EC2:
+
+bash
+while true; do ping -c 1 <internal-VM-IP> > /dev/null 2>&1; sleep 5; done
+
+And same from internal VM to AWS private IP:
+
+bash
+while true; do ping -c 1 <aws-ec2-private-ip> > /dev/null 2>&1; sleep 5; done
