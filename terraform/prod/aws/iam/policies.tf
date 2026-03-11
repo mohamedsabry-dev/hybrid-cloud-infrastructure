@@ -61,12 +61,21 @@ resource "aws_iam_policy" "security_boundary_prod" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Block IAM mutation
+      # Block IAM mutation (except PassRole)
       {
-        Sid      = "DenyIAMMutation"
+        Sid       = "DenyIAMMutation"
+        Effect    = "Deny"
+        NotAction = ["iam:PassRole", "iam:GetInstanceProfile"]
+        Resource  = "*"
+      },
+      # Allow PassRole only for specific EC2 roles
+      {
+        Sid      = "DenyPassRoleExceptAllowed"
         Effect   = "Deny"
-        Action   = "iam:*"
-        Resource = "*"
+        Action   = "iam:PassRole"
+        NotResource = [
+          "arn:aws:iam::${var.prod_account_id}:role/prod-wireguard-ssm-role"
+        ]
       },
       # Block CloudTrail
       {
