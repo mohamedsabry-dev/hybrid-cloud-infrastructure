@@ -7,6 +7,17 @@ data "terraform_remote_state" "network" {
   }
 }
 
+data "terraform_remote_state" "iam" {
+    backend = "s3"
+    config = {
+      bucket = "hybrid-cloud-infrastructure-tf-state-dev"
+      key    = "dev/aws/iam/terraform.tfstate"
+      region = "eu-west-2"
+    }
+}
+
+
+
 resource "aws_security_group" "wireguard" {
   name        = "dev-wireguard-sg"
   description = "WireGuard VPN EC2 security group"
@@ -49,6 +60,7 @@ resource "aws_instance" "wireguard" {
   vpc_security_group_ids = [aws_security_group.wireguard.id]
   key_name               = "vpn-key-pair-dev"
   source_dest_check      = false
+  iam_instance_profile   = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
 
   user_data = <<-EOF
     #!/bin/bash
@@ -85,3 +97,4 @@ resource "aws_route" "home_subnets" {
   destination_cidr_block = "10.0.0.0/16"
   network_interface_id   = aws_instance.wireguard.primary_network_interface_id
 }
+
