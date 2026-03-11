@@ -1,0 +1,52 @@
+# HashiCorp Vault Cluster Configuration
+# 3-node HA cluster with Raft storage
+
+vault_version: "1.18.3"
+vault_user: vault
+vault_group: vault
+vault_cluster_name: "vault-prod"
+
+# Directories
+vault_config_dir: /etc/vault.d
+vault_data_dir: /opt/vault/data
+vault_log_dir: /var/log/vault
+vault_tls_dir: /etc/vault.d/tls
+
+# Network
+vault_api_port: 8200
+vault_cluster_port: 8201
+
+# Cluster nodes (must match inventory)
+vault_nodes:
+  - { name: "vault1", fqdn: "vault1.lab.local", addr: "10.0.52.10" }
+  - { name: "vault2", fqdn: "vault2.lab.local", addr: "10.0.52.11" }
+  - { name: "vault3", fqdn: "vault3.lab.local", addr: "10.0.52.12" }
+
+# Raft storage backend
+vault_backend: raft
+vault_raft_path: "{{ vault_data_dir }}"
+
+# TLS (set to true for production)
+vault_tls_disable: true  # Set false and configure certs for production
+
+# Auto-unseal with AWS KMS
+vault_auto_unseal: true
+vault_kms_region: "eu-west-2"
+vault_kms_key_id: "alias/vault-unseal"  # or full ARN: arn:aws:kms:eu-west-2:ACCOUNT:key/xxx
+
+# KMS credentials (use vault-encrypted values or env vars)
+# Option 1: Vault-encrypted (recommended)
+# vault_kms_access_key: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...
+# vault_kms_secret_key: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...
+
+# Option 2: Fetch from AWS Secrets Manager at runtime
+# vault_kms_access_key: "{{ lookup('env', 'VAULT_KMS_ACCESS_KEY') }}"
+# vault_kms_secret_key: "{{ lookup('env', 'VAULT_KMS_SECRET_KEY') }}"
+
+# Initial setup (only run once)
+vault_init_keys: 5
+vault_init_threshold: 3
