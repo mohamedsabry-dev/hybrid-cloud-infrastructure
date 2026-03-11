@@ -8,7 +8,7 @@ terraform {
     }
     proxmox = {
       source  = "bpg/proxmox"
-      version = "0.93.1" # Pinned for offline runner
+      version = "0.96.0"  # Fixed mount_point bug (issue #2507)
     }
     external = {
       source  = "hashicorp/external"

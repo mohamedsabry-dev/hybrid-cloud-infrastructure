@@ -1,0 +1,16 @@
+# /playbooks/ansible_setup.yml
+---
+- name: Install Common Packages
+  hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+    - name: Install Packages
+      ansible.builtin.dnf:
+        name: "{{ initial_packages }}"
+        state: present
+
+    - name: Install Ansible Collections
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection install -r /srv/repo/ansible/dev/requirements.yml --upgrade
+      changed_when: true

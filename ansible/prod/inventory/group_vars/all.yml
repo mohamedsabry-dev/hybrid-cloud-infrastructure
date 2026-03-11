@@ -1,0 +1,47 @@
+# /group_vars/all.yml
+initial_packages:
+  - vim
+  - git
+  - curl
+  - htop
+  - unzip
+
+#### Join Hosts to Domain ####
+
+ipaclient_domain: lab.local
+ipaclient_realm: LAB.LOCAL
+ipaclient_servers:
+  - freeipa.lab.local
+ipaadmin_principal: admin
+ipaadmin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          33666539663830336363636138306663393537613061303137333935636665643233653531626163
+          6132316533383339663661363335316230393661623135320a303062666233353431393665643239
+          30333431383836613163643939303361633739646462656139393463376634663532343263636439
+          3966666635366462320a313139393032353934306230653635386134366332336130663331363838
+          3538
+ipaclient_mkhomedir: yes
+ipaclient_configure_dns_resolver: yes
+ipaclient_dns_servers:
+  - 10.0.50.10
+#ipaclient_ntp_servers:
+#  - freeipa.lab.local
+ipaclient_configure_ntp: false
+ipaclient_no_ntp: true
+
+ipa_managed_hosts:
+  - k8s-master1.lab.local
+  - k8s-master2.lab.local
+  - k8s-master3.lab.local
+  - k8s-worker1.lab.local
+  - k8s-worker2.lab.local
+  - k8s-worker3.lab.local
+  - vault1.lab.local
+  - vault2.lab.local
+  - vault3.lab.local
+  - ansible.lab.local
+  - local-runner.lab.local
+  - ex-nginx.lab.local
+  - freeipa.lab.local
+
+k8s_api_vip: 10.0.51.100

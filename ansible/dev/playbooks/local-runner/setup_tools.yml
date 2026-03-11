@@ -1,0 +1,14 @@
+---
+- name: Setup Needed Tools for Local GH Runner
+  hosts: local_runners
+  become: yes
+
+  tasks:
+    - name: Install AWS CLI
+      ansible.builtin.shell: |
+        curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+        cd /tmp && unzip -q -o awscliv2.zip
+        /tmp/aws/install --update
+        rm -rf /tmp/aws /tmp/awscliv2.zip
+      args:
+        creates: /usr/local/bin/aws
