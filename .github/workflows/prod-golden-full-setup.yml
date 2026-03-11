@@ -1,0 +1,236 @@
+name: "[PROD] Golden Templates - Full Setup"
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - prod
+    paths:
+      - 'terraform/prod/proxmox/lxc/golden-template/**'
+      - 'terraform/prod/proxmox/vms/golden-image/**'
+      - '.github/workflows/prod-golden-full-setup.yml'
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+env:
+  ENVIRONMENT: prod
+  TF_WORKING_DIR_LXC: terraform/prod/proxmox/lxc/golden-template
+  TF_WORKING_DIR_VM: terraform/prod/proxmox/vms/golden-image
+
+#####################
+#####################
+
+jobs:
+##### Job 1 Core #####
+  # 1. Name the job on GH UI
+  # 2. Define which runner to use
+  # 3. Define the manual safe lock trigger for workflow_dispatch
+  # 4. Define the default working directory for all steps in this job
+  create-vm:
+    name: "1. Create Golden VM"
+    runs-on: mac-mini
+    if: ${{ vars.PROD_INFRA_GOLDEN_VM_LOCK != 'true' }}
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR_VM }}
+
+##### Steps #####
+  # 1. Copy Code to the work place
+  # 2. Authenticate with AWS for OICD and Assume the iam role
+  # 3. Fetch the needed secrets expected inside the tf code variables
+  # 4. Initialize Tf working directory
+  # 5. Plan "dry run" the Tf code and out to tfplan
+  # 6. Only appear if plan fail to excute in middle and DB LockID Triggered
+  # 7. Give your self small windows to review the plan output before excute
+  # 8. Apply the planned content inside tfplan file
+  # 9. In case of previous success, display manual instructions for complete the Job
+    steps:
+      # 1. Copy Code to the work place
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Authenticate with AWS for OICD and Assume the iam role
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 3. Fetch the needed secrets expected inside the tf code variables
+      - name: Fetch Proxmox Secrets
+        run: |
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id prod/proxmox/terraform-token \
+            --query SecretString --output text)
+
+          TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+          # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
+          echo "::add-mask::${TOKEN_SECRET}"
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
+
+          echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+      # 4. Initialize Tf working directory
+      - name: Terraform Init
+        run: terraform init
+
+      # 5. Plan "dry run" the Tf code and out to tfplan
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      # 7. Give your self small windows to review the plan output before excute
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+
+      # 8. Apply the planned content inside tfplan file
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      # 9. In case of previous success, display manual instructions for complete the Job
+      - name: Post-Build Setup Instructions
+        if: steps.apply.outcome == 'success'
+        run: |
+          echo "=============================================="
+          echo "  VM CREATED - MANUAL SETUP REQUIRED"
+          echo "=============================================="
+          echo ""
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp proxmox/scripts/golden-vm-setup.sh admin_prod@pve-prod.lab.local:/tmp/"
+          echo ""
+          echo "Step 2: Copy script from Proxmox to Ansible LXC"
+          echo "  # On Proxmox host"
+          echo "  pct push 2001 /tmp/golden-vm-setup.sh /tmp/golden-vm-setup.sh"
+          echo ""
+          echo "Step 3: Open VM console in Proxmox UI and pull script from Ansible"
+          echo "  # Login as root in Proxmox web console"
+          echo "  scp root@10.0.53.10:/tmp/golden-vm-setup.sh /tmp/"
+          echo "  chmod +x /tmp/golden-vm-setup.sh"
+          echo "  /tmp/golden-vm-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, shutdown and convert to template"
+          echo "  shutdown -h now"
+          echo "  # On Proxmox: qm template 9000"
+          echo ""
+          echo "=============================================="
+
+#################################################################################
+#################################################################################
+
+
+  create-lxc-template:
+    name: "2. Create Golden LXC"
+    runs-on: mac-mini
+    needs: create-vm
+    if: ${{ always() && needs.create-vm.result != 'failure' && needs.create-vm.result != 'cancelled' && vars.PROD_INFRA_GOLDEN_LXC_LOCK != 'true' }}
+
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR_LXC }}
+
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      # 1. Authenticate with AWS via OIDC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+
+      # 3. Fetch the needed secrets expected inside the tf code variables
+      - name: Fetch Proxmox Secrets
+        run: |
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id prod/proxmox/terraform-token \
+            --query SecretString --output text)
+
+          TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+          # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
+          echo "::add-mask::${TOKEN_SECRET}"
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+
+          echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id prod/golden-image/lxc-root-password \
+            --query SecretString --output text)
+
+          echo "::add-mask::${LXC_PWD}"
+
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "Review window ended at $(date)"
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Post-Build Cleanup Instructions
+        if: steps.apply.outcome == 'success'
+        run: |
+          echo "=============================================="
+          echo " LXC CONTAINER CREATED"
+          echo "=============================================="
+          echo ""
+          echo "Step 1: Copy setup script to Proxmox host (from Mac)"
+          echo "  scp proxmox/scripts/golden-lxc-setup.sh admin_prod@pve-prod.lab.local:/tmp/"
+          echo ""
+          echo "Step 2: Push script into container (on Proxmox host)"
+          echo "  pct push 9001 /tmp/golden-lxc-setup.sh /tmp/golden-lxc-setup.sh"
+          echo ""
+          echo "Step 3: Enter container and run setup"
+          echo "  pct enter 9001"
+          echo "  chmod +x /tmp/golden-lxc-setup.sh"
+          echo "  /tmp/golden-lxc-setup.sh"
+          echo ""
+          echo "Step 4: After setup completes, exit and convert to template"
+          echo "  exit"
+          echo "  pct stop 9001"
+          echo ""
+          echo "Step 5: Create backup using vzdump (to local storage)"
+          echo "  vzdump 9001 --compress gzip --storage local --mode stop"
+          echo ""
+          echo "Step 6: Move backup to template directory and rename"
+          echo "  mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz"
+          echo ""
+          echo "Step 7: Verify template is available"
+          echo "  pveam list nas-iso"
+          echo ""
+          echo "Step 8: (Optional) Delete the source container"
+          echo "  pct destroy 9001"
+          echo ""
+          echo "Note: The template will be at: nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
+          echo "=============================================="
+
+##################################################################################
+##################################################################################
