@@ -14,7 +14,7 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-echo "Installing persistent route to 10.0.0.0/8 via 192.168.0.175..."
+echo "Installing persistent route to 10.0.0.0/8 via 192.168.100.175..."
 
 # Install route script
 cp "${SCRIPT_DIR}/add-route.sh" "$ROUTE_SCRIPT"
