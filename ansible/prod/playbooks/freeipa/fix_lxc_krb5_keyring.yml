@@ -1,0 +1,41 @@
+---
+- name: Fix Kerberos keyring issue on LXC containers
+  hosts: vault_cluster:ansible:local_runners:nginx
+  become: yes
+
+  tasks:
+    - name: Check if sssd.conf exists
+      ansible.builtin.stat:
+        path: /etc/sssd/sssd.conf
+      register: sssd_conf
+
+    - name: Backup sssd.conf
+      ansible.builtin.copy:
+        src: /etc/sssd/sssd.conf
+        dest: /etc/sssd/sssd.conf.backup
+        remote_src: yes
+        mode: preserve
+      when: sssd_conf.stat.exists
+
+    - name: Add FILE-based krb5 ccache to sssd.conf
+      ansible.builtin.lineinfile:
+        path: /etc/sssd/sssd.conf
+        regexp: '^krb5_ccache_template'
+        line: 'krb5_ccache_template = FILE:/tmp/krb5cc_%U'
+        insertafter: '^\[domain/'
+        state: present
+      when: sssd_conf.stat.exists
+      notify:
+        - Clear SSSD cache
+        - Restart SSSD
+
+  handlers:
+    - name: Clear SSSD cache
+      ansible.builtin.command:
+        cmd: sss_cache -E
+      changed_when: true
+
+    - name: Restart SSSD
+      ansible.builtin.service:
+        name: sssd
+        state: restarted

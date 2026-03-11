@@ -23,8 +23,8 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
 
   # Operating System Template
   operating_system {
-    template_file_id = var.template_file
-    type             = "centos"
+    template_file_id = var.template.file_id
+    type             = var.template.os_type
   }
 
   # CPU
@@ -57,7 +57,8 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     hostname = var.lxc_container.hostname
 
     user_account {
-      password = var.lxc_root_password
+      password = var.root_password
+      keys     = []
     }
 
     ip_config {
@@ -68,7 +69,7 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     }
 
     dns {
-      servers = ["10.0.5.1", "1.1.1.1"]
+      servers = ["8.8.8.8", "1.1.1.1"]
       domain  = "lab.local"
     }
   }

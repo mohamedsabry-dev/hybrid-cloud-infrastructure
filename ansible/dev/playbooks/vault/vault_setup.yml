@@ -1,0 +1,10 @@
+---
+- name: Setup Hashicorp Vault
+  hosts: vault_cluster
+  become: yes
+  
+  roles: 
+      - role: community.hashi_vault
+
+
+      
