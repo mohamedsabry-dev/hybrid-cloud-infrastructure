@@ -59,3 +59,37 @@ resource "aws_iam_role_policy_attachment" "infra_role_security_boundary" {
   role       = aws_iam_role.github_actions_infrastructure.name
   policy_arn = aws_iam_policy.security_boundary_prod.arn
 }
+
+# =============================================================================
+# WireGuard EC2 SSM Role (for Session Manager access)
+# =============================================================================
+resource "aws_iam_role" "prod_wireguard_ssm" {
+  name = "prod-wireguard-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "prod-wireguard-ssm-role"
+    Environment = "prod"
+    ManagedBy   = "terraform"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "prod_wireguard_ssm_core" {
+  role       = aws_iam_role.prod_wireguard_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "prod_wireguard_ssm" {
+  name = "prod-wireguard-ssm-profile"
+  role = aws_iam_role.prod_wireguard_ssm.name
+}
