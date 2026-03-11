@@ -1,0 +1,136 @@
+---
+- name: Setup Domain Groups
+  hosts: freeipa
+  become: yes
+  tasks:
+      - name: Setup Host Groups
+        freeipa.ansible_freeipa.ipahostgroup:
+          ipaadmin_principal: "{{ ipaadmin_principal }}"
+          ipaadmin_password: "{{ ipaadmin_password }}"
+          name: "{{ item.name }}"
+          description: "{{ item.description }}"
+          host: "{{ item.hosts }}"
+          state: present
+        loop: "{{ ipa_host_groups }}"
+
+
+- name: Setup User and Privilage
+  hosts: freeipa
+  become: yes
+  tasks:
+
+    - name: Create Bot Users
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        first: "{{ item.first }}"
+        last: "{{ item.last }}"
+        title: "{{ item.description }}"
+        password: "{{ default_bot_user_password }}"
+        loginshell: /bin/bash
+        update_password: on_create
+      loop: "{{ domain_bot_users }}"
+
+    - name: Setup Bot User Privilage !Auth
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        description: "Allow {{ item.name }} passwordless sudo"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        cmdcat: all
+        runasuser: root
+        sudooption: "{{ item.options }}"
+        state: present
+      loop: "{{ domain_bot_users }}"
+
+
+    - name: Create Admin Users
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        first: "{{ item.first }}"
+        last: "{{ item.last }}"
+        title: "{{ item.description }}"
+        password: "{{ default_admin_user_password }}"
+        loginshell: /bin/bash
+        update_password: on_create
+      loop: "{{ ipa_admin_users }}"
+
+    - name: Setup Admin User Sudo Rules (with password)
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_sudo"
+        description: "Allow {{ item.name }} to sudo on {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        cmdcat: all
+        runasuser: root
+        state: present
+      loop: "{{ ipa_admin_users }}"
+
+
+    - name: Create Automation User Group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: automation_users
+        description: "Automation service accounts"
+        user: "{{ domain_bot_users | map(attribute='name') | list }}"
+        state: present
+
+
+    - name: Create Admin User Group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_users
+        description: "Admin service accounts"
+        user: "{{ ipa_admin_users | map(attribute='name') | list }}"
+        state: present
+
+    - name: Set password policy for automation users (4 years)
+      freeipa.ansible_freeipa.ipapwpolicy:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: automation_users
+        maxlife: 1460
+        cospriority: 10
+
+    - name: Set password policy for admin users (1 year)
+      freeipa.ansible_freeipa.ipapwpolicy:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: admin_users
+        maxlife: 360
+        cospriority: 20
+
+    - name: Create HBAC SSH Rule for Bot Users
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_ssh"
+        description: "Allow {{ item.name }} SSH access to {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        hbacsvc:
+          - sshd
+        state: present
+      loop: "{{ domain_bot_users }}"
+
+    - name: Create HBAC SSH Rule for Admin Users
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}_ssh"
+        description: "Allow {{ item.name }} SSH access to {{ item.hostgroups | join(', ') }}"
+        user: "{{ item.name }}"
+        hostgroup: "{{ item.hostgroups }}"
+        hbacsvc:
+          - sshd
+        state: present
+      loop: "{{ ipa_admin_users }}"

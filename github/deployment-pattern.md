@@ -84,15 +84,14 @@ workflow runs                 workflow runs         complete
 ## Sample Workflow Structure
 
 ```yaml
-name: Dev - Infrastructure
+name: "[DEV] Infra - FreeIPA VM"
 
 on:
   push:
     branches: [dev]
     paths:
-      - 'terraform/dev/proxmox/**'
-      - '.github/workflows/dev-infrastructure.yml'
-  workflow_dispatch:
+      - 'terraform/dev/proxmox/vms/freeipa/**'
+      - '.github/workflows/dev-infra-freeipa.yml'
 
 permissions:
   id-token: write
@@ -100,19 +99,21 @@ permissions:
 
 env:
   ENVIRONMENT: dev
-  TF_WORKING_DIR: terraform/dev/proxmox
+  TF_WORKING_DIR: terraform/dev/proxmox/vms/freeipa
 
 jobs:
   deploy:
-    runs-on: macOS
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.INFRA_DEV_LOCKED != 'true' }}
+    name: "Deploy FreeIPA VM"
+    runs-on: mac-mini
+    if: ${{ vars.DEV_INFRA_FREEIPA_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Code Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -126,25 +127,30 @@ jobs:
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
 
-          SSH_SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id dev/proxmox/ssh-admin-password \
-            --query SecretString --output text)
-
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
           # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
-          echo "::add-mask::${SSH_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
-          # Set as TF_VAR for Terraform variables
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
-          echo "TF_VAR_proxmox_ssh_password=${SSH_SECRET}" >> $GITHUB_ENV
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          sleep 180
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
 ```
