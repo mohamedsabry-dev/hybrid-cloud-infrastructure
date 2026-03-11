@@ -1,0 +1,102 @@
+# Dev compute module deployment
+# Triggers on push to dev branch when compute files change
+
+#### Define Block ####
+# 1. Define the job name on GH UI
+# 2. Define the run condition "On push : Where ?"
+# 3. Define the working directory path on GH Level
+# 4. Declare if will use manual trigger later or not
+# 5. Declare the needed permissions for OIDC Use
+# 6. Declare Env Variables for clean use
+name: "[DEV] AWS - Compute"
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/aws/compute/**'
+      - '.github/workflows/dev-aws-compute.yml'
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/aws/compute
+#####################
+#####################
+
+
+jobs:
+  deploy:
+    name: "Deploy VPN EC2 (dev)"
+    runs-on: macOS
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -var="allowed_ip=${{ secrets.PUBLIC_IP }}" -out=tfplan
+      
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: WireGuard Setup Guide
+        if: success()
+        run: |
+          echo "=============================================="
+          echo "  WIREGUARD POST-DEPLOYMENT SETUP"
+          echo "=============================================="
+          echo ""
+          echo "1. Get the Elastic IP from Terraform output:"
+          echo "   terraform output wireguard_public_ip"
+          echo ""
+          echo "2. Copy setup script to EC2:"
+          echo "   scp -i vpn-key-pair-dev.pem network/setup-wireguard.sh ec2-user@<EIP>:~/"
+          echo ""
+          echo "3. SSH into the instance:"
+          echo "   ssh -i vpn-key-pair-dev.pem ec2-user@<EIP>"
+          echo ""
+          echo "4. Run the setup script:"
+          echo "   chmod +x setup-wireguard.sh && ./setup-wireguard.sh dev"
+          echo ""
+          echo "5. Copy the AWS Public Key shown by the script"
+          echo ""
+          echo "6. Update ER605 dev_tunnel:"
+          echo "   - Interface Local IP: 172.16.200.1"
+          echo "   - Peer Public Key: <new AWS key>"
+          echo "   - Peer Endpoint: <NEW_EIP>:51820"
+          echo "   - Peer AllowedIPs: 172.16.0.0/16"
+          echo ""
+          echo "7. Enter ER605 dev_tunnel public key when prompted"
+          echo ""
+          echo "8. Verify tunnel:"
+          echo "   sudo wg show"
+          echo "   ping 172.16.200.1"
+          echo ""
+          echo "NOTE: Tunnel IPs are in VPC range (172.16.200.x)"
+          echo "      to solve ER605 AllowedIPs routing issue"
+          echo "=============================================="
+
