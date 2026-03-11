@@ -1,0 +1,8 @@
+[admin@localhost ~]$ cat ~/.ssh/config 
+Host wg-dev
+    HostName 18.134.145.133           # EIP of wg-dev                                  
+    User ec2-user       
+    IdentityFile ~/Downloads/vpn-key-pair-dev.pem   
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+[admin@localhost ~]$ 
