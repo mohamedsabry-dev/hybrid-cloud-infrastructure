@@ -19,8 +19,8 @@ env:
 
 jobs: 
 
-  install-tools:
-    name: "Test Ping"
+  test-dev:
+    name: "Test Ping Dev"
     runs-on: dev-local-runner
 
     steps:
@@ -28,6 +28,19 @@ jobs:
       - name: Run Ping Test
         run: |
               ssh -o StrictHostKeyChecking=no root@10.0.63.10 "
-                ping -c 4 172.16.65.192;
-                ping -c 4 10.0.62.10 "
-              
+                ping -c 4 172.16.65.197;
+                ping -c 4 10.0.62.10
+                ping -c 4 10.0.63.1"
+
+  test-prod:
+    name: "Test Ping Prod"
+    runs-on: prod-local-runner
+
+    steps:
+
+      - name: Run Ping Test
+        run: |
+              ssh -o StrictHostKeyChecking=no root@10.0.53.10 "
+                ping -c 4 172.17.65.73;
+                ping -c 4 10.0.52.10
+                ping -c 4 10.0.53.1"

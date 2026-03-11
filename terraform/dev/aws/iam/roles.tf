@@ -62,3 +62,35 @@ resource "aws_iam_role_policy_attachment" "infra_role_security_boundary" {
   role       = aws_iam_role.github_actions_infrastructure.name
   policy_arn = aws_iam_policy.security_boundary_dev.arn
 }
+
+
+resource "aws_iam_role" "dev_wireguard_ssm" {
+  name = "dev-wireguard-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "dev-wireguard-ssm-role"
+    Environment = "dev"
+    ManagedBy   = "terraform"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "dev_wireguard_ssm_core" {
+  role       = aws_iam_role.dev_wireguard_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "dev_wireguard_ssm" {
+  name = "dev-wireguard-ssm-profile"
+  role = aws_iam_role.dev_wireguard_ssm.name
+}
