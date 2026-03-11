@@ -34,6 +34,7 @@ jobs:
   deploy:
     name: "Plan & Apply"
     runs-on: mac-mini
+    # runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -59,6 +60,9 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
+          
+      # - name: Install Terraform
+      #   uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init
         run: terraform init
@@ -72,7 +76,7 @@ jobs:
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 180
+          sleep 20
           echo "✅ Review window ended at $(date)"
           
       - name: Terraform Apply
