@@ -110,7 +110,21 @@ resource "aws_iam_policy" "security_boundary_prod" {
         ]
         Resource = "*"
       },
-      # Deny PassRole except for allowed EC2 roles
+      # Allow PassRole only for specific EC2 roles
+      {
+        Sid      = "AllowPassRoleForEC2"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = [
+          "arn:aws:iam::${var.prod_account_id}:role/prod-wireguard-ssm-role"
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
+      },
+      # Deny PassRole to any other roles
       {
         Sid      = "DenyPassRoleExceptAllowed"
         Effect   = "Deny"
