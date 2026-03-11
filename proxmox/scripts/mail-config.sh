@@ -1,0 +1,64 @@
+#!/bin/bash
+#===============================================================================
+# Proxmox Mail Configuration (Gmail SMTP Relay)
+# Run on: pve-dev, pve-prod
+#===============================================================================
+
+set -e
+
+echo "=========================================="
+echo "  Proxmox Gmail SMTP Relay Setup"
+echo "=========================================="
+echo ""
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+  echo "Error: Please run as root"
+  exit 1
+fi
+
+# Get user input
+read -p "Enter Gmail address: " GMAIL_ADDRESS
+read -sp "Enter Gmail App Password (no spaces): " GMAIL_APP_PASSWORD
+echo ""
+
+# Validate input
+if [ -z "$GMAIL_ADDRESS" ] || [ -z "$GMAIL_APP_PASSWORD" ]; then
+  echo "Error: Email and password cannot be empty"
+  exit 1
+fi
+
+echo ""
+echo "[1/5] Installing SASL module..."
+apt install libsasl2-modules -y > /dev/null 2>&1
+
+echo "[2/5] Creating credentials file..."
+echo "[smtp.gmail.com]:587 ${GMAIL_ADDRESS}:${GMAIL_APP_PASSWORD}" > /etc/postfix/sasl_passwd
+chmod 600 /etc/postfix/sasl_passwd
+postmap /etc/postfix/sasl_passwd
+
+echo "[3/5] Configuring postfix..."
+postconf -e "relayhost = [smtp.gmail.com]:587"
+postconf -e "smtp_tls_security_level = encrypt"
+postconf -e "smtp_sasl_auth_enable = yes"
+postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
+postconf -e "smtp_sasl_security_options = noanonymous"
+
+# Remove deprecated setting if exists
+postconf -X smtp_use_tls 2>/dev/null || true
+
+echo "[4/5] Restarting postfix..."
+systemctl restart postfix
+
+echo "[5/5] Sending test email..."
+echo "Test email from $(hostname) - Proxmox mail config successful" | mail -s "Proxmox Mail Test - $(hostname)" "$GMAIL_ADDRESS"
+
+echo ""
+echo "=========================================="
+echo "  Setup Complete!"
+echo "=========================================="
+echo ""
+echo "Check your inbox: ${GMAIL_ADDRESS}"
+echo ""
+echo "Verify with: journalctl -u postfix --since '1 minute ago'"
+echo ""

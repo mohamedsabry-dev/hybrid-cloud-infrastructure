@@ -25,3 +25,7 @@ output "infrastructure_role_name" {
   description = "Name of the GitHub Actions Infrastructure role"
   value       = aws_iam_role.github_actions_infrastructure.name
 }
+
+output "wireguard_instance_profile_name" {
+    value = aws_iam_instance_profile.dev_wireguard_ssm.name
+}

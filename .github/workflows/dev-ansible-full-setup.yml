@@ -1,0 +1,238 @@
+# Dev Ansible Full Setup - Combined Workflow
+# Combines: infra-ansible, gh-deploy-key, svc-ansible-setup
+# Each job has its own lock - locked jobs skip to next, not fail whole workflow
+
+name: "[DEV] Ansible - Full Setup"
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/lxc/ansible/**'
+      - 'ansible/dev/**'
+      - '.github/workflows/dev-ansible-full-setup.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/proxmox/lxc/ansible
+
+jobs:
+  ##### Job 1: Deploy Ansible LXC #####
+  # Lock: DEV_INFRA_ANSIBLE_LOCK
+  deploy-lxc:
+    name: "1. Deploy Ansible LXC"
+    runs-on: mac-mini
+    if: ${{ vars.DEV_INFRA_ANSIBLE_LOCK != 'true' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch Proxmox Secrets
+        run: |
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id dev/proxmox/terraform-token \
+            --query SecretString --output text)
+
+          TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+          # Mask BEFORE any use
+          echo "::add-mask::${TOKEN_ID}"
+          echo "::add-mask::${TOKEN_SECRET}"
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
+
+          echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+          # Fetch LXC root password for SSH access
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+          echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Wait for LXC SSH to be ready
+        run: |
+          echo "Waiting for SSH on 10.0.63.10..."
+          for i in {1..30}; do
+            if sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@10.0.63.10 "echo SSH ready"; then
+              echo "SSH is ready after ${i} attempts"
+              break
+            fi
+            echo "Attempt $i: SSH not ready, waiting 10s..."
+            sleep 10
+          done
+
+      - name: Generate Ansible SSH Key and Store in AWS
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 \
+            "test -f ~/.ssh/id_ed25519 || ssh-keygen -q -t ed25519 -C 'ansible' -f ~/.ssh/id_ed25519 -N ''"
+
+          # Fetch the public key from Ansible LXC
+          ANSIBLE_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "cat ~/.ssh/id_ed25519.pub")
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+
+          # Store in AWS Secrets Manager (update existing secret)
+          aws secretsmanager put-secret-value \
+            --secret-id dev/ansible/ssh-public-key \
+            --secret-string "${ANSIBLE_SSH_KEY}" > /dev/null
+          echo "Updated secret dev/ansible/ssh-public-key"
+
+  ##### Job 2: Add Deploy Key to GitHub #####
+  # Lock: DEV_SVC_DEPLOY_KEY_LOCK
+  # Runs even if Job 1 was skipped (locked)
+  add-deploy-key:
+    name: "2. Add Deploy Key"
+    runs-on: mac-mini
+    needs: deploy-lxc
+    if: ${{ always() && needs.deploy-lxc.result != 'failure' && needs.deploy-lxc.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch Ansible SSH Public Key
+        run: |
+          ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/ssh-public-key \
+            --query SecretString --output text)
+          echo "::add-mask::${ANSIBLE_SSH_KEY}"
+          echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
+
+      - name: Add Deploy Key to Repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_ADMIN_PAT }}
+        run: |
+          # Add deploy key (read-write) - skip if already exists
+          if gh api repos/${{ github.repository }}/keys \
+            -f title="ansible-dev" \
+            -f key="${ANSIBLE_SSH_KEY}" \
+            -F read_only=false 2>&1; then
+            echo "Deploy key 'ansible-dev' added successfully"
+          else
+            echo "Deploy key already exists or failed - continuing"
+          fi
+          echo "Ansible can clone via: git clone git@github.com:${{ github.repository }}.git"
+
+  ##### Job 3: Test Deploy Key + Clone Repo #####
+  # Lock: DEV_SVC_DEPLOY_KEY_LOCK (same as Job 2)
+  # Runs even if Job 2 was skipped (locked)
+  test-deploy-key:
+    name: "3. Test Git Clone"
+    runs-on: mac-mini
+    needs: add-deploy-key
+    if: ${{ always() && needs.add-deploy-key.result != 'failure' && needs.add-deploy-key.result != 'cancelled' && vars.DEV_SVC_DEPLOY_KEY_LOCK != 'true' }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch LXC Password
+        run: |
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
+      - name: Test Pull Dev
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.10 "
+            # Add GitHub host key to known_hosts
+            mkdir -p ~/.ssh
+            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+            # Clone or pull repo
+            if [ ! -d /srv/repo/.git ]; then
+              rm -rf /srv/repo
+              git clone -b dev --single-branch git@github.com:${{ github.repository }}.git /srv/repo
+            fi
+            cd /srv/repo && git pull origin dev
+          "
+
+  ##### Job 4: Setup Ansible #####
+  # Lock: DEV_SVC_ANSIBLE_SETUP_LOCK
+  # Runs even if previous jobs were skipped (locked)
+  setup-ansible:
+    name: "4. Setup Ansible"
+    runs-on: mac-mini
+    needs: test-deploy-key
+    if: ${{ always() && needs.test-deploy-key.result != 'failure' && needs.test-deploy-key.result != 'cancelled' && vars.DEV_SVC_ANSIBLE_SETUP_LOCK != 'true' }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch LXC Password and Vault Password
+        run: |
+          LXC_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/golden-image/lxc-root-password \
+            --query SecretString --output text)
+          echo "::add-mask::${LXC_PWD}"
+          echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
+
+          VAULT_PWD=$(aws secretsmanager get-secret-value \
+            --secret-id dev/ansible/vault-password \
+            --query SecretString --output text)
+          echo "::add-mask::${VAULT_PWD}"
+          echo "VAULT_PWD=${VAULT_PWD}" >> $GITHUB_ENV
+
+      - name: Install Ansible
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "dnf install -y ansible-core python3-pip"
+
+      - name: Pull latest code
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "cd /srv/repo && git pull origin dev"
+
+      - name: Setup Vault Password File
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "echo '${VAULT_PWD}' > ~/.ansible_vault && chmod 600 ~/.ansible_vault"
+
+      - name: Setup Ansible
+        run: |
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.63.10 "cd /srv/repo/ansible/dev && ansible-playbook -i inventory/first_setup_inventory.ini playbooks/ansible/ansible_setup.yml"

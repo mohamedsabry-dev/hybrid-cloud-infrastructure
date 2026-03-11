@@ -1,0 +1,331 @@
+================================================================================
+              PHASE 1 DEPLOYMENT GUIDE - DEV ENVIRONMENT
+================================================================================
+
+PHASE 0 OUTPUT (Prerequisites)
+├── Golden VM Image (Rocky Linux)     ← dev-golden-full-setup.yml [Job 1]
+├── Golden LXC Template (Rocky Linux) ← dev-golden-full-setup.yml [Job 2]
+├── AWS IAM Roles/Policies            ← dev-aws-iam.yml
+├── AWS Secrets Manager entries       ← dev-aws-secrets.yml
+└── Mac-Mini Runner (bootstrap)       ← manual setup
+
+================================================================================
+                         PHASE 1 DEPLOYMENT TREE
+================================================================================
+
+STEP 1: ANSIBLE CONTROL NODE
+│
+├── [WORKFLOW] dev-ansible-full-setup.yml
+│   │
+│   ├── Job 1: Deploy Ansible LXC (Terraform)
+│   │   ├── Create LXC from golden template
+│   │   ├── Generate SSH keypair on LXC
+│   │   └── Store public key in AWS Secrets
+│   │
+│   ├── Job 2: Add Deploy Key to GitHub
+│   │   ├── Fetch public key from AWS
+│   │   └── Add as deploy key (read-write)
+│   │
+│   ├── Job 3: Test Git Clone
+│   │   ├── Add github.com to known_hosts
+│   │   └── Clone repo to /srv/repo
+│   │
+│   └── Job 4: Setup Ansible
+│       ├── Install ansible-core, python3-pip
+│       └── Run ansible_setup.yml playbook
+│
+└── RESULT: Ansible LXC ready at 10.0.63.10
+
+
+STEP 2: LOCAL RUNNER (Self-Hosted GitHub Runner)
+│
+├── [WORKFLOW] dev-local-runner-full-setup.yml
+│   │
+│   ├── Job 1: Deploy Local Runner LXC (Terraform)
+│   │   ├── Create LXC from golden template
+│   │   └── Inject Ansible SSH key for access
+│   │
+│   ├── Job 2: Configure GitHub Runner
+│   │   ├── Download actions-runner
+│   │   ├── Configure with repo token
+│   │   └── Install as systemd service
+│   │
+│   └── Job 3: Install Tools via Ansible
+│       ├── SSH to Ansible LXC
+│       └── Run setup_tools.yml against runner
+│
+└── RESULT: dev-local-runner available for workflows
+
+
+STEP 3: REMAINING LXC INFRASTRUCTURE
+│
+├── [WORKFLOW] dev-vault-full-setup.yml
+│   └── Job 1: Deploy Vault Cluster (3 LXCs)
+│       ├── vault1.lab.local (10.0.62.10)
+│       ├── vault2.lab.local (10.0.62.11)
+│       └── vault3.lab.local (10.0.62.12)
+│
+├── [WORKFLOW] dev-nginx-full-setup.yml
+│   └── Job 1: Deploy Nginx LXC
+│       └── ex-nginx.lab.local (10.0.65.10)
+│
+└── RESULT: All LXCs deployed, SSH accessible via Ansible key
+
+
+STEP 4: FREEIPA IDENTITY SERVER
+│
+├── [WORKFLOW] dev-freeipa-full-setup.yml
+│   │
+│   ├── Job 1: Deploy FreeIPA VM (Terraform)
+│   │   ├── Create VM from golden image
+│   │   ├── Inject Ansible SSH key
+│   │   └── freeipa.lab.local (10.0.60.10)
+│   │
+│   └── Job 2: Install FreeIPA Service (runs on dev-local-runner)
+│       ├── Fetch IPA passwords from AWS Secrets
+│       ├── SSH to Ansible LXC
+│       └── Run freeipa_setup.yml playbook
+│           ├── Domain: lab.local
+│           ├── Realm: LAB.LOCAL
+│           ├── UID range: 60001-65500 (LXC compatible)
+│           └── DNS with forwarders (8.8.8.8, 1.1.1.1)
+│
+└── RESULT: FreeIPA server running, DNS active
+
+
+STEP 5: KUBERNETES CLUSTER
+│
+├── [WORKFLOW] dev-k8s-full-setup.yml
+│   │
+│   ├── Job 1: Deploy K8s Masters (3 VMs)
+│   │   ├── k8s-master1.lab.local (10.0.61.10)
+│   │   ├── k8s-master2.lab.local (10.0.61.11)
+│   │   └── k8s-master3.lab.local (10.0.61.12)
+│   │
+│   └── Job 2: Deploy K8s Workers (3 VMs)
+│       ├── k8s-worker1.lab.local (10.0.64.10)
+│       ├── k8s-worker2.lab.local (10.0.64.11)
+│       └── k8s-worker3.lab.local (10.0.64.12)
+│
+└── RESULT: 6 K8s nodes ready for cluster bootstrap
+
+
+================================================================================
+                    STEP 6: MANUAL ANSIBLE ADMIN SETUP
+================================================================================
+
+SSH to Ansible LXC and configure for manual playbook execution:
+
+    ssh root@ansible.lab.local
+    # or: ssh root@10.0.63.10
+
+    # 1. Set Ansible config path (add to bashrc for persistence)
+    echo 'export ANSIBLE_CONFIG=/srv/repo/ansible/dev/ansible.cfg' >> ~/.bashrc
+    source ~/.bashrc
+
+    # 2. Create vault password file (get password from AWS or team)
+    echo 'YOUR_VAULT_PASSWORD' > ~/.ansible_vault
+    chmod 600 ~/.ansible_vault
+
+    # 3. Create encrypted secrets (if not already done)
+    # Bot user password:
+    ansible-vault encrypt_string 'bot_password_here' --name 'default_bot_user_password'
+    # Admin user password:
+    ansible-vault encrypt_string 'admin_password_here' --name 'default_admin_user_password'
+    # IPA admin password:
+    ansible-vault encrypt_string 'ipa_admin_pass' --name 'ipaadmin_password'
+
+    # 4. Get Kerberos ticket for Ansible operations
+    kinit super_bot
+
+    # 5. Verify connectivity
+    ansible all -m ping
+
+
+================================================================================
+                      STEP 7: RUN ANSIBLE PLAYBOOKS
+================================================================================
+
+From Ansible LXC (/srv/repo/ansible/dev):
+
+    cd /srv/repo/ansible/dev
+
+    # --- Common Setup (all nodes) ---
+    # Fix base OS issues, install packages, enable SSH password auth
+    ansible-playbook -i inventory/inventory.ini playbooks/common/baseos_fix.yml
+    ansible-playbook -i inventory/inventory.ini playbooks/common/initial_packages.yml
+    ansible-playbook -i inventory/inventory.ini playbooks/common/enable_ssh_password_auth.yml
+
+    # --- Join Hosts to FreeIPA Domain ---
+    # Enrolls all managed_hosts as IPA clients
+    ansible-playbook -i inventory/inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml
+
+    # --- Configure FreeIPA Domain Objects ---
+    # Creates: host groups, users, sudo rules, HBAC rules, password policies
+    ansible-playbook -i inventory/inventory.ini playbooks/freeipa/domain_config.yml
+
+    # --- Fix LXC Kerberos Auth (if needed) ---
+    # Fixes password auth on LXCs (keyring → file ccache)
+    ansible-playbook -i inventory/inventory.ini playbooks/freeipa/fix_lxc_krb5_keyring.yml
+
+
+================================================================================
+                         DEPLOYMENT ORDER SUMMARY
+================================================================================
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  PHASE 0: Prerequisites (already done)                      │
+    │  ├── Golden Images (VM + LXC)                               │
+    │  ├── AWS IAM + Secrets                                      │
+    │  └── Mac-Mini bootstrap runner                              │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 1: Ansible LXC                                        │
+    │  └── dev-ansible-full-setup.yml                             │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 2: Local Runner LXC                                   │
+    │  └── dev-local-runner-full-setup.yml                        │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 3: Remaining LXCs (Vault, Nginx)                      │
+    │  ├── dev-vault-full-setup.yml                               │
+    │  └── dev-nginx-full-setup.yml                               │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 4: FreeIPA Server                                     │
+    │  └── dev-freeipa-full-setup.yml                             │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 5: K8s Cluster (Masters + Workers)                    │
+    │  └── dev-k8s-full-setup.yml                                 │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 6: Manual Ansible Admin Setup                         │
+    │  ├── SSH to Ansible LXC                                     │
+    │  ├── Export ANSIBLE_CONFIG                                  │
+    │  ├── Create ~/.ansible_vault                                │
+    │  └── kinit super_bot                                        │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 7: Ansible Playbooks                                  │
+    │  ├── common/baseos_fix.yml                                  │
+    │  ├── common/initial_packages.yml                            │
+    │  ├── common/enable_ssh_password_auth.yml                    │
+    │  ├── freeipa/add_hosts_to_ipa.yml                           │
+    │  ├── freeipa/domain_config.yml                              │
+    │  └── freeipa/fix_lxc_krb5_keyring.yml                       │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  ✓ PHASE 1 COMPLETE                                         │
+    │                                                             │
+    │  You now have:                                              │
+    │  • Ansible control node with repo access                    │
+    │  • Self-hosted GitHub runner                                │
+    │  • FreeIPA identity management                              │
+    │  • All hosts joined to domain                               │
+    │  • User accounts: super_bot + admin users                   │
+    │  • HBAC + Sudo rules configured                             │
+    │  • K8s nodes ready for cluster setup                        │
+    │  • Vault cluster ready for initialization                   │
+    └─────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                              LOCK FLAGS
+================================================================================
+
+Each workflow job has a lock flag. Set to 'true' to skip:
+
+INFRASTRUCTURE LOCKS:
+  DEV_INFRA_GOLDEN_VM_LOCK
+  DEV_INFRA_GOLDEN_LXC_LOCK
+  DEV_INFRA_ANSIBLE_LOCK
+  DEV_INFRA_LOCAL_RUNNER_LOCK
+  DEV_INFRA_VAULT_LOCK
+  DEV_INFRA_NGINX_LOCK
+  DEV_INFRA_FREEIPA_LOCK
+  DEV_INFRA_K8S_MASTERS_LOCK
+  DEV_INFRA_K8S_WORKERS_LOCK
+
+SERVICE LOCKS:
+  DEV_SVC_DEPLOY_KEY_LOCK
+  DEV_SVC_ANSIBLE_SETUP_LOCK
+  DEV_SVC_GH_RUNNER_LOCK
+  DEV_SVC_RUNNER_TOOLS_LOCK
+  DEV_SVC_FREEIPA_SETUP
+
+
+================================================================================
+                           AWS SECRETS REQUIRED
+================================================================================
+
+dev/proxmox/terraform-token      → Proxmox API token
+dev/golden-image/vm-root-password → VM root password
+dev/golden-image/lxc-root-password → LXC root password
+dev/ansible/ssh-public-key        → Ansible node SSH public key
+dev/freeipa/admin-password        → FreeIPA admin password
+dev/freeipa/dm-password           → FreeIPA Directory Manager password
+
+
+================================================================================
+                              IP ADDRESS MAP
+================================================================================
+
+VLAN 60 - Identity:
+  10.0.60.10  freeipa.lab.local
+
+VLAN 61 - K8s Masters:
+  10.0.61.10  k8s-master1.lab.local
+  10.0.61.11  k8s-master2.lab.local
+  10.0.61.12  k8s-master3.lab.local
+
+VLAN 62 - Vault:
+  10.0.62.10  vault1.lab.local
+  10.0.62.11  vault2.lab.local
+  10.0.62.12  vault3.lab.local
+
+VLAN 63 - Management:
+  10.0.63.10  ansible.lab.local
+  10.0.63.20  local-runner.lab.local
+
+VLAN 64 - K8s Workers:
+  10.0.64.10  k8s-worker1.lab.local
+  10.0.64.11  k8s-worker2.lab.local
+  10.0.64.12  k8s-worker3.lab.local
+
+VLAN 65 - DMZ:
+  10.0.65.10  ex-nginx.lab.local
+
+
+================================================================================
+                           TROUBLESHOOTING
+================================================================================
+
+See /troubleshooting/ folder for common issues:
+
+  TS-001  LXC Kerberos keyring auth failure
+  TS-002  LXC NTP configuration disabled
+  TS-003  FreeIPA DNS recursion/forwarders
+  TS-004  VM SSH permission denied (cloud-init)
+  TS-005  LXC UID mapping initgroups error
+  TS-006  Kerberos requires hostnames not IPs
+  TS-007  FreeIPA config requirements (cospriority, etc.)
+
+================================================================================

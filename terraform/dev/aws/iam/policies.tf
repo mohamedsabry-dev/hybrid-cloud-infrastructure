@@ -63,12 +63,63 @@ resource "aws_iam_policy" "security_boundary_dev" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Block IAM mutation
+      # Block IAM mutation (explicit list, excludes PassRole and read actions)
       {
-        Sid      = "DenyIAMMutation"
-        Effect   = "Deny"
-        Action   = "iam:*"
+        Sid    = "DenyIAMMutation"
+        Effect = "Deny"
+        Action = [
+          "iam:CreateUser",
+          "iam:DeleteUser",
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
+          "iam:AttachUserPolicy",
+          "iam:DetachUserPolicy",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:AttachGroupPolicy",
+          "iam:DetachGroupPolicy",
+          "iam:PutUserPolicy",
+          "iam:DeleteUserPolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:PutGroupPolicy",
+          "iam:DeleteGroupPolicy",
+          "iam:CreateAccessKey",
+          "iam:DeleteAccessKey",
+          "iam:UpdateAccessKey",
+          "iam:CreateLoginProfile",
+          "iam:DeleteLoginProfile",
+          "iam:UpdateLoginProfile",
+          "iam:AddUserToGroup",
+          "iam:RemoveUserFromGroup",
+          "iam:CreateGroup",
+          "iam:DeleteGroup",
+          "iam:UpdateGroup",
+          "iam:UpdateUser",
+          "iam:UpdateRole",
+          "iam:SetDefaultPolicyVersion",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:PutRolePermissionsBoundary",
+          "iam:DeleteRolePermissionsBoundary"
+        ]
         Resource = "*"
+      },
+      # Deny PassRole except for allowed EC2 roles
+      {
+        Sid      = "DenyPassRoleExceptAllowed"
+        Effect   = "Deny"
+        Action   = "iam:PassRole"
+        NotResource = [
+          "arn:aws:iam::${var.dev_account_id}:role/dev-wireguard-ssm-role"
+        ]
       },
       # Block CloudTrail
       {

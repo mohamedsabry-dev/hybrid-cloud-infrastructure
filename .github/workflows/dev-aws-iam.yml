@@ -1,0 +1,83 @@
+# Dev IAM module deployment
+# Triggers on push to dev-security branch when IAM files change
+
+#### Define Block ####
+# 1. Define the job name on GH UI
+# 2. Define the run condition "On push : Where ?"
+# 3. Define the working directory path on GH Level
+# 4. Declare if will use manual trigger later or not
+# 5. Declare the needed permissions for OIDC Use
+# 6. Declare Env Variables for clean use
+name: "[DEV] AWS - IAM"
+on:
+  push:
+    branches:
+      - dev-security
+    paths:
+      - 'terraform/dev/aws/iam/**'
+      - '.github/workflows/dev-aws-iam.yml'
+permissions:
+  id-token: write
+  contents: read
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/aws/iam
+#####################
+#####################
+
+
+jobs:
+##### Job 1 Core #####
+  # 1. Name the job on GH UI
+  # 2. Define which runner to use
+  # 3. Define the default working directory for all steps in this job
+  deploy:
+    name: "Plan & Apply"
+    runs-on: mac-mini
+    # runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+#####################
+#####################
+
+
+##### Steps #####
+  # 1. Copy Code to the work place
+  # 2. Authenticate with AWS for OIDC and Assume the TerraformAdmin role
+  # 3. Initialize Tf working directory
+  # 4. Plan "dry run" the Tf code and out to tfplan
+  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
+  # 6. Give yourself small window to review the plan output before execute
+  # 7. Apply the planned content inside tfplan file
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION }}
+          
+      # - name: Install Terraform
+      #   uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "✅ Review window ended at $(date)"
+          
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan

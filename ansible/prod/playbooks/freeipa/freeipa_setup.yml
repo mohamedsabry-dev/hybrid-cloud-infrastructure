@@ -1,0 +1,85 @@
+# playbooks/freeipa_setup.yml
+---
+- name: Install FreeIPA Server
+  hosts: freeipa
+  become: yes
+
+  vars:
+    # FreeIPA Server Configuration
+    ipaserver_domain: lab.local
+    ipaserver_realm: LAB.LOCAL
+    ipaserver_hostname: freeipa.lab.local
+
+    # ID Range Configuration (fits within LXC unprivileged UID mapping 0-65535)
+    # Must be above UID_MAX (60000) from /etc/login.defs, but below 65536 for LXC
+    ipaserver_idstart: 60001
+    ipaserver_idmax: 65500
+
+    # DNS Configuration
+    ipaserver_setup_dns: yes
+    ipaserver_auto_forwarders: yes
+    ipaserver_no_dnssec_validation: yes
+    ipaserver_forwarders:
+      - 8.8.8.8
+      - 1.1.1.1
+
+    # Passwords (Injected from AWS Secrets via CI/CD)
+    ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
+    ipadm_password: "{{ lookup('env', 'IPA_DM_PASSWORD') }}"
+    freeipa_alias: freeipa
+
+  pre_tasks:
+    - name: Uninstall IPA client if present
+      ansible.builtin.command:
+        cmd: ipa-client-install --uninstall --unattended
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Disable cloud-init hosts management
+      ansible.builtin.lineinfile:
+        path: /etc/cloud/cloud.cfg
+        regexp: 'manage_etc_hosts'
+        line: "manage_etc_hosts: False"
+
+    - name: Remove all existing freeipa entries from /etc/hosts
+      ansible.builtin.shell: |
+        sed -i '/freeipa/d' /etc/hosts
+      changed_when: true
+
+    - name: Add correct /etc/hosts entry for FreeIPA
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_default_ipv4.address }} {{ ipaserver_hostname }} {{ freeipa_alias }}"
+        state: present
+
+  roles:
+    - role: freeipa.ansible_freeipa.ipaserver
+
+  post_tasks:
+    - name: Configure DNS forwarders
+      freeipa.ansible_freeipa.ipadnsconfig:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        forwarders:
+          - ip_address: 8.8.8.8
+          - ip_address: 1.1.1.1
+        forward_policy: first
+        allow_sync_ptr: yes
+
+    - name: Allow DNS recursion from internal networks
+      ansible.builtin.blockinfile:
+        path: /etc/named/ipa-options-ext.conf
+        block: |
+          allow-recursion { 127.0.0.1; 10.0.0.0/8; };
+          allow-query-cache { 127.0.0.1; 10.0.0.0/8; };
+        marker: "# {mark} ANSIBLE MANAGED - DNS RECURSION"
+        create: yes
+        owner: root
+        group: named
+        mode: '0640'
+      notify: Restart named
+
+  handlers:
+    - name: Restart named
+      ansible.builtin.service:
+        name: named
+        state: restarted
