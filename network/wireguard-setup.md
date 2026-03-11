@@ -10,17 +10,17 @@ This guide covers setting up WireGuard VPN between AWS EC2 and on-premises ER605
                         AWS Dev (172.16.0.0/16)
                               |
 Home/Datacenter          WireGuard EC2 Dev
-  10.0.x.x                (10.200.0.2)
+  10.0.x.x               (172.16.200.2)
       |                        |
       |                   UDP 51820
       |                        |
    ER605 ─────────────────────┘
-(10.200.0.1 dev)
-(10.200.1.1 prod)              |
+(172.16.200.1 dev)
+(172.17.200.1 prod)            |
       |                   UDP 51820
       |                        |
       |                   WireGuard EC2 Prod
-      |                    (10.200.1.2)
+      |                   (172.17.200.2)
       |                        |
       └───────────────── AWS Prod (172.17.0.0/16)
 ```
@@ -33,136 +33,170 @@ Home/Datacenter          WireGuard EC2 Dev
 |---------|-----|------|
 | AWS VPC CIDR | 172.16.0.0/16 | 172.17.0.0/16 |
 | AWS WireGuard Subnet | 172.16.65.0/24 | 172.17.65.0/24 |
-| AWS Tunnel IP | 10.200.0.2/30 | 10.200.1.2/30 |
+| **AWS Tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
 | AWS Listen Port | 51820 | 51820 |
-| ER605 Tunnel IP | 10.200.0.1 | 10.200.1.1 |
+| **ER605 Tunnel IP** | **172.16.200.1** | **172.17.200.1** |
 | ER605 Listen Port | 51820 | 51821 |
 | ER605 Interface Name | dev_tunnel | prod_tunnel |
-| State Bucket | ...-tf-state-dev | ...-tf-state-prod |
+| ER605 Peer AllowedIPs | 172.16.0.0/16 | 172.17.0.0/16 |
+| On-Prem VLANs | 10.0.60-65.0/24 | 10.0.50-55.0/24 |
+
+> **IMPORTANT**: Tunnel IPs are within the AWS VPC range. See [Routing Issue & Solution](#routing-issue--solution) for why.
 
 ---
 
 ## AWS EC2 WireGuard Setup
 
-### 1. Install Required Packages
+### Quick Setup (Recommended)
 
 ```bash
-# Update system
+# Copy script to EC2
+scp -i vpn-key-pair.pem network/setup-wireguard.sh ec2-user@<EIP>:~/
+
+# SSH and run
+ssh -i vpn-key-pair.pem ec2-user@<EIP>
+chmod +x setup-wireguard.sh
+./setup-wireguard.sh dev   # or prod
+```
+
+### Manual Setup
+
+#### 1. Install Required Packages
+
+```bash
 sudo dnf update -y
-
-# Install WireGuard
-sudo dnf install wireguard-tools -y
-
-# Install monitoring tools
-sudo dnf install tcpdump -y
-sudo dnf install nmap-ncat -y    # For nc command
-sudo dnf install tmux -y          # For persistent sessions
-sudo dnf install cronie -y        # For cron jobs
-
-# Start cron service
+sudo dnf install wireguard-tools tcpdump nmap-ncat cronie iptables -y
 sudo systemctl enable crond
 sudo systemctl start crond
 ```
 
-### 2. Generate WireGuard Keys
+#### 2. Generate WireGuard Keys
 
 ```bash
-# Generate private and public keys
 wg genkey | sudo tee /etc/wireguard/private.key | wg pubkey | sudo tee /etc/wireguard/public.key
-
-# Secure the private key
 sudo chmod 600 /etc/wireguard/private.key
-
-# View your public key (needed for ER605 config)
 cat /etc/wireguard/public.key
 ```
 
-### 3. Create WireGuard Configuration
+#### 3. Create WireGuard Configuration
 
-```bash
-sudo nano /etc/wireguard/wg0.conf
-```
-
-**Dev Environment Config (`/etc/wireguard/wg0.conf`):**
+**Dev Environment (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
-Address = 10.200.0.2/30
+Address = 172.16.200.2/16
 ListenPort = 51820
-PrivateKey = <DEV_AWS_PRIVATE_KEY>
-
-# Enable IP forwarding and NAT
+PrivateKey = <AWS_PRIVATE_KEY>
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o enX0 -j MASQUERADE
 
 [Peer]
 PublicKey = <ER605_DEV_TUNNEL_PUBLIC_KEY>
-AllowedIPs = 10.200.0.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24
-# Endpoint not needed - ER605 initiates connection
+AllowedIPs = 172.16.200.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24, 10.0.5.0/24
 ```
 
-**Prod Environment Config (`/etc/wireguard/wg0.conf`):**
+**Prod Environment (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
-Address = 10.200.1.2/30
+Address = 172.17.200.2/16
 ListenPort = 51820
-PrivateKey = <PROD_AWS_PRIVATE_KEY>
-
-# Enable IP forwarding and NAT
+PrivateKey = <AWS_PRIVATE_KEY>
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o enX0 -j MASQUERADE
 
 [Peer]
 PublicKey = <ER605_PROD_TUNNEL_PUBLIC_KEY>
-AllowedIPs = 10.200.1.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24
-# Endpoint not needed - ER605 initiates connection
+AllowedIPs = 172.17.200.1/32, 10.0.50.0/24, 10.0.51.0/24, 10.0.52.0/24, 10.0.53.0/24, 10.0.54.0/24, 10.0.55.0/24, 10.0.5.0/24
 ```
 
-### 4. Enable IP Forwarding
+#### 4. Enable IP Forwarding
 
 ```bash
-# Enable temporarily
 sudo sysctl -w net.ipv4.ip_forward=1
-
-# Enable permanently
 echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
 ```
 
-### 5. Start WireGuard
+#### 5. Start WireGuard
 
 ```bash
-# Enable and start
-sudo systemctl enable wg-quick@wg0
-sudo systemctl start wg-quick@wg0
-
-# Check status
+sudo systemctl enable --now wg-quick@wg0
 sudo wg show
 ```
 
-### 6. Verify Network Interface
+#### 6. Restart WireGuard (after config changes)
 
 ```bash
-# Find your main interface name (enX0, ens5, eth0, etc.)
-ip a | grep -E "^[0-9]"
-
-# Update PostUp/PostDown in wg0.conf if interface name differs
+sudo systemctl restart wg-quick@wg0
+sudo wg show
 ```
 
 ---
 
-## ER605 WireGuard Configuration
+## ER605 Configuration
 
-### Dev Tunnel Interface Settings
+### IP Addresses
+
+| ID | Name | Type | Address |
+|----|------|------|---------|
+| 22 | AWS_DEV_Subnet | IP Address/Mask | 172.16.0.0/16 |
+| 23 | AWS_PROD_Subnet | IP Address/Mask | 172.17.0.0/16 |
+
+### IP Groups
+
+| ID | Group Name | Address Name | Description |
+|----|------------|--------------|-------------|
+| 12 | vpn_prod | vpn_AWS_PROD_Subnet | --- |
+| 13 | vpn_dev | vpn_AWS_DEV_Subnet | --- |
+
+### Access Control List (ACL)
+
+| ID | Name | Policy | Service Type | Direction | Source | Destination |
+|----|------|--------|--------------|-----------|--------|-------------|
+| 7 | vpn_dev | Allow | ALL | ALL | vpn_dev | DataCenter_Cairo |
+| 8 | vpn_prod | Allow | ALL | ALL | vpn_prod | DataCenter_Cairo |
+
+---
+
+### WireGuard Interfaces
+
+| ID | Name | MTU | Listen Port | Local IP | Status |
+|----|------|-----|-------------|----------|--------|
+| 1 | dev_tunnel | 1372 | 51820 | 172.16.200.1 | Enabled |
+| 2 | prod_tunnel | 1372 | 51821 | 172.17.200.1 | Enabled |
+
+#### Dev Tunnel Interface Settings
 
 | Setting | Value |
 |---------|-------|
 | Name | dev_tunnel |
-| MTU | 1400 |
+| MTU | 1372 |
 | Listen Port | 51820 |
-| Local IP Address | 10.200.0.1 |
+| Private Key | `<HIDDEN>` |
+| Public Key | `<ER605_DEV_PUBLIC_KEY>` |
+| Local IP Address | 172.16.200.1 |
 | Status | Enable |
 
-### Dev Tunnel Peer Settings
+#### Prod Tunnel Interface Settings
+
+| Setting | Value |
+|---------|-------|
+| Name | prod_tunnel |
+| MTU | 1372 |
+| Listen Port | 51821 |
+| Private Key | `<HIDDEN>` |
+| Public Key | `<ER605_PROD_PUBLIC_KEY>` |
+| Local IP Address | 172.17.200.1 |
+| Status | Enable |
+
+---
+
+### WireGuard Peers
+
+| Interface | Endpoint | Endpoint Port | Allowed Address | Persistent Keepalive | Status |
+|-----------|----------|---------------|-----------------|---------------------|--------|
+| dev_tunnel | `<AWS_DEV_EIP>` | 51820 | 172.16.0.0/16 | 25 | Enabled |
+| prod_tunnel | `<AWS_PROD_EIP>` | 51820 | 172.17.0.0/16 | 25 | Enabled |
+
+#### Dev Tunnel Peer Settings
 
 | Setting | Value |
 |---------|-------|
@@ -170,23 +204,12 @@ ip a | grep -E "^[0-9]"
 | Public Key | `<AWS_DEV_PUBLIC_KEY>` |
 | Endpoint | `<AWS_DEV_ELASTIC_IP>` |
 | Endpoint Port | 51820 |
-| Allowed Address | 0.0.0.0/0 |
+| **Allowed Address** | **172.16.0.0/16** |
+| Preshared Key | (Optional) |
 | Persistent Keepalive | 25 |
 | Status | Enable |
 
----
-
-### Prod Tunnel Interface Settings
-
-| Setting | Value |
-|---------|-------|
-| Name | prod_tunnel |
-| MTU | 1400 |
-| Listen Port | 51821 |
-| Local IP Address | 10.200.1.1 |
-| Status | Enable |
-
-### Prod Tunnel Peer Settings
+#### Prod Tunnel Peer Settings
 
 | Setting | Value |
 |---------|-------|
@@ -194,20 +217,46 @@ ip a | grep -E "^[0-9]"
 | Public Key | `<AWS_PROD_PUBLIC_KEY>` |
 | Endpoint | `<AWS_PROD_ELASTIC_IP>` |
 | Endpoint Port | 51820 |
-| Allowed Address | 0.0.0.0/0 |
+| **Allowed Address** | **172.17.0.0/16** |
+| Preshared Key | (Optional) |
 | Persistent Keepalive | 25 |
 | Status | Enable |
 
 ---
 
-### Required Firewall Rules
+## Routing Issue & Solution
 
-Create rules on ER605:
+### The Problem
 
-| Rule Name | Action | Source Zone | Destination Zone |
-|-----------|--------|-------------|------------------|
-| vpn_dev | Allow ALL | vpn_dev | DataCenter_Cairo |
-| vpn_prod | Allow ALL | vpn_prod | DataCenter_Cairo |
+ER605's WireGuard AllowedIPs field only accepts ONE entry. This caused routing issues:
+
+| AllowedIPs Setting | Result |
+|--------------------|--------|
+| `10.200.x.0/24` (tunnel only) | VPN→Internal works, Internal→VPN fails |
+| `172.x.0.0/16` (VPC only) | Internal→VPN works, VPN→Internal fails |
+| `0.0.0.0/0` (any) | Routes ALL traffic through ONE tunnel (wrong tunnel selected) |
+
+**Symptom**: Traffic to prod AWS (172.17.x.x) was routed through dev tunnel (10.200.0.2):
+```
+$ traceroute 172.17.65.73
+1  _gateway (10.0.53.1)
+2  10.200.0.2          <-- WRONG! Should be prod tunnel
+```
+
+### The Solution
+
+**Place tunnel IPs inside the AWS VPC CIDR range.**
+
+| Environment | Old Tunnel IPs | New Tunnel IPs |
+|-------------|----------------|----------------|
+| Dev | 10.200.0.1/2 | 172.16.200.1/2 |
+| Prod | 10.200.1.1/2 | 172.17.200.1/2 |
+
+Now **one AllowedIPs entry covers both tunnel AND VPC traffic**:
+- Dev peer: `172.16.0.0/16` covers tunnel (172.16.200.x) + VPC (172.16.x.x)
+- Prod peer: `172.17.0.0/16` covers tunnel (172.17.200.x) + VPC (172.17.x.x)
+
+**No static routes needed** - WireGuard handles routing automatically based on AllowedIPs.
 
 ---
 
@@ -228,7 +277,7 @@ Change NAT type from "Port-restricted cone NAT" to **"Full cone NAT"** to preven
 
 ## Keepalive Service (Systemd)
 
-Create a systemd service to keep the tunnel alive after reboot:
+The setup script creates this automatically. Manual creation:
 
 ```bash
 sudo tee /etc/systemd/system/wg-keepalive.service << 'EOF'
@@ -240,7 +289,7 @@ Wants=wg-quick@wg0.service
 [Service]
 Type=simple
 User=root
-ExecStart=/bin/bash -c 'while true; do ping -c 1 10.0.65.1 > /dev/null 2>&1; sleep 30; done'
+ExecStart=/bin/bash -c 'while true; do ping -c 1 <KEEPALIVE_TARGET> > /dev/null 2>&1; sleep 5; done'
 Restart=always
 RestartSec=10
 
@@ -249,47 +298,35 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable wg-keepalive
-sudo systemctl start wg-keepalive
-sudo systemctl status wg-keepalive
+sudo systemctl enable --now wg-keepalive
 ```
 
-**Note:** For prod, change the ping target to an appropriate VLAN interface (e.g., 10.0.50.1 for prod VLANs).
+**Keepalive Targets:**
+- Dev: `172.16.200.1` (ER605 tunnel IP)
+- Prod: `172.17.200.1` (ER605 tunnel IP)
 
 ---
 
 ## Monitoring Commands
 
-### Check WireGuard Status
-
 ```bash
+# WireGuard status
 sudo wg show
-```
 
-### Continuous Ping with Timestamps
+# Restart WireGuard
+sudo systemctl restart wg-quick@wg0
 
-```bash
-nohup bash -c 'ping 10.0.65.1 | while read line; do echo "$(date "+%H:%M:%S") $line"; done' > ~/ping.log 2>&1 &
-```
+# Check keepalive service
+sudo systemctl status wg-keepalive
 
-### Monitor Handshakes
+# Continuous ping with timestamps
+ping 172.16.200.1 | while read line; do echo "$(date "+%H:%M:%S") $line"; done
 
-```bash
-nohup bash -c 'while true; do echo "$(date "+%H:%M:%S") $(sudo wg show wg0 latest-handshakes)"; sleep 30; done' > ~/handshake.log 2>&1 &
-```
+# Monitor handshakes
+watch -n 30 'sudo wg show wg0 latest-handshakes'
 
-### Capture WireGuard Traffic
-
-```bash
-nohup sudo tcpdump -i enX0 udp port 51820 -n -tt > ~/wg-traffic.log 2>&1 &
-```
-
-### Check Logs
-
-```bash
-tail -100 ~/ping.log
-tail -100 ~/handshake.log
-tail -100 ~/wg-traffic.log
+# Capture WireGuard traffic
+sudo tcpdump -i enX0 udp port 51820 -n
 ```
 
 ---
@@ -306,34 +343,28 @@ tail -100 ~/wg-traffic.log
 ### Connection Drops After Time
 
 1. Enable Full Cone NAT on ISP router
-2. Lower keepalive to 15 seconds
+2. Lower keepalive to 5 seconds
 3. Enable wg-keepalive systemd service
+
+### Traffic Goes Through Wrong Tunnel
+
+**Symptom**: traceroute shows traffic using wrong tunnel IP (e.g., dev tunnel for prod traffic)
+
+**Cause**: ER605 AllowedIPs misconfigured or tunnel IPs not in VPC range
+
+**Solution**: Ensure tunnel IPs are within VPC CIDR:
+- Dev: 172.16.200.x (within 172.16.0.0/16)
+- Prod: 172.17.200.x (within 172.17.0.0/16)
 
 ### MTU Issues (Fragmentation)
 
 Test with different packet sizes:
 ```bash
-ping -s 1372 -D 10.0.65.10   # 1400 MTU
-ping -s 1172 -D 10.0.65.10   # 1200 MTU
+ping -s 1332 -M do 172.16.200.1   # 1372 MTU
+ping -s 1172 -M do 172.16.200.1   # 1200 MTU
 ```
 
-Set MTU in ER605 WireGuard interface to working value (recommended: 1400).
-
-### Asymmetric Traffic
-
-If TX >> RX or vice versa:
-- Check firewall rules on ER605
-- Verify AllowedIPs on both sides
-- Check return routes
-
----
-
-## Security Notes
-
-- Only open UDP 51820 and TCP 22 in AWS security group
-- Restrict to your public IP only (use `var.allowed_ip`)
-- Internal traffic (ping, SSH to internal hosts) passes through encrypted tunnel
-- No need to open ICMP in security group for tunnel traffic
+Set MTU in ER605 WireGuard interface to working value (current: 1372).
 
 ---
 
@@ -342,13 +373,22 @@ If TX >> RX or vice versa:
 ```
 ER605 (dev_tunnel)                    AWS Dev EC2
   Port 51820        ───────────────►    Port 51820
-  10.200.0.1                            10.200.0.2
+  172.16.200.1                          172.16.200.2
 
 
 ER605 (prod_tunnel)                   AWS Prod EC2
   Port 51821        ───────────────►    Port 51820
-  10.200.1.1                            10.200.1.2
+  172.17.200.1                          172.17.200.2
 ```
 
 Both AWS instances listen on port 51820 (they have different public IPs).
 ER605 uses different local ports (51820/51821) to route to the correct tunnel.
+
+---
+
+## Security Notes
+
+- Only open UDP 51820 and TCP 22 in AWS security group
+- Restrict to your public IP only (use `var.allowed_ip` in Terraform)
+- Internal traffic passes through encrypted tunnel
+- All public IPs and keys are stored securely, not in documentation
