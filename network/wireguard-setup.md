@@ -31,6 +31,7 @@ Home/Datacenter          WireGuard EC2 Dev
 
 | Setting | Dev | Prod |
 |---------|-----|------|
+| **Hostname** | **wg-dev** | **wg-prod** |
 | AWS VPC CIDR | 172.16.0.0/16 | 172.17.0.0/16 |
 | AWS WireGuard Subnet | 172.16.65.0/24 | 172.17.65.0/24 |
 | **AWS Tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
@@ -47,14 +48,42 @@ Home/Datacenter          WireGuard EC2 Dev
 
 ## AWS EC2 WireGuard Setup
 
+### SSH Config (Recommended)
+
+Add to `~/.ssh/config` for easy access:
+
+```
+Host wg-dev
+    HostName REDACTED_EIP_DEV
+    User ec2-user
+    IdentityFile ~/WorkSpace/vpn-key-pair-dev.pem
+
+Host wg-prod
+    HostName REDACTED_EIP_PROD
+    User ec2-user
+    IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
+```
+
+Optional `/etc/hosts` entries:
+```
+REDACTED_EIP_DEV  wg-dev
+REDACTED_EIP_PROD   wg-prod
+```
+
+Then connect with:
+```bash
+ssh wg-dev
+ssh wg-prod
+```
+
 ### Quick Setup (Recommended)
 
 ```bash
 # Copy script to EC2
-scp -i vpn-key-pair.pem network/setup-wireguard.sh ec2-user@<EIP>:~/
+scp network/setup-wireguard.sh wg-dev:~/   # or wg-prod
 
 # SSH and run
-ssh -i vpn-key-pair.pem ec2-user@<EIP>
+ssh wg-dev   # or wg-prod
 chmod +x setup-wireguard.sh
 ./setup-wireguard.sh dev   # or prod
 ```
