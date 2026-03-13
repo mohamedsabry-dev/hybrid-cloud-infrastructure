@@ -1,5 +1,5 @@
-# Dev IAM module deployment
-# Triggers on push to dev-security branch when IAM files change
+# Dev KMS Vault Unseal module deployment
+# Triggers on push to dev-security branch when KMS Vault Unseal files change
 
 #### Define Block ####
 # 1. Define the job name on GH UI
@@ -8,20 +8,20 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] AWS - IAM"
+name: "[DEV] AWS - KMS Vault Unseal"
 on:
   push:
     branches:
       - dev-security
     paths:
-      - 'terraform/dev/aws/iam/**'
-      - '.github/workflows/dev-aws-iam.yml'
+      - 'terraform/dev/aws/kms-vault-unseal/**'
+      - '.github/workflows/dev-aws-kms-vault-unseal.yml'
 permissions:
   id-token: write
   contents: read
 env:
   ENVIRONMENT: dev
-  TF_WORKING_DIR: terraform/dev/aws/iam
+  TF_WORKING_DIR: terraform/dev/aws/kms-vault-unseal
 #####################
 #####################
 
@@ -60,7 +60,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION }}
-          
+
       # - name: Install Terraform
       #   uses: hashicorp/setup-terraform@v2
 
@@ -78,6 +78,6 @@ jobs:
           echo "Plan output is available above for auditor review"
           sleep 180
           echo "✅ Review window ended at $(date)"
-          
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
