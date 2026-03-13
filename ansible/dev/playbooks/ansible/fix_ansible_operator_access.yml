@@ -1,0 +1,26 @@
+# /playbooks/ansible/fix_ansible_operator_access.yml
+# Purpose: Fix repo ownership and vault file permissions for domain users
+# Run as: root
+---
+- name: Fix Ansible Operator Access
+  hosts: ansible
+  become: yes
+  vars:
+    repo_path: /srv/repo
+    vault_password_file: /root/.ansible_vault
+
+  tasks:
+    #---------------------------------------------------------------------------
+    # Fix repo ownership
+    #---------------------------------------------------------------------------
+    - name: Set repo ownership to ansible_admin
+      ansible.builtin.shell: chown -R ansible_admin:ansible_admin {{ repo_path }}
+
+    #---------------------------------------------------------------------------
+    # Fix vault password file permissions
+    #---------------------------------------------------------------------------
+    - name: Set vault password file readable by ansible_admin
+      ansible.builtin.shell: |
+        chown root:ansible_admin {{ vault_password_file }}
+        chmod 640 {{ vault_password_file }}
+
