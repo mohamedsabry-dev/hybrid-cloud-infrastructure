@@ -37,6 +37,15 @@ fi
 echo "Setting hostname to $HOSTNAME..."
 sudo hostnamectl set-hostname "$HOSTNAME"
 
+# Add hosts entry for easy access
+if [[ "$ENV" == "dev" ]]; then
+    echo "Adding ansible-dev to /etc/hosts..."
+    echo "10.0.63.10 ansible-dev" | sudo tee -a /etc/hosts > /dev/null
+elif [[ "$ENV" == "prod" ]]; then
+    echo "Adding ansible-prod to /etc/hosts..."
+    echo "10.0.53.10 ansible-prod" | sudo tee -a /etc/hosts > /dev/null
+fi
+
 MAIN_INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
 echo "Detected interface: $MAIN_INTERFACE"
 
