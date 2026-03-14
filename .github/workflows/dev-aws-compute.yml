@@ -43,21 +43,21 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION_DEV }}
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Plan
         timeout-minutes: 3
-        run: terraform plan -var="allowed_ip=${{ secrets.PUBLIC_IP }}" -out=tfplan
+        run: terraform plan -var="allowed_ip=${{ secrets.PUBLIC_IP }}" -var="vpn_public_key=${{ secrets.VPN_PUBLIC_KEY_DEV }}" -out=tfplan
       
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 20
+          sleep 10
           echo "✅ Review window ended at $(date)"
 
       - name: Terraform Apply
