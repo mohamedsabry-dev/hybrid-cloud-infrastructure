@@ -1,6 +1,7 @@
 output "wireguard_public_ip" {
   description = "Public IP of the WireGuard VPN server"
   value       = aws_eip.wireguard.public_ip
+  sensitive   = true
 }
 
 output "wireguard_instance_id" {

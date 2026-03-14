@@ -4,45 +4,26 @@
 
 Device: Festa FS308GP
 Role: L2 Switch, PoE, VLAN Switching
-Management IP: 192.168.0.185 (via AX3000)
 Controller: Festa Cloud
+WAN: Direct connection to ISP ONT (for cloud management)
 
 ================================================================================
                          1. INITIAL SETUP (Festa Cloud)
 ================================================================================
 
-   ├── Connect switch to AX3000 (gets DHCP IP on 192.168.0.x)
+   ├── Connect switch to ISP (gets DHCP IP for cloud management)
    ├── Login to Festa Cloud Controller
    ├── Adopt device using Serial Number (SN)
-   └── Assign static management IP after adoption
+   └── Configure VLANs and port profiles
 
 ================================================================================
-                         2. MANAGEMENT INTERFACE
-================================================================================
-
-Path: VLAN Interface > Edit Interface
-
-   ┌────────────────────┬─────────────────────────────────────┐
-   │ Setting            │ Value                               │
-   ├────────────────────┼─────────────────────────────────────┤
-   │ Management VLAN    │ Enabled                             │
-   │ IP Address Mode    │ Static                              │
-   │ IP Address         │ 192.168.0.185                       │
-   │ Subnet Mask        │ 255.255.255.0                       │
-   │ Default Gateway    │ 192.168.0.1                         │
-   │ Primary DNS        │ 192.168.0.1                         │
-   │ Secondary DNS      │ 8.8.8.8                             │
-   │ DHCP Mode          │ None                                │
-   └────────────────────┴─────────────────────────────────────┘
-
-================================================================================
-                         3. PORT ASSIGNMENTS
+                         2. PORT ASSIGNMENTS
 ================================================================================
 
    ┌───────┬─────────────┬─────────────────────────────────────────────────────┐
    │ Port  │ Profile     │ Description                                         │
    ├───────┼─────────────┼─────────────────────────────────────────────────────┤
-   │ Port1 │ LAN         │ Management Uplink (to AX3000)                       │
+   │ Port1 │ LAN         │ ISP Uplink (Festa Cloud Management)                 │
    │ Port2 │ Prod_SVC_All│ Prod Services Uplink (to ER605 Port4)               │
    │ Port3 │ Dev_SVC_All │ Dev Services Uplink (to ER605 Port5)                │
    │ Port4 │ Dev_SVC_All │ Dev Server Trunk (svc0)                             │
@@ -53,13 +34,13 @@ Path: VLAN Interface > Edit Interface
    └───────┴─────────────┴─────────────────────────────────────────────────────┘
 
 ================================================================================
-                         4. VLAN NETWORKS
+                         3. VLAN NETWORKS
 ================================================================================
 
    ┌──────────────────┬─────────┬──────┬───────────────────────────────────────┐
    │ Name             │ Purpose │ VLAN │ Notes                                 │
    ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
-   │ LAN              │Interface│ 1    │ 192.168.0.1/24 - Mgmt Interface       │
+   │ LAN              │Interface│ 1    │ ISP DHCP - Cloud Mgmt Interface       │
    │ DUMP_VLAN        │ VLAN    │ 99   │ Unused/Isolation                      │
    ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
    │ NAS_Storage_VLAN │ VLAN    │ 40   │ Storage Network                       │
@@ -80,7 +61,7 @@ Path: VLAN Interface > Edit Interface
    └──────────────────┴─────────┴──────┴───────────────────────────────────────┘
 
 ================================================================================
-                         5. PORT PROFILES
+                         4. PORT PROFILES
 ================================================================================
 
    ┌─────────────┬─────────┬────────────────┬───────────┬───────────────────────┐
@@ -97,7 +78,7 @@ Path: VLAN Interface > Edit Interface
          All other VLANs operate in L2 switching mode.
 
 ================================================================================
-                         6. ACL (Future)
+                         5. ACL (Future)
 ================================================================================
 
    STATUS: Not configured yet

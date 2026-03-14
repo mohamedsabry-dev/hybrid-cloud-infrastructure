@@ -33,7 +33,6 @@ Setting          │ Value
 ─────────────────┼───────────────────────────────────
 SSID             │ unified_mgmt
 Security         │ WPA2-PSK[AES]
-Password         │ ##############
 AP Mode          │ Access Point (Bridge)
 AP Isolation     │ ENABLED
 
@@ -105,7 +104,7 @@ country=US
 
 network={
     ssid="unified_mgmt"
-    psk="##############"
+    psk="<password>"
     key_mgmt=WPA-PSK
 }
 ```
@@ -149,43 +148,6 @@ Interface │ IP         │ Gateway  │ VLAN      │ Purpose
 wlp4s0    │ 10.0.5.100 │ 10.0.5.1 │ 5 (untag) │ Management/SSH
 
 ================================================================================
-                         TESTING & VERIFICATION
-================================================================================
-
-AP Isolation Tests [TESTED 2026-02-13]:
-─────────────────────────────────────────────────────────────────────────────────
-Test                                           │ Result
-───────────────────────────────────────────────┼────────
-DEV (10.0.5.110) → PROD (10.0.5.100)           │ BLOCKED (AP Isolation)
-PROD (10.0.5.100) → DEV (10.0.5.110)           │ BLOCKED (AP Isolation)
-DEV → Gateway (10.0.5.1)                       │ PASS
-PROD → Gateway (10.0.5.1)                      │ PASS
-
-WiFi Connectivity Tests:
-─────────────────────────────────────────────────────────────────────────────────
-Test                                           │ Result
-───────────────────────────────────────────────┼────────
-WiFi connection to AP                          │ PASS
-Ping 10.0.5.1 (Gateway)                        │ PASS
-Ping 10.0.5.10 (AP)                            │ PASS
-Ping 10.0.50.1 (Prod VLAN via gateway)         │ PASS
-Ping 10.0.60.1 (Dev VLAN via gateway)          │ PASS
-
-Proxmox Server Tests:
-─────────────────────────────────────────────────────────────────────────────────
-Test                                           │ Result
-───────────────────────────────────────────────┼────────
-ping google.com (Internet access)              │ PASS
-ping 10.0.5.1 (Management gateway)             │ PASS
-ssh root@10.0.5.110 from Mac Mini              │ PASS
-
-================================================================================
-                         PENDING TASKS
-================================================================================
-
-[ ] Change WiFi password to something stronger
-
-================================================================================
                               STATUS: COMPLETE
 ================================================================================
 
@@ -194,3 +156,5 @@ ssh root@10.0.5.110 from Mac Mini              │ PASS
 [x] AP Isolation enabled for security
 [x] Proxmox servers connected via WiFi management
 [x] All connectivity tests passed
+
+================================================================================

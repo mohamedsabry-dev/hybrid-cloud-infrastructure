@@ -9,23 +9,23 @@ variable "github_repo" {
 variable "state_bucket_name" {
   description = "S3 bucket name for Terraform state"
   type        = string
-  default     = "hybrid-cloud-infrastructure-tf-state-dev"
+  default     = "hybrid-cloud-infrastructure-tf-state-dev-v2"
 }
 
 variable "lock_table_name" {
   description = "DynamoDB table name for state locking"
   type        = string
-  default     = "hybrid-cloud-infrastructure-tf-state-lock-dev"
+  default     = "hybrid-cloud-infrastructure-tf-state-lock-dev-v2"
 }
 
 variable "region" {
   description = "AWS region"
   type        = string
-  default     = "eu-west-2"
+  default     = "us-east-1"
 }
 
 variable "dev_account_id" {
   description = "Dev AWS Account ID"
   type        = string
-  default     = "REDACTED_AWS_DEV"
+  sensitive   = true
 }

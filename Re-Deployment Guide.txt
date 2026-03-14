@@ -36,21 +36,35 @@ STEP 0.1: AWS ACCOUNT SETUP (per account)
 |
 +-- CREATES:
     +-- OIDC Provider (GitHub federation)
-    +-- S3 Bucket (hybrid-cloud-infrastructure-tf-state-dev)
-    +-- DynamoDB Table (hybrid-cloud-infrastructure-tf-state-lock-dev)
+    +-- S3 Bucket (hybrid-cloud-infrastructure-tf-state-dev-v2)
+    +-- DynamoDB Table (hybrid-cloud-infrastructure-tf-state-lock-dev-v2)
     +-- TerraformPermissionsBoundary policy
     +-- GitHubActions-TerraformAdmin-dev role (security branch only)
+    +-- admin_dev user (console access)
 
 --------------------------------------------------------------------------------
 
 STEP 0.2: GITHUB SETUP
 |
-+-- VARIABLES (Settings -> Actions -> Variables):
++-- SECRETS (Settings -> Actions -> Secrets):
 |   |
-|   +-- Account IDs:
+|   +-- Account IDs (sensitive - hidden in public repo):
 |   |   +-- AWS_ACCOUNT_ID_DEV   = <dev-account-id>
 |   |   +-- AWS_ACCOUNT_ID_PROD  = <prod-account-id>
-|   |   +-- AWS_REGION           = eu-west-2
+|   |
+|   +-- Other Secrets:
+|   |   +-- GH_ADMIN_PAT         = (fine-grained PAT with admin:repo)
+|   |   +-- DEV_GH_RUNNER_TOKEN  = (fresh token, expires ~1h)
+|   |   +-- PROD_GH_RUNNER_TOKEN
+|   |   +-- PUBLIC_IP            = <your-public-ip>/32
+|   |   +-- VPN_PUBLIC_KEY_DEV   = ssh-ed25519 ... (from local PEM)
+|   |   +-- VPN_PUBLIC_KEY_PROD  = ssh-ed25519 ... (from local PEM)
+|
++-- VARIABLES (Settings -> Actions -> Variables):
+|   |
+|   +-- Regions:
+|   |   +-- AWS_REGION_DEV   = us-east-1
+|   |   +-- AWS_REGION_PROD  = eu-west-2
 |   |
 |   +-- Runner Config:
 |   |   +-- DEV_GH_RUNNER_NAME   = dev-local-runner
@@ -65,11 +79,6 @@ STEP 0.2: GITHUB SETUP
 |       +-- DEV_INFRA_K8S_WORKERS_LOCK, DEV_INFRA_VAULT_LOCK
 |       +-- DEV_SVC_DEPLOY_KEY_LOCK, DEV_SVC_ANSIBLE_SETUP_LOCK
 |       +-- DEV_SVC_GH_RUNNER_LOCK, DEV_SVC_FREEIPA_SETUP
-|
-+-- SECRETS (Settings -> Actions -> Secrets):
-|   +-- GH_ADMIN_PAT        (fine-grained PAT with admin:repo)
-|   +-- DEV_GH_RUNNER_TOKEN (fresh token, expires ~1h)
-|   +-- PROD_GH_RUNNER_TOKEN
 |
 +-- MAC-MINI RUNNER (Settings -> Actions -> Runners -> Add):
 |   +-- mkdir -p ~/WorkSpace/actions-runner && cd ~/WorkSpace/actions-runner
@@ -102,8 +111,9 @@ STEP 0.2.5: NETWORK INFRASTRUCTURE
 |   +-- 03-ap-wifi-config.txt   (WiFi/AP config)
 |   +-- 04-fs308gp-config.txt   (Switch config)
 |   +-- network-diagram.drawio  (Visual diagram)
+|   +-- vpn-setup/              (WireGuard VPN scripts)
 |
-+-- A) ER605 ROUTER (192.168.0.175):
++-- A) ER605 ROUTER (WAN: ISP direct, LAN: 10.0.5.1):
 |   |
 |   +-- Configure VLANs (Network > LAN > Network List):
 |   |   +-- VLAN 5:  10.0.5.1/24   (Management/WiFi)
@@ -121,11 +131,10 @@ STEP 0.2.5: NETWORK INFRASTRUCTURE
 |   |   +-- Port 5: VLANs 50-55 tagged (Prod trunk to switch)
 |   |
 |   +-- Firewall ACLs (Firewall > Access Control):
-|       +-- Allow Mac Mini (192.168.0.223) -> 10.0.0.0/16
 |       +-- Block SVC VLANs -> Mgmt VLANs
 |       +-- Block Prod <-> Dev cross-traffic
 |
-+-- B) FS308GP SWITCH (192.168.0.185 via Festa Cloud):
++-- B) FS308GP SWITCH (ISP direct for Festa Cloud mgmt):
 |   |
 |   +-- Create VLANs: 40 (Storage), 50-55 (Prod), 60-65 (Dev)
 |   |
@@ -149,8 +158,8 @@ STEP 0.2.5: NETWORK INFRASTRUCTURE
 |   +-- AP Isolation: ENABLED (blocks client-to-client)
 |   +-- Connected to: ER605 Port 3 (VLAN 5 untagged)
 |
-+-- D) MAC MINI STATIC ROUTE:
-    +-- sudo route -n add 10.0.0.0/16 192.168.0.175
++-- D) MAC MINI:
+    +-- Connected to lab network via ER605 (no static route needed)
 
 --------------------------------------------------------------------------------
 
@@ -566,15 +575,26 @@ Flow:
   OIDC -> AWS -> Secrets Manager -> Mask -> TF_VAR -> Terraform -> Provider
 
 ================================================================================
-                      GITHUB VARIABLES REFERENCE
+                      GITHUB SECRETS & VARIABLES REFERENCE
 ================================================================================
+
+Settings -> Actions -> Secrets (Repository secrets - hidden in public repo)
+
+ACCOUNT IDs (SECRETS):
+  AWS_ACCOUNT_ID_DEV       = ############
+  AWS_ACCOUNT_ID_PROD      = ############
+  PUBLIC_IP                = x.x.x.x/32
+  VPN_PUBLIC_KEY_DEV       = ssh-ed25519 ...
+  VPN_PUBLIC_KEY_PROD      = ssh-ed25519 ...
+  GH_ADMIN_PAT             = (fine-grained PAT)
+  DEV_GH_RUNNER_TOKEN      = (fresh token)
+  PROD_GH_RUNNER_TOKEN     = (fresh token)
 
 Settings -> Actions -> Variables (Repository variables)
 
-ACCOUNT & REGION:
-  AWS_ACCOUNT_ID_DEV       = ############  (mask in UI)
-  AWS_ACCOUNT_ID_PROD      = ############  (mask in UI)
-  AWS_REGION               = eu-west-2
+REGIONS:
+  AWS_REGION_DEV           = us-east-1
+  AWS_REGION_PROD          = eu-west-2
 
 ALL LOCK VARIABLES (default = true):
   +-- DEV Environment:
