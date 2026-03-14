@@ -8,7 +8,7 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] AWS - Network (DESTROY)"
+name: "[DEV] AWS - Network"
 on:
   push:
     branches:
@@ -43,14 +43,14 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION_DEV }}
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan (DESTROY MODE)
+      - name: Terraform Plan
         timeout-minutes: 3
-        run: terraform plan -destroy -out=tfplan
+        run: terraform plan -out=tfplan
 
       - name: Review Window
         run: |
