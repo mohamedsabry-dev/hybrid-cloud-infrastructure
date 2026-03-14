@@ -8,7 +8,7 @@
 # 4. Declare if will use manual trigger later or not
 # 5. Declare the needed permissions for OIDC Use
 # 6. Declare Env Variables for clean use
-name: "[DEV] AWS - Compute"
+name: "[DEV] AWS - Compute (DESTROY)"
 on:
   push:
     branches:
@@ -48,9 +48,9 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan
+      - name: Terraform Plan (DESTROY MODE)
         timeout-minutes: 3
-        run: terraform plan -var="allowed_ip=${{ secrets.PUBLIC_IP }}" -out=tfplan
+        run: terraform plan -destroy -var="allowed_ip=${{ secrets.PUBLIC_IP }}" -out=tfplan
       
       - name: Review Window
         run: |
