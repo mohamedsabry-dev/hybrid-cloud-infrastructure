@@ -3,3 +3,9 @@ variable "allowed_ip" {
   type        = string
   sensitive   = true
 }
+
+variable "vpn_public_key" {
+  description = "Public SSH key for VPN EC2 instance"
+  type        = string
+  sensitive   = true
+}
