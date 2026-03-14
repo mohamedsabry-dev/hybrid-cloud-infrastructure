@@ -34,4 +34,8 @@ key*
 Key*
 
 # vault ansible
-.ansible_vault 
+.ansible_vault
+
+# Router backups
+backup-ER605*.bin
+*.bin
