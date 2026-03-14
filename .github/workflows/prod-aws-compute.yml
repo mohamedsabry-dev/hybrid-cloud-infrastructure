@@ -51,7 +51,11 @@ jobs:
       # One-time migration: import existing key pair into state
       # Comment out after first successful run
       - name: Import Key Pair (migration)
-        run: terraform import aws_key_pair.vpn vpn-key-pair-prod || true
+        run: |
+          terraform import \
+            -var="allowed_ip=${{ secrets.PUBLIC_IP }}" \
+            -var="vpn_public_key=${{ secrets.VPN_PUBLIC_KEY_PROD }}" \
+            aws_key_pair.vpn vpn-key-pair-prod || true
 
       - name: Terraform Plan
         timeout-minutes: 3
