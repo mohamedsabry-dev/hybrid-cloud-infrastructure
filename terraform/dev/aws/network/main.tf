@@ -18,7 +18,7 @@ resource "aws_internet_gateway" "igw_main" {
 resource "aws_subnet" "subnet_vpn" {
   vpc_id            = aws_vpc.vpc_main.id
   cidr_block        = "172.16.65.0/24"
-  availability_zone = "eu-west-2a"
+  availability_zone = "us-east-1a"
 
   tags = {
     Name = "dev-vpn"
@@ -28,7 +28,7 @@ resource "aws_subnet" "subnet_vpn" {
 resource "aws_subnet" "subnet_mgmt" {
   vpc_id            = aws_vpc.vpc_main.id
   cidr_block        = "172.16.63.0/24"
-  availability_zone = "eu-west-2a"
+  availability_zone = "us-east-1a"
 
   tags = {
     Name = "dev-mgmt"
