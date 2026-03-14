@@ -52,7 +52,7 @@ jobs:
         timeout-minutes: 3
         run: |
           terraform plan \
-            -var="allowed_ip=${{ secrets.HOME_PUBLIC_IP }}" \
+            -var="allowed_ip=${{ secrets.HOME_PUBLIC_IP }}/32" \
             -var="vpn_public_key=${{ secrets.VPN_PUBLIC_KEY_PROD }}" \
             -out=tfplan
 
