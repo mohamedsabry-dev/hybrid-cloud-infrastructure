@@ -3,7 +3,9 @@
 ================================================================================
 
 Domain: lab.local
-DNS Servers: FreeIPA (Prod/Dev)
+DNS Servers: FreeIPA (Prod: 10.0.50.10, Dev: 10.0.60.10)
+DNS Forwarders: 8.8.8.8, 1.1.1.1 (configured in IPA)
+DHCP Range: 10.0.X.200 - 10.0.X.220 (per VLAN)
 
 ================================================================================
                          MANAGEMENT PLANE (VLAN 5 - WiFi)
