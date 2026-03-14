@@ -1,18 +1,18 @@
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket = "hybrid-cloud-infrastructure-tf-state-dev"
+    bucket = "hybrid-cloud-infrastructure-tf-state-dev-v2"
     key    = "dev/aws/network/terraform.tfstate"
-    region = "eu-west-2"
+    region = "us-east-1"
   }
 }
 
 data "terraform_remote_state" "iam" {
     backend = "s3"
     config = {
-      bucket = "hybrid-cloud-infrastructure-tf-state-dev"
+      bucket = "hybrid-cloud-infrastructure-tf-state-dev-v2"
       key    = "dev/aws/iam/terraform.tfstate"
-      region = "eu-west-2"
+      region = "us-east-1"
     }
 }
 
@@ -52,13 +52,18 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
   ip_protocol       = "-1"
 }
 
+resource "aws_key_pair" "vpn" {
+  key_name   = "vpn-key-pair-dev"
+  public_key = var.vpn_public_key
+}
+
 resource "aws_instance" "wireguard" {
-  ami                    = "ami-087c9ba923d9765d8"
-  instance_type          = "t2.micro"
-  availability_zone      = "eu-west-2a"
+  ami                    = "ami-02dfbd4ff395f2a1b"
+  instance_type          = "t3.micro"
+  availability_zone      = "us-east-1a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
-  key_name               = "vpn-key-pair-dev"
+  key_name               = aws_key_pair.vpn.key_name
   source_dest_check      = false
   iam_instance_profile   = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
 
