@@ -3,53 +3,68 @@
 ================================================================================
 
 COMPONENTS:
-  1. ISP Router           - Internet gateway
-  2. AX3000 Router        - Main LAN (192.168.0.x)
-  3. ER605                - Firewall, VPN, Gateway, Router
-  4. FS308GP              - L2 Switch, PoE, ACL
-  5. AC750                - Access Point (SSID WiFi)
-  6. NAS FS6706T          - ASUSTOR FlashStor Storage
-  7. Prod Server          - Asus TUF Gaming A15
-  8. Dev Server           - Asus Vivobook 15
+  1. ISP ONT             - Internet gateway (fiber terminal)
+  2. ER605               - Firewall, VPN, Gateway, Router
+  3. FS308GP             - L2 Switch, PoE, VLAN switching
+  4. AX3000              - Home WiFi Access Point only
+  5. AC750               - Lab Management WiFi Access Point
+  6. NAS FS6706T         - ASUSTOR FlashStor Storage
+  7. Prod Server         - Proxmox Production
+  8. Dev Server          - Proxmox Development
 
 ================================================================================
                          PHYSICAL TOPOLOGY
 ================================================================================
 
-ISP
-└── AX3000 (192.168.0.x)
-    │
-    ├── ER605 [WAN Port 1] (192.168.0.175)
-    │   ├── Port 2 ─── Internal Managment LAN > Default-Vlan1 "Empty"
-    │   ├── Port 3 ─── AC750 AP [VLAN 5 Untagged]
-    │   │               ├── NAS Mgmt Port
-    │   │               └── WiFi SSID
-    │   │                   ├── Prod Server (wlp4s0) - Mgmt
-    │   │                   └── Dev Server (wlp1s0) - Mgmt
-    │   ├── Port 4 ─── FS308GP Port 2 [Prod SVC Uplink]
-    │   └── Port 5 ─── FS308GP Port 3 [Dev SVC Uplink]
-    │
-    ├── FS308GP [Mgmt Port 1 - LAN] (192.168.0.185)
-    │   │
-    │   ├── VLAN 40 (Storage) ─ Tagged
-    │   │   ├── Port 8 ─── Prod Server (stor0)
-    │   │   ├── Port 7 ─── Dev Server (stor0)
-    │   │   └── Port 6 ─── NAS (LAN 1)
-    │   │
-    │   ├── VLAN 50-55 (Prod Services) ─ Tagged
-    │   │   └── Port 5 ─── Prod Server (trunk)
-    │   │
-    │   └── VLAN 60-65 (Dev Services) ─ Tagged
-    │       └── Port 4 ─── Dev Server (trunk)
-    │
-    └── Mac Mini (WiFi)
-        └── Static route: 10.0.0.0/16 via 192.168.0.175
+ISP ONT
+├── ER605 [WAN Port] ─────────────────── Lab Network Gateway
+│   │
+│   ├── Port 2 ─── Internal Management LAN (Default-Vlan1)
+│   │
+│   ├── Port 3 ─── AC750 AP [VLAN 5 Untagged]
+│   │               ├── NAS Mgmt Port
+│   │               └── WiFi SSID: unified_mgmt
+│   │                   ├── Prod Server (wlp4s0) - Mgmt
+│   │                   └── Dev Server (wlp1s0) - Mgmt
+│   │
+│   ├── Port 4 ─── FS308GP Port 2 [Prod SVC Uplink]
+│   │
+│   └── Port 5 ─── FS308GP Port 3 [Dev SVC Uplink]
+│
+├── FS308GP [Direct to ISP for Festa Cloud management]
+│   │
+│   ├── VLAN 40 (Storage) ─ Tagged
+│   │   ├── Port 8 ─── Prod Server (stor0)
+│   │   ├── Port 7 ─── Dev Server (stor0)
+│   │   └── Port 6 ─── NAS (LAN 1)
+│   │
+│   ├── VLAN 50-55 (Prod Services) ─ Tagged
+│   │   └── Port 5 ─── Prod Server (trunk)
+│   │
+│   └── VLAN 60-65 (Dev Services) ─ Tagged
+│       └── Port 4 ─── Dev Server (trunk)
+│
+└── AX3000 [WiFi AP Mode] ─────────────── Home Devices WiFi Only
+    └── Home devices (phones, tablets, etc.)
+
+================================================================================
+                         TRAFFIC FLOW
+================================================================================
+
+Lab Traffic:
+└── All lab traffic routes through ER605 for firewall/ACL control
+
+Home Traffic:
+└── Home devices on AX3000 WiFi go directly to ISP (isolated from lab)
+
+Storage Traffic:
+└── VLAN 40 isolated at L2 level (no ER605 routing)
 
 ================================================================================
                          VLAN SUMMARY
 ================================================================================
 
-  VLAN 5      │ Management      │ ER605 LAN, WiFi Mgmt
+  VLAN 5      │ Management      │ ER605 LAN, Lab WiFi Mgmt
   VLAN 40     │ Storage         │ NAS, Server Storage NICs
   VLAN 50-55  │ Prod Services   │ Production workloads
   VLAN 60-65  │ Dev Services    │ Development workloads
@@ -59,11 +74,13 @@ ISP
 ================================================================================
 
   Configuration Guides:
-  ├── er605-config.txt    - ER605 router/firewall configuration
-  ├── fs308gp-config.txt  - FS308GP switch configuration
-  └── ../docs/04-network-plan.txt - IP allocations & VM assignments
+  ├── 00-ip-planning.txt   - IP allocations & VLAN assignments
+  ├── 02-er605-config.txt  - ER605 router/firewall configuration
+  ├── 03-ap-wifi-config.txt- Access point configuration
+  ├── 04-fs308gp-config.txt- FS308GP switch configuration
+  └── vpn-setup/           - WireGuard VPN setup scripts
 
   Domain: lab.local
-  DNS Servers: 10.0.50.10 (Prod FreeIPA), 10.0.60.10 (Dev FreeIPA)
+  DNS Servers: FreeIPA (Prod/Dev)
 
 ================================================================================
