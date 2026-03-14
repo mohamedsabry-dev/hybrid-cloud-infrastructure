@@ -38,14 +38,15 @@ resource "aws_subnet" "subnet_mgmt" {
 resource "aws_route_table" "rt_public" {
   vpc_id = aws_vpc.vpc_main.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw_main.id
-  }
-
   tags = {
     Name = "prod-public-rt"
   }
+}
+
+resource "aws_route" "internet" {
+  route_table_id         = aws_route_table.rt_public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw_main.id
 }
 
 resource "aws_route_table_association" "rta_vpn" {
