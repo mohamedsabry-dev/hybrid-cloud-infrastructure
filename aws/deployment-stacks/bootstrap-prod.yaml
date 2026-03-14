@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Prod Account Bootstrap: OIDC + Terraform State + Admin Role with Permissions Boundary'
+Description: 'Prod Account Bootstrap: OIDC + Admin Role with Permissions Boundary + State Bucket'
 
 # ============================================================================
 # PROD Bootstrap Stack - ONE-TIME manual deployment via AWS Console
@@ -9,6 +9,7 @@ Description: 'Prod Account Bootstrap: OIDC + Terraform State + Admin Role with P
 # 3. Terraform State Bucket      - S3 bucket for Terraform state storage
 # 4. Terraform Lock Table        - DynamoDB table for state locking
 # 5. TerraformAdmin Role         - Admin role for prod-security branch
+# 6. Admin User (admin_prod)     - GUI admin with full admin + billing access
 # ============================================================================
 # Deploy: AWS Console → CloudFormation → Create Stack → Upload this file
 # Region: eu-west-2 (London) ONLY
@@ -210,6 +211,24 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # ============================================================================
+  # 7. Admin User (GUI Console Access)
+  # ============================================================================
+  AdminProdUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: admin_prod
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/job-function/Billing"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSBillingReadOnlyAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/CostOptimizationHubAdminAccess"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: gui-admin
+
 # ============================================================================
 # Outputs
 # ============================================================================
@@ -248,3 +267,8 @@ Outputs:
     Value: !GetAtt GitHubActionsTerraformRole.Arn
     Export:
       Name: prod-GitHubActionsRoleArn
+
+  AdminProdUserArn:
+    Value: !GetAtt AdminProdUser.Arn
+    Export:
+      Name: prod-AdminProdUserArn
