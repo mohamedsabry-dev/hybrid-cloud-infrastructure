@@ -48,6 +48,11 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      # One-time migration: import existing key pair into state
+      # Comment out after first successful run
+      - name: Import Key Pair (migration)
+        run: terraform import aws_key_pair.vpn vpn-key-pair-prod || true
+
       - name: Terraform Plan
         timeout-minutes: 3
         run: |
