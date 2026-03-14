@@ -20,15 +20,30 @@ echo "=== WireGuard Setup for $ENV ==="
 # Environment config
 # NOTE: Tunnel IPs are inside VPC range to solve ER605 AllowedIPs routing issue
 if [[ "$ENV" == "dev" ]]; then
+    HOSTNAME="wg-dev"
     TUNNEL_IP="172.16.200.2/16"
     ER605_TUNNEL_IP="172.16.200.1"
     ALLOWED_IPS="172.16.200.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24, 10.0.5.0/24"
     KEEPALIVE_TARGET="172.16.200.1"
 else
+    HOSTNAME="wg-prod"
     TUNNEL_IP="172.17.200.2/16"
     ER605_TUNNEL_IP="172.17.200.1"
     ALLOWED_IPS="172.17.200.1/32, 10.0.50.0/24, 10.0.51.0/24, 10.0.52.0/24, 10.0.53.0/24, 10.0.54.0/24, 10.0.55.0/24, 10.0.5.0/24"
     KEEPALIVE_TARGET="172.17.200.1"
+fi
+
+# Set hostname
+echo "Setting hostname to $HOSTNAME..."
+sudo hostnamectl set-hostname "$HOSTNAME"
+
+# Add hosts entry for easy access
+if [[ "$ENV" == "dev" ]]; then
+    echo "Adding ansible-dev to /etc/hosts..."
+    echo "10.0.63.10 ansible-dev" | sudo tee -a /etc/hosts > /dev/null
+elif [[ "$ENV" == "prod" ]]; then
+    echo "Adding ansible-prod to /etc/hosts..."
+    echo "10.0.53.10 ansible-prod" | sudo tee -a /etc/hosts > /dev/null
 fi
 
 MAIN_INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
