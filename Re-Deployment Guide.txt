@@ -56,9 +56,11 @@ STEP 0.2: GITHUB SETUP
 |   |   +-- GH_ADMIN_PAT         = (fine-grained PAT with admin:repo)
 |   |   +-- DEV_GH_RUNNER_TOKEN  = (fresh token, expires ~1h)
 |   |   +-- PROD_GH_RUNNER_TOKEN
-|   |   +-- PUBLIC_IP            = <your-public-ip>/32
+|   |   +-- HOME_PUBLIC_IP       = <your-public-ip>/32
 |   |   +-- VPN_PUBLIC_KEY_DEV   = ssh-ed25519 ... (from local PEM)
 |   |   +-- VPN_PUBLIC_KEY_PROD  = ssh-ed25519 ... (from local PEM)
+|   |   +-- WG_VPN_EIP_DEV       = <AWS Elastic IP for dev VPN>
+|   |   +-- WG_VPN_EIP_PROD      = <AWS Elastic IP for prod VPN>
 |
 +-- VARIABLES (Settings -> Actions -> Variables):
 |   |
@@ -580,12 +582,14 @@ Flow:
 
 Settings -> Actions -> Secrets (Repository secrets - hidden in public repo)
 
-ACCOUNT IDs (SECRETS):
+SECRETS:
   AWS_ACCOUNT_ID_DEV       = ############
   AWS_ACCOUNT_ID_PROD      = ############
-  PUBLIC_IP                = x.x.x.x/32
+  HOME_PUBLIC_IP           = x.x.x.x/32
   VPN_PUBLIC_KEY_DEV       = ssh-ed25519 ...
   VPN_PUBLIC_KEY_PROD      = ssh-ed25519 ...
+  WG_VPN_EIP_DEV           = <AWS Elastic IP for dev VPN>
+  WG_VPN_EIP_PROD          = <AWS Elastic IP for prod VPN>
   GH_ADMIN_PAT             = (fine-grained PAT)
   DEV_GH_RUNNER_TOKEN      = (fresh token)
   PROD_GH_RUNNER_TOKEN     = (fresh token)
