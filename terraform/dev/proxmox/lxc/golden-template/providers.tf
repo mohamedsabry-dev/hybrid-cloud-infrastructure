@@ -13,16 +13,16 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "hybrid-cloud-infrastructure-tf-state-dev"
+    bucket         = "hybrid-cloud-infrastructure-tf-state-dev-v2"
     key            = "dev/proxmox/lxc/golden-template/terraform.tfstate"
-    region         = "eu-west-2"
+    region         = "us-east-1"
     encrypt        = true
-    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev"
+    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev-v2"
   }
 }
 
 provider "aws" {
-  region = "eu-west-2"
+  region = "us-east-1"
 
   default_tags {
     tags = {
