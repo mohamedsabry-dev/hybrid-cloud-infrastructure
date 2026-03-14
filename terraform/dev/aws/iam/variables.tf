@@ -27,5 +27,5 @@ variable "region" {
 variable "dev_account_id" {
   description = "Dev AWS Account ID"
   type        = string
-  default     = "REDACTED_AWS_ID"
+  sensitive   = true
 }

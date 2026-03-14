@@ -51,13 +51,18 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
   ip_protocol       = "-1"
 }
 
+resource "aws_key_pair" "vpn" {
+  key_name   = "vpn-key-pair-prod"
+  public_key = var.vpn_public_key
+}
+
 resource "aws_instance" "wireguard" {
   ami                    = "ami-087c9ba923d9765d8"
   instance_type          = "t2.micro"
   availability_zone      = "eu-west-2a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
-  key_name               = "vpn-key-pair-prod"
+  key_name               = aws_key_pair.vpn.key_name
   source_dest_check      = false
   iam_instance_profile   = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
 

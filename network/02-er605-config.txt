@@ -4,7 +4,8 @@
 
 Device: TP-Link ER605 Omada Router
 Role: Firewall, VPN, Gateway, L3 Routing
-Management IP: 192.168.0.175 (WAN), 10.0.5.1 (LAN)
+Management IP: 10.0.5.1 (LAN)
+WAN: Direct connection to ISP ONT
 
 ================================================================================
                          1. BASIC SETUP
@@ -12,7 +13,6 @@ Management IP: 192.168.0.175 (WAN), 10.0.5.1 (LAN)
 
    ├── System Tools > Time Setting > Zone
    ├── System Tools > Admin Setup > Remote Management
-   │   └── Add trusted Mac-Mini IP: 192.168.0.223/32
    └── Network > WAN Mode > WAN (Single WAN Port)
 
 ================================================================================
@@ -75,7 +75,6 @@ Path: Network > LAN > Network List
 
 IP GROUPS (Preference > IP Address > Add Lists > IP Group)
 
-   ├── Mac_Mini_PC    : 192.168.0.223
    ├── IPGROUP_LAN    : 10.0.0.0/16
    ├── DC_SVC         : 10.0.50.0/24, 10.0.51.0/24, ... (All SVC VLANs)
    ├── DC_MGMT        : 10.0.5.0/24, 10.0.1.0/24
@@ -89,22 +88,28 @@ ACCESS CONTROL RULES (Firewall > Access Control)
    ┌────┬──────────────────────┬────────┬──────────┬───────────────┬───────────────┐
    │ ID │ Name                 │ Policy │ Direction│ Source        │ Destination   │
    ├────┼──────────────────────┼────────┼──────────┼───────────────┼───────────────┤
-   │ 1  │ Mac_Mini_Allow       │ Allow  │ WAN IN   │ Mac_Mini_PC   │ IPGROUP_LAN   │
-   │ 2  │ SVC_BLOCK_MGMT       │ Block  │ ALL      │ DC_SVC        │ DC_MGMT       │
-   │ 3  │ PROD_SVC_Block_DEV   │ Block  │ ALL      │ Prod_Svc      │ Dev_Svc       │
-   │ 4  │ DEV_SVC_Block_PROD   │ Block  │ ALL      │ Dev_Svc       │ Prod_Svc      │
-   │ 5  │ PROD_MGMT_Allow_PROD │ Allow  │ ALL      │ Prod_Mgmt_IP  │ Prod_Svc      │
-   │ 6  │ DEV_MGMT_Allow_DEV   │ Allow  │ ALL      │ Dev_Mgmt_IP   │ Dev_Svc       │
+   │ 1  │ SVC_BLOCK_MGMT       │ Block  │ ALL      │ DC_SVC        │ DC_MGMT       │
+   │ 2  │ PROD_SVC_Block_DEV   │ Block  │ ALL      │ Prod_Svc      │ Dev_Svc       │
+   │ 3  │ DEV_SVC_Block_PROD   │ Block  │ ALL      │ Dev_Svc       │ Prod_Svc      │
+   │ 4  │ PROD_MGMT_Allow_PROD │ Allow  │ ALL      │ Prod_Mgmt_IP  │ Prod_Svc      │
+   │ 5  │ DEV_MGMT_Allow_DEV   │ Allow  │ ALL      │ Dev_Mgmt_IP   │ Dev_Svc       │
    └────┴──────────────────────┴────────┴──────────┴───────────────┴───────────────┘
 
 ================================================================================
-                         6. CONFIGURATION BACKUP
+                         6. WIREGUARD VPN
 ================================================================================
 
-   Backup File: backup-ER605-2026-02-19-Stable.bin
-   Date: 2026-02-19
-   Status: Stable working configuration
+See: vpn-setup/ folder for WireGuard configuration scripts and guides.
 
+Tunnels:
+├── dev_tunnel  - Home to AWS Dev VPC (172.16.x.x)
+└── prod_tunnel - Home to AWS Prod VPC (172.17.x.x)
+
+================================================================================
+                         7. CONFIGURATION BACKUP
+================================================================================
+
+   Backup Location: backups/
    To restore: System Tools > Backup & Restore > Restore > Upload .bin file
 
 ================================================================================
