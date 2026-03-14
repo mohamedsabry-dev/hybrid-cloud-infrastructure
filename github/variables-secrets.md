@@ -10,9 +10,8 @@ Settings → Secrets and variables → Actions → Variables
 
 | Variable Name | Value | Purpose |
 |---------------|-------|---------|
-| `AWS_ACCOUNT_ID_DEV` | xxxxxxxxxxxx | DEV AWS account ID |
-| `AWS_ACCOUNT_ID_PROD` | xxxxxxxxxxxx | PROD AWS account ID |
-| `AWS_REGION` | eu-west-2 | Default AWS region (London) |
+| `AWS_REGION_DEV` | us-east-1 | DEV AWS region |
+| `AWS_REGION_PROD` | eu-west-2 | PROD AWS region (London) |
 
 ### Workflow Lock Variables
 
@@ -119,12 +118,19 @@ Settings → Secrets and variables → Actions → Secrets
 
 | Secret Name | Purpose |
 |-------------|---------|
+| `AWS_ACCOUNT_ID_DEV` | DEV AWS account ID |
+| `AWS_ACCOUNT_ID_PROD` | PROD AWS account ID |
 | `GH_ADMIN_PAT` | Fine-grained PAT with admin:repo permission (for deploy keys) |
 | `DEV_GH_RUNNER_TOKEN` | Fresh token from Settings > Actions > Runners (expires in ~1 hour) |
 | `PROD_GH_RUNNER_TOKEN` | Fresh token for prod runner setup |
+| `HOME_PUBLIC_IP` | Home public IP for AWS security group (allowed_ip) |
+| `VPN_PUBLIC_KEY_DEV` | SSH public key for DEV VPN EC2 instance |
+| `VPN_PUBLIC_KEY_PROD` | SSH public key for PROD VPN EC2 instance |
+| `WG_VPN_EIP_DEV` | WireGuard VPN Elastic IP for DEV environment |
+| `WG_VPN_EIP_PROD` | WireGuard VPN Elastic IP for PROD environment |
 
-> **Note:** Most secrets are retrieved from AWS Secrets Manager at runtime via OIDC.
-> Only GitHub-specific secrets (PATs, runner tokens) are stored in GitHub Secrets.
+> **Note:** Most infrastructure secrets are retrieved from AWS Secrets Manager at runtime via OIDC.
+> GitHub Secrets store: AWS account IDs, GitHub-specific tokens, VPN/network config.
 
 **Why:**
 - Secrets Manager provides audit trail (CloudTrail)
@@ -171,7 +177,7 @@ steps:
   - name: Configure AWS Credentials
     uses: aws-actions/configure-aws-credentials@v4
     with:
-      role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+      role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
       aws-region: ${{ vars.AWS_REGION }}
 
   - name: Fetch Proxmox Secrets
