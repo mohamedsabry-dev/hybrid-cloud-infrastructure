@@ -56,8 +56,13 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_PROD }}
+
+      - name: Set Terraform Variables
+        run: |
+          echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID_PROD }}"
+          echo "TF_VAR_prod_account_id=${{ secrets.AWS_ACCOUNT_ID_PROD }}" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
@@ -71,7 +76,7 @@ jobs:
           echo "⏳ 3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 20
+          sleep 180
           echo "✅ Review window ended at $(date)"
           
       - name: Terraform Apply
