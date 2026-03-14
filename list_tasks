@@ -2,7 +2,3 @@
 
 Backup load test — monitor CPU, RAM, storage during backup run, record observationsObservationMedium2
 Vault cluster mental model map — full setup sequence, TLS, unseal, Raft initDraftHigh3
-Terraform draft — AWS KMS key + policy for Vault auto-unsealDraftMedium4
-Terraform draft — SSM instance profile for EC2 direct connectDraftLow
-
-Today & Tomorrow — No execution, no pressure. Rest and prepare for Friday Vault setup.
