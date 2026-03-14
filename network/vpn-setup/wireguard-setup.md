@@ -180,8 +180,10 @@ sudo wg show
 
 | ID | Name | Policy | Service Type | Direction | Source | Destination |
 |----|------|--------|--------------|-----------|--------|-------------|
-| 7 | vpn_dev | Allow | ALL | ALL | vpn_dev | DataCenter_Cairo |
-| 8 | vpn_prod | Allow | ALL | ALL | vpn_prod | DataCenter_Cairo |
+| 7 | vpn_dev | Allow | ALL | ALL | vpn_dev | Development_Env |
+| 8 | vpn_prod | Allow | ALL | ALL | vpn_prod | Production_Env |
+
+> **Note**: VPN traffic is segmented - Dev VPN only reaches Dev VLANs (60-65), Prod VPN only reaches Prod VLANs (50-55).
 
 ---
 
