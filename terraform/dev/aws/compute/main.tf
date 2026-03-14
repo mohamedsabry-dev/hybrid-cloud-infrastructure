@@ -54,7 +54,7 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
 
 resource "aws_instance" "wireguard" {
   ami                    = "ami-087c9ba923d9765d8"
-  instance_type          = "t2.micro"
+  instance_type          = "t3.micro"
   availability_zone      = "eu-west-2a"
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
