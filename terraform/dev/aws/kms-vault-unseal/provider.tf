@@ -10,7 +10,7 @@ terraform {
   
   backend "s3" {
     bucket         = "hybrid-cloud-infrastructure-tf-state-dev-v2"
-    key            = "dev/aws/compute/terraform.tfstate"
+    key            = "dev/aws/kms-vault-unseal/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev-v2"
@@ -24,7 +24,7 @@ provider "aws" {
     tags = {
       Environment = "dev"
       ManagedBy   = "terraform"
-      Module      = "compute"
+      Module      = "kms-vault-unseal"
     }
   }
 }
