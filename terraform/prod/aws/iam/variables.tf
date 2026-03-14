@@ -27,5 +27,5 @@ variable "region" {
 variable "prod_account_id" {
   description = "Prod AWS Account ID"
   type        = string
-  default     = "969041180300"
+  sensitive   = true
 }

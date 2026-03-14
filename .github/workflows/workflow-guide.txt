@@ -87,11 +87,11 @@ Checklist:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_{ENV} }}:role/GitHubActions-{RoleName}-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_{ENV} }}:role/GitHubActions-{RoleName}-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_{ENV} }}
 
 Checklist:
-├── Use correct AWS_ACCOUNT_ID variable (DEV/PROD)
+├── Use correct AWS_ACCOUNT_ID secret (DEV/PROD)
 ├── Use correct IAM role name
 └── Double colon after iam:: in ARN
 
