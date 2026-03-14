@@ -9,9 +9,10 @@ Description: 'Dev Account Bootstrap: OIDC + Admin Role with Permissions Boundary
 # 3. Terraform State Bucket      - S3 bucket for Terraform state storage
 # 4. Terraform Lock Table        - DynamoDB table for state locking
 # 5. TerraformAdmin Role         - Admin role for dev-security branch
+# 6. Admin User (admin_dev)      - GUI admin with full admin + billing access
 # ============================================================================
 # Deploy: AWS Console → CloudFormation → Create Stack → Upload this file
-# Region: eu-west-2 (London) ONLY
+# Region: us-east-1 (N. Virginia) ONLY
 # ============================================================================
 
 Metadata:
@@ -29,17 +30,17 @@ Parameters:
 
   StateBucketName:
     Type: String
-    Default: hybrid-cloud-infrastructure-tf-state-dev
+    Default: hybrid-cloud-infrastructure-tf-state-dev-v2
 
   LockTableName:
     Type: String
-    Default: hybrid-cloud-infrastructure-tf-state-lock-dev
+    Default: hybrid-cloud-infrastructure-tf-state-lock-dev-v2
 
 Rules:
   RegionCheck:
     Assertions:
-      - Assert: !Equals [!Ref "AWS::Region", "eu-west-2"]
-        AssertDescription: "This stack must be deployed in eu-west-2 (London) only"
+      - Assert: !Equals [!Ref "AWS::Region", "us-east-1"]
+        AssertDescription: "This stack must be deployed in us-east-1 (N. Virginia) only"
 
 Resources:
   # ============================================================================
@@ -208,6 +209,24 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # ============================================================================
+  # 6. Admin User (GUI Console Access)
+  # ============================================================================
+  AdminDevUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: admin_dev
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/job-function/Billing"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSBillingReadOnlyAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/CostOptimizationHubAdminAccess"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: gui-admin
+
 # ============================================================================
 # Outputs
 # ============================================================================
@@ -246,4 +265,9 @@ Outputs:
     Value: !GetAtt TerraformStateBucket.Arn
     Export:
       Name: dev-TerraformStateBucketArn
+
+  AdminDevUserArn:
+    Value: !GetAtt AdminDevUser.Arn
+    Export:
+      Name: dev-AdminDevUserArn
 
