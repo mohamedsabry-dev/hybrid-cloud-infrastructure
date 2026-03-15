@@ -11,7 +11,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [aws/](aws/) | AWS CloudFormation, IAM issues | 1 |
 | [github/](github/) | GitHub Actions, runners, workflows | 2 |
 | [identity/](identity/) | FreeIPA, Kerberos, authentication | 4 |
-| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 3 |
+| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 4 |
 | [macos/](macos/) | macOS client configuration | 2 |
 | [network/](network/) | Routing, connectivity issues | 2 |
 | [proxmox/](proxmox/) | Proxmox VE platform issues | 4 |
@@ -55,6 +55,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [15](linux/15-rocky-linux-dnf-metadata-error.md) | Rocky Linux DNF Metadata Error | DNF repository metadata download failures |
 | [18](linux/18-lxc-ntp-configuration-disabled.md) | LXC NTP Configuration Disabled | LXC containers inherit time from host, can't run chronyd |
 | [21](linux/21-lxc-uid-mapping-initgroups-error.md) | LXC UID Mapping initgroups Error | FreeIPA default UIDs outside LXC mapped range |
+| [24](linux/24-lxc-chronyd-adjtimex-failure.md) | LXC Chronyd adjtimex Failure | Unprivileged LXC cannot adjust clock, configure host instead |
 
 ---
 
@@ -118,6 +119,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | SSH with IP fails, hostname works | Kerberos needs FQDN | [22](identity/22-kerberos-gssapi-requires-hostnames.md) |
 | DNS recursion REFUSED | BIND recursion not allowed | [19](identity/19-freeipa-dns-configuration-issues.md) |
 | Chronyd fails on LXC | LXC can't manage time | [18](linux/18-lxc-ntp-configuration-disabled.md) |
+| `adjtimex failed: Operation not permitted` | Unprivileged LXC, configure host | [24](linux/24-lxc-chronyd-adjtimex-failure.md) |
 | LXC snapshot not supported | Mount point on NFS | [16](proxmox/16-proxmox-lxc-snapshot-nfs-mount.md) |
 | `cospriority is required` | Missing password policy priority | [23](identity/23-freeipa-configuration-requirements.md) |
 
