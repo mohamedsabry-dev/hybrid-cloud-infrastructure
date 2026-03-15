@@ -31,7 +31,7 @@ ISP ONT
 │   │
 │   └── Port 5 ─── FS308GP Port 3 [Dev SVC Uplink]
 │
-├── FS308GP [Direct to ISP for Festa Cloud management]
+├── FS308GP [Direct to ISP for Festa Cloud management] (Mgmt IP: 192.168.100.185)
 │   │
 │   ├── VLAN 40 (Storage) ─ Tagged
 │   │   ├── Port 8 ─── Prod Server (stor0)
@@ -68,17 +68,19 @@ Storage Traffic:
   VLAN 40     │ Storage         │ NAS, Server Storage NICs
   VLAN 50-55  │ Prod Services   │ Production workloads
   VLAN 60-65  │ Dev Services    │ Development workloads
+  VLAN 99     │ Dump/Isolation  │ Native VLAN on trunk ports (unused traffic)
 
 ================================================================================
                          RELATED DOCUMENTATION
 ================================================================================
 
   Configuration Guides:
-  ├── 00-ip-planning.txt   - IP allocations & VLAN assignments
-  ├── 02-er605-config.txt  - ER605 router/firewall configuration
-  ├── 03-ap-wifi-config.txt- Access point configuration
-  ├── 04-fs308gp-config.txt- FS308GP switch configuration
-  └── vpn-setup/           - WireGuard VPN setup scripts
+  ├── 00-ip-planning.txt    - IP allocations & VLAN assignments
+  ├── 02-er605-config.txt   - ER605 router/firewall configuration
+  ├── 03-ap-wifi-config.txt - Access point configuration
+  ├── 04-fs308gp-config.txt - FS308GP switch configuration
+  ├── 06-vpn-wireguard-config.txt - WireGuard VPN summary
+  └── vpn-setup/            - WireGuard setup scripts & detailed guide
 
   Domain: lab.local
   DNS Servers: FreeIPA (Prod/Dev)

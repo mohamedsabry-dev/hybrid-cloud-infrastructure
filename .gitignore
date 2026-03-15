@@ -39,3 +39,6 @@ Key*
 # Router backups
 backup-ER605*.bin
 *.bin
+
+# Switch config backups (contains credentials)
+network/backups/*.cfg
