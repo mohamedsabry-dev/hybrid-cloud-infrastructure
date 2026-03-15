@@ -1,0 +1,120 @@
+# Playbook to config the time of all nodes: 
+# In ansible/dev/playbooks/common/ntp.yml
+---
+- name: Configure Chrony on FreeIPA
+  hosts: freeipa
+  become: yes
+  tasks:
+    - name: Set timezone
+      community.general.timezone:
+        name: Africa/Cairo
+
+    - name: Install chrony
+      ansible.builtin.package:
+        name: chrony
+        state: present
+
+    - name: Enable and start chronyd
+      ansible.builtin.service:
+        name: chronyd
+        state: started
+        enabled: yes
+
+    - name: Deploy IPA chrony config
+      ansible.builtin.copy:
+        src: "../../config_files/chrony_ipa.conf"
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: yes
+      notify: Restart Chrony
+
+  handlers:
+    - name: Restart Chrony
+      ansible.builtin.service:
+        name: chronyd
+        state: restarted
+
+
+- name: Configure Chrony on VMs (non-IPA)
+  hosts: vms:!freeipa
+  become: yes
+  tasks:
+    - name: Set timezone
+      community.general.timezone:
+        name: Africa/Cairo
+
+    - name: Install chrony
+      ansible.builtin.package:
+        name: chrony
+        state: present
+
+    - name: Enable and start chronyd
+      ansible.builtin.service:
+        name: chronyd
+        state: started
+        enabled: yes
+
+    - name: Deploy VM chrony config
+      ansible.builtin.copy:
+        src: "../../config_files/chrony_vm.conf"
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: yes
+      notify: Restart Chrony
+
+  handlers:
+    - name: Restart Chrony
+      ansible.builtin.service:
+        name: chronyd
+        state: restarted
+
+
+- name: Configure Chrony on LXC nodes
+  hosts: lxc
+  become: yes
+  tasks:
+    - name: Set timezone
+      community.general.timezone:
+        name: Africa/Cairo
+
+    - name: Reminder for LXC host configuration
+      ansible.builtin.debug:
+        msg:
+        - "NOTE: LXC containers inherit time from the host."
+        - "Ensure chrony is installed and running on the Proxmox host."
+        - "Run on host: apt install chrony && systemctl enable --now chrony"
+      when: ansible_virtualization_type == "lxc"
+      run_once: true
+
+
+#   - name: Install chrony
+#     ansible.builtin.package:
+#       name: chrony
+#       state: present
+
+#   - name: Enable and start chronyd
+#     ansible.builtin.service:
+#       name: chronyd
+#       state: started
+#       enabled: yes
+
+#   - name: Deploy LXC chrony config
+#     ansible.builtin.copy:
+#       src: "../../config_files/chrony_lxc.conf"
+#       dest: /etc/chrony.conf
+#       owner: root
+#       group: root
+#       mode: '0644'
+#       backup: yes
+#     notify: Restart Chrony
+
+# handlers:
+#   - name: Restart Chrony
+#     ansible.builtin.service:
+#       name: chronyd
+#       state: restarted
+
