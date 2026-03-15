@@ -5,6 +5,10 @@
   hosts: freeipa
   become: yes
   tasks:
+    - name: Set timezone
+      community.general.timezone:
+        name: Africa/Cairo
+
     - name: Install chrony
       ansible.builtin.package:
         name: chrony
@@ -37,6 +41,10 @@
   hosts: vms:!freeipa
   become: yes
   tasks:
+    - name: Set timezone
+      community.general.timezone:
+        name: Africa/Cairo
+
     - name: Install chrony
       ansible.builtin.package:
         name: chrony
