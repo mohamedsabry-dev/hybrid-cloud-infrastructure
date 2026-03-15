@@ -4,8 +4,9 @@
 # 3. Fix APT Repos
 # 4. APT Update & Upgrade
 # 5. Remove Subscription Nag
-# 6. Create admin_dev Management User (PAM)
-# 7. Create tf_dev Automation User
+# 6. Configure Chrony (NTP) & Timezone
+# 7. Create admin_dev Management User (PAM)
+# 8. Create tf_dev Automation User
 
 
 set -e
@@ -26,7 +27,7 @@ fi
 
 # --- 1. Disable Sleep/Suspend ---
 echo ""
-echo "[1/7] Disabling sleep/suspend..."
+echo "[1/8] Disabling sleep/suspend..."
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 echo "Done."
 
@@ -38,7 +39,7 @@ echo "Done."
 
 # --- 2. Ensure DNS (fallback to 8.8.8.8) ---
 echo ""
-echo "[2/7] Ensuring DNS configuration..."
+echo "[2/8] Ensuring DNS configuration..."
 
 RESOLV_CONF="/etc/resolv.conf"
 FALLBACK_DNS="nameserver 8.8.8.8"
@@ -59,7 +60,7 @@ fi
 
 # --- 3. Fix APT Repos ---
 echo ""
-echo "[3/7] Fixing APT repositories..."
+echo "[3/8] Fixing APT repositories..."
 
 SOURCES_DIR="/etc/apt/sources.list.d"
 ENTERPRISE_REPOS="ceph.sources pve-enterprise.list pve-enterprise.sources"
@@ -89,7 +90,7 @@ fi
 
 # --- 4. APT Update & Upgrade ---
 echo ""
-echo "[4/7] Running apt update && upgrade..."
+echo "[4/8] Running apt update && upgrade..."
 apt update && apt upgrade -y
 
 
@@ -100,7 +101,7 @@ apt update && apt upgrade -y
 
 # --- 5. Remove Subscription Nag ---
 echo ""
-echo "[5/7] Removing subscription nag..."
+echo "[5/8] Removing subscription nag..."
 PROXMOXLIB="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
 if [[ -f "$PROXMOXLIB" ]]; then
     sed -Ezi.bak "s/(Ext\.Msg\.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" "$PROXMOXLIB"
@@ -115,9 +116,57 @@ fi
 # ======================================================================= #
 
 
-# --- 6. Create admin_dev Management User (PAM) ---
+# --- 6. Configure Chrony (NTP) & Timezone ---
 echo ""
-echo "[6/7] Creating admin_dev management user (PAM)..."
+echo "[6/8] Configuring Chrony (NTP) and timezone..."
+
+# Install chrony
+apt install chrony -y
+
+# Configure chrony with custom NTP servers
+CHRONY_CONF="/etc/chrony/chrony.conf"
+cp "$CHRONY_CONF" "${CHRONY_CONF}.bak"
+
+cat > "$CHRONY_CONF" << 'EOF'
+# NTP Servers
+pool 0.pool.ntp.org iburst
+pool 1.pool.ntp.org iburst
+server time.cloudflare.com iburst
+
+# Record the rate at which the system clock gains/losses time
+driftfile /var/lib/chrony/drift
+
+# Allow the system clock to be stepped in the first three updates
+makestep 1.0 3
+
+# Enable kernel synchronization of the real-time clock (RTC)
+rtcsync
+
+# Specify directory for log files
+logdir /var/log/chrony
+EOF
+
+# Set timezone
+timedatectl set-timezone Africa/Cairo
+
+# Enable and start chrony
+systemctl enable chrony
+systemctl restart chrony
+
+echo "Timezone: $(timedatectl | grep 'Time zone' | awk '{print $3}')"
+echo "Chrony status:"
+chronyc tracking | head -3
+echo "Done."
+
+
+# ======================================================================= #
+# ======================================================================= #
+# ======================================================================= #
+
+
+# --- 7. Create admin_dev Management User (PAM) ---
+echo ""
+echo "[7/8] Creating admin_dev management user (PAM)..."
 
 ADMIN_NAME="admin_dev"
 ADMIN_USER="${ADMIN_NAME}@pam"
@@ -152,9 +201,9 @@ echo "  ADMIN USER CREATED (PAM)"
 # ======================================================================= #
 
 
-# --- 7. Create tf_dev Automation User ---
+# --- 8. Create tf_dev Automation User ---
 echo ""
-echo "[7/7] Creating tf_dev automation user..."
+echo "[8/8] Creating tf_dev automation user..."
 
 USERNAME="tf_dev"
 REALM="pve"
