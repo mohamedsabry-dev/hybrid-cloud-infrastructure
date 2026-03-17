@@ -1,10 +1,174 @@
+# Setup, Install, Config, Deploy HashiCorp Vault
+# Save in ansible/dev/playbooks/vault/vault_setup.yml
 ---
-- name: Setup Hashicorp Vault
+- name: Configure FreeIPA Service Principals for Vault
+  hosts: freeipa
+  become: yes
+  tasks:
+
+    - name: Create Vault service principals in FreeIPA
+      freeipa.ansible_freeipa.ipaservice:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "vault/{{ item }}"
+        state: present
+      loop:
+        - vault1.lab.local
+        - vault2.lab.local
+        - vault3.lab.local
+
+
+- name: Deploy HashiCorp Vault
   hosts: vault_cluster
   become: yes
-  
-  roles: 
-      - role: community.hashi_vault
+  tasks:
+
+    - name: Install required dependencies
+      ansible.builtin.dnf:
+        name:
+          - gnupg2
+        state: present
+
+    - name: Add HashiCorp YUM repository
+      ansible.builtin.yum_repository:
+        name: hashicorp
+        description: HashiCorp Stable - $basearch
+        baseurl: https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
+        gpgkey: https://rpm.releases.hashicorp.com/gpg
+        gpgcheck: yes
+        enabled: yes
+
+    - name: Import HashiCorp GPG key into RPM keystore
+      ansible.builtin.rpm_key:
+        key: https://rpm.releases.hashicorp.com/gpg
+        state: present
+
+    - name: Install Vault
+      ansible.builtin.dnf:
+        name: vault
+        state: present
+
+    - name: Verify Vault binary
+      ansible.builtin.command: vault --version
+      register: vault_version
+      changed_when: false
+
+    - name: Print Vault version
+      ansible.builtin.debug:
+        msg: "{{ vault_version.stdout }}"
+
+    - name: Add Vault cluster nodes to /etc/hosts
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        block: |
+          10.0.62.10  vault1.lab.local  vault1
+          10.0.62.11  vault2.lab.local  vault2
+          10.0.62.12  vault3.lab.local  vault3
+        marker: "# {mark} ANSIBLE MANAGED - vault cluster"
+
+    - name: Create vault group
+      ansible.builtin.group:
+        name: vault
+        system: yes
+        state: present
+
+    - name: Create vault user
+      ansible.builtin.user:
+        name: vault
+        group: vault
+        system: yes
+        shell: /sbin/nologin
+        home: /opt/vault
+        create_home: no
+        state: present
+
+    - name: Create Vault directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: vault
+        group: vault
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: /opt/vault,      mode: "0750" }
+        - { path: /opt/vault/data, mode: "0750" }
+        - { path: /opt/vault/tls,  mode: "0700" }
+        - { path: /etc/vault.d,    mode: "0750" }
+        - { path: /var/log/vault,  mode: "0750" }
+
+    - name: Ensure certmonger is started and enabled
+      ansible.builtin.systemd:
+        name: certmonger
+        state: started
+        enabled: yes
+
+    - name: Check current cert issuer
+      ansible.builtin.command: >
+        openssl x509 -in /opt/vault/tls/tls.crt -noout -issuer
+      register: cert_issuer
+      changed_when: false
+      failed_when: false
+
+    - name: Remove placeholder TLS files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/vault/tls/tls.crt
+        - /opt/vault/tls/tls.key
+      when: "'HashiCorp' in cert_issuer.stdout or cert_issuer.rc != 0"
+    
+    - name: Request signed certificate from FreeIPA
+      ansible.builtin.command: >
+        ipa-getcert request
+        -f /opt/vault/tls/tls.crt
+        -k /opt/vault/tls/tls.key
+        -K vault/{{ inventory_hostname }}
+        -N CN={{ inventory_hostname }}
+        -D {{ inventory_hostname }}
+        -C "systemctl reload vault"
+      when: "'HashiCorp' in cert_issuer.stdout or cert_issuer.rc != 0"
+
+    - name: Set correct ownership on TLS files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: vault
+        group: vault
+        mode: "0600"
+      loop:
+        - /opt/vault/tls/tls.crt
+        - /opt/vault/tls/tls.key
+
+    - name: Deploy vault credentials file
+      ansible.builtin.template:
+        src: ../../config_files/vault.env.j2
+        dest: /etc/vault.d/vault.env
+        owner: vault
+        group: vault
+        mode: "0600"
+
+    - name: Deploy Vault configuration
+      ansible.builtin.template:
+        src: ../../config_files/vault.hcl.j2
+        dest: /etc/vault.d/vault.hcl
+        owner: vault
+        group: vault
+        mode: "0640"
+
+    - name: Set Vault environment variables        # ← add here
+      ansible.builtin.copy:
+        dest: /etc/profile.d/vault.sh
+        content: |
+           export VAULT_ADDR=https://{{ inventory_hostname }}:8200
+           export VAULT_CACERT=/etc/ipa/ca.crt
+        owner: root
+        group: root
+        mode: "0644"
 
 
-      
+    - name: Enable and start Vault service
+      ansible.builtin.systemd:
+        name: vault
+        state: started
+        enabled: yes
+        daemon_reload: yes
