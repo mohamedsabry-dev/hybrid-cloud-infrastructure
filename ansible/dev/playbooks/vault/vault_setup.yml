@@ -29,13 +29,14 @@
           name: "{{ item.name }}"
           first: "{{ item.first }}"
           last: "{{ item.last }}"
-          description: "{{ item.description }}"
+          title: "{{ item.description }}"
           password: "{{ item.password }}"
           update_password: "{{ item.update_password }}"
           state: present
-      no_log: true
+  
       loop: "{{ hashicorp_vault_users }}"
-
+      no_log: true
+      
     - name: Create Vault admins group in FreeIPA
       freeipa.ansible_freeipa.ipagroup:
         ipaadmin_principal: "{{ ipaadmin_principal }}"
