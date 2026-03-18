@@ -22,7 +22,7 @@
 
     - name: Deploy IPA chrony config
       ansible.builtin.copy:
-        src: "../../config_files/chrony_ipa.conf"
+        src: "templates/chrony_ipa.conf"
         dest: /etc/chrony.conf
         owner: root
         group: root
@@ -58,7 +58,7 @@
 
     - name: Deploy VM chrony config
       ansible.builtin.copy:
-        src: "../../config_files/chrony_vm.conf"
+        src: "templates/chrony_vm.conf"
         dest: /etc/chrony.conf
         owner: root
         group: root
@@ -104,7 +104,7 @@
 
 #   - name: Deploy LXC chrony config
 #     ansible.builtin.copy:
-#       src: "../../config_files/chrony_lxc.conf"
+#       src: "templates/chrony_lxc.conf"
 #       dest: /etc/chrony.conf
 #       owner: root
 #       group: root
