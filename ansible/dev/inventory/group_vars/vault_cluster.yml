@@ -1,52 +1,21 @@
-# HashiCorp Vault Cluster Configuration
-# 3-node HA cluster with Raft storage
+# In inventory/group_vars/vault_cluster.yml
+# Passwords
+# vault_aws_access_key_id: !vault |
+#           $ANSIBLE_VAULT;1.1;AES256
+#           32383163653633326137626537356131306137383861383963393530303730636532623031656561
+#           3462363232383535653535343365343439663662363063630a306132616339366666616661636461
+#           39623030323566346431363334626635353932336333633738346230373031343964303536396463
+#           6636303436353934380a353437373134626433326432326636316566383035323362636236646665
+#           37313730616438666133643466376436633236373232346430363865313439396664
 
-vault_version: "1.18.3"
-vault_user: vault
-vault_group: vault
-vault_cluster_name: "vault-prod"
+# vault_aws_secret_access_key: !vault |
+#           $ANSIBLE_VAULT;1.1;AES256
+#           32313165616137666666613936353831306130373264396333626138373235393762363131363365
+#           6365366337623530653039616664623966353164336431640a333666666366653533386164643664
+#           36346633396330663835396163313035336263623065336532646535313739643366313537326161
+#           6139633362616164350a366438326539643835326335313761396132666363393361373936616165
+#           39373066353433363932643464393261303963373062396330646632363438353433376336636161
+#           6462646537393930363138656539343137633165346437363261
 
-# Directories
-vault_config_dir: /etc/vault.d
-vault_data_dir: /opt/vault/data
-vault_log_dir: /var/log/vault
-vault_tls_dir: /etc/vault.d/tls
-
-# Network
-vault_api_port: 8200
-vault_cluster_port: 8201
-
-# Cluster nodes (must match inventory)
-vault_nodes:
-  - { name: "vault1", fqdn: "vault1.lab.local", addr: "10.0.52.10" }
-  - { name: "vault2", fqdn: "vault2.lab.local", addr: "10.0.52.11" }
-  - { name: "vault3", fqdn: "vault3.lab.local", addr: "10.0.52.12" }
-
-# Raft storage backend
-vault_backend: raft
-vault_raft_path: "{{ vault_data_dir }}"
-
-# TLS (set to true for production)
-vault_tls_disable: true  # Set false and configure certs for production
-
-# Auto-unseal with AWS KMS
-vault_auto_unseal: true
-vault_kms_region: "eu-west-2"
-vault_kms_key_id: "alias/vault-unseal"  # or full ARN: arn:aws:kms:eu-west-2:ACCOUNT:key/xxx
-
-# KMS credentials (use vault-encrypted values or env vars)
-# Option 1: Vault-encrypted (recommended)
-# vault_kms_access_key: !vault |
-#   $ANSIBLE_VAULT;1.1;AES256
-#   ...
-# vault_kms_secret_key: !vault |
-#   $ANSIBLE_VAULT;1.1;AES256
-#   ...
-
-# Option 2: Fetch from AWS Secrets Manager at runtime
-# vault_kms_access_key: "{{ lookup('env', 'VAULT_KMS_ACCESS_KEY') }}"
-# vault_kms_secret_key: "{{ lookup('env', 'VAULT_KMS_SECRET_KEY') }}"
-
-# Initial setup (only run once)
-vault_init_keys: 5
-vault_init_threshold: 3
+vault_aws_access_key_id: "{{ lookup('env', 'VAULT_UNSEAL_ACCESS_KEY') }}"
+vault_aws_secret_access_key: "{{ lookup('env', 'VAULT_UNSEAL_SECRET_KEY') }}"

@@ -1,0 +1,163 @@
+Vault HA Cluster — Troubleshooting Log
+HashiCorp Vault | Rocky Linux LXC | Proxmox | Ansible
+Session Date: March 17, 2026
+════════════════════════════════════════════════════════════════
+
+ISSUES
+├── 1. GPG Signature Validation Failure on Vault Install
+│   ├── Symptom
+│   │   └── DNF failed with: "Failed to validate GPG signature for
+│   │       vault-1.21.4-1.x86_64: Public key not installed"
+│   │       vault3 also threw FileNotFoundError on cached RPM
+│   ├── Root Cause
+│   │   └── yum_repository module adds the GPG key URL to the repo
+│   │       file but does NOT import it into the RPM keystore.
+│   │       DNF requires the key physically imported via rpm --import
+│   │       before it can verify packages
+│   ├── Fix Applied
+│   │   ├── Added ansible.builtin.rpm_key task between repo and
+│   │   │   install tasks to import the HashiCorp GPG key into RPM
+│   │   └── Ran "dnf clean all" on all nodes to clear corrupted cache
+│   └── Lesson
+│       └── yum_repository and rpm_key are two separate steps on
+│           RHEL-family systems. Adding a repo URL is never sufficient
+│           — the key must also be imported into the RPM keystore
+│
+├── 2. ipa-getcert --force Flag Not Recognized
+│   ├── Symptom
+│   │   └── ipa-getcert request failed on all 3 nodes with:
+│   │       "unrecognized option --force"
+│   ├── Root Cause
+│   │   └── --force does not exist in certmonger 0.79.20-3.el10
+│   │       installed on Rocky Linux 10. Incorrectly assumed valid
+│   ├── Fix Applied
+│   │   └── Removed --force. Added separate task to delete placeholder
+│   │       TLS files before cert request, gated by same when condition
+│   └── Lesson
+│       └── Always verify CLI flags against the actual installed version.
+│           Never assume documentation flags apply to all versions
+│
+├── 3. FreeIPA CA Rejected CSR — Hostname Mismatch
+│   ├── Symptom
+│   │   └── Cert request rejected with: "hostname in subject of request
+│   │       'vault1' does not match name or aliases of principal
+│   │       'vault/vault1.lab.local@LAB.LOCAL'"
+│   │       Status: CA_REJECTED, stuck: yes
+│   ├── Root Cause
+│   │   └── Certmonger generated CSR with subject CN=vault1 (short
+│   │       hostname from ansible_hostname) but service principal was
+│   │       registered as vault/vault1.lab.local. FreeIPA requires
+│   │       subject to match the full principal FQDN
+│   ├── Fix Applied
+│   │   ├── Added -N CN={{ inventory_hostname }} to set subject to FQDN
+│   │   ├── Added -D {{ inventory_hostname }} to set DNS SAN to FQDN
+│   │   └── Ran getcert stop-tracking and deleted cert files before retry
+│   └── Lesson
+│       └── With ipa-getcert and a service principal, always explicitly
+│           set -N (subject) and -D (DNS SAN) to the FQDN. Certmonger
+│           defaults to short hostname which fails FreeIPA principal matching
+│
+├── 4. Ownership Task Failing — Cert Not Written Yet
+│   ├── Symptom
+│   │   └── "Set correct ownership on TLS files" failed on vault2/3:
+│   │       "file is absent, cannot continue"
+│   ├── Root Cause
+│   │   └── The when condition was still the old one without
+│   │       "or cert_issuer.rc != 0" so the request task was being
+│   │       skipped on vault2/3 entirely — not a timing issue
+│   ├── Fix Applied
+│   │   └── Updated when condition to:
+│   │       "'HashiCorp' in cert_issuer.stdout or cert_issuer.rc != 0"
+│   └── Lesson
+│       └── Always use -w with ipa-getcert to wait for cert issuance.
+│           Ensure when conditions handle ALL expected states including
+│           missing files, not just the happy path
+│
+├── 5. vault status Defaulting to 127.0.0.1 — TLS IP SAN Error
+│   ├── Symptom
+│   │   └── "tls: failed to verify certificate for 127.0.0.1 because
+│   │       it doesn't contain any IP SANs"
+│   ├── Root Cause
+│   │   └── Vault CLI defaults to https://127.0.0.1:8200 when
+│   │       VAULT_ADDR is not set. Cert was issued for vault1.lab.local
+│   │       not 127.0.0.1. IP SANs were deliberately not included
+│   ├── Fix Applied
+│   │   └── Deployed /etc/profile.d/vault.sh on all nodes via Ansible:
+│   │       export VAULT_ADDR=https://{{ inventory_hostname }}:8200
+│   │       export VAULT_CACERT=/etc/ipa/ca.crt
+│   └── Lesson
+│       └── Always set VAULT_ADDR explicitly. Use VAULT_CACERT pointing
+│           to the signing CA rather than VAULT_SKIP_VERIFY=1
+│
+├── 6. $(hostname -f) Expanding on Control Node Instead of Remote
+│   ├── Symptom
+│   │   └── All vault nodes tried to connect to ansible.lab.local:8200
+│   │       instead of their own hostname
+│   ├── Root Cause
+│   │   └── Double quotes allowed the Ansible control node shell to
+│   │       expand $(hostname -f) before the command was sent remotely
+│   ├── Fix Applied
+│   │   └── Escaped with backslash: \$(hostname -f)
+│   │       to force expansion on the remote node
+│   └── Lesson
+│       └── Use \$ to escape variables that should expand on the remote
+│           node, not the Ansible control node
+│
+├── 7. Cert Issuer Check Failing Hard on Missing File
+│   ├── Symptom
+│   │   └── Play aborted at "Check current cert issuer" task when
+│   │       /opt/vault/tls/tls.crt did not exist
+│   ├── Root Cause
+│   │   └── openssl x509 returns rc=1 when file is missing. Task did
+│   │       not have failed_when: false so Ansible treated it as fatal
+│   ├── Fix Applied
+│   │   ├── Added failed_when: false to the issuer check task
+│   │   └── Updated when condition to handle rc != 0 case:
+│   │       "'HashiCorp' in cert_issuer.stdout or cert_issuer.rc != 0"
+│   └── Lesson
+│       └── Use failed_when: false on probe/check tasks where a
+│           non-zero return code is an expected handleable condition,
+│           not a true failure
+│
+└── 8. Task Ordering — RPM Post-Install Running Before Ansible Tasks
+    ├── Symptom
+    │   └── Vault RPM post-install script created /opt/vault/tls,
+    │       /opt/vault/data, vault user, and self-signed TLS certs
+    │       before Ansible directory and user tasks ran
+    ├── Root Cause
+    │   └── Directory and user creation tasks were placed after
+    │       "dnf install vault" in the playbook. RPM post-install
+    │       script runs synchronously as part of install — before
+    │       Ansible continues to the next task
+    ├── Fix Applied
+    │   └── Tasks kept for explicit state enforcement and idempotency.
+    │       Noted as known ordering issue — correct fix is to reorder:
+    │       create user/dirs BEFORE install task
+    └── Lesson
+        └── RPM post-install scripts run synchronously during dnf install.
+            Any Ansible tasks that should own resource creation must come
+            BEFORE the install task, not after
+
+
+COMMANDS USED DURING TROUBLESHOOTING
+├── Check GPG key import
+│   ├── rpm -q gnupg2
+│   ├── rpm -qf /opt/vault/tls/tls.crt
+│   └── rpm -q --scripts vault
+│
+├── Clean DNF cache after failed install
+│   └── ansible vault_cluster -m command -a "dnf clean all" --become
+│
+├── Check certmonger request status
+│   └── getcert list -f /opt/vault/tls/tls.crt
+│
+├── Stop a stuck certmonger tracking request
+│   └── getcert stop-tracking -f /opt/vault/tls/tls.crt
+│
+├── Check cert issuer
+│   └── openssl x509 -in /opt/vault/tls/tls.crt -noout -issuer
+│
+└── Check Vault status across all nodes
+    └── ansible vault_cluster -m command \
+        -a "bash -c 'source /etc/profile.d/vault.sh && vault status'" \
+        -i inventory/inventory.ini

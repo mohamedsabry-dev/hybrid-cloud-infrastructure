@@ -50,8 +50,8 @@ jobs:
 
       # One-time migration: import route after switching from inline to aws_route resource
       # Comment out after first successful run
-      - name: Import Route (migration)
-        run: terraform import aws_route.internet $(terraform output -raw rt_public_id)_0.0.0.0/0 || true
+      # - name: Import Route (migration)
+      #   run: terraform import aws_route.internet $(terraform output -raw rt_public_id)_0.0.0.0/0 || true
 
       - name: Terraform Plan
         timeout-minutes: 3

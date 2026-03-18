@@ -45,3 +45,6 @@ ipa_managed_hosts:
   - freeipa.lab.local
 
 k8s_api_vip: 10.0.61.100
+
+
+
