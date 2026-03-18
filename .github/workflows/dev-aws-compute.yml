@@ -61,7 +61,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION_DEV }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       # Variables are marked sensitive in TF - values will be redacted in plan output
       - name: Terraform Plan

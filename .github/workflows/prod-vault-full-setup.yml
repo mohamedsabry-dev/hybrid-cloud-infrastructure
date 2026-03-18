@@ -1,43 +1,60 @@
-# Prod Proxmox Vault Cluster LXC - HashiCorp Vault HA Cluster
+# =============================================================================
+# PROD Vault Full Setup
+# =============================================================================
+# Deploys HashiCorp Vault HA cluster (3 LXC containers) and configures Vault
+# Each job has its own lock - locked jobs skip to next, workflow continues
+# =============================================================================
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
 name: "[PROD] Vault - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod branch
+# -----------------------------------------------------------------------------
 on:
+  workflow_dispatch:
   push:
     branches:
       - prod
     paths:
       - 'terraform/prod/proxmox/lxc/vault_cluster/**'
       - 'ansible/prod/playbooks/vault/**'
-      - 'ansible/prod/inventory/group_vars/vault_cluster/**'
+      - 'ansible/prod/inventory/group_vars/vault_cluster.yml'
       - '.github/workflows/prod-vault-full-setup.yml'
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/proxmox/lxc/vault_cluster
-#####################
-#####################
+  ANSIBLE_HOST: 10.0.53.10
+  ANSIBLE_USER: root
 
-
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy Vault Cluster LXC
+  # Creates 3 LXC containers for Vault HA cluster
+  # Lock: PROD_INFRA_VAULT_CLUSTER_LOCK
+  # ---------------------------------------------------------------------------
   deploy-lxc:
-    name: "Deploy Vault Cluster LXC"
+    name: "1. Deploy Vault Cluster LXC"
     runs-on: mac-mini
     if: ${{ vars.PROD_INFRA_VAULT_CLUSTER_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
     steps:
       - name: Code Checkout
@@ -49,31 +66,28 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
-      # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id prod/proxmox/terraform-token \
             --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
-          # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
-          # Fetch Ansible SSH public key
           ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
             --secret-id prod/ansible/ssh-public-key \
             --query SecretString --output text)
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "TF_VAR_ssh_public_keys=[\"${ANSIBLE_SSH_KEY}\"]" >> $GITHUB_ENV
 
-          # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id prod/golden-image/lxc-root-password \
             --query SecretString --output text)
@@ -87,6 +101,7 @@ jobs:
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
@@ -99,8 +114,13 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-  Setup:
-    name: "2. Install Vault Service And Configure it"
+  # ---------------------------------------------------------------------------
+  # Job 2: Setup Vault Service
+  # Installs and configures Vault with AWS KMS auto-unseal via Ansible
+  # Lock: PROD_SVC_VAULT_SETUP
+  # ---------------------------------------------------------------------------
+  setup:
+    name: "2. Setup Vault Service"
     runs-on: prod-local-runner
     needs: deploy-lxc
     if: ${{ always() && needs.deploy-lxc.result != 'failure' && needs.deploy-lxc.result != 'cancelled' && vars.PROD_SVC_VAULT_SETUP != 'true' }}
@@ -115,30 +135,30 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
-      - name: Fetch Access/Secret vault_unseal Keys
+      - name: Fetch Vault Unseal Credentials
         run: |
           VAULT_UNSEAL_KEYS=$(aws secretsmanager get-secret-value \
             --secret-id prod/vault/unseal-credentials \
             --query SecretString --output text)
+          echo "::add-mask::${VAULT_UNSEAL_KEYS}"
 
           ACCESS_KEY=$(echo "$VAULT_UNSEAL_KEYS" | jq -r '.access_key_id')
           SECRET_KEY=$(echo "$VAULT_UNSEAL_KEYS" | jq -r '.secret_access_key')
 
           echo "::add-mask::${ACCESS_KEY}"
           echo "::add-mask::${SECRET_KEY}"
-          echo "::add-mask::${ACCESS_KEY}=${SECRET_KEY}"
 
           echo "VAULT_UNSEAL_ACCESS_KEY=${ACCESS_KEY}" >> $GITHUB_ENV
           echo "VAULT_UNSEAL_SECRET_KEY=${SECRET_KEY}" >> $GITHUB_ENV
 
       - name: Pull latest code
         run: |
-           ssh -o StrictHostKeyChecking=no root@10.0.53.10 "cd /srv/repo/ && git pull origin prod"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin prod"
 
       - name: Run Vault setup playbook
         run: |
-            ssh -o StrictHostKeyChecking=no root@10.0.53.10 "\
-              export VAULT_UNSEAL_ACCESS_KEY='${{ env.VAULT_UNSEAL_ACCESS_KEY }}' && \
-              export VAULT_UNSEAL_SECRET_KEY='${{ env.VAULT_UNSEAL_SECRET_KEY }}' && \
-              cd /srv/repo/ansible/prod/ && \
-              ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+            export VAULT_UNSEAL_ACCESS_KEY='${{ env.VAULT_UNSEAL_ACCESS_KEY }}' && \
+            export VAULT_UNSEAL_SECRET_KEY='${{ env.VAULT_UNSEAL_SECRET_KEY }}' && \
+            cd /srv/repo/ansible/prod/ && \
+            ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml"
