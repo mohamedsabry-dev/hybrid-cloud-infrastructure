@@ -3,238 +3,434 @@
 ================================================================================
 
 Step-by-step checklist for creating GitHub Actions workflows.
+Updated: March 2026
 
 ================================================================================
-                         STEP 1: NAME & TRIGGER
+                         FILE STRUCTURE TEMPLATE
 ================================================================================
 
-name: "[ENV] Resource Name"    # e.g. [DEV] Golden VM, [PROD] Secrets
+Every workflow should follow this structure with standardized section headers:
 
+```yaml
+# =============================================================================
+# {ENV} {Resource Name} Full Setup
+# =============================================================================
+# Brief description of what this workflow does
+# Each job has its own lock - locked jobs skip to next, workflow continues
+# =============================================================================
+
+name: "[{ENV}] {Resource} - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to {branch}
+# -----------------------------------------------------------------------------
 on:
+  workflow_dispatch:
   push:
     branches:
       - {branch}
     paths:
       - 'terraform/{env}/{path}/**'
+      - 'ansible/{env}/playbooks/{resource}/**'
       - '.github/workflows/{this-file}.yml'
 
-  workflow_dispatch:
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
+permissions:
+  id-token: write
+  contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+env:
+  ENVIRONMENT: {env}
+  TF_WORKING_DIR: terraform/{env}/{path}
+  ANSIBLE_HOST: 10.0.{subnet}.10
+  ANSIBLE_USER: root
+
+# =============================================================================
+# Jobs
+# =============================================================================
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: {Job Description}
+  # {What this job does}
+  # Lock: {ENV}_INFRA_{NAME}_LOCK
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: "1. {Job Display Name}"
+    ...
+```
 
 Checklist:
-├── Name describes environment + action
-├── Branch matches environment (dev/prod)
-├── Paths point to correct Terraform folder
-├── Include workflow file itself in paths
-└── Add workflow_dispatch for manual trigger
+├── File header uses ===== (top level)
+├── Section headers use ----- (mid level)
+├── Job headers use ----- with # prefix
+├── Description explains purpose in 1-2 lines
+└── Lock variable documented in job header
+
+================================================================================
+                         SECTION HEADER FORMAT
+================================================================================
+
+Use consistent separators throughout:
+
+```
+# =============================================================================
+# FILE LEVEL - Workflow title and description
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SECTION LEVEL - Triggers, Permissions, Env, etc.
+# -----------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # JOB LEVEL - Job description with lock variable
+  # ---------------------------------------------------------------------------
+```
+
+================================================================================
+                         STEP 1: NAME & TRIGGERS
+================================================================================
+
+```yaml
+name: "[ENV] Resource - Full Setup"
+
+on:
+  workflow_dispatch:              # Always include for manual trigger
+  push:
+    branches:
+      - {branch}                  # dev, prod, dev-security, prod-security
+    paths:
+      - 'terraform/{env}/{path}/**'
+      - 'ansible/{env}/playbooks/{resource}/**'
+      - '.github/workflows/{this-file}.yml'
+```
+
+Checklist:
+├── Name format: "[ENV] Resource - Action"
+├── workflow_dispatch always included (manual trigger)
+├── Branch matches environment
+├── Paths include ALL relevant directories
+└── Include workflow file itself in paths
 
 ================================================================================
                          STEP 2: PERMISSIONS
 ================================================================================
 
+```yaml
 permissions:
-  id-token: write   # For OIDC
-  contents: read    # For checkout
+  id-token: write   # Required for OIDC authentication
+  contents: read    # Required for checkout
+```
 
 Checklist:
-└── Always include both for OIDC workflows
+├── id-token: write - Always required for AWS OIDC
+├── contents: read - Always required for checkout
+└── Do NOT add actions: write (unless auto-locking)
 
 ================================================================================
                          STEP 3: ENVIRONMENT VARIABLES
 ================================================================================
 
+```yaml
 env:
-  ENVIRONMENT: {env}
-  TF_WORKING_DIR: terraform/{env}/{path}
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/proxmox/lxc/ansible
+  ANSIBLE_HOST: 10.0.63.10       # Use env vars instead of hardcoded IPs
+  ANSIBLE_USER: root
+```
+
+Environment-specific values:
+
+| Environment | Subnet | ANSIBLE_HOST | LOCAL_RUNNER_HOST |
+|-------------|--------|--------------|-------------------|
+| DEV         | 63     | 10.0.63.10   | 10.0.63.20        |
+| PROD        | 53     | 10.0.53.10   | 10.0.53.20        |
 
 Checklist:
 ├── ENVIRONMENT matches branch (dev/prod)
-└── TF_WORKING_DIR matches paths trigger
+├── TF_WORKING_DIR matches paths trigger
+├── ANSIBLE_HOST defined if using SSH to Ansible
+├── LOCAL_RUNNER_HOST defined if job runs on local runner
+└── Never hardcode IPs in steps - use ${{ env.VAR }}
 
 ================================================================================
                          STEP 4: JOB SETUP
 ================================================================================
 
+Single Job Workflow:
+```yaml
 jobs:
   deploy:
-    name: "Display Name"
-    runs-on: macOS
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.{RESOURCE}_{ENV}_LOCKED != 'true' }}
+    name: "Deploy {Resource}"
+    runs-on: mac-mini
+    if: ${{ vars.{ENV}_INFRA_{NAME}_LOCK != 'true' }}
+```
 
-    defaults:
-      run:
-        working-directory: ${{ env.TF_WORKING_DIR }}
+Multi-Job Workflow (first job):
+```yaml
+jobs:
+  deploy:
+    name: "1. Deploy {Resource}"
+    runs-on: mac-mini
+    if: ${{ vars.{ENV}_INFRA_{NAME}_LOCK != 'true' }}
+```
 
-Checklist:
-├── runs-on: macOS (your runner)
-├── Add lock variable check in if:
-├── Set defaults.run.working-directory
-└── Create lock variable in GitHub Settings if needed
-
-================================================================================
-                         STEP 5: CHECKOUT
-================================================================================
-
-    steps:
-      - uses: actions/checkout@v4
-
-Checklist:
-└── Always first step
-
-================================================================================
-                         STEP 6: AWS AUTHENTICATION
-================================================================================
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_{ENV} }}:role/GitHubActions-{RoleName}-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION_{ENV} }}
+Multi-Job Workflow (subsequent jobs):
+```yaml
+  setup:
+    name: "2. Setup {Service}"
+    runs-on: {env}-local-runner
+    needs: deploy
+    if: ${{ always() && needs.deploy.result != 'failure' && needs.deploy.result != 'cancelled' && vars.{ENV}_SVC_{NAME}_LOCK != 'true' }}
+```
 
 Checklist:
-├── Use correct AWS_ACCOUNT_ID secret (DEV/PROD)
-├── Use correct IAM role name
-└── Double colon after iam:: in ARN
+├── runs-on: mac-mini (for Terraform jobs)
+├── runs-on: {env}-local-runner (for Ansible jobs)
+├── Job names numbered: "1. Deploy...", "2. Setup..."
+├── Job IDs lowercase: deploy, setup (not Deploy, Setup)
+├── First job: simple lock check
+└── Subsequent jobs: always() + needs checks + lock check
 
 ================================================================================
-                         STEP 7: FETCH SECRETS (IF NEEDED)
+                         STEP 5: FETCH SECRETS (CRITICAL)
 ================================================================================
 
-      - name: Fetch Secrets
-        run: |
-          SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id {env}/path/to/secret \
-            --query SecretString --output text)
+DECISION: Mask API_SECRET immediately after fetch, before parsing.
 
-          # Mask before use
-          echo "::add-mask::${SECRET}"
+```yaml
+- name: Fetch Proxmox Secrets
+  run: |
+    API_SECRET=$(aws secretsmanager get-secret-value \
+      --secret-id {env}/proxmox/terraform-token \
+      --query SecretString --output text)
+    echo "::add-mask::${API_SECRET}"         # MASK IMMEDIATELY
 
-          # Set as TF_VAR
-          echo "TF_VAR_variable_name=${SECRET}" >> $GITHUB_ENV
+    TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+    TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+    echo "::add-mask::${TOKEN_ID}"
+    echo "::add-mask::${TOKEN_SECRET}"
+    echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
+
+    echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+```
 
 Checklist:
-├── Correct secret path in Secrets Manager
-├── Mask ALL secrets with ::add-mask::
-└── Use TF_VAR_ prefix for Terraform variables
+├── Mask raw secret immediately after aws cli fetch
+├── Mask each parsed value separately
+├── Mask combined values (token_id=token_secret)
+├── Use TF_VAR_ prefix for Terraform variables
+└── Single quotes around secret path, not double
 
 ================================================================================
-                         STEP 8: TERRAFORM STEPS
+                         STEP 6: TERRAFORM STEPS
 ================================================================================
 
-      - name: Terraform Init
-        run: terraform init
+DECISION: Always use `terraform init -upgrade`
 
-      - name: Terraform Plan
-        timeout-minutes: 10
-        run: terraform plan -out=tfplan
+```yaml
+- name: Terraform Init
+  run: terraform init -upgrade
 
-      - name: Lock Cleanup Instructions
-        if: failure() || cancelled()
-        run: |
-          echo "State may be locked. Check DynamoDB."
+- name: Terraform Plan
+  timeout-minutes: 3
+  run: terraform plan -out=tfplan
 
-      - name: Review Window
-        run: |
-          echo "Review window - 3 minutes"
-          sleep 180
+# 3-minute pause for manual review before applying
+- name: Review Window
+  run: |
+    echo "3-minute review window started at $(date)"
+    echo "Environment: ${{ env.ENVIRONMENT }}"
+    echo "Plan output is available above for auditor review"
+    sleep 180
+    echo "Review window ended at $(date)"
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+- name: Terraform Apply
+  id: apply
+  run: terraform apply -auto-approve tfplan
+```
+
+Why -upgrade?
+- Version constraints are in provider blocks
+- -upgrade gets latest patch version within constraints
+- Local provider mirror caches versions (no overhead)
+- Without -upgrade, may use outdated .terraform/ cache
 
 Checklist:
-├── Add timeout-minutes to plan
+├── terraform init -upgrade (always)
+├── timeout-minutes on plan (prevent hangs)
 ├── Save plan to file (-out=tfplan)
-├── Add lock cleanup on failure
-├── Add review window if needed
-└── Apply uses saved plan file
+├── Comment before Review Window explaining purpose
+├── Apply uses saved plan file
+└── Add id: apply if checking outcome later
+
+================================================================================
+                         STEP 7: SSH OPERATIONS
+================================================================================
+
+Use env vars for SSH targets:
+
+```yaml
+- name: Pull latest code
+  run: |
+    ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} \
+      "cd /srv/repo/ && git pull origin {branch}"
+
+- name: Run playbook
+  run: |
+    ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+      cd /srv/repo/ansible/{env}/ && \
+      ansible-playbook -i inventory/inventory.ini playbooks/{resource}/{playbook}.yml"
+```
+
+With password (sshpass):
+```yaml
+- name: SSH with password
+  run: |
+    sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no \
+      ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "command"
+```
+
+Checklist:
+├── Use env vars for host/user (not hardcoded)
+├── -o StrictHostKeyChecking=no for first connection
+├── -q flag for quiet mode (less noise)
+├── Escape newlines with \ for multi-line commands
+└── Quote command strings properly
+
+================================================================================
+                         WHEN TO USE INLINE -var vs GITHUB_ENV
+================================================================================
+
+DECISION: Two patterns for passing Terraform variables:
+
+1. GITHUB_ENV Pattern (when bash processing needed):
+```yaml
+- name: Fetch Secrets
+  run: |
+    API_SECRET=$(aws secretsmanager get-secret-value ...)
+    TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+    echo "TF_VAR_token=${TOKEN_ID}" >> $GITHUB_ENV
+
+- name: Terraform Plan
+  run: terraform plan -out=tfplan
+```
+
+2. Inline -var Pattern (when value comes directly from secrets/vars):
+```yaml
+- name: Terraform Plan
+  run: terraform plan -var="account_id=${{ secrets.AWS_ACCOUNT_ID }}" -out=tfplan
+```
+
+| Scenario | Use Pattern |
+|----------|-------------|
+| AWS Secrets Manager (JSON parsing) | GITHUB_ENV |
+| Simple GitHub secret value | Inline -var |
+| Multiple values from same fetch | GITHUB_ENV |
+| Value needs masking first | GITHUB_ENV |
+
+================================================================================
+                         MULTI-JOB WORKFLOW PATTERN
+================================================================================
+
+DECISION: Use always() to ensure downstream jobs evaluate their conditions.
+
+Problem: Without always(), if Job 1 is skipped (locked), Jobs 2+ are auto-skipped.
+
+Solution:
+```yaml
+if: ${{ always() && needs.{prev}.result != 'failure' && needs.{prev}.result != 'cancelled' && vars.LOCK != 'true' }}
+```
+
+Behavior:
+
+| Previous Job | This Job (unlocked) | This Job (locked) |
+|--------------|---------------------|-------------------|
+| Success      | Runs                | Skips             |
+| Skipped      | Runs                | Skips             |
+| Failed       | Skips               | Skips             |
+| Cancelled    | Skips               | Skips             |
 
 ================================================================================
                          COMMON MISTAKES
 ================================================================================
 
-Mistake                          │ Fix
-─────────────────────────────────┼─────────────────────────────────────────────
-arn:aws:iam:${{                  │ arn:aws:iam::${{ (double colon)
-canceled                         │ cancelled (British spelling)
-{{ vars.NAME }}                  │ ${{ vars.NAME }} (missing $)
-Wrong indentation                │ uses: and with: indent under - name:
-Forgot to mask secrets           │ Always ::add-mask:: before using
+| Mistake                              | Fix                                    |
+|--------------------------------------|----------------------------------------|
+| arn:aws:iam:${{                      | arn:aws:iam::${{ (double colon)        |
+| canceled                             | cancelled (British spelling)           |
+| {{ vars.NAME }}                      | ${{ vars.NAME }} (missing $)           |
+| terraform init                       | terraform init -upgrade                |
+| Hardcoded IP: root@10.0.63.10        | ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} |
+| Mask after jq parsing                | Mask immediately after aws cli fetch   |
+| runs-on: macOS                       | runs-on: mac-mini                      |
+| name: "Setup"                        | name: "2. Setup Service"               |
+| Setup: (job ID)                      | setup: (lowercase)                     |
+| permissions: actions: write          | Remove unless auto-locking needed      |
 
 ================================================================================
-                         COMMENT FORMAT (GUIDE BLOCKS)
+                         CHECKLIST BEFORE COMMIT
 ================================================================================
 
-Use these comment blocks to document each section of your workflow.
+File Structure:
+[ ] File header with ===== separators
+[ ] Section headers with ----- separators
+[ ] Job headers with # ----- separators
+[ ] Description in file header
 
-#### Define Block ####
-─────────────────────────────────────────────────────────────────────────────────
-Place at top of workflow, before name:
+Triggers:
+[ ] workflow_dispatch included
+[ ] Correct branch (dev/prod/dev-security/prod-security)
+[ ] Paths include terraform, ansible, and workflow file
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
-name: "[ENV] Resource"
-on:
-  ...
-#####################
-#####################
+Environment:
+[ ] ENVIRONMENT matches branch
+[ ] TF_WORKING_DIR matches paths
+[ ] ANSIBLE_HOST/ANSIBLE_USER if using SSH
+[ ] No hardcoded IPs in steps
 
-##### Job Core #####
-─────────────────────────────────────────────────────────────────────────────────
-Place before job definition:
+Secrets:
+[ ] API_SECRET masked immediately after fetch
+[ ] All parsed values masked
+[ ] Combined values masked (token_id=token_secret)
 
-jobs:
-##### Job 1 Core #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the manual safe lock trigger for workflow_dispatch
-  # 4. Define the default working directory for all steps in this job
-  deploy:
-    name: "Job Name"
-    runs-on: macOS
-    ...
-#####################
-#####################
+Terraform:
+[ ] terraform init -upgrade
+[ ] timeout-minutes on plan
+[ ] Comment before Review Window
+[ ] Apply uses saved plan file
 
-##### Steps #####
-─────────────────────────────────────────────────────────────────────────────────
-Place before steps, list what each step does:
-
-##### Steps #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the iam role
-  # 3. Fetch the needed secrets expected inside the tf code variables
-  # 4. Initialize Tf working directory
-  # 5. Plan "dry run" the Tf code and out to tfplan
-  # 6. Only appear if plan fail to execute in middle and DB LockID Triggered
-  # 7. Give yourself small window to review the plan output before execute
-  # 8. Apply the planned content inside tfplan file
-  # 9. In case of previous success, display manual instructions
-    steps:
-      ...
-##################################################################################
+Multi-Job:
+[ ] Job names numbered (1., 2., 3.)
+[ ] Job IDs lowercase
+[ ] Subsequent jobs use always() pattern
+[ ] Lock variable documented in job header
 
 ================================================================================
                          QUICK REFERENCE
 ================================================================================
 
-Order:
-name → on → permissions → env → jobs → defaults → steps
+File Order:
+  header → name → on → permissions → env → jobs
 
-Steps:
-checkout → aws auth → fetch secrets → tf init → tf plan → review → tf apply
+Job Order:
+  name → runs-on → needs → if → defaults → steps
+
+Step Order:
+  checkout → aws auth → fetch secrets → tf init → tf plan → review → tf apply
+
+Environment IPs:
+  DEV:  ANSIBLE=10.0.63.10, RUNNER=10.0.63.20
+  PROD: ANSIBLE=10.0.53.10, RUNNER=10.0.53.20
+
+Lock Variables:
+  Infrastructure: {ENV}_INFRA_{NAME}_LOCK
+  Service:        {ENV}_SVC_{NAME}_LOCK
 
 ================================================================================
-
-
-
-Note: 
-
-      51 -      # One-time migration: import route after switching from inline to aws_route resource        
-      52 -      # Comment out after first successful run                                                    
-      53 -      # - name: Import Route (migration)                                                          
-      54 -      #   run: terraform import aws_route.internet $(terraform output -raw                        
-         -rt_public_id)_0.0.0.0/0 || true       

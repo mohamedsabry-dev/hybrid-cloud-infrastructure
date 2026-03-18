@@ -90,7 +90,7 @@ jobs:
           echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3

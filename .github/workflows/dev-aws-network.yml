@@ -60,7 +60,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION_DEV }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
