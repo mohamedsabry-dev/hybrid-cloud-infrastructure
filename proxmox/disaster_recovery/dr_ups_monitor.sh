@@ -71,7 +71,6 @@ Server: $HOSTNAME
 Time: $(date)
 Battery: ${BATTERY_CAPACITY}%
 Status: DISCHARGING - Power may be lost!
-Action: Checking network for 2 minutes before shutdown decision
 EOF
 
     # Ping hosts for 2 minutes (12 checks x 10 seconds)

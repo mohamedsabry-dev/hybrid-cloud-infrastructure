@@ -228,3 +228,13 @@ Steps:
 checkout → aws auth → fetch secrets → tf init → tf plan → review → tf apply
 
 ================================================================================
+
+
+
+Note: 
+
+      51 -      # One-time migration: import route after switching from inline to aws_route resource        
+      52 -      # Comment out after first successful run                                                    
+      53 -      # - name: Import Route (migration)                                                          
+      54 -      #   run: terraform import aws_route.internet $(terraform output -raw                        
+         -rt_public_id)_0.0.0.0/0 || true       
