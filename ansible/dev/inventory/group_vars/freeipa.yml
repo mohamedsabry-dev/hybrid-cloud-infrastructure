@@ -105,3 +105,20 @@ default_bot_user_password: !vault |
           3631
 
 # ansible-vault encrypt_string 'Put password' --name 'default_bot_user_password'
+
+
+hashicorp_vault_users:
+  - name: sabry
+    first: Sabry
+    last: Admin
+    description: "Vault super admin"
+    password: "{{ default_admin_user_password }}"
+    update_password: on_create
+
+  - name: admin
+    first: Domain
+    last: Admin
+    description: "Vault super admin"
+    password: "{{ default_admin_user_password }}"
+    update_password: on_create
+

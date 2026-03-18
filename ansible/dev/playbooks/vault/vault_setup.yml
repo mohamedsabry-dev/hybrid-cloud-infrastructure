@@ -1,7 +1,7 @@
 # Setup, Install, Config, Deploy HashiCorp Vault
 # Save in ansible/dev/playbooks/vault/vault_setup.yml
 ---
-- name: Configure FreeIPA Service Principals for Vault
+- name:  Configure FreeIPA Service Principals for Vault
   hosts: freeipa
   become: yes
   tasks:
@@ -16,6 +16,34 @@
         - vault1.lab.local
         - vault2.lab.local
         - vault3.lab.local
+
+- name:  Configure hashicorp vault user & group on freeipa
+  hosts: freeipa
+  become: yes
+  tasks:
+
+    - name: Create Vault admin users in FreeIPA
+      freeipa.ansible_freeipa.ipauser:
+          ipaadmin_principal: "{{ ipaadmin_principal }}"
+          ipaadmin_password: "{{ ipaadmin_password }}"
+          name: "{{ item.name }}"
+          first: "{{ item.first }}"
+          last: "{{ item.last }}"
+          description: "{{ item.description }}"
+          password: "{{ item.password }}"
+          update_password: "{{ item.update_password }}"
+          state: present
+      no_log: true
+      loop: "{{ hashicorp_vault_users }}"
+
+    - name: Create Vault admins group in FreeIPA
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: vault-admins
+        description: "HashiCorp Vault administrators"
+        user: "{{ hashicorp_vault_users | map(attribute='name') | list }}"
+        state: present
 
 
 - name: Deploy HashiCorp Vault
@@ -121,6 +149,7 @@
     - name: Request signed certificate from FreeIPA
       ansible.builtin.command: >
         ipa-getcert request
+        -w
         -f /opt/vault/tls/tls.crt
         -k /opt/vault/tls/tls.key
         -K vault/{{ inventory_hostname }}
@@ -141,15 +170,16 @@
 
     - name: Deploy vault credentials file
       ansible.builtin.template:
-        src: ../../config_files/vault.env.j2
+        src: templates/vault.env.j2
         dest: /etc/vault.d/vault.env
         owner: vault
         group: vault
         mode: "0600"
+      no_log: true
 
     - name: Deploy Vault configuration
       ansible.builtin.template:
-        src: ../../config_files/vault.hcl.j2
+        src: templates/vault.hcl.j2
         dest: /etc/vault.d/vault.hcl
         owner: vault
         group: vault
