@@ -1,0 +1,5 @@
+# ============================================================================
+# GROUP_VARS/NGINX.YML - Nginx reverse proxy configuration
+# Used by: (future nginx playbooks)
+# ============================================================================
+# Reserved for future use - add nginx-specific variables here

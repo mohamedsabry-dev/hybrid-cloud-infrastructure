@@ -1,3 +1,9 @@
+# ============================================================================
+# SETUP_TOOLS.YML - Install Tools on Local GitHub Runner
+# ============================================================================
+# PURPOSE: Install required tools (AWS CLI) on local GitHub Actions runner
+# USED BY: dev-local-runner-full-setup.yml workflow
+# ============================================================================
 ---
 - name: Setup Needed Tools for Local GH Runner
   hosts: local_runners
