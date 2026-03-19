@@ -232,7 +232,7 @@ Address: 10.0.20.185
 
 ### Problem
 
-Mac Mini (192.168.0.222) on the home network could not access Vault VMs because Vault firewall rules only allow connections from the 10.0.20.0/24 subnet.
+Mac Mini (<HOME_IP>) on the home network could not access Vault VMs because Vault firewall rules only allow connections from the 10.0.20.0/24 subnet.
 
 **Vault Firewall Configuration:**
 ```yaml
@@ -270,7 +270,7 @@ Mode: Hybrid Outbound NAT (or Manual)
 Interface: LAN (where traffic exits to Lab network)
 Address Family: IPv4
 Protocol: Any
-Source: Network → 192.168.0.222/32 (Mac IP)
+Source: Network → <HOME_IP>/32 (Mac IP)
 Destination: Network → 10.0.20.0/24 (Lab subnet)
 Translation Address: 10.0.20.222 (VIP)
 Description: "Masquerade Mac as 10.0.20.222"
@@ -279,7 +279,7 @@ Description: "Masquerade Mac as 10.0.20.222"
 ### Traffic Flow
 
 ```
-Mac Mini (192.168.0.222)
+Mac Mini (<HOME_IP>)
   ↓
 Home Router
   ↓

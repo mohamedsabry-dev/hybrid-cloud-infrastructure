@@ -47,7 +47,7 @@ This guide documents the pfSense firewall configuration to restrict Vault nodes 
 | **Rule 1** | Firewall Pass | SECURE_NO_INTERNET → LOCAL_NETWORKS | Allow internal communication |
 | **Rule 2** | Firewall Block | SECURE_NO_INTERNET → Any | Block internet access |
 | **Mac Mini VIP** | Virtual IP | 10.0.20.222 | NAT translation endpoint |
-| **Outbound NAT** | NAT Rule | 192.168.0.222 → 10.0.20.222 | Mac Mini masquerade |
+| **Outbound NAT** | NAT Rule | <HOME_IP> → 10.0.20.222 | Mac Mini masquerade |
 
 **Vault VM OS Firewall (Host Layer):**
 
@@ -248,7 +248,7 @@ This section covers OS-level firewall (firewalld) configuration on Vault VMs for
 |--------|------------|--------|--------|
 | Internet | Any public IP | Blocked by pfSense + OS FW | ✅ Intended |
 | Home Network | 192.168.0.0/24 | Outside lab subnet | ⚠️ Use NAT |
-| Mac Mini (direct) | 192.168.0.222 | Outside lab subnet | ✅ NAT configured |
+| Mac Mini (direct) | <HOME_IP> | Outside lab subnet | ✅ NAT configured |
 | AWS VPC (future) | TBD | Not in allowed CIDRs | ⚠️ Needs addition |
 
 ### Configuration via Ansible
@@ -319,7 +319,7 @@ rule family="ipv4" source address="10.0.20.193" port port="8201" protocol="tcp" 
 
 #### Issue 1: Mac Mini Direct Access
 
-**Problem:** Mac Mini (192.168.0.222) not in 10.0.20.0/24
+**Problem:** Mac Mini (<HOME_IP>) not in 10.0.20.0/24
 **Solution:** Already resolved with pfSense NAT (appears as 10.0.20.222)
 **Status:** ✅ Working
 
@@ -454,7 +454,7 @@ sudo firewall-cmd --reload
 
 ### Problem Statement
 
-**Issue:** Mac Mini (192.168.0.222) on home network cannot access Vault VMs because Vault OS firewall only allows connections from 10.0.20.0/24 subnet.
+**Issue:** Mac Mini (<HOME_IP>) on home network cannot access Vault VMs because Vault OS firewall only allows connections from 10.0.20.0/24 subnet.
 
 **Solution:** Create Virtual IP and configure Outbound NAT to translate Mac Mini traffic to appear from 10.0.20.222.
 
@@ -482,7 +482,7 @@ sudo firewall-cmd --reload
 - **Interface:** LAN (where traffic exits to Lab)
 - **Address Family:** IPv4
 - **Protocol:** Any
-- **Source:** Network → 192.168.0.222/32 (Mac IP)
+- **Source:** Network → <HOME_IP>/32 (Mac IP)
 - **Destination:** Network → 10.0.20.0/24 (Lab subnet)
 - **Translation Address:** 10.0.20.222 (VIP)
 - **Description:** "Masquerade Mac as 10.0.20.222"
@@ -491,16 +491,16 @@ sudo firewall-cmd --reload
 ### Traffic Flow Diagram
 
 ```
-Mac Mini (192.168.0.222)
+Mac Mini (<HOME_IP>)
     ↓ Sends packet to Vault
 pfSense NAT (translates source)
-    ↓ Rewrites: 192.168.0.222 → 10.0.20.222
+    ↓ Rewrites: <HOME_IP> → 10.0.20.222
 Vault (10.0.20.191)
     ↓ Sees connection from 10.0.20.222
     ✅ Allowed (matches 10.0.20.0/24 firewall rule)
     ↓ Sends reply to 10.0.20.222
 pfSense NAT (un-translates destination)
-    ↓ Rewrites: 10.0.20.222 → 192.168.0.222
+    ↓ Rewrites: 10.0.20.222 → <HOME_IP>
 Mac Mini receives reply
 ```
 
