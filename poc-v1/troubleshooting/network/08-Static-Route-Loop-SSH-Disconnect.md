@@ -46,14 +46,14 @@ Network Topology:
 ```
 Internet
   │
-Physical Router (192.168.0.1)
+Physical Router (<GATEWAY_IP>)
   │
 Windows Laptop (192.168.0.50) ── Wi-Fi/Ethernet ── ESXi Master
   │                                                      │
   └── Static Route: 10.0.0.0/24 via pfSense WAN          │
                                                          │
                                                     pfSense VM
-                                                    WAN: 192.168.0.104
+                                                    WAN: <GATEWAY_IP>04
                                                     LAN: 10.0.0.1
                                                          │
                                                     Internal Network
@@ -64,12 +64,12 @@ Windows Laptop (192.168.0.50) ── Wi-Fi/Ethernet ── ESXi Master
 The Loop Flow:
 --------------
 1. Laptop wants to reach 10.0.0.100 (IPA server)
-2. Laptop has static route: 10.0.0.0/24 → 192.168.0.104 (pfSense WAN)
+2. Laptop has static route: 10.0.0.0/24 → <GATEWAY_IP>04 (pfSense WAN)
 3. Packet sent to pfSense WAN
 4. pfSense routes packet to 10.0.0.100 on LAN
 5. Response comes back from 10.0.0.100
 6. pfSense sends response to laptop via WAN
-7. BUT physical router ALSO has static route: 10.0.0.0/24 → 192.168.0.104
+7. BUT physical router ALSO has static route: 10.0.0.0/24 → <GATEWAY_IP>04
 8. Router intercepts response, sends it back to pfSense
 9. pfSense sees packet destined for 10.0.0.100, routes to LAN
 10. Packet loops between router and pfSense
@@ -94,13 +94,13 @@ Routing decision on physical router for return packet:
 
 Router's routing table:
 - 192.168.0.0/24 → Local network (directly connected)
-- 10.0.0.0/24 → 192.168.0.104 (static route)
+- 10.0.0.0/24 → <GATEWAY_IP>04 (static route)
 
 Router logic:
 - "Destination 192.168.0.50 is in 192.168.0.0/24, should deliver locally"
 - BUT source is 10.0.0.100, which matches 10.0.0.0/24 route
 - Some routers do reverse path filtering (RPF) or source-based routing
-- Router may forward packet to 192.168.0.104 (pfSense) instead of laptop
+- Router may forward packet to <GATEWAY_IP>04 (pfSense) instead of laptop
 - Result: Routing loop
 
 ================================================================================
@@ -116,16 +116,16 @@ tracert 10.0.0.100
 
 Problematic output showing loop:
 ```
-  1    <1 ms    <1 ms    <1 ms  192.168.0.104  (pfSense WAN)
-  2    <1 ms    <1 ms    <1 ms  192.168.0.1    (Router - WRONG!)
-  3    <1 ms    <1 ms    <1 ms  192.168.0.104  (pfSense WAN - Loop!)
-  4    <1 ms    <1 ms    <1 ms  192.168.0.1    (Router - Loop!)
+  1    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>04  (pfSense WAN)
+  2    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>    (Router - WRONG!)
+  3    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>04  (pfSense WAN - Loop!)
+  4    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>    (Router - Loop!)
   5    *        *        *     Request timed out
 ```
 
 Correct output (no loop):
 ```
-  1    <1 ms    <1 ms    <1 ms  192.168.0.104  (pfSense WAN)
+  1    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>04  (pfSense WAN)
   2    1 ms     1 ms     1 ms   10.0.0.100     (IPA Server - Direct!)
 ```
 
@@ -139,7 +139,7 @@ route print
 Look for:
 ```
 Network Destination    Netmask          Gateway       Interface
-10.0.0.0               255.255.255.0    192.168.0.104  192.168.0.50
+10.0.0.0               255.255.255.0    <GATEWAY_IP>04  192.168.0.50
 ```
 
 On Physical Router:
@@ -148,7 +148,7 @@ On Physical Router:
 Look for:
 ```
 Static Routes:
-10.0.0.0/24 → 192.168.0.104
+10.0.0.0/24 → <GATEWAY_IP>04
 ```
 
 If BOTH exist → PROBLEM!
@@ -159,8 +159,8 @@ Navigate to: Diagnostics > Routes
 Look for:
 ```
 10.0.0.0/24 → LAN interface (10.0.0.1)
-192.168.0.0/24 → WAN interface (192.168.0.104)
-default → 192.168.0.1 (router)
+192.168.0.0/24 → WAN interface (<GATEWAY_IP>04)
+default → <GATEWAY_IP> (router)
 ```
 
 Diagnosis 3: Use tcpdump to Observe Loop
@@ -229,19 +229,19 @@ WHY:
 
 CORRECT Configuration:
 ----------------------
-✅ Windows Laptop: Static route 10.0.0.0/24 → 192.168.0.104
+✅ Windows Laptop: Static route 10.0.0.0/24 → <GATEWAY_IP>04
 ❌ Physical Router: NO static route for 10.0.0.0/24
-✅ pfSense: Default route → 192.168.0.1, LAN route → 10.0.0.0/24
+✅ pfSense: Default route → <GATEWAY_IP>, LAN route → 10.0.0.0/24
 
 Solution Implementation
 -----------------------
 
 Step 1: Remove Static Route from Physical Router
 -------------------------------------------------
-Access router admin panel (typically http://192.168.0.1):
+Access router admin panel (typically http://<GATEWAY_IP>):
 
 1. Navigate to: Advanced Settings > Static Routes
-2. Find route: 10.0.0.0/24 → 192.168.0.104
+2. Find route: 10.0.0.0/24 → <GATEWAY_IP>04
 3. Delete the route
 4. Save configuration
 5. Reboot router (if required)
@@ -260,7 +260,7 @@ route print | findstr "10.0.0.0"
 If route doesn't exist, add it:
 ```powershell
 # Add persistent route
-route -p ADD 10.0.0.0 MASK 255.255.255.0 192.168.0.104 METRIC 1
+route -p ADD 10.0.0.0 MASK 255.255.255.0 <GATEWAY_IP>04 METRIC 1
 ```
 
 If route exists but incorrect, delete and re-add:
@@ -269,7 +269,7 @@ If route exists but incorrect, delete and re-add:
 route DELETE 10.0.0.0 MASK 255.255.255.0
 
 # Add correct route
-route -p ADD 10.0.0.0 MASK 255.255.255.0 192.168.0.104 METRIC 1
+route -p ADD 10.0.0.0 MASK 255.255.255.0 <GATEWAY_IP>04 METRIC 1
 ```
 
 Verify:
@@ -280,7 +280,7 @@ route print | findstr "10.0.0.0"
 Expected output:
 ```
 Network Destination    Netmask          Gateway       Interface     Metric
-10.0.0.0               255.255.255.0    192.168.0.104  192.168.0.50   1
+10.0.0.0               255.255.255.0    <GATEWAY_IP>04  192.168.0.50   1
 ```
 
 Step 3: Verify pfSense Routing
@@ -292,7 +292,7 @@ Verify:
 ```
 10.0.0.0/24 → link#2 (LAN interface)
 192.168.0.0/24 → link#1 (WAN interface)
-default → 192.168.0.1 (router)
+default → <GATEWAY_IP> (router)
 ```
 
 On pfSense shell:
@@ -333,12 +333,12 @@ tracert 10.0.0.100
 
 Expected output (2 hops, no loop):
 ```
-  1    <1 ms    <1 ms    <1 ms  192.168.0.104  (pfSense WAN)
+  1    <1 ms    <1 ms    <1 ms  <GATEWAY_IP>04  (pfSense WAN)
   2    1 ms     1 ms     1 ms   10.0.0.100     (IPA Server)
 ```
 
 ✓ Only 2 hops
-✓ No router (192.168.0.1) in the path
+✓ No router (<GATEWAY_IP>) in the path
 ✓ No repeated IPs (no loop)
 
 Test 2: SSH Should Remain Stable
