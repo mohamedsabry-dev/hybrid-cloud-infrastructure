@@ -112,9 +112,15 @@ jobs:
       # Wait for LXC to boot before SSH operations
       - name: Wait for LXC SSH to be ready
         run: |
-          echo "Waiting 2 minutes for LXC to boot..."
-          sleep 120
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "echo SSH ready"
+          echo "Waiting for SSH on ${{ env.ANSIBLE_HOST }}..."
+          for i in {1..30}; do
+            if sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "echo SSH ready"; then
+              echo "SSH is ready after ${i} attempts"
+              break
+            fi
+            echo "Attempt $i: SSH not ready, waiting 10s..."
+            sleep 10
+          done
 
       # Generate SSH key (if not exists) and store public key in AWS
       - name: Generate Ansible SSH Key and Store in AWS
