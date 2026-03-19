@@ -1,5 +1,32 @@
-# In inventory/group_vars/vault_cluster.yml
-# Passwords
+# ============================================================================
+# GROUP_VARS/VAULT_CLUSTER.YML - HashiCorp Vault cluster configuration
+# Used by: playbooks/vault/vault_setup.yml
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# AWS KMS AUTO-UNSEAL CREDENTIALS
+# ----------------------------------------------------------------------------
+# Two approaches available:
+#
+# APPROACH 1: Environment Variable Lookup (ACTIVE - used by GitHub workflows)
+# - Credentials fetched from AWS Secrets Manager during workflow execution
+# - Set via: export VAULT_UNSEAL_ACCESS_KEY=xxx && export VAULT_UNSEAL_SECRET_KEY=xxx
+# - Preferred for CI/CD pipelines
+#
+# APPROACH 2: Ansible Vault Encrypted (COMMENTED - for manual/local testing)
+# - Credentials stored encrypted in this file
+# - Requires: ansible-vault decrypt or vault password file
+# - Useful when running playbooks manually without workflow
+# ----------------------------------------------------------------------------
+
+# APPROACH 1: Environment lookup (active)
+vault_aws_access_key_id: "{{ lookup('env', 'VAULT_UNSEAL_ACCESS_KEY') }}"
+vault_aws_secret_access_key: "{{ lookup('env', 'VAULT_UNSEAL_SECRET_KEY') }}"
+
+# APPROACH 2: Ansible Vault encrypted (for manual testing - uncomment to use)
+# To use: comment out the env lookup above, uncomment below, run with vault password
+#
 # vault_aws_access_key_id: !vault |
 #           $ANSIBLE_VAULT;1.1;AES256
 #           32383163653633326137626537356131306137383861383963393530303730636532623031656561
@@ -7,7 +34,7 @@
 #           39623030323566346431363334626635353932336333633738346230373031343964303536396463
 #           6636303436353934380a353437373134626433326432326636316566383035323362636236646665
 #           37313730616438666133643466376436633236373232346430363865313439396664
-
+#
 # vault_aws_secret_access_key: !vault |
 #           $ANSIBLE_VAULT;1.1;AES256
 #           32313165616137666666613936353831306130373264396333626138373235393762363131363365
@@ -16,6 +43,3 @@
 #           6139633362616164350a366438326539643835326335313761396132666363393361373936616165
 #           39373066353433363932643464393261303963373062396330646632363438353433376336636161
 #           6462646537393930363138656539343137633165346437363261
-
-vault_aws_access_key_id: "{{ lookup('env', 'VAULT_UNSEAL_ACCESS_KEY') }}"
-vault_aws_secret_access_key: "{{ lookup('env', 'VAULT_UNSEAL_SECRET_KEY') }}"

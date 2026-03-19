@@ -1,5 +1,10 @@
-# Setup, Install, Config, Deploy HashiCorp Vault
-# Save in ansible/prod/playbooks/vault/vault_setup.yml
+# ============================================================================
+# VAULT_SETUP.YML - HashiCorp Vault Cluster Deployment
+# ============================================================================
+# PURPOSE: Deploy 3-node Vault HA cluster with TLS and AWS KMS auto-unseal
+# USAGE: ansible-playbook playbooks/vault/vault_setup.yml
+# NOTE: After playbook, run manual init on vault1 (see README.md)
+# ============================================================================
 ---
 - name:  Configure FreeIPA Service Principals for Vault
   hosts: freeipa

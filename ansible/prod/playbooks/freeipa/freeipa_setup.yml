@@ -1,4 +1,10 @@
-# playbooks/freeipa_setup.yml
+# ============================================================================
+# FREEIPA_SETUP.YML - FreeIPA Server Installation
+# ============================================================================
+# PURPOSE: Install and configure FreeIPA identity server
+# USAGE: ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml
+# CREDENTIALS: Injected via environment variables from AWS Secrets Manager
+# ============================================================================
 ---
 - name: Install FreeIPA Server
   hosts: freeipa

@@ -1,0 +1,5 @@
+# ============================================================================
+# GROUP_VARS/K8S_MASTERS.YML - Kubernetes master nodes configuration
+# Used by: (future k8s playbooks)
+# ============================================================================
+# Reserved for future use - add k8s master-specific variables here

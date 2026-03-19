@@ -1,1 +1,15 @@
-In Vault: ├── Create policy: super_admin ├── Create policy: readonly (for other users later) ├── Enable LDAP auth, point to FreeIPA ├── Map vault-admins group → super_admin policy └── Create one local emergency user → super_admin policy
+# ============================================================================
+# VAULT_CONFIG.YML - Vault Policies and Auth Configuration
+# ============================================================================
+# PURPOSE: Configure Vault policies, LDAP auth, and access control
+# STATUS: TODO - To be implemented after vault_setup.yml and manual init
+# ============================================================================
+#
+# PLANNED CONFIGURATION:
+# ├── Create policy: super_admin
+# ├── Create policy: readonly (for other users later)
+# ├── Enable LDAP auth, point to FreeIPA
+# ├── Map vault-admins group → super_admin policy
+# └── Create one local emergency user → super_admin policy
+#
+# ============================================================================
