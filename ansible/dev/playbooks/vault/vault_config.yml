@@ -1,1 +1,61 @@
 In Vault: ├── Create policy: super_admin ├── Create policy: readonly (for other users later) ├── Enable LDAP auth, point to FreeIPA ├── Map vault-admins group → super_admin policy └── Create one local emergency user → super_admin policy
+
+Raw Commands:
+
+0- vault Login : Use root token 
+
+1. Enable Audit Logging
+vault audit enable file file_path=/var/log/vault/audit.log
+
+2. Enable LDAP Auth Method
+vault auth enable ldap
+
+vault write auth/ldap/config \
+  url="ldaps://freeipa.lab.local" \
+  binddn="uid=super_bot,cn=users,cn=accounts,dc=lab,dc=local" \
+  bindpass="your-bot-password" \
+  userdn="cn=users,cn=accounts,dc=lab,dc=local" \
+  userattr="uid" \
+  groupdn="cn=groups,cn=accounts,dc=lab,dc=local" \
+  groupattr="cn" \
+  groupfilter="(member={{.UserDN}})" \
+  certificate=@/etc/ipa/ca.crt \
+  insecure_tls=false \
+  starttls=false
+
+3. Create Policies
+
+# super_admin policy
+vault policy write super_admin - <<EOF
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+EOF
+
+# readonly policy
+vault policy write readonly - <<EOF
+path "secret/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+
+4. Map FreeIPA Group to Policy
+
+vault write auth/ldap/groups/vault-admins \
+  policies=super_admin
+
+5. Create Local Emergency User
+
+vault auth enable userpass
+
+vault write auth/userpass/users/vault-emergency \
+  password="strong-random-password" \
+  policies=super_admin
+
+6. Verify LDAP Login Works
+
+vault login -method=ldap username=sabry
+
+7. Revoke Root Token
+
+vault token revoke <root-token>

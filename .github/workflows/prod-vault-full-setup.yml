@@ -151,6 +151,14 @@ jobs:
           echo "VAULT_UNSEAL_ACCESS_KEY=${ACCESS_KEY}" >> $GITHUB_ENV
           echo "VAULT_UNSEAL_SECRET_KEY=${SECRET_KEY}" >> $GITHUB_ENV
 
+      - name: Fetch FreeIPA Keytab
+        run: |
+          FREEIPA_KEYTAB=$(aws secretsmanager get-secret-value \
+            --secret-id prod/super_bot/keytab \
+            --query SecretString --output text)
+          echo "::add-mask::${FREEIPA_KEYTAB}"
+          echo "FREEIPA_KEYTAB=${FREEIPA_KEYTAB}" >> $GITHUB_ENV
+
       - name: Pull latest code
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin prod"
@@ -158,7 +166,10 @@ jobs:
       - name: Run Vault setup playbook
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+            echo '${{ env.FREEIPA_KEYTAB }}' | base64 -d > /tmp/super_bot.keytab && \
+            kinit super_bot@LAB.LOCAL -k -t /tmp/super_bot.keytab && \
             export VAULT_UNSEAL_ACCESS_KEY='${{ env.VAULT_UNSEAL_ACCESS_KEY }}' && \
             export VAULT_UNSEAL_SECRET_KEY='${{ env.VAULT_UNSEAL_SECRET_KEY }}' && \
             cd /srv/repo/ansible/prod/ && \
-            ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml"
+            ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml && \
+            rm -f /tmp/super_bot.keytab"
