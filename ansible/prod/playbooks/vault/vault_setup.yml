@@ -191,7 +191,7 @@
         group: vault
         mode: "0640"
 
-    - name: Set Vault environment variables        # ← add here
+    - name: Set Vault environment variables
       ansible.builtin.copy:
         dest: /etc/profile.d/vault.sh
         content: |
@@ -208,3 +208,20 @@
         state: started
         enabled: yes
         daemon_reload: yes
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "VAULT SETUP COMPLETE - MANUAL STEPS REQUIRED"
+          - "=============================================="
+          - ""
+          - "1. INITIALIZE VAULT (on vault1 only):"
+          - "   ssh vault1.lab.local"
+          - "   vault operator init -recovery-shares=5 -recovery-threshold=3"
+          - "   Save recovery keys and root token to AWS Secrets Manager!"
+          - ""
+          - "2. RUN CONFIGURATION PLAYBOOK:"
+          - "   ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_config.yml -e 'vault_root_token=hvs.xxxxx'"
+          - ""
+          - "=============================================="
