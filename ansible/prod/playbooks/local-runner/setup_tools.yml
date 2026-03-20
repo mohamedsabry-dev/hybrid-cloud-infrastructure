@@ -1,3 +1,9 @@
+# ============================================================================
+# SETUP_TOOLS.YML - GitHub Runner Tools Installation
+# ============================================================================
+# PURPOSE: Install tools required by GitHub Actions self-hosted runner
+# USAGE: ansible-playbook -i inventory/first_setup_inventory.ini playbooks/local-runner/setup_tools.yml
+# ============================================================================
 ---
 - name: Setup Needed Tools for Local GH Runner
   hosts: local_runners

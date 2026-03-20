@@ -1,3 +1,9 @@
+# ============================================================================
+# TEST.YML - Test Ansible Connectivity
+# ============================================================================
+# PURPOSE: Verify Ansible can connect to all hosts and execute commands
+# USAGE: ansible-playbook playbooks/ansible/test.yml
+# ============================================================================
 ---
 - name: Test Ansible
   hosts: all

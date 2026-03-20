@@ -17,3 +17,13 @@ output "secret_arn" {
   description = "ARN of the Secrets Manager secret containing credentials"
   value       = aws_secretsmanager_secret.vault_unseal_credentials.arn
 }
+
+output "vault_unseal_credentials_arn" {
+  description = "ARN of the Vault KMS unseal credentials secret"
+  value       = aws_secretsmanager_secret.vault_unseal_credentials.arn
+}
+
+output "vault_unseal_keys_arn" {
+  description = "ARN of the Vault recovery keys secret"
+  value       = aws_secretsmanager_secret.vault_unseal_keys.arn
+}

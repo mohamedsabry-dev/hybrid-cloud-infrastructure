@@ -1,0 +1,39 @@
+# ansible/prod/playbooks/vault/templates/vault.hcl.j2
+
+seal "awskms" {
+  region     = "eu-west-2"
+  kms_key_id = "alias/vault-unseal"
+}
+
+# Global Settings
+ui            = true
+disable_mlock = true
+
+# Storage
+storage "raft" {
+  path    = "/opt/vault/data"
+  node_id = "{{ ansible_hostname }}"
+
+  retry_join {
+    leader_api_addr = "https://vault1.lab.local:8200"
+  }
+  retry_join {
+    leader_api_addr = "https://vault2.lab.local:8200"
+  }
+  retry_join {
+    leader_api_addr = "https://vault3.lab.local:8200"
+  }
+}
+
+# Listener
+listener "tcp" {
+  address            = "0.0.0.0:8200"
+  cluster_address    = "0.0.0.0:8201"
+  tls_cert_file      = "/opt/vault/tls/tls.crt"
+  tls_key_file       = "/opt/vault/tls/tls.key"
+  tls_client_ca_file = "/etc/ipa/ca.crt"
+}
+
+# Addresses
+api_addr     = "https://{{ ansible_default_ipv4.address }}:8200"
+cluster_addr = "https://{{ ansible_default_ipv4.address }}:8201"

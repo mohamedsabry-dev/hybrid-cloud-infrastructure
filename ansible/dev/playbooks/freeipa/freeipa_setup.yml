@@ -23,9 +23,10 @@
       - 8.8.8.8
       - 1.1.1.1
 
-    ***REMOVED*** (Injected from AWS Secrets via CI/CD)
+    # (Injected from AWS Secrets via CI/CD)
     ipaadmin_password: "{{ lookup('env', 'IPA_ADMIN_PASSWORD') }}"
     ipadm_password: "{{ lookup('env', 'IPA_DM_PASSWORD') }}"
+    
     freeipa_alias: freeipa
 
   pre_tasks:

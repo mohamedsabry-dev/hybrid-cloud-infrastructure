@@ -1,8 +1,15 @@
-# Dev Local Runner Full Setup - Combined Workflow
-# Combines: infra-local_runner, svc-gh-local_runner, svc-local_runner-tools
-# Each job has its own lock - locked jobs skip to next, not fail whole workflow
+# =============================================================================
+# DEV Local Runner Full Setup
+# =============================================================================
+# Deploys GitHub Actions self-hosted runner LXC and configures it
+# Each job has its own lock - locked jobs skip to next, workflow continues
+# =============================================================================
 
 name: "[DEV] Local Runner - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to dev branch
+# -----------------------------------------------------------------------------
 on:
   workflow_dispatch:
   push:
@@ -10,28 +17,45 @@ on:
       - dev
     paths:
       - 'terraform/dev/proxmox/lxc/local_runner/**'
-      - 'ansible/dev/playbooks/local-runner/setup_tools.yml'
+      - 'ansible/dev/playbooks/local-runner/**'
       - '.github/workflows/dev-local-runner-full-setup.yml'
 
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
 
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: dev
   TF_WORKING_DIR: terraform/dev/proxmox/lxc/local_runner
+  ANSIBLE_HOST: 10.0.63.10
+  ANSIBLE_USER: root
+  LOCAL_RUNNER_HOST: 10.0.63.20
+  LOCAL_RUNNER_USER: root
 
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
 
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy Local Runner LXC
+  # Creates LXC container and generates SSH key for runner
+  # Lock: DEV_INFRA_LOCAL_RUNNER_LOCK
+  # ---------------------------------------------------------------------------
   deploy:
-    name: "1. Deploy local_runner LXC"
+    name: "1. Deploy Local Runner LXC"
     runs-on: mac-mini
     if: ${{ vars.DEV_INFRA_LOCAL_RUNNER_LOCK != 'true' }}
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-
 
     steps:
       - name: Code Checkout
@@ -43,38 +67,34 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_DEV }}
 
-      # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
-          # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
-          # Fetch Ansible SSH public key
           ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
             --secret-id dev/ansible/ssh-public-key \
             --query SecretString --output text)
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "TF_VAR_ssh_public_keys=[\"${ANSIBLE_SSH_KEY}\"]" >> $GITHUB_ENV
 
-          # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id dev/golden-image/lxc-root-password \
             --query SecretString --output text)
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
           echo "TF_VAR_root_password=${LXC_PWD}" >> $GITHUB_ENV
-
 
       - name: Terraform Init
         run: terraform init -upgrade
@@ -83,29 +103,28 @@ jobs:
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
 
-      - name: Generate local_runner SSH Key and Store in AWS
+      # Generate SSH key on local runner and store in AWS
+      - name: Generate Local Runner SSH Key
         run: |
-          # Generate SSH key on local_runner (skip if exists)
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} \
             "test -f ~/.ssh/id_ed25519 || ssh-keygen -q -t ed25519 -C 'local-runner' -f ~/.ssh/id_ed25519 -N ''"
 
-          # Fetch the public key
-          LOCAL_RUNNER_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 "cat ~/.ssh/id_ed25519.pub")
+          LOCAL_RUNNER_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} "cat ~/.ssh/id_ed25519.pub")
           echo "::add-mask::${LOCAL_RUNNER_SSH_KEY}"
 
-          # Update AWS secret
           aws secretsmanager put-secret-value \
             --secret-id dev/local-runner/ssh-public-key \
             --secret-string "${LOCAL_RUNNER_SSH_KEY}" > /dev/null
@@ -113,22 +132,21 @@ jobs:
 
           echo "LOCAL_RUNNER_SSH_KEY=${LOCAL_RUNNER_SSH_KEY}" >> $GITHUB_ENV
 
-      - name: Copy local_runner SSH Key to Ansible LXC
+      # Allow local runner to SSH into Ansible LXC
+      - name: Copy Local Runner SSH Key to Ansible
         run: |
-          # Add local_runner key to Ansible's authorized_keys
-          # Allows GH runner to SSH into Ansible to trigger playbooks
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@10.0.63.10 \
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} \
             "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${LOCAL_RUNNER_SSH_KEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys" > /dev/null
-          echo "local_runner SSH key added to Ansible"
+          echo "Local runner SSH key added to Ansible"
 
-##### Job 2: Setup GH Runner #####
+  # ---------------------------------------------------------------------------
+  # Job 2: Setup GitHub Actions Runner
+  # Installs and configures self-hosted runner service
   # Lock: DEV_SVC_GH_RUNNER_LOCK
-  # Variables required in GitHub repo settings:
-  # - GH_RUNNER_TOKEN: Fresh token from Settings > Actions > Runners (update before running)
-  # - GH_RUNNER_NAME: Runner name (default: dev-local-runner)
-  # - GH_RUNNER_LABELS: Runner labels (default: dev-local-runner)
+  # Required: DEV_GH_RUNNER_TOKEN (fresh token from Settings > Actions > Runners)
+  # ---------------------------------------------------------------------------
   setup:
-    name: "2. Setup GH Runner"
+    name: "2. Setup GitHub Actions Runner"
     runs-on: mac-mini
     needs: deploy
     if: ${{ always() && needs.deploy.result != 'failure' && needs.deploy.result != 'cancelled' && vars.DEV_SVC_GH_RUNNER_LOCK != 'true' }}
@@ -140,7 +158,7 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_DEV }}
 
-      - name: Fetch LXC root password
+      - name: Fetch LXC Password
         run: |
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id dev/golden-image/lxc-root-password \
@@ -148,54 +166,56 @@ jobs:
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
 
-      - name: Install GitHub Runner on LXC
+      # Complex setup: requires root for install, runner user for config
+      - name: Install GitHub Runner
         env:
           RUNNER_TOKEN: ${{ secrets.DEV_GH_RUNNER_TOKEN }}
           RUNNER_NAME: ${{ vars.DEV_GH_RUNNER_NAME }}
           RUNNER_LABELS: ${{ vars.DEV_GH_RUNNER_LABELS }}
         run: |
-          # Stop existing service and clean old config (handles orphaned configs)
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+          # Stop existing service and clean old config
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} \
             "cd /opt/actions-runner 2>/dev/null && ./svc.sh stop 2>/dev/null; ./svc.sh uninstall 2>/dev/null; rm -f .runner .credentials .credentials_rsaparams .service 2>/dev/null; exit 0"
 
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 "
-            # Create runner user (as root)
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} "
+            # Create runner user
             id runner > /dev/null 2>&1 || useradd -m runner
 
-            # Setup directory (as root)
+            # Setup directory
             mkdir -p /opt/actions-runner
             cd /opt/actions-runner
 
-            # Download if not exists (as root)
+            # Download if not exists
             [ -f actions-runner-linux-x64-2.331.0.tar.gz ] || \
               curl -sL -o actions-runner-linux-x64-2.331.0.tar.gz \
               https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-linux-x64-2.331.0.tar.gz
 
-            # Extract (as root)
+            # Extract and set ownership
             tar xzf ./actions-runner-linux-x64-2.331.0.tar.gz
-
-            # Set ownership (as root)
             chown -R runner:runner /opt/actions-runner
 
-            # Copy root SSH keys to runner user (allows runner to SSH to other LXCs)
+            # Copy root SSH keys to runner user
             mkdir -p /home/runner/.ssh
             cp /root/.ssh/id_ed25519 /root/.ssh/id_ed25519.pub /home/runner/.ssh/ 2>/dev/null || true
             chown -R runner:runner /home/runner/.ssh
             chmod 600 /home/runner/.ssh/id_ed25519 2>/dev/null || true
           "
 
-          # Configure runner
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+          # Configure runner (must run as runner user)
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} \
             "su - runner -c 'cd /opt/actions-runner && ./config.sh --unattended --replace --url https://github.com/mohamedsabry-dev/hybrid-cloud-infrastructure --token ${{ secrets.DEV_GH_RUNNER_TOKEN }} --name ${{ vars.DEV_GH_RUNNER_NAME }} --labels ${{ vars.DEV_GH_RUNNER_LABELS }} --work _work'"
 
-          # Install and start service
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.63.20 \
+          # Install and start service (must run as root)
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.LOCAL_RUNNER_USER }}@${{ env.LOCAL_RUNNER_HOST }} \
             "cd /opt/actions-runner && ./svc.sh install runner && ./svc.sh start"
 
-##### Job 3: Install Tools on Local Runner #####
+  # ---------------------------------------------------------------------------
+  # Job 3: Install Tools via Ansible
+  # Installs required tools (terraform, aws cli, etc.) on the runner
   # Lock: DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK
+  # ---------------------------------------------------------------------------
   install-tools:
-    name: "3. Install Tools on Local Runner"
+    name: "3. Install Runner Tools"
     runs-on: dev-local-runner
     needs: setup
     if: ${{ always() && needs.setup.result != 'failure' && needs.setup.result != 'cancelled' && vars.DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK != 'true' }}
@@ -203,10 +223,10 @@ jobs:
     steps:
       - name: Pull latest code
         run: |
-          ssh -o StrictHostKeyChecking=no root@10.0.63.10 "cd /srv/repo/ && git pull origin dev"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin dev"
 
       - name: Run setup_tools playbook
         run: |
-          ssh -o StrictHostKeyChecking=no root@10.0.63.10 "\
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
             cd /srv/repo/ansible/dev && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/local-runner/setup_tools.yml"

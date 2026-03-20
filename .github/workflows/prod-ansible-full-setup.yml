@@ -1,8 +1,15 @@
-# Prod Ansible Full Setup - Combined Workflow
-# Combines: infra-ansible, gh-deploy-key, svc-ansible-setup
-# Each job has its own lock - locked jobs skip to next, not fail whole workflow
+# =============================================================================
+# PROD Ansible Full Setup
+# =============================================================================
+# Deploys Ansible LXC, configures GitHub deploy key, and sets up Ansible
+# Each job has its own lock - locked jobs skip to next, workflow continues
+# =============================================================================
 
 name: "[PROD] Ansible - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod branch
+# -----------------------------------------------------------------------------
 on:
   workflow_dispatch:
   push:
@@ -10,20 +17,35 @@ on:
       - prod
     paths:
       - 'terraform/prod/proxmox/lxc/ansible/**'
-      - 'ansible/prod/**'
+      - 'ansible/prod/playbooks/ansible/**'
       - '.github/workflows/prod-ansible-full-setup.yml'
 
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
 
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/proxmox/lxc/ansible
+  ANSIBLE_HOST: 10.0.53.10
+  ANSIBLE_USER: root
 
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
-  ##### Job 1: Deploy Ansible LXC #####
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy Ansible LXC via Terraform
+  # Creates the container and generates SSH key for Ansible
   # Lock: PROD_INFRA_ANSIBLE_LOCK
+  # ---------------------------------------------------------------------------
   deploy-lxc:
     name: "1. Deploy Ansible LXC"
     runs-on: mac-mini
@@ -48,18 +70,17 @@ jobs:
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id prod/proxmox/terraform-token \
             --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
-          # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
-          # Fetch LXC root password for SSH access
           LXC_PWD=$(aws secretsmanager get-secret-value \
             --secret-id prod/golden-image/lxc-root-password \
             --query SecretString --output text)
@@ -74,23 +95,25 @@ jobs:
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
 
+      # Wait for LXC to boot before SSH operations
       - name: Wait for LXC SSH to be ready
         run: |
-          echo "Waiting for SSH on 10.0.53.10..."
+          echo "Waiting for SSH on ${{ env.ANSIBLE_HOST }}..."
           for i in {1..30}; do
-            if sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@10.0.53.10 "echo SSH ready"; then
+            if sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no -o ConnectTimeout=5 ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "echo SSH ready"; then
               echo "SSH is ready after ${i} attempts"
               break
             fi
@@ -98,24 +121,25 @@ jobs:
             sleep 10
           done
 
+      # Generate SSH key (if not exists) and store public key in AWS
       - name: Generate Ansible SSH Key and Store in AWS
         run: |
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.53.10 \
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} \
             "test -f ~/.ssh/id_ed25519 || ssh-keygen -q -t ed25519 -C 'ansible' -f ~/.ssh/id_ed25519 -N ''"
 
-          # Fetch the public key from Ansible LXC
-          ANSIBLE_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.53.10 "cat ~/.ssh/id_ed25519.pub")
+          ANSIBLE_SSH_KEY=$(sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cat ~/.ssh/id_ed25519.pub")
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
 
-          # Store in AWS Secrets Manager (update existing secret)
           aws secretsmanager put-secret-value \
             --secret-id prod/ansible/ssh-public-key \
             --secret-string "${ANSIBLE_SSH_KEY}" > /dev/null
           echo "Updated secret prod/ansible/ssh-public-key"
 
-  ##### Job 2: Add Deploy Key to GitHub #####
+  # ---------------------------------------------------------------------------
+  # Job 2: Add Deploy Key to GitHub
+  # Enables Ansible to clone the repo via SSH
   # Lock: PROD_SVC_DEPLOY_KEY_LOCK
-  # Runs even if Job 1 was skipped (locked)
+  # ---------------------------------------------------------------------------
   add-deploy-key:
     name: "2. Add Deploy Key"
     runs-on: mac-mini
@@ -137,24 +161,28 @@ jobs:
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "ANSIBLE_SSH_KEY=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
+      # Add deploy key to repo (skip if already exists)
       - name: Add Deploy Key to Repo
         env:
           GH_TOKEN: ${{ secrets.GH_ADMIN_PAT }}
         run: |
-          # Add deploy key (read-write) - skip if already exists
-          if gh api repos/${{ github.repository }}/keys \
-            -f title="ansible-prod" \
-            -f key="${ANSIBLE_SSH_KEY}" \
-            -F read_only=false 2>&1; then
-            echo "Deploy key 'ansible-prod' added successfully"
+          EXISTING=$(gh api repos/${{ github.repository }}/keys --jq '.[] | select(.title=="ansible-prod") | .id')
+          if [ -n "$EXISTING" ]; then
+            echo "Deploy key 'ansible-prod' already exists (ID: $EXISTING)"
           else
-            echo "Deploy key already exists or failed - continuing"
+            gh api repos/${{ github.repository }}/keys \
+              -f title="ansible-prod" \
+              -f key="${ANSIBLE_SSH_KEY}" \
+              -F read_only=false
+            echo "Deploy key 'ansible-prod' added successfully"
           fi
           echo "Ansible can clone via: git clone git@github.com:${{ github.repository }}.git"
 
-  ##### Job 3: Test Deploy Key + Clone Repo #####
-  # Lock: PROD_SVC_DEPLOY_KEY_LOCK (same as Job 2)
-  # Runs even if Job 2 was skipped (locked)
+  # ---------------------------------------------------------------------------
+  # Job 3: Test Deploy Key
+  # Verifies Ansible can clone the repo and pulls latest code
+  # Lock: PROD_SVC_DEPLOY_KEY_LOCK
+  # ---------------------------------------------------------------------------
   test-deploy-key:
     name: "3. Test Git Clone"
     runs-on: mac-mini
@@ -176,14 +204,13 @@ jobs:
           echo "::add-mask::${LXC_PWD}"
           echo "LXC_PWD=${LXC_PWD}" >> $GITHUB_ENV
 
+      # Clone repo to /srv/repo or pull if exists
       - name: Test Pull Prod
         run: |
-          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no root@10.0.53.10 "
-            # Add GitHub host key to known_hosts
+          sshpass -p "${LXC_PWD}" ssh -q -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "
             mkdir -p ~/.ssh
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
-            # Clone or pull repo
             if [ ! -d /srv/repo/.git ]; then
               rm -rf /srv/repo
               git clone -b prod --single-branch git@github.com:${{ github.repository }}.git /srv/repo
@@ -191,9 +218,11 @@ jobs:
             cd /srv/repo && git pull origin prod
           "
 
-  ##### Job 4: Setup Ansible #####
+  # ---------------------------------------------------------------------------
+  # Job 4: Setup Ansible
+  # Installs Ansible and runs the setup playbook
   # Lock: PROD_SVC_ANSIBLE_SETUP_LOCK
-  # Runs even if previous jobs were skipped (locked)
+  # ---------------------------------------------------------------------------
   setup-ansible:
     name: "4. Setup Ansible"
     runs-on: mac-mini
@@ -223,16 +252,16 @@ jobs:
 
       - name: Install Ansible
         run: |
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.53.10 "dnf install -y ansible-core python3-pip"
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "dnf install -y ansible-core python3-pip"
 
       - name: Pull latest code
         run: |
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.53.10 "cd /srv/repo && git pull origin prod"
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo && git pull origin prod"
 
       - name: Setup Vault Password File
         run: |
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.53.10 "echo '${VAULT_PWD}' > ~/.ansible_vault && chmod 600 ~/.ansible_vault"
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "echo '${VAULT_PWD}' > ~/.ansible_vault && chmod 600 ~/.ansible_vault"
 
       - name: Setup Ansible
         run: |
-          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no root@10.0.53.10 "cd /srv/repo/ansible/prod && ansible-playbook -i inventory/first_setup_inventory.ini playbooks/ansible/ansible_setup.yml"
+          sshpass -p "${LXC_PWD}" ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ansible/prod && ansible-playbook -i inventory/first_setup_inventory.ini playbooks/ansible/ansible_setup.yml"

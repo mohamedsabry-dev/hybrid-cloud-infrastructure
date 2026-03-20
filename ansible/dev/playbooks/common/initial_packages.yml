@@ -1,9 +1,0 @@
----
-- name: Install Common Packages
-  hosts: all
-  become: yes
-  tasks:
-    - name: Install Packages
-      ansible.builtin.dnf:
-        name: "{{ initial_packages }}"
-        state: present

@@ -114,6 +114,7 @@ Resources:
             Action:
               - s3:DeleteBucket
               - s3:DeleteBucketPolicy
+              - s3:PutBucketPolicy
             Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
 
   # ============================================================================
@@ -136,6 +137,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -187,7 +194,7 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 4. Terraform State Lock Table
+  # 5. Terraform State Lock Table
   # ============================================================================
   TerraformLockTable:
     Type: AWS::DynamoDB::Table
