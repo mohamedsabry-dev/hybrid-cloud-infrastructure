@@ -1,0 +1,16 @@
+MAC-Mini ~/.ssh/config
+
+Host wg-dev
+      HostName EIP
+      User ec2-user
+      IdentityFile ~/WorkSpace/vpn-key-pair-dev.pem
+                                                                                                            
+Host wg-prod 
+      HostName EIP
+      User ec2-user
+      IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
+
+Host github.com
+  Hostname ssh.github.com
+  Port 443
+  User git

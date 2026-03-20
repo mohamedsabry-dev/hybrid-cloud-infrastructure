@@ -1,43 +1,57 @@
-# Prod network module deployment
-# Triggers on push to prod branch when network files change
+# =============================================================================
+# PROD AWS Network
+# =============================================================================
+# Deploys AWS networking resources (VPC, subnets, route tables, IGW)
+# =============================================================================
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
 name: "[PROD] AWS - Network"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod branch
+# -----------------------------------------------------------------------------
 on:
+  workflow_dispatch:
   push:
     branches:
       - prod
     paths:
       - 'terraform/prod/aws/network/**'
       - '.github/workflows/prod-aws-network.yml'
-  workflow_dispatch:
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/aws/network
-#####################
-#####################
 
-
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy VPC & Networking
+  # Creates VPC, subnets, route tables, and internet gateway
+  # ---------------------------------------------------------------------------
   deploy:
-    name: "Plan & Apply (prod)"
-    runs-on: macOS
+    name: "Deploy VPC & Networking"
+    runs-on: mac-mini
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Code Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -46,17 +60,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
       - name: Terraform Init
-        run: terraform init
-
-      # One-time migration: import route after switching from inline to aws_route resource
-      # Comment out after first successful run
-      - name: Import Route (migration)
-        run: terraform import aws_route.internet $(terraform output -raw rt_public_id)_0.0.0.0/0 || true
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"

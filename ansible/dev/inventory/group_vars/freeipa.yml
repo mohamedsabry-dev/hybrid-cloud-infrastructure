@@ -1,5 +1,15 @@
-ipa_host_groups:  
-    - name: automation_group                                                                                   
+# ============================================================================
+# GROUP_VARS/FREEIPA.YML - FreeIPA server and domain configuration
+# Used by: playbooks/freeipa/domain_config.yml
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# IPA HOST GROUPS
+# Defines logical groupings of hosts within FreeIPA for HBAC and sudo rules
+# ----------------------------------------------------------------------------
+ipa_host_groups:
+    - name: automation_group
       description: "All server hosts managed by Bot User"
       hosts: "{{ ipa_managed_hosts }}"
 
@@ -39,6 +49,11 @@ ipa_host_groups:
       hosts:
         - ex-nginx.lab.local
 
+
+# ----------------------------------------------------------------------------
+# DOMAIN BOT USERS
+# Automation service accounts with passwordless sudo on their assigned hosts
+# ----------------------------------------------------------------------------
 domain_bot_users:
     - name: super_bot                                                                                          
       first: Super
@@ -50,6 +65,10 @@ domain_bot_users:
         - "!authenticate"
 
 
+# ----------------------------------------------------------------------------
+# IPA ADMIN USERS
+# Human admin accounts with sudo access limited to their service hostgroups
+# ----------------------------------------------------------------------------
 ipa_admin_users:
 
     - name: k8s_admin                                                                                          
@@ -88,6 +107,12 @@ ipa_admin_users:
       hostgroups:
         - runner_nodes
 
+
+# ----------------------------------------------------------------------------
+# ANSIBLE VAULT ENCRYPTED PASSWORDS
+# Encrypt with: ansible-vault encrypt_string 'PASSWORD' --name 'variable_name'
+# Decrypt requires: ~/.ansible_vault password file (see ansible.cfg)
+# ----------------------------------------------------------------------------
 default_admin_user_password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           63636137613538623464613331396432313532656365376330383862373662303135306536636363
@@ -104,4 +129,25 @@ default_bot_user_password: !vault |
           3461313365613364650a383532623861663862363665373838653137633464316365363638366536
           3631
 
-# ansible-vault encrypt_string 'Put password' --name 'default_bot_user_password'
+# Command: ansible-vault encrypt_string 'PASSWORD' --name 'default_bot_user_password'
+
+
+# ----------------------------------------------------------------------------
+# HASHICORP VAULT ADMIN USERS
+# FreeIPA users created specifically for Vault UI/API access
+# ----------------------------------------------------------------------------
+hashicorp_vault_users:
+  - name: sabry
+    first: Sabry
+    last: Admin
+    description: "Vault super admin"
+    password: "{{ default_admin_user_password }}"
+    update_password: on_create
+
+  - name: vault_operator
+    first: Vault
+    last: Operator
+    description: "Vault super admin"
+    password: "{{ default_admin_user_password }}"
+    update_password: on_create
+

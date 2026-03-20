@@ -10,13 +10,14 @@ Documentation of issues encountered and resolved during infrastructure setup.
 |----------|-------------|-------|
 | [aws/](aws/) | AWS CloudFormation, IAM issues | 1 |
 | [github/](github/) | GitHub Actions, runners, workflows | 2 |
-| [identity/](identity/) | FreeIPA, Kerberos, authentication | 4 |
-| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 3 |
+| [identity/](identity/) | FreeIPA, Kerberos, authentication | 7 |
+| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 4 |
 | [macos/](macos/) | macOS client configuration | 2 |
 | [network/](network/) | Routing, connectivity issues | 2 |
 | [proxmox/](proxmox/) | Proxmox VE platform issues | 4 |
 | [security/](security/) | Secrets management, incidents | 1 |
 | [terraform/](terraform/) | Terraform IaC issues | 4 |
+| [vault/](vault/) | HashiCorp Vault deployment issues | 8 |
 
 ---
 
@@ -45,6 +46,9 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [19](identity/19-freeipa-dns-configuration-issues.md) | FreeIPA DNS Configuration Issues | DNS recursion denied + forwarders syntax error |
 | [22](identity/22-kerberos-gssapi-requires-hostnames.md) | Kerberos GSSAPI Requires Hostnames | GSSAPI auth fails when using IP addresses |
 | [23](identity/23-freeipa-configuration-requirements.md) | FreeIPA Configuration Requirements | cospriority, server SSSD, UID_MAX gotchas |
+| [33](identity/33-freeipa-dns-recursion-denied.md) | FreeIPA DNS Recursion Denied | BIND defaults to localhost-only recursion |
+| [34](identity/34-freeipa-dns-forwarders-syntax.md) | FreeIPA DNS Forwarders Syntax | ipadnsconfig requires ip_address dict format |
+| [35](identity/35-freeipa-server-sssd-sudo.md) | FreeIPA Server SSSD Sudo | IPA server doesn't use SSSD for sudo lookups |
 
 ---
 
@@ -55,6 +59,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [15](linux/15-rocky-linux-dnf-metadata-error.md) | Rocky Linux DNF Metadata Error | DNF repository metadata download failures |
 | [18](linux/18-lxc-ntp-configuration-disabled.md) | LXC NTP Configuration Disabled | LXC containers inherit time from host, can't run chronyd |
 | [21](linux/21-lxc-uid-mapping-initgroups-error.md) | LXC UID Mapping initgroups Error | FreeIPA default UIDs outside LXC mapped range |
+| [24](linux/24-lxc-chronyd-adjtimex-failure.md) | LXC Chronyd adjtimex Failure | Unprivileged LXC cannot adjust clock, configure host instead |
 
 ---
 
@@ -106,6 +111,21 @@ Documentation of issues encountered and resolved during infrastructure setup.
 
 ---
 
+## Vault
+
+| # | Title | Summary |
+|---|-------|---------|
+| [25](vault/25-vault-gpg-signature-validation-failure.md) | Vault GPG Signature Validation Failure | DNF GPG key not imported into RPM keystore |
+| [26](vault/26-certmonger-force-flag-not-recognized.md) | Certmonger --force Flag Not Recognized | Flag doesn't exist in Rocky Linux 10 certmonger |
+| [27](vault/27-freeipa-ca-rejected-csr-hostname-mismatch.md) | FreeIPA CA Rejected CSR Hostname Mismatch | Certmonger uses short hostname, FreeIPA needs FQDN |
+| [28](vault/28-ansible-cert-ownership-task-file-absent.md) | Ansible Cert Ownership Task File Absent | When condition missing rc != 0 check |
+| [29](vault/29-vault-tls-ip-san-error.md) | Vault TLS IP SAN Error | VAULT_ADDR not set, defaults to 127.0.0.1 |
+| [30](vault/30-ansible-shell-expansion-wrong-node.md) | Ansible Shell Expansion Wrong Node | $(hostname) expands on control node |
+| [31](vault/31-ansible-cert-check-missing-file-fatal.md) | Ansible Cert Check Missing File Fatal | Missing failed_when: false on probe task |
+| [32](vault/32-rpm-postinstall-task-ordering.md) | RPM Post-Install Task Ordering | RPM scripts run before Ansible continues |
+
+---
+
 ## Quick Reference
 
 ### Common Patterns
@@ -118,6 +138,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | SSH with IP fails, hostname works | Kerberos needs FQDN | [22](identity/22-kerberos-gssapi-requires-hostnames.md) |
 | DNS recursion REFUSED | BIND recursion not allowed | [19](identity/19-freeipa-dns-configuration-issues.md) |
 | Chronyd fails on LXC | LXC can't manage time | [18](linux/18-lxc-ntp-configuration-disabled.md) |
+| `adjtimex failed: Operation not permitted` | Unprivileged LXC, configure host | [24](linux/24-lxc-chronyd-adjtimex-failure.md) |
 | LXC snapshot not supported | Mount point on NFS | [16](proxmox/16-proxmox-lxc-snapshot-nfs-mount.md) |
 | `cospriority is required` | Missing password policy priority | [23](identity/23-freeipa-configuration-requirements.md) |
 

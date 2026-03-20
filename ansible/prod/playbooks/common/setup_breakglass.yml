@@ -1,3 +1,10 @@
+# ============================================================================
+# SETUP_BREAKGLASS.YML - Emergency Access User Setup
+# ============================================================================
+# PURPOSE: Create break-glass user with randomly generated password
+# STATUS: TODO - To be implemented
+# USAGE: ansible-playbook playbooks/common/setup_breakglass.yml
+# ============================================================================
 ---
 - name: Setup break-glass user password
   hosts: managed_hosts

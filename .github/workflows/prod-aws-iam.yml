@@ -1,57 +1,58 @@
-# Prod IAM module deployment
-# Triggers on push to prod-security branch when IAM files change
+# =============================================================================
+# PROD AWS IAM
+# =============================================================================
+# Deploys IAM roles and policies for GitHub Actions OIDC authentication
+# Triggers on prod-security branch (security-sensitive changes)
+# =============================================================================
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
 name: "[PROD] AWS - IAM"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod-security branch
+# -----------------------------------------------------------------------------
 on:
+  workflow_dispatch:
   push:
     branches:
       - prod-security
     paths:
       - 'terraform/prod/aws/iam/**'
       - '.github/workflows/prod-aws-iam.yml'
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/aws/iam
-#####################
-#####################
 
-
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
-##### Job 1 Core #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the default working directory for all steps in this job
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy IAM Roles & Policies
+  # Uses TerraformAdmin role (requires elevated permissions for IAM changes)
+  # ---------------------------------------------------------------------------
   deploy:
-    name: "Plan & Apply"
-    runs-on: macOS
+    name: "Deploy IAM Roles & Policies"
+    runs-on: mac-mini
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
-
-##### Steps #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the TerraformAdmin role
-  # 3. Initialize Tf working directory
-  # 4. Plan "dry run" the Tf code and out to tfplan
-  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
-  # 6. Give yourself small window to review the plan output before execute
-  # 7. Apply the planned content inside tfplan file
     steps:
-      - uses: actions/checkout@v4
+      - name: Code Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -59,25 +60,21 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
-      - name: Set Terraform Variables
-        run: |
-          echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID_PROD }}"
-          echo "TF_VAR_prod_account_id=${{ secrets.AWS_ACCOUNT_ID_PROD }}" >> $GITHUB_ENV
-
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
-        run: terraform plan -out=tfplan
+        run: terraform plan -var="prod_account_id=${{ secrets.AWS_ACCOUNT_ID_PROD }}" -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
-          echo "⏳ 3-minute review window started at $(date)"
+          echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
-          
+          echo "Review window ended at $(date)"
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

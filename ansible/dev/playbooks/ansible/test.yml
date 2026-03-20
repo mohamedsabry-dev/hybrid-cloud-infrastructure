@@ -1,5 +1,12 @@
+# ============================================================================
+# TEST.YML - Node Accessibility Test
+# ============================================================================
+# PURPOSE: Verify all nodes are reachable and responding
+# USAGE: Used in ansible-full-setup workflow for validation after setup
+#        Also useful for manual connectivity testing
+# ============================================================================
 ---
-- name: Test Ansible
+- name: Test Ansible Connectivity
   hosts: all
   become: yes
   tasks:
@@ -7,7 +14,7 @@
       ansible.builtin.command:
         cmd: hostnamectl
       register: hostname_output
-# Test
+
     - name: Display Hostname
       ansible.builtin.debug:
         msg: "{{ hostname_output.stdout_lines }}"
