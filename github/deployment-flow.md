@@ -12,16 +12,16 @@ This document describes the complete deployment workflow for the hybrid-cloud-in
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  1. dev-infra-ansible.yml                                                   │
+│  1. dev-ansible-full-setup.yml                                              │
 │     └── Deploy Ansible LXC → Generate SSH key → Store in AWS                │
 │         (dev/ansible/ssh-public-key)                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  2. dev-infra-local_runner.yml                                              │
-│  3. dev-infra-nginx.yml                                                     │
-│  4. dev-infra-vault_cluster.yml                                             │
+│  2. dev-local-runner-full-setup.yml                                         │
+│  3. dev-nginx-full-setup.yml                                                │
+│  4. dev-vault-full-setup.yml                                                │
 │     └── Fetch Ansible SSH key from AWS → Add to authorized_keys             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -30,10 +30,10 @@ This document describes the complete deployment workflow for the hybrid-cloud-in
 
 | Order | Workflow | LXC | IP | VLAN |
 |-------|----------|-----|-----|------|
-| 1 | dev-infra-ansible.yml | ansible | 10.0.63.10 | 63 |
-| 2 | dev-infra-local_runner.yml | local-runner | 10.0.63.20 | 63 |
-| 3 | dev-infra-nginx.yml | ex-nginx | 10.0.65.10 | 65 |
-| 4 | dev-infra-vault_cluster.yml | vault1,2,3 | 10.0.62.10-12 | 62 |
+| 1 | dev-ansible-full-setup.yml | ansible | 10.0.63.10 | 63 |
+| 2 | dev-local-runner-full-setup.yml | local-runner | 10.0.63.20 | 63 |
+| 3 | dev-nginx-full-setup.yml | ex-nginx | 10.0.65.10 | 65 |
+| 4 | dev-vault-full-setup.yml | vault1,2,3 | 10.0.62.10-12 | 62 |
 
 ### SSH Trust (Phase 1 Result)
 
@@ -45,38 +45,26 @@ Ansible (10.0.63.10) ──SSH──► local_runner (10.0.63.20)
 
 ---
 
-## Phase 2: Bootstrap (Setup)
+## Phase 2: Bootstrap & Services
 
-**Runner:** mac-mini (self-hosted)
+**Note:** Bootstrap and service setup are now integrated into `*-full-setup.yml` workflows.
+Each workflow handles both infrastructure deployment and service configuration.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  5. dev-svc-gh_deploy_key.yml                                               │
-│     └── Fetch Ansible SSH key from AWS                                      │
-│     └── Add as GitHub Deploy Key via gh CLI                                 │
+│  dev-ansible-full-setup.yml (4 jobs)                                        │
+│     Job 1: Deploy Ansible LXC (Terraform)                                   │
+│     Job 2: Add Deploy Key to GitHub                                         │
+│     Job 3: Test Git Clone                                                   │
+│     Job 4: Setup Ansible                                                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  6. dev-svc-gh_runner.yml                                                   │
-│     └── Ansible runs playbook on local_runner LXC                           │
-│         ├── Install GitHub Actions runner                                   │
-│         ├── Configure runner with repo token                                │
-│         └── Start runner service                                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Phase 3: Services (Ansible Playbooks)
-
-**Runner:** local_runner LXC (self-hosted, after Phase 2)
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  7. dev-svc-ansible.yml     → Configure Ansible control node itself        │
-│  8. dev-svc-nginx.yml       → Install/configure Nginx reverse proxy        │
-│  9. dev-svc-vault.yml       → Install/configure Vault HA cluster           │
+│  dev-local-runner-full-setup.yml (3 jobs)                                   │
+│     Job 1: Deploy Local Runner LXC (Terraform)                              │
+│     Job 2: Setup GitHub Actions Runner                                      │
+│     Job 3: Install Runner Tools (Ansible)                                   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -86,9 +74,8 @@ Ansible (10.0.63.10) ──SSH──► local_runner (10.0.63.20)
 
 | Phase | Purpose | Runner | Workflow Pattern |
 |-------|---------|--------|------------------|
-| 1. Infrastructure | Deploy LXCs (Terraform) | mac-mini | `dev-infra-*.yml` |
-| 2. Bootstrap | Setup GH runner | mac-mini | `dev-svc-gh_*.yml` |
-| 3. Services | Configure services (Ansible) | local_runner | `dev-svc-*.yml` |
+| Infrastructure + Services | Deploy & Configure | mac-mini / local-runner | `{env}-*-full-setup.yml` |
+| AWS Infrastructure | Deploy AWS resources | mac-mini | `{env}-aws-*.yml` |
 
 ---
 

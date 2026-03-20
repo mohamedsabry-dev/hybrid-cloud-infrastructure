@@ -1,4 +1,12 @@
-# /group_vars/all.yml
+# ============================================================================
+# GROUP_VARS/ALL.YML - Variables applied to all hosts
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# INITIAL PACKAGES
+# Used by: playbooks/common/initial_packages.yml, playbooks/ansible/ansible_setup.yml
+# ----------------------------------------------------------------------------
 initial_packages:
   - vim
   - git
@@ -6,12 +14,30 @@ initial_packages:
   - htop
   - unzip
 
-#### Join Hosts to Domain ####
 
+# ----------------------------------------------------------------------------
+# FREEIPA CLIENT CONFIGURATION
+# Used by: playbooks/freeipa/add_hosts_to_ipa.yml (role: freeipa.ansible_freeipa.ipaclient)
+# ----------------------------------------------------------------------------
 ipaclient_domain: lab.local
 ipaclient_realm: LAB.LOCAL
 ipaclient_servers:
   - freeipa.lab.local
+ipaclient_mkhomedir: yes
+ipaclient_configure_dns_resolver: yes
+ipaclient_dns_servers:
+  - 10.0.60.10
+
+# NTP disabled - LXC containers share kernel time with Proxmox host
+# See troubleshooting/linux/18-lxc-ntp-configuration-disabled.md for full reasoning
+ipaclient_configure_ntp: false
+ipaclient_no_ntp: true
+
+
+# ----------------------------------------------------------------------------
+# FREEIPA ADMIN CREDENTIALS
+# Used by: playbooks/freeipa/freeipa_setup.yml, domain_config.yml, playbooks/vault/vault_setup.yml
+# ----------------------------------------------------------------------------
 ipaadmin_principal: admin
 ipaadmin_password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
@@ -20,15 +46,12 @@ ipaadmin_password: !vault |
           35633238616232633233303566376334376238393862393635613066336231343233366136396139
           3466393934656132650a653136633666663130653633666464323431646631363066623639333837
           3661
-ipaclient_mkhomedir: yes
-ipaclient_configure_dns_resolver: yes
-ipaclient_dns_servers:
-  - 10.0.60.10
-#ipaclient_ntp_servers:
-#  - freeipa.lab.local
-ipaclient_configure_ntp: false
-ipaclient_no_ntp: true  
 
+
+# ----------------------------------------------------------------------------
+# IPA MANAGED HOSTS LIST
+# Used by: group_vars/freeipa.yml (referenced in ipa_host_groups.automation_group)
+# ----------------------------------------------------------------------------
 ipa_managed_hosts:
   - k8s-master1.lab.local
   - k8s-master2.lab.local
@@ -44,4 +67,9 @@ ipa_managed_hosts:
   - ex-nginx.lab.local
   - freeipa.lab.local
 
+
+# ----------------------------------------------------------------------------
+# KUBERNETES CONFIGURATION
+# Used by: (reserved for future k8s playbooks)
+# ----------------------------------------------------------------------------
 k8s_api_vip: 10.0.61.100

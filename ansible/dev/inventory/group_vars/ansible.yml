@@ -1,0 +1,5 @@
+# ============================================================================
+# GROUP_VARS/ANSIBLE.YML - Ansible control node configuration
+# Used by: playbooks/ansible/ansible_setup.yml
+# ============================================================================
+# Reserved for future use - add ansible node-specific variables here

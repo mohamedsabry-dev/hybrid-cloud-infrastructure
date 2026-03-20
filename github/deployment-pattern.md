@@ -84,14 +84,15 @@ workflow runs                 workflow runs         complete
 ## Sample Workflow Structure
 
 ```yaml
-name: "[DEV] Infra - FreeIPA VM"
+name: "[DEV] FreeIPA - Full Setup"
 
 on:
+  workflow_dispatch:
   push:
     branches: [dev]
     paths:
       - 'terraform/dev/proxmox/vms/freeipa/**'
-      - '.github/workflows/dev-infra-freeipa.yml'
+      - '.github/workflows/dev-freeipa-full-setup.yml'
 
 permissions:
   id-token: write
@@ -118,19 +119,19 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_DEV }}
 
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id dev/proxmox/terraform-token \
             --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
-          # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
           echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
@@ -148,6 +149,7 @@ jobs:
         run: |
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
           sleep 180
           echo "Review window ended at $(date)"
 

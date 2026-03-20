@@ -1,0 +1,131 @@
+# ============================================================================
+# VAULT INITIAL CONFIGURATION
+# ============================================================================
+# Run after: vault operator init (manual step, keys saved to AWS)
+#
+# Usage:
+#   ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_config.yml \
+#     -e "vault_root_token=hvs.xxxxx"
+#
+# Note: ldap_bindpass and emergency_password are encrypted in group_vars/vault_cluster.yml
+#       Vault password file configured in ansible.cfg (vault_password_file)
+# ============================================================================
+---
+- name: Initial Configure Vault
+  hosts: vault1.lab.local
+  become: yes
+  environment:
+    VAULT_ADDR: "https://vault1.lab.local:8200"
+    VAULT_TOKEN: "{{ vault_root_token }}"
+    VAULT_CACERT: "/etc/ipa/ca.crt"
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # 1. Enable Audit Logging
+    # --------------------------------------------------------------------------
+    - name: Enable file audit logging
+      ansible.builtin.shell: vault audit enable file file_path=/var/log/vault/audit.log || true
+
+    # --------------------------------------------------------------------------
+    # 2. Enable LDAP Auth Method
+    # --------------------------------------------------------------------------
+    - name: Enable LDAP auth method
+      ansible.builtin.shell: vault auth enable ldap || true
+
+    - name: Configure LDAP auth backend
+      ansible.builtin.shell: |
+        vault write auth/ldap/config \
+          url="ldaps://freeipa.lab.local" \
+          binddn="uid=super_bot,cn=users,cn=accounts,dc=lab,dc=local" \
+          bindpass="{{ ldap_bindpass }}" \
+          userdn="cn=users,cn=accounts,dc=lab,dc=local" \
+          userattr="uid" \
+          groupdn="cn=groups,cn=accounts,dc=lab,dc=local" \
+          groupattr="cn" \
+          groupfilter="(member={{ '{{' }}.UserDN{{ '}}' }})" \
+          certificate=@/etc/ipa/ca.crt \
+          insecure_tls=false \
+          starttls=false
+      no_log: true
+
+    # --------------------------------------------------------------------------
+    # 3. Create Policies
+    # --------------------------------------------------------------------------
+    - name: Create super_admin policy
+      ansible.builtin.shell: |
+        vault policy write super_admin - <<EOF
+        path "*" {
+          capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+        }
+        EOF
+
+    - name: Create readonly policy
+      ansible.builtin.shell: |
+        vault policy write readonly - <<EOF
+        path "secret/*" {
+          capabilities = ["read", "list"]
+        }
+        EOF
+
+    # --------------------------------------------------------------------------
+    # 4. Map FreeIPA Group to Policy
+    # --------------------------------------------------------------------------
+    - name: Map vault-admins group to super_admin policy
+      ansible.builtin.shell: vault write auth/ldap/groups/vault-admins policies=super_admin
+
+    # --------------------------------------------------------------------------
+    # 5. Create Local Emergency User
+    # --------------------------------------------------------------------------
+    - name: Enable userpass auth method
+      ansible.builtin.shell: vault auth enable userpass || true
+
+    - name: Create emergency user
+      ansible.builtin.shell: |
+        vault write auth/userpass/users/vault-emergency \
+          password="{{ emergency_password }}" \
+          policies=super_admin
+      no_log: true
+
+    # --------------------------------------------------------------------------
+    # 6. Verify Configuration
+    # --------------------------------------------------------------------------
+    - name: List enabled auth methods
+      ansible.builtin.shell: vault auth list
+      register: auth_list
+
+    - name: Show auth methods
+      ansible.builtin.debug:
+        var: auth_list.stdout_lines
+
+    - name: List policies
+      ansible.builtin.shell: vault policy list
+      register: policy_list
+
+    - name: Show policies
+      ansible.builtin.debug:
+        var: policy_list.stdout_lines
+
+    # --------------------------------------------------------------------------
+    # 7. Post-Configuration Summary
+    # --------------------------------------------------------------------------
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "VAULT CONFIGURATION COMPLETE"
+          - "=============================================="
+          - ""
+          - "LOGIN COMMANDS:"
+          - "  LDAP user:        vault login -method=ldap username=<user>"
+          - "  Emergency user:   vault login -method=userpass username=vault-emergency"
+          - "  Root token:       vault login <root-token>"
+          - ""
+          - "VERIFY COMMANDS:"
+          - "  vault token lookup"
+          - "  vault auth list"
+          - "  vault policy list"
+          - ""
+          - "REVOKE ROOT TOKEN (after verifying LDAP works):"
+          - "  vault token revoke <root-token>"
+          - ""
+          - "=============================================="

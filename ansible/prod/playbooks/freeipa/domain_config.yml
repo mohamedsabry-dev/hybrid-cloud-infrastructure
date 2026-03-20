@@ -1,3 +1,10 @@
+# ============================================================================
+# DOMAIN_CONFIG.YML - FreeIPA Domain Configuration
+# ============================================================================
+# PURPOSE: Configure users, groups, HBAC rules, and sudo rules in FreeIPA
+# USAGE: ansible-playbook playbooks/freeipa/domain_config.yml
+# PREREQ: Requires kinit admin (or super_bot after initial setup)
+# ============================================================================
 ---
 - name: Setup Domain Groups
   hosts: freeipa

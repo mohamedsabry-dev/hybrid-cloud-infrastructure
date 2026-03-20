@@ -1,57 +1,57 @@
-# Prod KMS Vault Unseal module deployment
-# Triggers on push to prod-security branch when KMS Vault Unseal files change
+# =============================================================================
+# PROD AWS KMS Vault Unseal
+# =============================================================================
+# Deploys KMS key and IAM user for HashiCorp Vault auto-unseal
+# Triggers on prod-security branch (security-sensitive changes)
+# =============================================================================
 
-#### Define Block ####
-# 1. Define the job name on GH UI
-# 2. Define the run condition "On push : Where ?"
-# 3. Define the working directory path on GH Level
-# 4. Declare if will use manual trigger later or not
-# 5. Declare the needed permissions for OIDC Use
-# 6. Declare Env Variables for clean use
 name: "[PROD] AWS - KMS Vault Unseal"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod-security branch
+# -----------------------------------------------------------------------------
 on:
+  workflow_dispatch:
   push:
     branches:
       - prod-security
     paths:
       - 'terraform/prod/aws/kms-vault-unseal/**'
       - '.github/workflows/prod-aws-kms-vault-unseal.yml'
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/aws/kms-vault-unseal
-#####################
-#####################
 
-
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
-##### Job 1 Core #####
-  # 1. Name the job on GH UI
-  # 2. Define which runner to use
-  # 3. Define the default working directory for all steps in this job
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy KMS Key & Unseal User
+  # Uses TerraformAdmin role (requires elevated permissions for KMS/IAM)
+  # ---------------------------------------------------------------------------
   deploy:
-    name: "Plan & Apply"
+    name: "Deploy KMS Key & Unseal User"
     runs-on: mac-mini
 
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
-
-##### Steps #####
-  # 1. Copy Code to the work place
-  # 2. Authenticate with AWS for OIDC and Assume the TerraformAdmin role
-  # 3. Initialize Tf working directory
-  # 4. Plan "dry run" the Tf code and out to tfplan
-  # 5. Only appear if plan fail to execute in middle and DB LockID Triggered
-  # 6. Give yourself small window to review the plan output before execute
-  # 7. Apply the planned content inside tfplan file
     steps:
-      - name: Checkout Code
+      - name: Code Checkout
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
@@ -61,19 +61,20 @@ jobs:
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -upgrade
 
       - name: Terraform Plan
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
           sleep 180
-          echo "✅ Review window ended at $(date)"
+          echo "Review window ended at $(date)"
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

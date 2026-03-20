@@ -305,7 +305,7 @@ Stop-VBRJob -Job $Job
 
 ## Problem: Power Outage Scenarios
 
-- Home router (192.168.0.1): Loses power immediately
+- Home router (<GATEWAY_IP>): Loses power immediately
 - Network switches: Lose power immediately
 - Result: External network (192.168.0.x) unavailable
 
