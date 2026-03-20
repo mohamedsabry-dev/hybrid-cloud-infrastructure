@@ -153,18 +153,20 @@ jobs:
 
       - name: Fetch and Deploy FreeIPA Keytab
         run: |
-          # Try SecretBinary first, fallback to SecretString (base64 encoded)
-          if aws secretsmanager get-secret-value --secret-id dev/super_bot/keytab --query SecretBinary --output text 2>/dev/null | base64 -d > /tmp/super_bot.keytab; then
-            echo "Fetched keytab as SecretBinary"
-          else
-            aws secretsmanager get-secret-value --secret-id dev/super_bot/keytab --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
-            echo "Fetched keytab as SecretString (base64)"
-          fi
-          chmod 600 /tmp/super_bot.keytab
+          # Fetch keytab (stored as base64 SecretString)
+          aws secretsmanager get-secret-value \
+            --secret-id dev/super_bot/keytab \
+            --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
+
+          # Verify file size (should be ~200-400 bytes)
+          ls -la /tmp/super_bot.keytab
 
           # Copy to Ansible host
           scp -o StrictHostKeyChecking=no /tmp/super_bot.keytab ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }}:/tmp/super_bot.keytab
           rm -f /tmp/super_bot.keytab
+
+          # Verify on Ansible host
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "ls -la /tmp/super_bot.keytab && klist -kt /tmp/super_bot.keytab"
 
       - name: Pull latest code
         run: |
