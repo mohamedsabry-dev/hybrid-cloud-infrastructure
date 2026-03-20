@@ -151,13 +151,20 @@ jobs:
           echo "VAULT_UNSEAL_ACCESS_KEY=${ACCESS_KEY}" >> $GITHUB_ENV
           echo "VAULT_UNSEAL_SECRET_KEY=${SECRET_KEY}" >> $GITHUB_ENV
 
-      - name: Fetch FreeIPA Keytab
+      - name: Fetch and Deploy FreeIPA Keytab
         run: |
-          FREEIPA_KEYTAB=$(aws secretsmanager get-secret-value \
-            --secret-id prod/super_bot/keytab \
-            --query SecretString --output text)
-          echo "::add-mask::${FREEIPA_KEYTAB}"
-          echo "FREEIPA_KEYTAB=${FREEIPA_KEYTAB}" >> $GITHUB_ENV
+          # Try SecretBinary first, fallback to SecretString (base64 encoded)
+          if aws secretsmanager get-secret-value --secret-id prod/super_bot/keytab --query SecretBinary --output text 2>/dev/null | base64 -d > /tmp/super_bot.keytab; then
+            echo "Fetched keytab as SecretBinary"
+          else
+            aws secretsmanager get-secret-value --secret-id prod/super_bot/keytab --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
+            echo "Fetched keytab as SecretString (base64)"
+          fi
+          chmod 600 /tmp/super_bot.keytab
+
+          # Copy to Ansible host
+          scp -o StrictHostKeyChecking=no /tmp/super_bot.keytab ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }}:/tmp/super_bot.keytab
+          rm -f /tmp/super_bot.keytab
 
       - name: Pull latest code
         run: |
@@ -166,7 +173,6 @@ jobs:
       - name: Run Vault setup playbook
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
-            echo '${{ env.FREEIPA_KEYTAB }}' | base64 -d > /tmp/super_bot.keytab && \
             kinit super_bot@LAB.LOCAL -k -t /tmp/super_bot.keytab && \
             export VAULT_UNSEAL_ACCESS_KEY='${{ env.VAULT_UNSEAL_ACCESS_KEY }}' && \
             export VAULT_UNSEAL_SECRET_KEY='${{ env.VAULT_UNSEAL_SECRET_KEY }}' && \
