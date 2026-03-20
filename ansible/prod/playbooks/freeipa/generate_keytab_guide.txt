@@ -27,7 +27,7 @@ cat /tmp/super_bot.keytab.b64
 ```bash
 # From machine with AWS access
 aws secretsmanager put-secret-value \
-  --secret-id dev/super_bot/keytab \
+  --secret-id prod/super_bot/keytab \
   --secret-string "$(cat /tmp/super_bot.keytab.b64)"
 ```
 
@@ -43,7 +43,7 @@ kdestroy
 The workflow fetches keytab as base64 SecretString:
 ```yaml
 aws secretsmanager get-secret-value \
-  --secret-id dev/super_bot/keytab \
+  --secret-id prod/super_bot/keytab \
   --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
 ```
 
