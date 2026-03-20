@@ -1,9 +1,8 @@
 #TaskTypePriority1
 
 Backup load test — monitor CPU, RAM, storage during backup run, record observationsObservationMedium2
-Vault cluster mental model map — full setup sequence, TLS, unseal, Raft initDraftHigh3
-
-Check The warning 
+raft backup dir 
+Check The warning TS when craete snapshot it appear
 ()
   Logical volume "snap_vm-2006-disk-0_Before_Vault" created.
   WARNING: You have not turned on protection against thin pools running out of space.

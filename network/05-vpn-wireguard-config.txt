@@ -14,7 +14,7 @@ Environments: Dev + Prod (separate tunnels)
    | Environment | ER605 Tunnel   | AWS Tunnel     | ER605 Port  | AWS Port    |
    +-------------+----------------+----------------+-------------+-------------+
    | Dev         | 172.16.200.1   | 172.16.200.2   | 51820       | 51820       |
-   | Prod        | 172.17.200.1   | 172.17.200.2   | 51821       | 51820       |
+   | Prod        | 172.17.200.1   | 172.17.200.2   | 51830       | 51820       |
    +-------------+----------------+----------------+-------------+-------------+
 
    NOTE: Tunnel IPs are within AWS VPC CIDR to solve ER605 AllowedIPs limitation.
@@ -30,8 +30,8 @@ INTERFACES:
    +----+-------------+------+-------------+----------------+---------+
    | ID | Name        | MTU  | Listen Port | Local IP       | Status  |
    +----+-------------+------+-------------+----------------+---------+
-   | 1  | dev_tunnel  | 1372 | 51820       | 172.16.200.1   | Enabled |
-   | 2  | prod_tunnel | 1372 | 51821       | 172.17.200.1   | Enabled |
+   | 1  | dev_tunnel  | 1420 | 51820       | 172.16.200.1   | Enabled |
+   | 2  | prod_tunnel | 1420 | 51830       | 172.17.200.1   | Enabled |
    +----+-------------+------+-------------+----------------+---------+
 
 PEERS:
@@ -121,7 +121,29 @@ ACL RULES:
    ping 172.17.200.1   # Prod tunnel
 
 ================================================================================
-                         6. RELATED FILES
+                         6. TROUBLESHOOTING
+================================================================================
+
+   ISP/CGNAT PORT BLOCKING:
+   ------------------------
+   Symptom: One tunnel works (dev), other doesn't (prod). AWS tcpdump shows
+            bidirectional packets, but ER605 shows RX: 0 bytes, no handshake.
+
+   Cause:   ISP uses CGNAT (check routing table for 100.64.0.0/10 addresses).
+            ISP may block specific UDP ports at CGNAT level.
+
+   Diagnosis:
+   - AWS tcpdump shows responses being sent back
+   - ER605 peer shows TX bytes but RX: 0 B
+   - Port forwarding/DMZ on ISP router doesn't help
+
+   Solution: Change ER605 Listen Port to a different value (e.g., 51830).
+             AWS side doesn't need changes - it responds to source port.
+
+   Note: Port 51821 was blocked by ISP, changed to 51830 (March 2026).
+
+================================================================================
+                         7. RELATED FILES
 ================================================================================
 
    |- vpn-setup/wireguard-setup.md  - Full setup guide with troubleshooting
