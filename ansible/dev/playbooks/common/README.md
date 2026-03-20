@@ -19,8 +19,18 @@ Combined playbook for initial node preparation. Includes:
 1. **Mirror Fix** - Fixes Rocky Linux repo configuration (required due to old mirror package issues)
 2. **SSH Password Auth** - Enables password authentication on VMs (cloud-init overrides this)
 3. **Initial Packages** - Installs base packages (vim, git, curl, htop, unzip)
+4. **pip** - Installs python3-pip (required for Python packages)
+5. **hvac** - Installs hvac Python library (required for HashiCorp Vault Ansible modules)
 
 **Run first on fresh nodes before FreeIPA enrollment.**
+
+#### Idempotency
+
+The mirror fix section is idempotent:
+- Checks if `#mirrorlist=` exists in repo file (fix already applied)
+- Only runs sed commands if not already fixed
+- Only cleans/rebuilds cache when changes made
+- Re-running shows `skipped` instead of `changed`
 
 ### ntp.yml
 

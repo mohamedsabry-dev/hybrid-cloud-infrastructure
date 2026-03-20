@@ -19,20 +19,28 @@
   become: yes
 
   tasks:
+    - name: Check if mirror fix already applied
+      ansible.builtin.shell: grep -q "^#mirrorlist=" /etc/yum.repos.d/rocky.repo
+      register: mirror_check
+      changed_when: false
+      failed_when: false
+
     - name: Update Rocky Linux repo configuration
       ansible.builtin.shell: |
         sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo
         sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo
         sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo
+      when: mirror_check.rc != 0
 
     - name: Disable extras repo
       ansible.builtin.command: dnf config-manager --set-disabled extras
+      register: extras_result
+      changed_when: "'disabled' not in extras_result.stdout"
+      failed_when: false
 
-    - name: Clean DNF Cache
-      ansible.builtin.command: dnf clean all
-
-    - name: Rebuild DNF Cache
-      ansible.builtin.command:   dnf makecache
+    - name: Clean and rebuild DNF cache
+      ansible.builtin.shell: dnf clean all && dnf makecache
+      when: mirror_check.rc != 0
 
 
 # ----------------------------------------------------------------------------
@@ -67,4 +75,14 @@
     - name: Install Packages
       ansible.builtin.dnf:
         name: "{{ initial_packages }}"
+        state: present
+
+    - name: Install pip
+      ansible.builtin.dnf:
+        name: python3-pip
+        state: present
+
+    - name: Install hvac Python library (required for Vault modules)
+      ansible.builtin.pip:
+        name: hvac
         state: present

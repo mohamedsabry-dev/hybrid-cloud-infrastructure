@@ -158,15 +158,9 @@ jobs:
             --secret-id prod/super_bot/keytab \
             --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
 
-          # Verify file size (should be ~200-400 bytes)
-          ls -la /tmp/super_bot.keytab
-
           # Copy to Ansible host
           scp -o StrictHostKeyChecking=no /tmp/super_bot.keytab ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }}:/tmp/super_bot.keytab
           rm -f /tmp/super_bot.keytab
-
-          # Verify on Ansible host
-          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "ls -la /tmp/super_bot.keytab && klist -kt /tmp/super_bot.keytab"
 
       - name: Pull latest code
         run: |

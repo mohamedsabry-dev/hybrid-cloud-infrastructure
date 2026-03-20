@@ -7,7 +7,7 @@ Playbooks for deploying and configuring HashiCorp Vault HA cluster.
 | Playbook | Purpose | Target |
 |----------|---------|--------|
 | `vault_setup.yml` | Deploy Vault cluster with TLS and KMS unseal | vault_cluster + freeipa |
-| `vault_config.yml` | Configure Vault policies and auth (TODO) | vault_cluster |
+| `vault_config.yml` | Configure Vault auth, policies, LDAP integration | vault1 (single node) |
 
 ## Templates
 
@@ -190,6 +190,111 @@ vault operator raft list-peers
 **Rationale:** Manual unseal requires human intervention every restart. Unacceptable for a 3-node HA cluster. KMS auto-unseal means nodes unseal themselves on restart with zero intervention. Recovery keys only needed if KMS becomes unavailable.
 
 **Trade-off:** Creates dependency on AWS KMS availability. Mitigated by AWS KMS high availability SLA.
+
+### 11. vault_config.yml - Shell vs API Modules
+
+**Decision:** How to implement Vault configuration tasks in Ansible
+
+| Option | Chosen |
+|--------|--------|
+| `community.hashi_vault.vault_write` module (API) | No |
+| `ansible.builtin.shell` with vault CLI | **Yes** |
+
+**Rationale:** Initial attempt with `community.hashi_vault` modules faced multiple issues:
+- Required `hvac` Python library on target nodes
+- Complex idempotency handling (`failed_when` with error message parsing)
+- Re-running playbook caused failures ("path already in use")
+- Jinja2 template conflicts with Vault Go templates (`{{.UserDN}}`)
+
+Shell approach is simpler:
+- Vault CLI is already installed on nodes
+- `|| true` handles "already enabled" cases cleanly
+- Environment variables (`VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_CACERT`) apply to all commands
+- One-time setup playbook doesn't need complex idempotency
+
+**Trade-off:** Shell tasks always show `changed` on re-runs. Acceptable for one-time setup.
+
+### 12. hvac Python Library Dependency
+
+**Decision:** Where to install `hvac` library (required for community.hashi_vault modules)
+
+| Option | Chosen |
+|--------|--------|
+| Install in vault_config.yml pre_tasks | No |
+| Install in ansible_setup.yml (controller only) | No |
+| Install in pre_setup.yml (all nodes) | **Yes** |
+
+**Rationale:** Even though we switched to shell commands, `hvac` and `pip` were added to `pre_setup.yml` for future flexibility. All nodes get the dependency during initial setup.
+
+### 13. Jinja2/Vault Template Escaping
+
+**Decision:** How to handle Vault Go template syntax in Ansible playbooks
+
+**Problem:** Vault LDAP config uses `{{.UserDN}}` which conflicts with Ansible Jinja2 templating.
+
+**Solution:** Escape double braces using Jinja2 literal syntax:
+```yaml
+groupfilter="(member={{ '{{' }}.UserDN{{ '}}' }})"
+```
+
+This outputs literal `{{.UserDN}}` to Vault.
+
+**Note:** Ugly but necessary when mixing templating engines.
+
+### 14. Vault Configuration Idempotency
+
+**Decision:** How to handle re-runs of vault_config.yml
+
+| Approach | Chosen |
+|----------|--------|
+| `changed_when: false` (always report ok) | No |
+| Custom `changed_when` logic per task | No |
+| Default shell behavior (always changed) | **Yes** |
+
+**Rationale:**
+- `changed_when: false` lies about actual changes
+- Custom logic unreliable (vault commands have inconsistent output)
+- For one-time setup, `changed` status is acceptable and honest
+
+**Principle:** Don't optimize idempotency reporting for playbooks that run once.
+
+### 15. Workflow vs Manual Execution
+
+**Decision:** Which playbooks to include in GitHub workflows
+
+| Playbook | Execution | Chosen |
+|----------|-----------|--------|
+| `vault_setup.yml` | GitHub Workflow | **Yes** |
+| `vault_config.yml` | Manual from Ansible node | **Yes** |
+
+**Rationale:**
+
+The project follows a clear separation pattern:
+- **Workflow (automated):** Infrastructure deployment and basic service setup
+- **Manual (ansible node):** Internal configuration that requires judgment or one-time sensitive operations
+
+`vault_setup.yml` is appropriate for workflow because:
+- Deploys infrastructure (service principals, packages, TLS certs)
+- Repeatable and idempotent
+- No sensitive output to capture
+
+`vault_config.yml` stays manual because:
+- Requires `vault operator init` to run first (manual, one-time)
+- Init outputs recovery keys and root token that must be securely captured
+- Configuration may need verification before proceeding
+- Automating init→save-to-AWS→config adds significant complexity with minimal benefit
+- Root token should be revoked after LDAP verification (human judgment)
+
+**Industry Standard:** Vault initialization is almost always manual in production environments. Many organizations require a "key ceremony" with multiple trusted people present. The recovery keys are the most sensitive secrets in the infrastructure.
+
+**Pattern Applied:**
+```
+Workflow: Deploy LXC → Setup Vault → STOP (display manual steps)
+                                        ↓
+Manual:   SSH vault1 → init → save keys → run vault_config.yml
+```
+
+**Trade-off:** Extra manual step after workflow completes. Acceptable for a one-time operation that happens once per cluster lifetime.
 
 ---
 
