@@ -1,0 +1,10 @@
+                                                                                                                 
+  # On FreeIPA server                                                                                              
+  ipa-getkeytab -s freeipa.lab.local -p super_bot -k /tmp/super_bot.keytab                                         
+                           
+  # Test it
+  kinit super_bot@LAB.LOCAL -k -t /tmp/super_bot.keytab
+
+  # Base64 encode
+  base64 -w 0 /tmp/super_bot.keytab
+
