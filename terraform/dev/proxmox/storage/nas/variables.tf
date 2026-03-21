@@ -34,6 +34,27 @@ variable "nas_data" {
   }
 }
 
+variable "backups" {
+  type = object({
+    id        = string
+    server    = string
+    export    = string
+    nodes     = list(string)
+    content   = list(string)
+    keep_last = number
+  })
+  default = {
+    id        = "nas-backups"
+    server    = "10.0.40.120"
+    export    = "/volume1/Backups"
+    nodes     = ["pve-dev"]
+    content   = ["backup", "rootdir"]
+    keep_last = 5
+  }
+}
+
+
+
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"

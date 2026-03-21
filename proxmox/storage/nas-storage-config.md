@@ -59,6 +59,26 @@ Isolated L2 network on FS308GP managed switch (no ER605 routing)
 
 ---
 
+## SMB Share - Configuration Backups
+
+Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
+
+| Setting | Value |
+|---------|-------|
+| Name | Backups |
+| Description | ENV Backup Files |
+| Volume | Volume 1 (EXT4) |
+| Network Recycle Bin | Yes |
+| Admin Only Access | Yes |
+| Anonymous Access | Deny |
+| Permission Mode | Traditional |
+
+**Purpose:** Store Proxmox config backups from both environments. Accessible via SMB from management network only.
+
+**Access:** `smb://10.0.5.120/Backups` (admin credentials required)
+
+---
+
 ## Proxmox Storage Config
 
 **DEV Server** (Datacenter → Storage → Add → NFS):

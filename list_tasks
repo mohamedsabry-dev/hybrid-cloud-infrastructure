@@ -1,9 +1,8 @@
 #TaskTypePriority1
 
 Backup load test — monitor CPU, RAM, storage during backup run, record observationsObservationMedium2
-Vault cluster mental model map — full setup sequence, TLS, unseal, Raft initDraftHigh3
-
-Check The warning 
+raft backup dir 
+Check The warning TS when craete snapshot it appear
 ()
   Logical volume "snap_vm-2006-disk-0_Before_Vault" created.
   WARNING: You have not turned on protection against thin pools running out of space.
@@ -11,3 +10,10 @@ Check The warning
   Logical volume "snap_vm-2006-disk-1_Before_Vault" created.
   WARNING: Sum of all thin volume sizes (<350.03 GiB) exceeds the size of thin pool pve/data and the amount of free space in volume group (16.00 GiB).
 TASK OK
+
+Backup Proxmox config iteself 
+Backup Raft Config cluster
+Save Network BAckup Config ER + Sw to True nas >> Done created Backup shared dir on true nas and saved the ER and sw config there "because they are local in gitignore and not share in the repo " 
+# On the way to do same with proxmox, we make script backup soime important config 
+
+
