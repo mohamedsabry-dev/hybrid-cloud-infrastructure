@@ -65,7 +65,8 @@ echo ">>> [4/9] Installing SSH and security tools..."
 dnf install -y \
     openssh-server \
     openssh-clients \
-    rsyslog
+    rsyslog \
+    firewalld
 
 #-------------------------------------------------------------------------------
 # 5. Install Network Tools
@@ -123,6 +124,10 @@ echo ">>> [8/9] Enabling services..."
 systemctl enable sshd
 systemctl enable rsyslog
 
+# Firewalld: installed but disabled (enable via Ansible if needed)
+systemctl disable firewalld
+echo "NOTE: firewalld installed but disabled. Enable via Ansible if needed."
+
 # Enable root SSH login (can disable later via Ansible if using gandalf)
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
@@ -137,7 +142,7 @@ echo "==========================================================================
 echo ""
 echo "Installed:"
 echo "  - curl, wget, vim, htop, git, tree, jq"
-echo "  - openssh-server/clients, rsyslog"
+echo "  - openssh-server/clients, rsyslog, firewalld (disabled)"
 echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat"
 echo "  - ipa-client (package only, not configured)"
 echo "  - gandalf user (break-glass, in wheel group)"

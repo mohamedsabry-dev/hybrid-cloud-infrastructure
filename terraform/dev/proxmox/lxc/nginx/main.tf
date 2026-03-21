@@ -34,6 +34,7 @@ resource "proxmox_virtual_environment_container" "nginx" {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
     path   = var.mount_points.mount_1.path
+    backup = var.mount_points.mount_1.backup
   }
 
   # Container Settings

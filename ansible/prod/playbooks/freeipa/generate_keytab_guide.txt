@@ -1,0 +1,137 @@
+# Kerberos Keytab Generation Guide
+# For: super_bot@LAB.LOCAL
+# Environment: PROD
+
+## Two Methods
+
+| Method | Password Auth | Keytab Auth | When to Use |
+|--------|---------------|-------------|-------------|
+| Standard (no -r) | Broken | Works | Keytab-only automation |
+| Retrieve (-r) | Works | Works | Need both auth methods |
+
+---
+
+## Method 1: Standard Generation (Keytab-Only)
+
+**WARNING:** This breaks password authentication!
+
+```bash
+# SSH to FreeIPA
+ssh root@freeipa.lab.local
+
+# Get admin ticket
+kinit admin
+
+# Generate keytab (replaces password-derived keys with random keys)
+ipa-getkeytab -s freeipa.lab.local -p super_bot -k /tmp/super_bot.keytab
+
+# Test keytab works
+kinit -k -t /tmp/super_bot.keytab super_bot
+klist
+
+# Password will NOT work after this
+kdestroy
+```
+
+---
+
+## Method 2: Retrieve Existing Keys (Both Auth Methods Work)
+
+**Preserves password authentication.**
+
+```bash
+# SSH to FreeIPA
+ssh root@freeipa.lab.local
+
+# Step 1: Check if current password works
+kinit super_bot
+# If "Password incorrect" -> password is broken, go to Step 2
+# If success -> password works, skip to Step 3
+kdestroy
+
+# Step 2: Reset password (only if Step 1 failed)
+ipa user-mod super_bot --password
+# Enter new password when prompted
+
+# Verify new password works
+kinit super_bot
+kdestroy
+
+# Step 3: Retrieve keytab WITHOUT regenerating keys
+LDAPTLS_CACERT=/etc/ipa/ca.crt ipa-getkeytab -r -p super_bot -k /tmp/super_bot.keytab -D "cn=Directory Manager" -w '<DM_PASSWORD>' -H ldaps://freeipa.lab.local
+
+# Step 4: Verify BOTH work
+kinit super_bot                              # Password - should work
+kdestroy
+kinit -k -t /tmp/super_bot.keytab super_bot  # Keytab - should work
+klist
+kdestroy
+```
+
+---
+
+## Store in AWS Secrets Manager
+
+```bash
+# Encode to base64
+base64 -w 0 /tmp/super_bot.keytab > /tmp/super_bot.keytab.b64
+
+# From machine with AWS access
+aws secretsmanager put-secret-value \
+  --secret-id prod/super_bot/keytab \
+  --secret-string "$(cat /tmp/super_bot.keytab.b64)"
+```
+
+---
+
+## Cleanup
+
+```bash
+rm /tmp/super_bot.keytab /tmp/super_bot.keytab.b64
+kdestroy
+```
+
+---
+
+## Workflow Fetch Method
+
+The workflow fetches keytab as base64 SecretString:
+```yaml
+aws secretsmanager get-secret-value \
+  --secret-id prod/super_bot/keytab \
+  --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
+```
+
+---
+
+## IMPORTANT: Password Changes
+
+If super_bot password is changed:
+1. Existing keytab becomes INVALID
+2. Regenerate keytab using Method 1 or Method 2 above
+3. Update AWS secret with new keytab
+
+---
+
+## Technical Details
+
+**Why does Method 1 break password?**
+
+`ipa-getkeytab` without `-r` generates NEW random Kerberos keys:
+- Updates `krblastpwdchange` timestamp
+- Replaces password-derived keys with random keys
+- Keytab has new random keys → works
+- Password can't derive matching keys → broken
+
+**Why does Method 2 preserve password?**
+
+`ipa-getkeytab -r` retrieves EXISTING keys:
+- Does not regenerate keys
+- Requires Directory Manager privileges
+- Both password-derived keys and keytab have same keys
+
+---
+
+## Troubleshooting
+
+See: `troubleshooting/identity/36-keytab-preauthentication-failed.md`

@@ -13,6 +13,7 @@ output "secret_arns" {
     ipa_admin_password      = aws_secretsmanager_secret.ipa_admin_password.arn
     ipa_dm_password         = aws_secretsmanager_secret.ipa_dm_password.arn
     super_bot_keytab        = aws_secretsmanager_secret.super_bot_keytab.arn
+    ansible_vault_password  = aws_secretsmanager_secret.ansible_vault_password.arn
   }
 }
 
@@ -29,5 +30,6 @@ output "secret_names" {
     ipa_admin_password      = aws_secretsmanager_secret.ipa_admin_password.name
     ipa_dm_password         = aws_secretsmanager_secret.ipa_dm_password.name
     super_bot_keytab        = aws_secretsmanager_secret.super_bot_keytab.name
+    ansible_vault_password  = aws_secretsmanager_secret.ansible_vault_password.name
   }
 }

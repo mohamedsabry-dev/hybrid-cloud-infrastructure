@@ -1,8 +1,15 @@
-# Prod FreeIPA Full Setup - Combined Workflow
-# Combines: infra-freeipa, svc-freeipa-server-setup
-# Each job has its own lock - locked jobs skip to next, not fail whole workflow
+# =============================================================================
+# PROD FreeIPA Full Setup
+# =============================================================================
+# Deploys FreeIPA VM and installs IPA server (Identity/DNS)
+# Each job has its own lock - locked jobs skip to next, workflow continues
+# =============================================================================
 
 name: "[PROD] FreeIPA - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to prod branch
+# -----------------------------------------------------------------------------
 on:
   workflow_dispatch:
   push:
@@ -10,20 +17,35 @@ on:
       - prod
     paths:
       - 'terraform/prod/proxmox/vms/freeipa/**'
-      - 'ansible/prod/**'
+      - 'ansible/prod/playbooks/freeipa/**'
       - '.github/workflows/prod-freeipa-full-setup.yml'
 
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
 permissions:
   id-token: write
   contents: read
 
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
   TF_WORKING_DIR: terraform/prod/proxmox/vms/freeipa
+  ANSIBLE_HOST: 10.0.53.10
+  ANSIBLE_USER: root
 
+# =============================================================================
+# Jobs
+# =============================================================================
 jobs:
-##### Job 1: Deploy FreeIPA VM #####
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy FreeIPA VM via Terraform
+  # Creates the VM from golden image with cloud-init
   # Lock: PROD_INFRA_FREEIPA_LOCK
+  # ---------------------------------------------------------------------------
   deploy-vm:
     name: "1. Deploy FreeIPA VM"
     runs-on: mac-mini
@@ -32,8 +54,6 @@ jobs:
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
-#####################
-#####################
 
     steps:
       - name: Code Checkout
@@ -45,31 +65,28 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
-      # 3. Fetch the needed secrets expected inside the tf code variables
       - name: Fetch Proxmox Secrets
         run: |
           API_SECRET=$(aws secretsmanager get-secret-value \
             --secret-id prod/proxmox/terraform-token \
             --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
 
           TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
           TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
 
-          # Mask BEFORE any use
           echo "::add-mask::${TOKEN_ID}"
           echo "::add-mask::${TOKEN_SECRET}"
-          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"   # mask the combined token too
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
 
           echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
 
-          # Fetch Ansible SSH public key
           ANSIBLE_SSH_KEY=$(aws secretsmanager get-secret-value \
             --secret-id prod/ansible/ssh-public-key \
             --query SecretString --output text)
           echo "::add-mask::${ANSIBLE_SSH_KEY}"
           echo "TF_VAR_ansible_ssh_public_key=${ANSIBLE_SSH_KEY}" >> $GITHUB_ENV
 
-          # Fetch VM root password
           VM_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
             --secret-id prod/golden-image/vm-root-password \
             --query SecretString --output text)
@@ -83,6 +100,7 @@ jobs:
         timeout-minutes: 3
         run: terraform plan -out=tfplan
 
+      # 3-minute pause for manual review before applying
       - name: Review Window
         run: |
           echo "3-minute review window started at $(date)"
@@ -95,18 +113,18 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-##### Job 2: Install FreeIPA Service #####
+  # ---------------------------------------------------------------------------
+  # Job 2: Install FreeIPA Server
+  # Configures IPA domain, DNS, and Kerberos via Ansible
   # Lock: PROD_SVC_FREEIPA_SETUP
-  # Runs if Job 1 succeeded or was skipped (locked), NOT if failed
+  # ---------------------------------------------------------------------------
   install-freeipa:
-    name: "2. Install FreeIPA Service"
+    name: "2. Install FreeIPA Server"
     runs-on: prod-local-runner
     needs: deploy-vm
     if: ${{ always() && needs.deploy-vm.result != 'failure' && needs.deploy-vm.result != 'cancelled' && vars.PROD_SVC_FREEIPA_SETUP != 'true' }}
 
-
     steps:
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -118,27 +136,23 @@ jobs:
           IPA_ADMIN_PASS=$(aws secretsmanager get-secret-value \
             --secret-id prod/freeipa/admin-password \
             --query SecretString --output text)
-
           echo "::add-mask::${IPA_ADMIN_PASS}"
           echo "IPA_ADMIN_PASSWORD=${IPA_ADMIN_PASS}" >> $GITHUB_ENV
-
 
           IPA_LDAP_PASS=$(aws secretsmanager get-secret-value \
             --secret-id prod/freeipa/dm-password \
             --query SecretString --output text)
-
           echo "::add-mask::${IPA_LDAP_PASS}"
           echo "IPA_DM_PASSWORD=${IPA_LDAP_PASS}" >> $GITHUB_ENV
 
-
       - name: Pull latest code
         run: |
-           ssh -o StrictHostKeyChecking=no root@10.0.53.10 "cd /srv/repo/ && git pull origin prod"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin prod"
 
       - name: Run FreeIPA playbook
         run: |
-            ssh -o StrictHostKeyChecking=no root@10.0.53.10 "\
-              export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
-              export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
-              cd /srv/repo/ansible/prod/ && \
-              ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+            export IPA_ADMIN_PASSWORD='${{ env.IPA_ADMIN_PASSWORD }}' && \
+            export IPA_DM_PASSWORD='${{ env.IPA_DM_PASSWORD }}' && \
+            cd /srv/repo/ansible/prod/ && \
+            ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml"

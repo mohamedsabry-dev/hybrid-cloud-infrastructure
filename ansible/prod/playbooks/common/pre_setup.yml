@@ -1,0 +1,88 @@
+# ============================================================================
+# PRE_SETUP.YML - Initial Node Configuration
+# ============================================================================
+# PURPOSE: Prepare nodes with basic configuration before FreeIPA enrollment
+# INCLUDES: Mirror fix, SSH password auth, initial packages
+#
+# NOTE: Run this playbook first on fresh nodes. The baseos fix is required
+#       due to Rocky Linux mirror issues with old package repos.
+#
+# USAGE: ansible-playbook -i inventory/first_setup_inventory.ini playbooks/common/pre_setup.yml
+# ============================================================================
+---
+# ----------------------------------------------------------------------------
+# SECTION 1: Fix Rocky Linux Mirror Configuration
+# Required due to old mirror packages repo issues
+# ----------------------------------------------------------------------------
+- name: Fix Mirror Library
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if mirror fix already applied
+      ansible.builtin.shell: grep -q "^#mirrorlist=" /etc/yum.repos.d/rocky.repo
+      register: mirror_check
+      changed_when: false
+      failed_when: false
+
+    - name: Update Rocky Linux repo configuration
+      ansible.builtin.shell: |
+        sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo
+        sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo
+        sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo
+      when: mirror_check.rc != 0
+
+    - name: Disable extras repo
+      ansible.builtin.command: dnf config-manager --set-disabled extras
+      register: extras_result
+      changed_when: "'disabled' not in extras_result.stdout"
+      failed_when: false
+
+    - name: Clean and rebuild DNF cache
+      ansible.builtin.shell: dnf clean all && dnf makecache
+      when: mirror_check.rc != 0
+
+
+# ----------------------------------------------------------------------------
+# SECTION 2: Enable SSH Password Authentication on VMs
+# Required because cloud-init overrides sshd config during TF template creation
+# ----------------------------------------------------------------------------
+- name: Enable SSH Password Authentication on VMs
+  hosts: k8s_masters,k8s_workers
+  become: yes
+  tasks:
+    - name: Enable PasswordAuthentication in cloud-init sshd config
+      ansible.builtin.replace:
+        path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+        regexp: 'PasswordAuthentication no'
+        replace: 'PasswordAuthentication yes'
+      notify: Restart sshd
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+
+
+# ----------------------------------------------------------------------------
+# SECTION 3: Install Initial Packages
+# ----------------------------------------------------------------------------
+- name: Install Common Packages
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install Packages
+      ansible.builtin.dnf:
+        name: "{{ initial_packages }}"
+        state: present
+
+    - name: Install pip
+      ansible.builtin.dnf:
+        name: python3-pip
+        state: present
+
+    - name: Install hvac Python library (required for Vault modules)
+      ansible.builtin.pip:
+        name: hvac
+        state: present

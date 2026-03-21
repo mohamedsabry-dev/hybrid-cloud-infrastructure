@@ -19,3 +19,16 @@ resource "proxmox_virtual_environment_storage_nfs" "nas_data" {
     keep_last = var.nas_data.keep_last
   }
 }
+
+# Dev Backup
+resource "proxmox_virtual_environment_storage_nfs" "backups" {
+  id      = var.backups.id
+  server  = var.backups.server
+  export  = var.backups.export
+  nodes   = var.backups.nodes
+  content = var.backups.content
+
+  backups {
+    keep_last = var.backups.keep_last
+  }
+}

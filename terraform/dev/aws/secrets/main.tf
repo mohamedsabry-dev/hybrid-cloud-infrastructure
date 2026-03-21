@@ -199,6 +199,3 @@ resource "aws_secretsmanager_secret_version" "ansible_vault_password" {
     ignore_changes = [secret_string]
   }
 }
-
-
-

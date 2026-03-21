@@ -28,6 +28,14 @@ Parameters:
     Type: String
     Default: prod
 
+  StateBucketName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-tf-state-prod
+
+  LockTableName:
+    Type: String
+    Default: hybrid-cloud-infrastructure-tf-state-lock-prod
+
 Rules:
   RegionCheck:
     Assertions:
@@ -49,81 +57,7 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 2. Terraform State Bucket (Prod only)
-  # ============================================================================
-  TerraformStateBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      BucketName: hybrid-cloud-infrastructure-tf-state-prod
-      VersioningConfiguration:
-        Status: Enabled
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        IgnorePublicAcls: true
-        BlockPublicPolicy: true
-        RestrictPublicBuckets: true
-      LifecycleConfiguration:
-        Rules:
-          - Id: ExpireOldVersions
-            Status: Enabled
-            NoncurrentVersionExpiration:
-              NoncurrentDays: 90
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ============================================================================
-  # 3. Terraform State Bucket Policy
-  # ============================================================================
-  TerraformStateBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref TerraformStateBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: DenyNonSSL
-            Effect: Deny
-            Principal: '*'
-            Action: 's3:*'
-            Resource:
-              - !GetAtt TerraformStateBucket.Arn
-              - !Sub "${TerraformStateBucket.Arn}/*"
-            Condition:
-              Bool:
-                aws:SecureTransport: 'false'
-
-  # ============================================================================
-  # 4. Terraform State Lock Table (Prod only)
-  # ============================================================================
-  TerraformLockTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: hybrid-cloud-infrastructure-tf-state-lock-prod
-      BillingMode: PAY_PER_REQUEST
-      DeletionProtectionEnabled: true
-      AttributeDefinitions:
-        - AttributeName: LockID
-          AttributeType: S
-      KeySchema:
-        - AttributeName: LockID
-          KeyType: HASH
-      SSESpecification:
-        SSEEnabled: true
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ============================================================================
-  # 5. Permissions Boundary (Limits ALL roles/users created by Terraform)
+  # 2. Permissions Boundary (Limits ALL roles/users created by Terraform)
   # ============================================================================
   TerraformPermissionsBoundary:
     Type: AWS::IAM::ManagedPolicy
@@ -146,21 +80,6 @@ Resources:
               - iam:UpdateOpenIDConnectProviderThumbprint
               - iam:RemoveClientIDFromOpenIDConnectProvider
             Resource: !Ref GitHubOIDCProvider
-          # Deny modifying Terraform State Bucket
-          - Sid: DenyModifyStateBucket
-            Effect: Deny
-            Action:
-              - s3:DeleteBucket
-              - s3:DeleteBucketPolicy
-              - s3:PutBucketPolicy
-            Resource: !GetAtt TerraformStateBucket.Arn
-          # Deny modifying Lock Table
-          - Sid: DenyModifyLockTable
-            Effect: Deny
-            Action:
-              - dynamodb:DeleteTable
-              - dynamodb:UpdateTable
-            Resource: !GetAtt TerraformLockTable.Arn
           # Deny modifying this permissions boundary
           - Sid: DenyModifyPermissionsBoundary
             Effect: Deny
@@ -182,9 +101,72 @@ Resources:
               - iam:DeleteRolePermissionsBoundary
               - iam:PutRolePermissionsBoundary
             Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/GitHubActions-TerraformAdmin-prod"
+          # Deny modifying Lock Table
+          - Sid: DenyModifyLockTable
+            Effect: Deny
+            Action:
+              - dynamodb:DeleteTable
+              - dynamodb:UpdateTable
+            Resource: !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${LockTableName}"
+          # Deny modifying State Bucket
+          - Sid: DenyModifyStateBucket
+            Effect: Deny
+            Action:
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+              - s3:PutBucketPolicy
+            Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
 
   # ============================================================================
-  # 6. GitHub Actions Terraform Admin Role
+  # 3. Terraform State Bucket (Prod Account)
+  # ============================================================================
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref StateBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  TerraformStateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TerraformStateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTLS
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ============================================================================
+  # 4. GitHub Actions Terraform Admin Role
   # ============================================================================
   GitHubActionsTerraformRole:
     Type: AWS::IAM::Role
@@ -212,7 +194,30 @@ Resources:
           Value: !Ref Environment
 
   # ============================================================================
-  # 7. Admin User (GUI Console Access)
+  # 5. Terraform State Lock Table
+  # ============================================================================
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref LockTableName
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 6. Admin User (GUI Console Access)
   # ============================================================================
   AdminProdUser:
     Type: AWS::IAM::User
@@ -238,15 +243,15 @@ Outputs:
     Export:
       Name: prod-GitHubOIDCProviderArn
 
-  StateBucketName:
-    Value: !Ref TerraformStateBucket
+  PermissionsBoundaryArn:
+    Value: !Ref TerraformPermissionsBoundary
     Export:
-      Name: prod-TerraformStateBucketName
+      Name: prod-TerraformPermissionsBoundaryArn
 
-  StateBucketArn:
-    Value: !GetAtt TerraformStateBucket.Arn
+  GitHubActionsRoleArn:
+    Value: !GetAtt GitHubActionsTerraformRole.Arn
     Export:
-      Name: prod-TerraformStateBucketArn
+      Name: prod-GitHubActionsRoleArn
 
   LockTableName:
     Value: !Ref TerraformLockTable
@@ -258,15 +263,15 @@ Outputs:
     Export:
       Name: prod-TerraformLockTableArn
 
-  PermissionsBoundaryArn:
-    Value: !Ref TerraformPermissionsBoundary
+  StateBucketName:
+    Value: !Ref TerraformStateBucket
     Export:
-      Name: prod-TerraformPermissionsBoundaryArn
+      Name: prod-TerraformStateBucketName
 
-  GitHubActionsRoleArn:
-    Value: !GetAtt GitHubActionsTerraformRole.Arn
+  StateBucketArn:
+    Value: !GetAtt TerraformStateBucket.Arn
     Export:
-      Name: prod-GitHubActionsRoleArn
+      Name: prod-TerraformStateBucketArn
 
   AdminProdUserArn:
     Value: !GetAtt AdminProdUser.Arn

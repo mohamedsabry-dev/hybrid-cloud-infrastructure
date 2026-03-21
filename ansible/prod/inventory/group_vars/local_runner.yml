@@ -1,1 +1,5 @@
-# Local runner specific variables
+# ============================================================================
+# GROUP_VARS/LOCAL_RUNNER.YML - CI/CD runner nodes configuration
+# Used by: playbooks/local-runner/setup_tools.yml
+# ============================================================================
+# Reserved for future use - add runner-specific variables here
