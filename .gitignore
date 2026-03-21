@@ -42,3 +42,6 @@ backup-ER605*.bin
 
 # Switch config backups (contains credentials)
 network/backups/*.cfg
+
+# Device diagnostic logs
+logs/**

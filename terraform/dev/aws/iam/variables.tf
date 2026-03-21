@@ -1,5 +1,11 @@
 # Input variables
 
+variable "environment" {
+  description = "Environment name (dev/prod)"
+  type        = string
+  default     = "dev"
+}
+
 variable "github_repo" {
   description = "GitHub repository in format owner/repo"
   type        = string
@@ -24,8 +30,8 @@ variable "region" {
   default     = "us-east-1"
 }
 
-variable "dev_account_id" {
-  description = "Dev AWS Account ID"
+variable "account_id" {
+  description = "AWS Account ID"
   type        = string
   sensitive   = true
 }

@@ -29,13 +29,13 @@ mkdir -p "${BACKUP_DIR}"
 #-------------------------------------------------------------------------------
 # Core Proxmox Configuration
 #-------------------------------------------------------------------------------
-echo "[1/6] Backing up /etc/pve..."
+echo "[1/9] Backing up /etc/pve..."
 cp -a /etc/pve "${BACKUP_DIR}/"
 
 #-------------------------------------------------------------------------------
 # Network Configuration
 #-------------------------------------------------------------------------------
-echo "[2/6] Backing up network config..."
+echo "[2/9] Backing up network config..."
 mkdir -p "${BACKUP_DIR}/network"
 cp /etc/network/interfaces "${BACKUP_DIR}/network/"
 cp /etc/hosts "${BACKUP_DIR}/network/"
@@ -45,15 +45,45 @@ cp /etc/hostname "${BACKUP_DIR}/network/"
 #-------------------------------------------------------------------------------
 # Storage Configuration
 #-------------------------------------------------------------------------------
-echo "[3/6] Backing up storage config..."
+echo "[3/9] Backing up storage config..."
 mkdir -p "${BACKUP_DIR}/storage"
 cp /etc/fstab "${BACKUP_DIR}/storage/"
 [ -d /etc/lvm ] && cp -a /etc/lvm "${BACKUP_DIR}/storage/"
+# ZFS pool info (if ZFS is used)
+zpool list > "${BACKUP_DIR}/storage/zpool-list.txt" 2>/dev/null || true
+zpool status > "${BACKUP_DIR}/storage/zpool-status.txt" 2>/dev/null || true
+
+#-------------------------------------------------------------------------------
+# Boot & Kernel Configuration
+#-------------------------------------------------------------------------------
+echo "[4/9] Backing up boot/kernel config..."
+mkdir -p "${BACKUP_DIR}/boot"
+[ -f /etc/default/grub ] && cp /etc/default/grub "${BACKUP_DIR}/boot/"
+[ -f /etc/modules ] && cp /etc/modules "${BACKUP_DIR}/boot/"
+[ -d /etc/modprobe.d ] && cp -a /etc/modprobe.d "${BACKUP_DIR}/boot/"
+[ -f /etc/sysctl.conf ] && cp /etc/sysctl.conf "${BACKUP_DIR}/boot/"
+[ -d /etc/sysctl.d ] && cp -a /etc/sysctl.d "${BACKUP_DIR}/boot/"
+
+#-------------------------------------------------------------------------------
+# APT Sources
+#-------------------------------------------------------------------------------
+echo "[5/9] Backing up apt sources..."
+mkdir -p "${BACKUP_DIR}/apt"
+[ -f /etc/apt/sources.list ] && cp /etc/apt/sources.list "${BACKUP_DIR}/apt/"
+[ -d /etc/apt/sources.list.d ] && cp -a /etc/apt/sources.list.d "${BACKUP_DIR}/apt/"
+
+#-------------------------------------------------------------------------------
+# SSH & Access
+#-------------------------------------------------------------------------------
+echo "[6/9] Backing up SSH config..."
+mkdir -p "${BACKUP_DIR}/ssh"
+[ -f /etc/ssh/sshd_config ] && cp /etc/ssh/sshd_config "${BACKUP_DIR}/ssh/"
+[ -f /root/.ssh/authorized_keys ] && cp /root/.ssh/authorized_keys "${BACKUP_DIR}/ssh/"
 
 #-------------------------------------------------------------------------------
 # Cron Jobs
 #-------------------------------------------------------------------------------
-echo "[4/6] Backing up cron jobs..."
+echo "[7/9] Backing up cron jobs..."
 mkdir -p "${BACKUP_DIR}/cron"
 crontab -l > "${BACKUP_DIR}/cron/root-crontab.txt" 2>/dev/null || true
 [ -d /etc/cron.d ] && cp -a /etc/cron.d "${BACKUP_DIR}/cron/"
@@ -61,7 +91,7 @@ crontab -l > "${BACKUP_DIR}/cron/root-crontab.txt" 2>/dev/null || true
 #-------------------------------------------------------------------------------
 # Custom Systemd Services
 #-------------------------------------------------------------------------------
-echo "[5/6] Backing up systemd services..."
+echo "[8/9] Backing up systemd services..."
 mkdir -p "${BACKUP_DIR}/systemd"
 cp /etc/systemd/system/*.service "${BACKUP_DIR}/systemd/" 2>/dev/null || true
 systemctl list-unit-files --state=enabled > "${BACKUP_DIR}/systemd/enabled.txt"
@@ -69,7 +99,7 @@ systemctl list-unit-files --state=enabled > "${BACKUP_DIR}/systemd/enabled.txt"
 #-------------------------------------------------------------------------------
 # System Info
 #-------------------------------------------------------------------------------
-echo "[6/6] Capturing system info..."
+echo "[9/9] Capturing system info..."
 cat > "${BACKUP_DIR}/SYSTEM-INFO.txt" << EOF
 Backup Date: $(date)
 Hostname: ${HOSTNAME}
@@ -138,6 +168,13 @@ fi
 #    cp network/interfaces /etc/network/interfaces
 #    cp network/hosts /etc/hosts
 #    cp storage/fstab /etc/fstab
+#    cp boot/grub /etc/default/grub && update-grub
+#    cp boot/modules /etc/modules
+#    cp -a boot/modprobe.d/* /etc/modprobe.d/
+#    cp -a boot/sysctl.d/* /etc/sysctl.d/
+#    cp -a apt/sources.list* /etc/apt/
+#    cp ssh/sshd_config /etc/ssh/
+#    cp ssh/authorized_keys /root/.ssh/
 #    crontab cron/root-crontab.txt
 #    cp systemd/*.service /etc/systemd/system/ && systemctl daemon-reload
 #
@@ -148,6 +185,7 @@ fi
 # NOTES:
 # - VM/LXC DATA not included - restore from vzdump
 # - Storage paths must exist before starting services
-# - If hardware changed, update /etc/network/interfaces
+# - If hardware changed, update /etc/network/interfaces MAC addresses
+# - Review SYSTEM-INFO.txt for original system state
 #
 #===============================================================================

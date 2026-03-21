@@ -24,8 +24,8 @@ resource "aws_kms_key" "vault_unseal" {
         Effect = "Allow"
         Principal = {
           AWS = [
-            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/admin_dev",
-            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitHubActions-TerraformAdmin-dev"
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.admin_user}",
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitHubActions-TerraformAdmin-${var.environment}"
           ]
         }
         Action = [

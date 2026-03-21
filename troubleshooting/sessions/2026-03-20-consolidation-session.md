@@ -275,3 +275,74 @@ Added `backup = true` to mount_point blocks:
 4. **Don't rely on existing tickets** - Automate kinit in workflows
 5. **Check all disk types in backup** - Mount points default to backup=false
 6. **Mirror configs between environments** - Dev and prod should match
+
+---
+
+## Part 3: AWS Terraform Consolidation (2026-03-21)
+
+### Goal
+Consolidate `terraform/dev/aws` and `terraform/prod/aws` modules so code is identical between environments, with only `variables.tf` and `provider.tf` differing.
+
+### Modules Consolidated
+
+| Module | Files Made Identical | State Migration |
+|--------|---------------------|-----------------|
+| compute | main.tf, outputs.tf | No |
+| network | main.tf, outputs.tf | No |
+| iam | roles.tf, policies.tf, outputs.tf | Yes |
+| secrets | main.tf, outputs.tf | No |
+| kms-vault-unseal | kms.tf, user.tf, secret.tf, outputs.tf | No |
+
+### Naming Convention Change
+Changed from prefix pattern to suffix pattern:
+- Old: `dev-wireguard-sg`, `SecurityBoundary-Dev`
+- New: `wireguard-sg-dev`, `SecurityBoundary-dev`
+
+### IAM State Migration Commands (Executed 2026-03-21)
+```bash
+terraform state mv aws_iam_role.dev_wireguard_ssm aws_iam_role.wireguard_ssm
+terraform state mv aws_iam_role_policy_attachment.dev_wireguard_ssm_core aws_iam_role_policy_attachment.wireguard_ssm_core
+terraform state mv aws_iam_instance_profile.dev_wireguard_ssm aws_iam_instance_profile.wireguard_ssm
+terraform state mv aws_iam_policy.terraform_state_dev aws_iam_policy.terraform_state
+terraform state mv aws_iam_policy.security_boundary_dev aws_iam_policy.security_boundary
+```
+
+### Workflow Execution Order (IMPORTANT)
+
+**After IAM consolidation, run workflows in this order:**
+
+1. **IAM workflow first** - Recreates IAM resources with new names
+2. **Compute workflow second** - Updates EC2 to use new instance profile name
+
+**Why:** Compute module references IAM instance profile via remote state:
+```hcl
+iam_instance_profile = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
+```
+
+Between step 1 and step 2, EC2 temporarily loses SSM Session Manager access (instance profile deleted, new one not yet attached).
+
+### Issues Encountered
+
+#### Security Group Rename Stuck
+- **Problem:** SG rename caused Terraform to get stuck on "Still destroying..."
+- **Cause:** Can't delete SG while attached to EC2 ENI
+- **Fix:** Temporarily assigned default VPC SG via AWS Console, Terraform completed
+- **Prevention:** Uncomment `create_before_destroy` lifecycle block before renaming
+- **Documentation:** `troubleshooting/terraform/40-terraform-security-group-rename-stuck.md`
+
+### Files Updated
+
+**Workflows (removed state migration after execution):**
+- `.github/workflows/dev-aws-iam.yml`
+- `.github/workflows/prod-aws-iam.yml`
+
+**Added troubleshooting:**
+- `troubleshooting/terraform/40-terraform-security-group-rename-stuck.md`
+
+**Updated READMEs with troubleshooting section:**
+- `terraform/dev/aws/compute/README.md`
+- `terraform/prod/aws/compute/README.md`
+
+**Added commented lifecycle block:**
+- `terraform/dev/aws/compute/main.tf`
+- `terraform/prod/aws/compute/main.tf`
