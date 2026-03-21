@@ -1,17 +1,16 @@
 # IAM managed policies
 #
-# 1. TerraformState-Prod         - Read/write prod/* state in S3 + DynamoDB locking
-# 2. SecurityBoundary-Prod       - DENY IAM, CloudTrail, Billing
+# 1. TerraformState    - Read/write ${environment}/* state in S3 + DynamoDB locking
+# 2. SecurityBoundary  - DENY IAM, CloudTrail, Billing
 #
-# Note: Infrastructure role uses AWS managed PowerUserAccess + SecurityBoundary-Prod
-
+# Note: Infrastructure role uses AWS managed PowerUserAccess + SecurityBoundary
 
 # =============================================================================
-# 1. Terraform State Policy (S3 + DynamoDB for prod/* state files)
+# 1. Terraform State Policy (S3 + DynamoDB for state files)
 # =============================================================================
-resource "aws_iam_policy" "terraform_state_prod" {
-  name        = "TerraformState-Prod"
-  description = "Access to Terraform state bucket and lock table for prod environment"
+resource "aws_iam_policy" "terraform_state" {
+  name        = "TerraformState-${var.environment}"
+  description = "Access to Terraform state bucket and lock table for ${var.environment} environment"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -26,14 +25,14 @@ resource "aws_iam_policy" "terraform_state_prod" {
         Resource = "arn:aws:s3:::${var.state_bucket_name}"
       },
       {
-        Sid    = "S3ReadWriteProdState"
+        Sid    = "S3ReadWriteState"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject"
         ]
-        Resource = "arn:aws:s3:::${var.state_bucket_name}/prod/*"
+        Resource = "arn:aws:s3:::${var.state_bucket_name}/${var.environment}/*"
       },
       {
         Sid    = "DynamoDBStateLocking"
@@ -43,7 +42,7 @@ resource "aws_iam_policy" "terraform_state_prod" {
           "dynamodb:PutItem",
           "dynamodb:DeleteItem"
         ]
-        Resource = "arn:aws:dynamodb:${var.region}:${var.prod_account_id}:table/${var.lock_table_name}"
+        Resource = "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.lock_table_name}"
       }
     ]
   })
@@ -52,10 +51,10 @@ resource "aws_iam_policy" "terraform_state_prod" {
 }
 
 # =============================================================================
-# 2. Security Boundary Policy (DENY IAM, CloudTrail, Billing)
+# 2. Security Boundary Policy (DENY IAM, CloudTrail, Billing + bootstrap protection)
 # =============================================================================
-resource "aws_iam_policy" "security_boundary_prod" {
-  name        = "SecurityBoundary-Prod"
+resource "aws_iam_policy" "security_boundary" {
+  name        = "SecurityBoundary-${var.environment}"
   description = "Prevents IAM mutation, CloudTrail, Billing and bootstrap resource modification"
 
   policy = jsonencode({
@@ -116,7 +115,7 @@ resource "aws_iam_policy" "security_boundary_prod" {
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = [
-          "arn:aws:iam::${var.prod_account_id}:role/prod-wireguard-ssm-role"
+          "arn:aws:iam::${var.account_id}:role/wireguard-ssm-role-${var.environment}"
         ]
         Condition = {
           StringEquals = {
@@ -130,7 +129,7 @@ resource "aws_iam_policy" "security_boundary_prod" {
         Effect   = "Deny"
         Action   = "iam:PassRole"
         NotResource = [
-          "arn:aws:iam::${var.prod_account_id}:role/prod-wireguard-ssm-role"
+          "arn:aws:iam::${var.account_id}:role/wireguard-ssm-role-${var.environment}"
         ]
       },
       # Block CloudTrail
