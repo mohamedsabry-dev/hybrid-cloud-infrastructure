@@ -103,6 +103,7 @@ variable "mount_points" {
     volume = string
     size   = string
     path   = string
+    backup = bool
   }))
 
   default = {
@@ -110,6 +111,7 @@ variable "mount_points" {
       volume = "local-lvm"
       size   = "5G"
       path   = "/opt/nginx"
+      backup = true
     }
   }
 }

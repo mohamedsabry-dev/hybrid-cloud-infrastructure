@@ -1,4 +1,9 @@
-# /playbooks/ansible_setup.yml
+# ============================================================================
+# ANSIBLE_SETUP.YML - Ansible Control Node Setup
+# ============================================================================
+# PURPOSE: Install packages and Ansible Galaxy collections on the ansible node
+# USAGE: ansible-playbook playbooks/ansible/ansible_setup.yml
+# ============================================================================
 ---
 - name: Install Common Packages
   hosts: localhost
@@ -12,5 +17,5 @@
 
     - name: Install Ansible Collections
       ansible.builtin.command:
-        cmd: ansible-galaxy collection install -r /srv/repo/ansible/prod/requirements.yml --upgrade
+        cmd: ansible-galaxy collection install -r /srv/repo/ansible/prod/playbooks/ansible/templates/requirements.yml --upgrade
       changed_when: true

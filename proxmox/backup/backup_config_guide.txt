@@ -1,0 +1,161 @@
+# Proxmox Backup Configuration
+
+## How to Create/Edit Backup Job (Web UI)
+
+### Create New Backup Job
+
+1. Go to **Datacenter** → **Backup** → Click **Add**
+2. Configure:
+   - **Node:** Select target node (pve-dev or pve-prod)
+   - **Storage:** Select backup storage (nas-dev-data or nas-prod-data)
+   - **Schedule:** Set days and time (e.g., thu,sat 21:00)
+   - **Selection mode:** All (to backup everything on node)
+   - **Mode:** Snapshot
+   - **Compression:** ZSTD
+3. Click **Retention** tab → Set retention policy if needed
+4. Click **Create**
+
+### Enable repeat-missed (Critical for Laptops)
+
+1. Go to **Datacenter** → **Backup**
+2. Select the backup job → Click **Edit**
+3. Scroll down → Check **Repeat missed** checkbox
+4. Click **OK**
+
+### Verify Backup Includes All Disks
+
+1. Go to **Datacenter** → **Backup**
+2. Select backup job → Click **Job Detail**
+3. Check **Included disks** section
+4. All disks should show **Yes** under "Backup Job"
+5. If mp0 shows "No - Disabled" → See LXC mount point fix below
+
+### Enable Backup on LXC Mount Points
+
+1. Go to **Datacenter** → Select LXC container
+2. Click **Resources** tab
+3. Double-click **mp0** (or other mount point)
+4. Check **Backup** checkbox
+5. Click **OK**
+
+Note: This is now managed via Terraform (`backup = true` in mount_point block)
+
+---
+
+## DEV Environment (pve-dev)
+
+**Job ID:** backup-769f8091-c41c
+**Location:** `/etc/pve/jobs.cfg`
+
+```
+vzdump: backup-769f8091-c41c
+        schedule thu,sat 21:00
+        all 1
+        compress zstd
+        enabled 1
+        fleecing 0
+        mailnotification always
+        mailto mohamedsabry.dev@gmail.com
+        mode snapshot
+        node pve-dev
+        notes-template {{guestname}}, {{node}}, {{vmid}}
+        notification-mode legacy-sendmail
+        repeat-missed 1
+        storage nas-dev-data
+```
+
+---
+
+## PROD Environment (pve-prod)
+
+**Job ID:** backup-23446773-fa34
+**Location:** `/etc/pve/jobs.cfg`
+
+```
+vzdump: backup-23446773-fa34
+        schedule thu,sat 21:00
+        all 1
+        compress zstd
+        enabled 1
+        fleecing 0
+        mailnotification always
+        mailto mohamedsabry.dev@gmail.com
+        mode snapshot
+        node pve-prod
+        notes-template {{guestname}}, {{node}}, {{vmid}}
+        notification-mode legacy-sendmail
+        repeat-missed 1
+        storage nas-prod-data
+```
+
+---
+
+## Key Settings Explained
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `schedule` | `thu,sat 21:00` | Runs Thursday and Saturday at 9 PM |
+| `all` | `1` | Backup all VMs/LXCs on the node |
+| `compress` | `zstd` | Use zstd compression (fast + good ratio) |
+| `mode` | `snapshot` | Live snapshot backup (no downtime) |
+| `repeat-missed` | `1` | **CRITICAL** - Retry backup if node was offline |
+| `storage` | `nas-*-data` | Backup to NAS storage |
+| `mailnotification` | `always` | Email on success and failure |
+
+---
+
+## Storage Locations
+
+| Environment | Storage | Path |
+|-------------|---------|------|
+| DEV | nas-dev-data | NFS mount to ASUSTOR NAS |
+| PROD | nas-prod-data | NFS mount to ASUSTOR NAS |
+
+---
+
+## Important Notes
+
+### repeat-missed Setting
+
+This is **critical** for laptop-based Proxmox hosts:
+- Laptops may be closed/sleeping during scheduled backup time
+- Without `repeat-missed 1`, backup is simply skipped
+- With `repeat-missed 1`, backup runs when laptop wakes up
+
+**Always ensure this is enabled!**
+
+### Restore Commands
+
+```bash
+# List containers
+pct list
+
+# List available backups
+ls -la /mnt/nas-dev-data/dump/ | grep vzdump
+
+# Stop container before restore
+pct stop <ctid>
+
+# Restore from backup
+pct restore <ctid> /path/to/backup.tar.zst --storage local-lvm
+
+# Or via Web UI
+# Datacenter → Storage → nas-*-data → Backups → Select → Restore
+```
+
+### Manual Backup
+
+```bash
+# Backup single container
+vzdump <ctid> --storage nas-dev-data --compress zstd --mode snapshot
+
+# Backup all
+vzdump --all --storage nas-dev-data --compress zstd --mode snapshot
+```
+
+---
+
+## Troubleshooting
+
+- Backup missed and not retried: `troubleshooting/proxmox/37-proxmox-backup-missed-not-retried.md`
+- LXC mount points not backed up: `troubleshooting/proxmox/38-lxc-mount-point-backup-disabled.md`

@@ -1,29 +1,30 @@
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket = "hybrid-cloud-infrastructure-tf-state-prod"
-    key    = "prod/aws/network/terraform.tfstate"
-    region = "eu-west-2"
+    bucket = var.remote_state_bucket
+    key    = "${var.environment}/aws/network/terraform.tfstate"
+    region = var.remote_state_region
   }
 }
 
 data "terraform_remote_state" "iam" {
   backend = "s3"
   config = {
-    bucket = "hybrid-cloud-infrastructure-tf-state-prod"
-    key    = "prod/aws/iam/terraform.tfstate"
-    region = "eu-west-2"
+    bucket = var.remote_state_bucket
+    key    = "${var.environment}/aws/iam/terraform.tfstate"
+    region = var.remote_state_region
   }
 }
 
 
+
 resource "aws_security_group" "wireguard" {
-  name        = "prod-wireguard-sg"
+  name        = "wireguard-sg-${var.environment}"
   description = "WireGuard VPN EC2 security group"
   vpc_id      = data.terraform_remote_state.network.outputs.vpc_id
 
   tags = {
-    Name = "prod-wireguard-sg"
+    Name = "wireguard-sg-${var.environment}"
   }
 }
 
@@ -32,8 +33,8 @@ resource "aws_vpc_security_group_ingress_rule" "wireguard_udp" {
   security_group_id = aws_security_group.wireguard.id
   cidr_ipv4         = var.allowed_ip
   ip_protocol       = "udp"
-  from_port         = 51820
-  to_port           = 51820
+  from_port         = var.wireguard_port
+  to_port           = var.wireguard_port
 }
 
 # SSH access for management
@@ -52,14 +53,14 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
 }
 
 resource "aws_key_pair" "vpn" {
-  key_name   = "vpn-key-pair-prod"
+  key_name   = "vpn-key-pair-${var.environment}"
   public_key = var.vpn_public_key
 }
 
 resource "aws_instance" "wireguard" {
-  ami                    = "ami-087c9ba923d9765d8"
-  instance_type          = "t2.micro"
-  availability_zone      = "eu-west-2a"
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  availability_zone      = var.availability_zone
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
   key_name               = aws_key_pair.vpn.key_name
@@ -79,7 +80,7 @@ resource "aws_instance" "wireguard" {
   EOF
 
   tags = {
-    Name = "prod-wireguard"
+    Name = "wireguard-${var.environment}"
   }
 }
 
@@ -87,7 +88,7 @@ resource "aws_eip" "wireguard" {
   domain = "vpc"
 
   tags = {
-    Name = "prod-wireguard-eip"
+    Name = "wireguard-eip-${var.environment}"
   }
 }
 
@@ -98,6 +99,7 @@ resource "aws_eip_association" "wireguard" {
 
 resource "aws_route" "home_subnets" {
   route_table_id         = data.terraform_remote_state.network.outputs.rt_public_id
-  destination_cidr_block = "10.0.0.0/16"
+  destination_cidr_block = var.home_cidr
   network_interface_id   = aws_instance.wireguard.primary_network_interface_id
 }
+

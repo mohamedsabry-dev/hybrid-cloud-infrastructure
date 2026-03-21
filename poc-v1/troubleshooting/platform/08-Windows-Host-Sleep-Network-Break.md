@@ -127,11 +127,11 @@ Check Bridged Network:
 Diagnosis 5: Test Connectivity After Wake
 ------------------------------------------
 # From Windows host
-ping 192.168.0.100 (ESXi IP)
+ping <GATEWAY_IP>00 (ESXi IP)
 # If fails, bridge is broken
 
 # From ESXi (if accessible via console)
-vmkping 192.168.0.1 (gateway)
+vmkping <GATEWAY_IP> (gateway)
 # If fails, uplink is down
 
 ================================================================================
@@ -232,8 +232,8 @@ Verification 3: Test Sleep/Wake Cycle
 3. Wait 2 minutes
 4. Wake Windows
 5. Immediately test connectivity:
-   ping 192.168.0.100
-   ping 192.168.0.101
+   ping <GATEWAY_IP>00
+   ping <GATEWAY_IP>01
 
 Expected: All pings succeed immediately after wake
 

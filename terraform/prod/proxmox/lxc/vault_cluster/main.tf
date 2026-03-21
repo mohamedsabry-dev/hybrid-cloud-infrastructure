@@ -37,6 +37,7 @@ resource "proxmox_virtual_environment_container" "vault1" {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
     path   = var.mount_points.mount_1.path
+    backup = var.mount_points.mount_1.backup
   }
 
   # Container Settings
@@ -132,6 +133,7 @@ resource "proxmox_virtual_environment_container" "vault2" {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
     path   = var.mount_points.mount_1.path
+    backup = var.mount_points.mount_1.backup
   }
 
   # Container Settings
@@ -227,6 +229,7 @@ resource "proxmox_virtual_environment_container" "vault3" {
     volume = var.mount_points.mount_1.volume
     size   = var.mount_points.mount_1.size
     path   = var.mount_points.mount_1.path
+    backup = var.mount_points.mount_1.backup
   }
 
   # Container Settings

@@ -1,9 +1,9 @@
 resource "aws_vpc" "vpc_main" {
-  cidr_block           = "172.17.0.0/16"  # Different CIDR from dev (172.16.0.0/16)
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
 
   tags = {
-    Name = "prod-main"
+    Name = "vpc-main-${var.environment}"
   }
 }
 
@@ -11,27 +11,27 @@ resource "aws_internet_gateway" "igw_main" {
   vpc_id = aws_vpc.vpc_main.id
 
   tags = {
-    Name = "prod-igw"
+    Name = "igw-main-${var.environment}"
   }
 }
 
 resource "aws_subnet" "subnet_vpn" {
   vpc_id            = aws_vpc.vpc_main.id
-  cidr_block        = "172.17.65.0/24"
-  availability_zone = "eu-west-2a"
+  cidr_block        = var.subnet_vpn_cidr
+  availability_zone = var.availability_zone
 
   tags = {
-    Name = "prod-vpn"
+    Name = "subnet-vpn-${var.environment}"
   }
 }
 
 resource "aws_subnet" "subnet_mgmt" {
   vpc_id            = aws_vpc.vpc_main.id
-  cidr_block        = "172.17.63.0/24"
-  availability_zone = "eu-west-2a"
+  cidr_block        = var.subnet_mgmt_cidr
+  availability_zone = var.availability_zone
 
   tags = {
-    Name = "prod-mgmt"
+    Name = "subnet-mgmt-${var.environment}"
   }
 }
 
@@ -39,7 +39,7 @@ resource "aws_route_table" "rt_public" {
   vpc_id = aws_vpc.vpc_main.id
 
   tags = {
-    Name = "prod-public-rt"
+    Name = "rt-public-${var.environment}"
   }
 }
 

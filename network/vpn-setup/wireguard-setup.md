@@ -37,7 +37,7 @@ Home/Datacenter          WireGuard EC2 Dev
 | **AWS Tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
 | AWS Listen Port | 51820 | 51820 |
 | **ER605 Tunnel IP** | **172.16.200.1** | **172.17.200.1** |
-| ER605 Listen Port | 51820 | 51821 |
+| ER605 Listen Port | 51820 | 51830 |
 | ER605 Interface Name | dev_tunnel | prod_tunnel |
 | ER605 Peer AllowedIPs | 172.16.0.0/16 | 172.17.0.0/16 |
 | On-Prem VLANs | 10.0.60-65.0/24 | 10.0.50-55.0/24 |
@@ -191,15 +191,15 @@ sudo wg show
 
 | ID | Name | MTU | Listen Port | Local IP | Status |
 |----|------|-----|-------------|----------|--------|
-| 1 | dev_tunnel | 1372 | 51820 | 172.16.200.1 | Enabled |
-| 2 | prod_tunnel | 1372 | 51821 | 172.17.200.1 | Enabled |
+| 1 | dev_tunnel | 1420 | 51820 | 172.16.200.1 | Enabled |
+| 2 | prod_tunnel | 1420 | 51830 | 172.17.200.1 | Enabled |
 
 #### Dev Tunnel Interface Settings
 
 | Setting | Value |
 |---------|-------|
 | Name | dev_tunnel |
-| MTU | 1372 |
+| MTU | 1420 |
 | Listen Port | 51820 |
 | Private Key | `<HIDDEN>` |
 | Public Key | `<ER605_DEV_PUBLIC_KEY>` |
@@ -211,8 +211,8 @@ sudo wg show
 | Setting | Value |
 |---------|-------|
 | Name | prod_tunnel |
-| MTU | 1372 |
-| Listen Port | 51821 |
+| MTU | 1420 |
+| Listen Port | 51830 |
 | Private Key | `<HIDDEN>` |
 | Public Key | `<ER605_PROD_PUBLIC_KEY>` |
 | Local IP Address | 172.17.200.1 |
@@ -297,12 +297,13 @@ Now **one AllowedIPs entry covers both tunnel AND VPC traffic**:
 
 Change NAT type from "Port-restricted cone NAT" to **"Full cone NAT"** to prevent connection drops.
 
-### Port Forwarding (if AWS initiates)
+### Port Forwarding
 
-| Name | External Port | Internal IP | Internal Port | Protocol |
-|------|---------------|-------------|---------------|----------|
-| WireGuard_Dev | 51820 | 192.168.100.175 | 51820 | UDP |
-| WireGuard_Prod | 51821 | 192.168.100.175 | 51821 | UDP |
+**Not required** when behind CGNAT (most ISPs). ER605 initiates outbound connections and WireGuard's PersistentKeepalive (25 sec) maintains the NAT mapping.
+
+Port forwarding on your ISP router won't help with CGNAT anyway - the real NAT happens at ISP level before reaching your router.
+
+> **Note**: DMZ is also not needed. Both were tested during troubleshooting and confirmed unnecessary.
 
 ---
 
@@ -391,11 +392,40 @@ sudo tcpdump -i enX0 udp port 51820 -n
 
 Test with different packet sizes:
 ```bash
-ping -s 1332 -M do 172.16.200.1   # 1372 MTU
+ping -s 1332 -M do 172.16.200.1   # 1420 MTU
 ping -s 1172 -M do 172.16.200.1   # 1200 MTU
 ```
 
-Set MTU in ER605 WireGuard interface to working value (current: 1372).
+Set MTU in ER605 WireGuard interface to working value (current: 1420).
+
+### ISP/CGNAT Port Blocking
+
+**Symptom**: One tunnel works (dev on 51820), other doesn't (prod). AWS tcpdump shows bidirectional packets, but ER605 shows RX: 0 bytes and no handshake.
+
+**How to identify CGNAT**: Check ISP router routing table for addresses in `100.64.0.0/10` range (e.g., `100.122.0.1`). This indicates Carrier-Grade NAT.
+
+**Diagnosis**:
+```bash
+# On AWS - shows packets going both ways
+sudo tcpdump -i enX0 udp port 51820 -n
+
+# But ER605 WireGuard status shows:
+# TX Bytes: increasing, RX Bytes: 0 B, Last Handshake: ---
+```
+
+**Why this happens**:
+- ISP blocks specific UDP ports at their CGNAT level
+- Port forwarding/DMZ on your ISP router won't help (NAT happens before your router)
+- Dev tunnel works because its port isn't blocked
+
+**Solution**: Change ER605 Listen Port to a different value:
+1. ER605 → VPN → WireGuard → Edit prod_tunnel
+2. Change Listen Port (e.g., 51821 → 51830)
+3. Save and verify handshake establishes
+
+> **Note**: AWS side doesn't need changes - it responds to whatever source port packets arrive from.
+
+**History**: Port 51821 was blocked by ISP, changed to 51830 (March 2026).
 
 ---
 
@@ -408,12 +438,12 @@ ER605 (dev_tunnel)                    AWS Dev EC2
 
 
 ER605 (prod_tunnel)                   AWS Prod EC2
-  Port 51821        ───────────────►    Port 51820
+  Port 51830        ───────────────►    Port 51820
   172.17.200.1                          172.17.200.2
 ```
 
 Both AWS instances listen on port 51820 (they have different public IPs).
-ER605 uses different local ports (51820/51821) to route to the correct tunnel.
+ER605 uses different local ports (51820/51830) to route to the correct tunnel.
 
 ---
 

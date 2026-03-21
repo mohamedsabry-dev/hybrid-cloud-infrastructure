@@ -1,0 +1,172 @@
+================================================================================
+ANSIBLE PROD ENVIRONMENT - OPERATIONS GUIDE
+================================================================================
+
+TABLE OF CONTENTS
+├── 1. Quick Start - Manual Steps After Provisioning
+├── 2. Ansible Config Location
+├── 3. Git Workflow from Ansible Node
+├── 4. Keytab Setup for Automation
+└── 5. Utility Commands
+
+================================================================================
+1. QUICK START - MANUAL STEPS AFTER PROVISIONING
+================================================================================
+
+After the ansible node is provisioned, run these manual steps to complete setup:
+
+    # 1. SSH to ansible node
+    ssh root@ansible.lab.local
+
+    # 2. Set Ansible config location (persists across reboots)
+    echo 'export ANSIBLE_CONFIG=/srv/repo/ansible/prod/ansible.cfg' >> ~/.bashrc
+    source ~/.bashrc
+
+    # 3. Create vault password file (get password from AWS Secrets Manager or team)
+    echo 'YOUR_VAULT_PASSWORD_HERE' > ~/.ansible_vault
+    chmod 600 ~/.ansible_vault
+
+    # 4. Configure git pull strategy
+    git config --global pull.rebase true
+
+    # 5. Verify setup
+    cd /srv/repo
+    ansible --version          # Should show config file path
+    kinit super_bot            # Get Kerberos ticket
+    ansible managed_hosts -m ping  # Should ping all hosts
+
+NOTE: The vault password file path is configured in ansible.cfg:
+      vault_password_file = ~/.ansible_vault
+
+================================================================================
+2. ANSIBLE CONFIG LOCATION
+================================================================================
+
+We use the export approach to ensure Ansible picks up the correct config file
+regardless of the current working directory:
+
+    echo 'export ANSIBLE_CONFIG=/srv/repo/ansible/prod/ansible.cfg' >> ~/.bashrc
+    source ~/.bashrc
+
+This is added to the ansible node's ~/.bashrc so it persists across reboots.
+
+NORMAL OPERATIONS (FreeIPA running):
+    kinit super_bot
+    ansible-playbook playbooks/...
+
+EMERGENCY FALLBACK (FreeIPA down):
+    ansible-playbook -i inventory/first_setup_inventory.ini -u root playbooks/...
+
+================================================================================
+3. GIT WORKFLOW FROM ANSIBLE NODE
+================================================================================
+
+The ansible node needs write access to push changes back to the repository.
+
+DEPLOY KEY CONFIGURATION
+--------------------------------------------------------------------------------
+
+The GitHub deploy key was initially set as read-only. Updated the workflow to
+use write access:
+
+    # .github/workflows/prod-ansible-full-setup.yml (line ~135)
+    # Changed from:
+    -F read_only=true
+    # To:
+    -F read_only=false
+
+To apply the change:
+    1. Delete existing deploy key on GitHub (Settings → Deploy keys → Delete `ansible-prod`)
+    2. Set `PROD_SVC_DEPLOY_KEY_LOCK` to `false` in repo variables
+    3. Re-run the workflow to re-add key with write access
+
+GIT PULL STRATEGY
+--------------------------------------------------------------------------------
+
+Configure rebase as default pull strategy to avoid merge commits:
+
+    git config --global pull.rebase true
+
+This ensures `git pull` automatically rebases local commits on top of remote
+changes, keeping a clean linear history.
+
+TYPICAL WORKFLOW FOR ANSIBLE ADMIN
+--------------------------------------------------------------------------------
+
+    # SSH to ansible node
+    ssh root@ansible.lab.local
+
+    # Pull latest changes
+    cd /srv/repo
+    git pull origin prod
+
+    # Make edits, test playbooks
+    vim ansible/prod/inventory/group_vars/all.yml
+    kinit super_bot
+    ansible-playbook ansible/prod/playbooks/freeipa/domain_config.yml
+
+    # Commit and push changes back
+    git add -A
+    git commit -m "Update configuration"
+    git push origin prod
+
+================================================================================
+4. KEYTAB SETUP FOR AUTOMATION (super_bot)
+================================================================================
+
+Keytabs allow passwordless Kerberos authentication for CI/CD workflows.
+
+CREATE (one-time, manual):
+--------------------------------------------------------------------------------
+
+    ssh root@freeipa.lab.local
+    ipa-getkeytab -s freeipa.lab.local -p super_bot -k /tmp/sb.keytab
+    base64 -w 0 /tmp/sb.keytab          # copy output
+    rm /tmp/sb.keytab
+
+    aws secretsmanager create-secret --name prod/super_bot/keytab \
+      --secret-string "PASTE_BASE64"
+
+FETCH (workflow usage):
+--------------------------------------------------------------------------------
+
+    KEYTAB=$(aws secretsmanager get-secret-value --secret-id prod/super_bot/keytab \
+      --query SecretString --output text)
+    echo "$KEYTAB" | base64 -d > /tmp/sb.keytab && chmod 600 /tmp/sb.keytab
+
+    kinit -kt /tmp/sb.keytab super_bot   # get ticket
+    ansible-playbook ...                  # run playbook
+    rm /tmp/sb.keytab && kdestroy        # cleanup
+
+================================================================================
+5. UTILITY COMMANDS
+================================================================================
+
+CLEAR SSH KNOWN_HOSTS AFTER RECREATING INFRASTRUCTURE:
+--------------------------------------------------------------------------------
+
+    for ip in 10.0.50.10 10.0.51.10 10.0.51.11 10.0.51.12 10.0.52.10 \
+              10.0.52.11 10.0.52.12 10.0.53.10 10.0.53.20 10.0.54.10 \
+              10.0.54.11 10.0.54.12 10.0.55.10; do
+      ssh-keygen -R "$ip" 2>/dev/null
+    done
+
+CREATE VAULT-ENCRYPTED VARIABLE:
+--------------------------------------------------------------------------------
+
+    ansible-vault encrypt_string 'your_secret_password' --name 'variable_name'
+
+TEST ANSIBLE CONNECTIVITY WITH KERBEROS:
+--------------------------------------------------------------------------------
+
+    kinit super_bot
+    ansible managed_hosts -m command -a "id"
+    # All should show super_bot user info
+
+CHECK ANSIBLE CONFIG:
+--------------------------------------------------------------------------------
+
+    ansible --version              # Shows config file path
+    ansible-config dump --only-changed
+
+================================================================================

@@ -219,10 +219,10 @@ Problems:
 Access Pattern in Bridged Mode:
 --------------------------------
 To access ESXi:
-  https://esxi.localdomain (or https://192.168.0.100)
+  https://esxi.localdomain (or https://<GATEWAY_IP>00)
 
 To access vCenter:
-  https://vsphere.local (or https://192.168.0.101)
+  https://vsphere.local (or https://<GATEWAY_IP>01)
 
 To SSH to ESXi:
   ssh root@esxi.localdomain
@@ -259,7 +259,7 @@ Architecture Comparison:
 NAT Mode:
   Internet
     ↓
-  Home Router (192.168.0.1)
+  Home Router (<GATEWAY_IP>)
     ↓
   Windows Host (192.168.0.50)
     ↓ [IP Forwarding + Port Forwarding]
@@ -270,10 +270,10 @@ NAT Mode:
 Bridged Mode:
   Internet
     ↓
-  Home Router (192.168.0.1)
+  Home Router (<GATEWAY_IP>)
     ├─ Windows Host (192.168.0.50)
-    ├─ ESXi (192.168.0.100)
-    ├─ vCenter (192.168.0.101)
+    ├─ ESXi (<GATEWAY_IP>00)
+    ├─ vCenter (<GATEWAY_IP>01)
     └─ Other VMs (192.168.0.x)
 
 Simpler, cleaner, more production-like.
@@ -303,12 +303,12 @@ During ESXi installation or via esxcli:
 
 esxcli network ip interface ipv4 set \
   -i vmk0 \
-  -I 192.168.0.100 \
+  -I <GATEWAY_IP>00 \
   -N 255.255.255.0 \
   -t static
 
 esxcli network ip route ipv4 add \
-  -g 192.168.0.1 \
+  -g <GATEWAY_IP> \
   -n default
 
 Step 4: Update Windows Hosts File (Optional)
@@ -316,8 +316,8 @@ Step 4: Update Windows Hosts File (Optional)
 C:\Windows\System32\drivers\etc\hosts
 
 Add:
-192.168.0.100  esxi.localdomain  esxi
-192.168.0.101  vsphere.local     vsphere
+<GATEWAY_IP>00  esxi.localdomain  esxi
+<GATEWAY_IP>01  vsphere.local     vsphere
 
 Step 5: Configure Router DHCP Reservation (Recommended)
 --------------------------------------------------------
@@ -325,7 +325,7 @@ Access your router admin panel:
 1. DHCP Settings
 2. Add reservation:
    - MAC: 00:0c:29:xx:xx:xx (ESXi vmnic0 MAC)
-   - IP: 192.168.0.100
+   - IP: <GATEWAY_IP>00
    - Hostname: esxi
 
 Ensures IP stays consistent even if using DHCP.
@@ -378,8 +378,8 @@ Internal Network (Host-Only):
 - For services that shouldn't be exposed
 
 Example:
-- ESXi Management: 192.168.0.100 (Bridged) + 10.0.20.100 (Host-Only)
-- vCenter: 192.168.0.101 (Bridged) + 10.0.20.101 (Host-Only)
+- ESXi Management: <GATEWAY_IP>00 (Bridged) + 10.0.20.100 (Host-Only)
+- vCenter: <GATEWAY_IP>01 (Bridged) + 10.0.20.101 (Host-Only)
 - Internal services: 10.0.20.x only (Host-Only)
 
 Benefits:
@@ -396,26 +396,26 @@ After switching to Bridged:
 Test 1: Direct Access
 ----------------------
 From Windows host:
-  ping 192.168.0.100
-  curl https://192.168.0.100 (ESXi Web UI)
-  ssh root@192.168.0.100
+  ping <GATEWAY_IP>00
+  curl https://<GATEWAY_IP>00 (ESXi Web UI)
+  ssh root@<GATEWAY_IP>00
 
 Expected: All work without port numbers
 
 Test 2: Standard Ports
 -----------------------
 Access ESXi Web UI:
-  https://192.168.0.100 (port 443, not 8443)
+  https://<GATEWAY_IP>00 (port 443, not 8443)
 
 Access vCenter Web UI:
-  https://192.168.0.101 (port 443, not 8444)
+  https://<GATEWAY_IP>01 (port 443, not 8444)
 
 Expected: Standard ports work
 
 Test 3: From Other Devices
 ---------------------------
 From phone or another laptop on same network:
-  https://192.168.0.100
+  https://<GATEWAY_IP>00
 
 Expected: Can access ESXi UI (VMs are real network devices)
 

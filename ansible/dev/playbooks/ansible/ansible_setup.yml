@@ -12,5 +12,5 @@
 
     - name: Install Ansible Collections
       ansible.builtin.command:
-        cmd: ansible-galaxy collection install -r /srv/repo/ansible/dev/requirements.yml --upgrade
+        cmd: ansible-galaxy collection install -r /srv/repo/ansible/dev/playbooks/templates/requirements.yml --upgrade
       changed_when: true
