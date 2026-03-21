@@ -4,13 +4,13 @@
 # Policy ARNs
 # =============================================================================
 output "terraform_state_policy_arn" {
-  description = "ARN of the Terraform State policy (read/write dev)"
-  value       = aws_iam_policy.terraform_state_dev.arn
+  description = "ARN of the Terraform State policy"
+  value       = aws_iam_policy.terraform_state.arn
 }
 
 output "security_boundary_policy_arn" {
   description = "ARN of the Security Boundary policy"
-  value       = aws_iam_policy.security_boundary_dev.arn
+  value       = aws_iam_policy.security_boundary.arn
 }
 
 # =============================================================================
@@ -26,6 +26,10 @@ output "infrastructure_role_name" {
   value       = aws_iam_role.github_actions_infrastructure.name
 }
 
+# =============================================================================
+# WireGuard SSM Outputs
+# =============================================================================
 output "wireguard_instance_profile_name" {
-    value = aws_iam_instance_profile.dev_wireguard_ssm.name
+  description = "Instance profile name for WireGuard EC2 SSM access"
+  value       = aws_iam_instance_profile.wireguard_ssm.name
 }

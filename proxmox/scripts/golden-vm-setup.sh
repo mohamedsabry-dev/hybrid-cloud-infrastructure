@@ -138,6 +138,11 @@ systemctl enable cloud-init
 systemctl enable rsyslog
 systemctl enable auditd
 
+# Firewalld: disable (installed by default on Rocky, enable via Ansible if needed)
+systemctl disable firewalld
+systemctl stop firewalld 2>/dev/null || true
+echo "NOTE: firewalld disabled. Enable via Ansible if needed."
+
 # SSH: Allow root login with keys only (no password)
 # Keys will be injected via Terraform cloud-init initialization
 sed -i 's/^#PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
@@ -190,7 +195,7 @@ echo "Installed:"
 echo "  - qemu-guest-agent, cloud-init"
 echo "  - curl, wget, vim, htop, git, tree, jq"
 echo "  - net-tools, traceroute, bind-utils, tcpdump, nmap-ncat, nmcli"
-echo "  - openssh-server/clients, audit, rsyslog"
+echo "  - openssh-server/clients, audit, rsyslog, firewalld (disabled)"
 echo "  - ipa-client (package only, not configured)"
 echo "  - gandalf user (break-glass, in wheel group)"
 echo ""

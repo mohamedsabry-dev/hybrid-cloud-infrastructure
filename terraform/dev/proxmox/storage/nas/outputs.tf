@@ -7,3 +7,8 @@ output "nas_data_id" {
   description = "The ID of the NAS data storage"
   value       = proxmox_virtual_environment_storage_nfs.nas_data.id
 }
+
+output "backups" {
+  description = "The ID of the NAS data storage"
+  value       = proxmox_virtual_environment_storage_nfs.backups.id
+}
