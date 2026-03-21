@@ -84,3 +84,35 @@ terraform apply -var="account_id=123456789012"
 - Cannot create/modify IAM resources (prevents privilege escalation)
 - Cannot disable CloudTrail (audit protection)
 - PassRole limited to specific EC2 roles only
+
+## Post-IAM Workflow: Run Compute Workflow
+
+**IMPORTANT:** After IAM workflow completes, run the Compute workflow.
+
+The compute module references the instance profile via remote state:
+```hcl
+iam_instance_profile = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
+```
+
+If IAM resources are recreated (e.g., naming change), the EC2 loses its instance profile until compute workflow runs and reattaches it.
+
+## State Migration History
+
+### 2026-03-21: Consolidation - Prefix to Suffix Naming
+
+Changed Terraform resource block names for consistency between dev/prod:
+
+```bash
+# Executed via workflow, then removed from workflow
+terraform state mv aws_iam_role.dev_wireguard_ssm aws_iam_role.wireguard_ssm
+terraform state mv aws_iam_role_policy_attachment.dev_wireguard_ssm_core aws_iam_role_policy_attachment.wireguard_ssm_core
+terraform state mv aws_iam_instance_profile.dev_wireguard_ssm aws_iam_instance_profile.wireguard_ssm
+terraform state mv aws_iam_policy.terraform_state_dev aws_iam_policy.terraform_state
+terraform state mv aws_iam_policy.security_boundary_dev aws_iam_policy.security_boundary
+```
+
+This also triggered AWS resource name changes (forces replacement):
+- `dev-wireguard-ssm-role` → `wireguard-ssm-role-dev`
+- `dev-wireguard-ssm-profile` → `wireguard-ssm-profile-dev`
+- `SecurityBoundary-Dev` → `SecurityBoundary-dev`
+- `TerraformState-Dev` → `TerraformState-dev`

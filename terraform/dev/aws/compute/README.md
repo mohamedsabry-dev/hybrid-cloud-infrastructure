@@ -66,3 +66,21 @@ After EC2 is provisioned, configure WireGuard:
 1. SSH to instance using the EIP
 2. Run WireGuard setup script
 3. Configure peer on home router
+
+## Troubleshooting
+
+### Security Group Rename Gets Stuck
+
+**Problem:** When renaming a security group (e.g., changing naming convention), Terraform gets stuck on "Still destroying..." because the SG is attached to the EC2 instance ENI. AWS refuses to delete a SG that's in use.
+
+**Why it happens:** By default, Terraform uses delete-before-create for resource replacement. It tries to delete the old SG first, but can't because the EC2 is still using it.
+
+**Manual fix:**
+1. While Terraform is stuck, go to AWS Console → EC2 → Select instance
+2. Actions → Security → Change Security Groups
+3. Temporarily assign the default VPC security group
+4. Terraform will complete (old SG deletes, new SG creates, EC2 updated)
+
+**Prevention:** Uncomment the `create_before_destroy` lifecycle block in `main.tf` before renaming. This creates the new SG first, updates EC2, then deletes the old SG.
+
+**Why we don't enable it by default:** Resources are rarely renamed. The default delete-before-create avoids naming conflicts if the new name already exists. We prefer manual intervention for rare rename operations over potential issues in normal operations.
