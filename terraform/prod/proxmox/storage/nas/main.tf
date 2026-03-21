@@ -7,7 +7,7 @@ resource "proxmox_virtual_environment_storage_nfs" "nas_iso" {
   content = var.nas_iso.content
 }
 
-# Dev storage
+# Prod storage
 resource "proxmox_virtual_environment_storage_nfs" "nas_data" {
   id      = var.nas_data.id
   server  = var.nas_data.server
@@ -17,5 +17,18 @@ resource "proxmox_virtual_environment_storage_nfs" "nas_data" {
 
   backups {
     keep_last = var.nas_data.keep_last
+  }
+}
+
+# Prod Backup
+resource "proxmox_virtual_environment_storage_nfs" "backups" {
+  id      = var.backups.id
+  server  = var.backups.server
+  export  = var.backups.export
+  nodes   = var.backups.nodes
+  content = var.backups.content
+
+  backups {
+    keep_last = var.backups.keep_last
   }
 }
