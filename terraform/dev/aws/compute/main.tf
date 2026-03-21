@@ -1,30 +1,37 @@
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket = "hybrid-cloud-infrastructure-tf-state-dev-v2"
-    key    = "dev/aws/network/terraform.tfstate"
-    region = "us-east-1"
+    bucket = var.remote_state_bucket
+    key    = "${var.environment}/aws/network/terraform.tfstate"
+    region = var.remote_state_region
   }
 }
 
 data "terraform_remote_state" "iam" {
-    backend = "s3"
-    config = {
-      bucket = "hybrid-cloud-infrastructure-tf-state-dev-v2"
-      key    = "dev/aws/iam/terraform.tfstate"
-      region = "us-east-1"
-    }
+  backend = "s3"
+  config = {
+    bucket = var.remote_state_bucket
+    key    = "${var.environment}/aws/iam/terraform.tfstate"
+    region = var.remote_state_region
+  }
 }
 
 
 
 resource "aws_security_group" "wireguard" {
-  name        = "dev-wireguard-sg"
+  name        = "wireguard-sg-${var.environment}"
   description = "WireGuard VPN EC2 security group"
   vpc_id      = data.terraform_remote_state.network.outputs.vpc_id
 
+  # Uncomment if planning to rename this SG while attached to EC2.
+  # Without this, Terraform tries delete-before-create which fails
+  # because the SG is still attached to the instance ENI.
+  # lifecycle {
+  #   create_before_destroy = true
+  # }
+
   tags = {
-    Name = "dev-wireguard-sg"
+    Name = "wireguard-sg-${var.environment}"
   }
 }
 
@@ -33,8 +40,8 @@ resource "aws_vpc_security_group_ingress_rule" "wireguard_udp" {
   security_group_id = aws_security_group.wireguard.id
   cidr_ipv4         = var.allowed_ip
   ip_protocol       = "udp"
-  from_port         = 51820
-  to_port           = 51820
+  from_port         = var.wireguard_port
+  to_port           = var.wireguard_port
 }
 
 # SSH access for management
@@ -53,14 +60,14 @@ resource "aws_vpc_security_group_egress_rule" "allow_all" {
 }
 
 resource "aws_key_pair" "vpn" {
-  key_name   = "vpn-key-pair-dev"
+  key_name   = "vpn-key-pair-${var.environment}"
   public_key = var.vpn_public_key
 }
 
 resource "aws_instance" "wireguard" {
-  ami                    = "ami-02dfbd4ff395f2a1b"
-  instance_type          = "t3.micro"
-  availability_zone      = "us-east-1a"
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  availability_zone      = var.availability_zone
   subnet_id              = data.terraform_remote_state.network.outputs.subnet_vpn_id
   vpc_security_group_ids = [aws_security_group.wireguard.id]
   key_name               = aws_key_pair.vpn.key_name
@@ -80,7 +87,7 @@ resource "aws_instance" "wireguard" {
   EOF
 
   tags = {
-    Name = "dev-wireguard"
+    Name = "wireguard-${var.environment}"
   }
 }
 
@@ -88,7 +95,7 @@ resource "aws_eip" "wireguard" {
   domain = "vpc"
 
   tags = {
-    Name = "dev-wireguard-eip"
+    Name = "wireguard-eip-${var.environment}"
   }
 }
 
@@ -99,7 +106,7 @@ resource "aws_eip_association" "wireguard" {
 
 resource "aws_route" "home_subnets" {
   route_table_id         = data.terraform_remote_state.network.outputs.rt_public_id
-  destination_cidr_block = "10.0.0.0/16"
+  destination_cidr_block = var.home_cidr
   network_interface_id   = aws_instance.wireguard.primary_network_interface_id
 }
 

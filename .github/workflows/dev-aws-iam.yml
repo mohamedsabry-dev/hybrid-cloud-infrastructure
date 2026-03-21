@@ -69,7 +69,7 @@ jobs:
 
       - name: Terraform Plan
         timeout-minutes: 3
-        run: terraform plan -var="dev_account_id=${{ secrets.AWS_ACCOUNT_ID_DEV }}" -out=tfplan
+        run: terraform plan -var="account_id=${{ secrets.AWS_ACCOUNT_ID_DEV }}" -out=tfplan
 
       # 3-minute pause for manual review before applying
       - name: Review Window
