@@ -23,6 +23,13 @@ resource "aws_security_group" "wireguard" {
   description = "WireGuard VPN EC2 security group"
   vpc_id      = data.terraform_remote_state.network.outputs.vpc_id
 
+  # Uncomment if planning to rename this SG while attached to EC2.
+  # Without this, Terraform tries delete-before-create which fails
+  # because the SG is still attached to the instance ENI.
+  # lifecycle {
+  #   create_before_destroy = true
+  # }
+
   tags = {
     Name = "wireguard-sg-${var.environment}"
   }
