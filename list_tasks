@@ -17,3 +17,4 @@ Save Network BAckup Config ER + Sw to True nas >> Done created Backup shared dir
 # On the way to do same with proxmox, we make script backup soime important config 
 
 
+Conslidation phasse 
