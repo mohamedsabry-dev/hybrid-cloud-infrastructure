@@ -1,0 +1,17 @@
+On Vault 
+
+vault login -method=ldap username=sabry
+vault secrets enable -path=secret kv-v2
+  vault kv put secret/freeipa/keytab-super-bot keytab="YOUR_BASE64_STRING"  principal="super_bot@LAB.LOCAL"
+vault kv get  secret/freeipa/keytab-super-bot
+
+
+On Ansible
+
+export VAULT_ADDR="https://vault1.lab.local:8200"
+
+TOKEN=$(curl -sk $VAULT_ADDR/v1/auth/ldap/login/sabry -d '{"password":"password"}' | jq -r '.auth.clien
+t_token')
+curl -sk -H "X-Vault-Token: $TOKEN" $VAULT_ADDR/v1/secret/data/freeipa/keytab-super-bot | jq -r '.data.data.keytab' | base64 -d > /tmp/super_bot.keytab
+
+kinit -kt /tmp/super_bot.keytab super_bot@LAB.LOCAL

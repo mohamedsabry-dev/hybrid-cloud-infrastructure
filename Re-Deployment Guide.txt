@@ -182,18 +182,19 @@ STEP 0.3: PROXMOX INSTALL (v9.1)
 
 STEP 0.4: PROXMOX BOOTSTRAP
 |
-+-- SCRIPTS LOCATION: proxmox/scripts/
-|   +-- bootstrap-dev.sh      (post-install bootstrap)
-|   +-- bootstrap-prod.sh
-|   +-- network-setup-dev.sh  (VLAN configuration)
-|   +-- network-setup-prod.sh
-|   +-- golden-vm-setup.sh    (run inside VM)
-|   +-- golden-lxc-setup.sh   (run inside CT)
++-- SCRIPTS LOCATION:
+|   +-- proxmox/bootstrap_proxmox/
+|   |   +-- bootstrap.sh      (post-install bootstrap)
+|   |   +-- network-setup.sh  (VLAN configuration)
+|   |   +-- mail-config.sh    (email notifications)
+|   +-- proxmox/golden_templates/
+|       +-- golden-vm-setup.sh    (run inside VM)
+|       +-- golden-lxc-setup.sh   (run inside CT)
 |
 +-- RUN:
-|   +-- scp proxmox/scripts/bootstrap-dev.sh root@<ip>:/tmp/
+|   +-- scp proxmox/bootstrap_proxmox/bootstrap.sh root@<ip>:/tmp/
 |   +-- ssh root@<ip>
-|   +-- chmod +x /tmp/bootstrap-dev.sh && /tmp/bootstrap-dev.sh
+|   +-- chmod +x /tmp/bootstrap.sh && /tmp/bootstrap.sh dev  # or prod
 |
 +-- SAVE: API token output -> will store in AWS
 
@@ -201,8 +202,9 @@ STEP 0.4: PROXMOX BOOTSTRAP
 
 STEP 0.5: PROXMOX NETWORK
 |
-+-- scp proxmox/scripts/network-setup-dev.sh root@<ip>:/tmp/
-+-- WIFI_PASSWORD="xxx" /tmp/network-setup-dev.sh
++-- scp proxmox/bootstrap_proxmox/network-setup.sh root@<ip>:/tmp/
++-- chmod +x /tmp/network-setup.sh
++-- WIFI_PASSWORD="xxx" /tmp/network-setup.sh dev  # or prod
 |
 +-- CONFIGURES:
 |   +-- WiFi -> 10.0.5.110 (management)
@@ -219,18 +221,20 @@ STEP 0.6: NAS MOUNTS
 |   +-- Management: https://10.0.5.120:8001 (VLAN 5)
 |   +-- Storage:    10.0.40.120 (VLAN 40)
 |
-+-- NFS SHARES:
++-- NFS SHARES (create on NAS first):
 |   +-- /volume1/shared-iso    -> ISOs, CT templates (both servers)
-|   +-- /volume1/dev-storage   -> DEV VMs, backups (10.0.40.110 only)
-|   +-- /volume1/prod-storage  -> PROD VMs, backups (10.0.40.100 only)
+|   +-- /volume1/dev-storage   -> DEV VMs, container rootfs (10.0.40.110 only)
+|   +-- /volume1/prod-storage  -> PROD VMs, container rootfs (10.0.40.100 only)
+|   +-- /volume1/Backups       -> vzdump backups (both servers)
 |
-+-- Proxmox GUI -> Datacenter -> Storage -> Add -> NFS:
-|
-+-- nas-iso:      10.0.40.120:/volume1/shared-iso     (ISO, CT template)
-+-- nas-dev-data: 10.0.40.120:/volume1/dev-storage    (Disk, CT, Backup)
++-- TERRAFORM MANAGED (terraform/dev/proxmox/storage/nas/):
+|   +-- nas-iso:      10.0.40.120:/volume1/shared-iso   (iso, vztmpl)
+|   +-- nas-dev-data: 10.0.40.120:/volume1/dev-storage  (images, rootdir, backup)
+|   +-- nas-backups:  10.0.40.120:/volume1/Backups      (backup, rootdir)
 |
 +-- Verify: showmount -e 10.0.40.120
 +-- Note: Upload ISOs to shared-iso/template/iso/ (not root)
++-- Note: Backups retention managed via Terraform (keep_last = 2 or 5)
 
 --------------------------------------------------------------------------------
 

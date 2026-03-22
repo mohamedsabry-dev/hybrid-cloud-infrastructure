@@ -16,9 +16,9 @@ fi
 trap "rm -f $LOCK_FILE" EXIT
 touch "$LOCK_FILE"
 
-# Step 1: Get battery info
-BATTERY_STATUS=$(cat /sys/class/power_supply/BAT0/status)
-BATTERY_CAPACITY=$(cat /sys/class/power_supply/BAT0/capacity)
+# Step 1: Get battery info (BAT* matches BAT0, BAT1, etc.)
+BATTERY_STATUS=$(cat /sys/class/power_supply/BAT*/status 2>/dev/null)
+BATTERY_CAPACITY=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null)
 
 echo "$(date) - Battery: $BATTERY_STATUS at ${BATTERY_CAPACITY}%"
 

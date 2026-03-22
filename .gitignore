@@ -44,4 +44,4 @@ backup-ER605*.bin
 network/backups/*.cfg
 
 # Device diagnostic logs
-logs/**
+network/logs/**

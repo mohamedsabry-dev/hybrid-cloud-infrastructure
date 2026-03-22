@@ -1,18 +1,40 @@
 #!/usr/bin/env bash
+#===============================================================================
+# Proxmox VE Post-Install Bootstrap Script
+# Usage: ./bootstrap.sh <dev|prod>
+#===============================================================================
 # 1. Disable Sleep/Suspend
 # 2. Ensure DNS (add 8.8.8.8 fallback)
 # 3. Fix APT Repos
 # 4. APT Update & Upgrade
 # 5. Remove Subscription Nag
 # 6. Configure Chrony (NTP) & Timezone
-# 7. Create admin_prod Management User (PAM)
-# 8. Create tf_prod Automation User
-
+# 7. Create admin_<env> Management User (PAM)
+# 8. Create tf_<env> Automation User
+#===============================================================================
 
 set -e
 
+#===============================================================================
+# Environment Selection
+#===============================================================================
+ENV="$1"
+
+if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
+    echo "Usage: $0 <dev|prod>"
+    echo "  dev  - Configure for development environment"
+    echo "  prod - Configure for production environment"
+    exit 1
+fi
+
+# Set environment-specific variables
+ADMIN_NAME="admin_${ENV}"
+TF_USERNAME="tf_${ENV}"
+ADMIN_COMMENT="Admin ${ENV^} - Full Admin"
+TF_COMMENT="Terraform ${ENV^} - Full Admin"
+
 echo ""
-echo "=== Proxmox VE 9.x Post-Install Bootstrap ==="
+echo "=== Proxmox VE 9.x Post-Install Bootstrap (${ENV^^}) ==="
 echo ""
 
 if [[ $EUID -ne 0 ]]; then
@@ -21,11 +43,8 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 1. Disable Sleep/Suspend ---
+# ======================================================================= #
 echo ""
 echo "[1/8] Disabling sleep/suspend..."
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
@@ -33,11 +52,8 @@ echo "Done."
 
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 2. Ensure DNS (fallback to 8.8.8.8) ---
+# ======================================================================= #
 echo ""
 echo "[2/8] Ensuring DNS configuration..."
 
@@ -54,11 +70,8 @@ fi
 
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 3. Fix APT Repos ---
+# ======================================================================= #
 echo ""
 echo "[3/8] Fixing APT repositories..."
 
@@ -84,22 +97,16 @@ fi
 
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 4. APT Update & Upgrade ---
+# ======================================================================= #
 echo ""
 echo "[4/8] Running apt update && upgrade..."
 apt update && apt upgrade -y
 
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 5. Remove Subscription Nag ---
+# ======================================================================= #
 echo ""
 echo "[5/8] Removing subscription nag..."
 PROXMOXLIB="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
@@ -112,11 +119,8 @@ fi
 
 
 # ======================================================================= #
-# ======================================================================= #
-# ======================================================================= #
-
-
 # --- 6. Configure Chrony (NTP) & Timezone ---
+# ======================================================================= #
 echo ""
 echo "[6/8] Configuring Chrony (NTP) and timezone..."
 
@@ -160,21 +164,16 @@ echo "Done."
 
 
 # ======================================================================= #
+# --- 7. Create Admin Management User (PAM) ---
 # ======================================================================= #
-# ======================================================================= #
-
-
-# --- 7. Create admin_prod Management User (PAM) ---
 echo ""
-echo "[7/8] Creating admin_prod management user (PAM)..."
+echo "[7/8] Creating ${ADMIN_NAME} management user (PAM)..."
 
-ADMIN_NAME="admin_prod"
 ADMIN_USER="${ADMIN_NAME}@pam"
 
 # Check if Linux user exists
 if id "$ADMIN_NAME" &>/dev/null; then
     echo "Linux user ${ADMIN_NAME} already exists"
-    SKIP_LINUX=1
 else
     echo "Creating Linux user ${ADMIN_NAME}..."
     useradd -m -s /bin/bash "$ADMIN_NAME"
@@ -186,29 +185,25 @@ fi
 if pveum user list | grep -q "^${ADMIN_USER}"; then
     echo "Proxmox user ${ADMIN_USER} already exists"
 else
-    pveum user add "${ADMIN_USER}" --comment "Admin Prod - Full Admin"
+    pveum user add "${ADMIN_USER}" --comment "${ADMIN_COMMENT}"
 fi
 
 # Ensure admin role
 pveum acl modify "/" --users "${ADMIN_USER}" --roles Administrator
 
 echo ""
-echo "  ADMIN USER CREATED (PAM)"
+echo "  ADMIN USER CREATED (PAM): ${ADMIN_USER}"
 
 
 # ======================================================================= #
+# --- 8. Create Terraform Automation User ---
 # ======================================================================= #
-# ======================================================================= #
-
-
-# --- 8. Create tf_prod Automation User ---
 echo ""
-echo "[8/8] Creating tf_prod automation user..."
+echo "[8/8] Creating ${TF_USERNAME} automation user..."
 
-USERNAME="tf_prod"
 REALM="pve"
 TOKEN_ID="terraform"
-FULL_USER="${USERNAME}@${REALM}"
+FULL_USER="${TF_USERNAME}@${REALM}"
 
 if pveum user list | grep -q "^${FULL_USER}"; then
     echo "User ${FULL_USER} already exists"
@@ -222,7 +217,7 @@ if pveum user list | grep -q "^${FULL_USER}"; then
 fi
 
 if [[ -z "$SKIP_USER" ]]; then
-    pveum user add "${FULL_USER}" --comment "Terraform Prod - Full Admin"
+    pveum user add "${FULL_USER}" --comment "${TF_COMMENT}"
     pveum acl modify "/" --users "${FULL_USER}" --roles Administrator
 
     echo "  API TOKEN - SAVE THIS NOW!"
@@ -233,11 +228,10 @@ fi
 
 
 # ======================================================================= #
+# Complete
 # ======================================================================= #
-# ======================================================================= #
-
 echo ""
-echo "=== All configurations complete! ==="
+echo "=== All configurations complete (${ENV^^}) ==="
 echo ""
 read -p "Restart pveproxy now? (y/N): " confirm
 if [[ "$confirm" =~ ^[Yy]$ ]]; then

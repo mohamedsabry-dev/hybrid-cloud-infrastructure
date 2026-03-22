@@ -399,4 +399,4 @@ df -h /data
 
 - Golden Image Template: `terraform/dev/proxmox/vms/golden-image/main.tf`
 - FreeIPA VM: `terraform/dev/proxmox/vms/freeipa/main.tf`
-- Golden Image Bootstrap: `proxmox/scripts/golden-vm-setup.sh`
+- Golden Image Bootstrap: `proxmox/golden_templates/golden-vm-setup.sh`
