@@ -1,0 +1,210 @@
+================================================================================
+                              IP PLANNING
+================================================================================
+
+Domain: lab.local
+DNS Servers: FreeIPA (one per environment - 10.0.50.10 prod, 10.0.60.10 dev)
+DNS Forwarders: 8.8.8.8, 1.1.1.1 (configured in each FreeIPA)
+DHCP Range: 10.0.X.200 - 10.0.X.220 (per VLAN)
+
+Note: Network devices (ER605, AP, NAS, Proxmox) are NOT registered in IPA DNS.
+
+================================================================================
+                         MANAGEMENT PLANE (VLAN 5 - WiFi)
+================================================================================
+
+Device              | IP Address    | Notes
+--------------------|---------------|--------------------------------------------
+ER605 Gateway       | 10.0.5.1      | Web UI (not in IPA domain)
+Access Point        | 10.0.5.10     | Web UI (not in IPA domain)
+Prod Proxmox        | 10.0.5.100    | Web UI, SSH (not in IPA domain)
+Dev Proxmox         | 10.0.5.110    | Web UI, SSH (not in IPA domain)
+NAS                 | 10.0.5.120    | Web UI (not in IPA domain)
+
+WiFi SSID: unified_mgmt
+Security: WPA2-PSK [AES]
+AP Isolation: ENABLED (clients cannot reach each other)
+
+================================================================================
+                         STORAGE PLANE (VLAN 40)
+================================================================================
+
+Device              | IP Address    | Protocol
+--------------------|---------------|--------------------------------------------
+Prod Proxmox        | 10.0.40.100   | NFS client (no hostname - storage interface)
+Dev Proxmox         | 10.0.40.110   | NFS client (no hostname - storage interface)
+NAS                 | 10.0.40.120   | NFS server (no hostname - storage interface)
+
+Note: Storage traffic isolated from ER605.
+      Proxmox interfaces: stor0.40 (tagged VLAN subinterface)
+      No DNS hostnames for storage interfaces - IP only.
+
+================================================================================
+                         PRODUCTION SERVICE PLANE
+================================================================================
+
+VLAN 50 - Identity (10.0.50.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.50.1     | -                           | ER605
+FreeIPA             | 10.0.50.10    | freeipa.lab.local           | VM
+
+VLAN 51 - K8s Control Plane (10.0.51.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.51.1     | -                           | ER605
+K8s Master 1        | 10.0.51.10    | k8s-master1.lab.local       | VM
+K8s Master 2        | 10.0.51.11    | k8s-master2.lab.local       | VM
+K8s Master 3        | 10.0.51.12    | k8s-master3.lab.local       | VM
+K8s API VIP         | 10.0.51.100   | k8s-api.lab.local           | VIP
+
+VLAN 52 - Vault (10.0.52.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.52.1     | -                           | ER605
+Vault Node 1        | 10.0.52.10    | vault1.lab.local            | LXC
+Vault Node 2        | 10.0.52.11    | vault2.lab.local            | LXC
+Vault Node 3        | 10.0.52.12    | vault3.lab.local            | LXC
+
+VLAN 53 - Management (10.0.53.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.53.1     | -                           | ER605
+Ansible             | 10.0.53.10    | ansible.lab.local           | LXC
+Local Runner        | 10.0.53.20    | local-runner.lab.local      | LXC
+
+Note: Prometheus, Grafana, Loki, FluxCD run as pods on K8s workers (VLAN 54).
+
+VLAN 54 - K8s Data Plane (10.0.54.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.54.1     | -                           | ER605
+K8s Worker 1        | 10.0.54.10    | k8s-worker1.lab.local       | VM
+K8s Worker 2        | 10.0.54.11    | k8s-worker2.lab.local       | VM
+K8s Worker 3        | 10.0.54.12    | k8s-worker3.lab.local       | VM
+
+Pods running on workers:
+- Worker 1: Prometheus, Grafana
+- Worker 2: NGINX Ingress, Loki
+- Worker 3: Helm, FluxCD
+
+VLAN 55 - DMZ (10.0.55.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.55.1     | -                           | ER605
+NGINX               | 10.0.55.10    | ex-nginx.lab.local          | LXC
+
+================================================================================
+                         DEVELOPMENT SERVICE PLANE
+================================================================================
+
+VLAN 60 - Identity (10.0.60.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.60.1     | -                           | ER605
+FreeIPA             | 10.0.60.10    | freeipa.lab.local           | VM
+
+VLAN 61 - K8s Control Plane (10.0.61.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.61.1     | -                           | ER605
+K8s Master 1        | 10.0.61.10    | k8s-master1.lab.local       | VM
+K8s Master 2        | 10.0.61.11    | k8s-master2.lab.local       | VM
+K8s Master 3        | 10.0.61.12    | k8s-master3.lab.local       | VM
+K8s API VIP         | 10.0.61.100   | k8s-api.lab.local           | VIP
+
+VLAN 62 - Vault (10.0.62.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.62.1     | -                           | ER605
+Vault Node 1        | 10.0.62.10    | vault1.lab.local            | LXC
+Vault Node 2        | 10.0.62.11    | vault2.lab.local            | LXC
+Vault Node 3        | 10.0.62.12    | vault3.lab.local            | LXC
+
+VLAN 63 - Management (10.0.63.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.63.1     | -                           | ER605
+Ansible             | 10.0.63.10    | ansible.lab.local           | LXC
+Local Runner        | 10.0.63.20    | local-runner.lab.local      | LXC
+
+Note: Prometheus, Grafana, Loki, FluxCD run as pods on K8s workers (VLAN 64).
+
+VLAN 64 - K8s Data Plane (10.0.64.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.64.1     | -                           | ER605
+K8s Worker 1        | 10.0.64.10    | k8s-worker1.lab.local       | VM
+K8s Worker 2        | 10.0.64.11    | k8s-worker2.lab.local       | VM
+K8s Worker 3        | 10.0.64.12    | k8s-worker3.lab.local       | VM
+
+Pods running on workers:
+- Worker 1: Prometheus, Grafana
+- Worker 2: NGINX Ingress, Loki
+- Worker 3: Helm, FluxCD
+
+VLAN 65 - DMZ (10.0.65.0/24)
+-------------------------------------------------------------------------------
+Role                | IP Address    | Hostname                    | Type
+--------------------|---------------|-----------------------------|-----------
+Gateway             | 10.0.65.1     | -                           | ER605
+NGINX               | 10.0.65.10    | ex-nginx.lab.local          | LXC
+
+================================================================================
+                              IP ALLOCATION SUMMARY
+================================================================================
+
+Range           | Purpose                     | Environment
+----------------|-----------------------------|---------------------------------
+10.0.5.0/24     | Management (WiFi)           | Shared (not in IPA domain)
+10.0.40.0/24    | Storage (isolated L2)       | Shared (no hostnames)
+----------------|-----------------------------|---------------------------------
+10.0.50.0/24    | Identity (FreeIPA)          | PROD
+10.0.51.0/24    | K8s Control Plane           | PROD
+10.0.52.0/24    | Secrets (Vault)             | PROD
+10.0.53.0/24    | Management (Ansible, CI/CD) | PROD
+10.0.54.0/24    | K8s Data Plane              | PROD
+10.0.55.0/24    | DMZ (NGINX)                 | PROD
+----------------|-----------------------------|---------------------------------
+10.0.60.0/24    | Identity (FreeIPA)          | DEV
+10.0.61.0/24    | K8s Control Plane           | DEV
+10.0.62.0/24    | Secrets (Vault)             | DEV
+10.0.63.0/24    | Management (Ansible, CI/CD) | DEV
+10.0.64.0/24    | K8s Data Plane              | DEV
+10.0.65.0/24    | DMZ (NGINX)                 | DEV
+
+================================================================================
+                              RESOURCE TYPES
+================================================================================
+
+VMs (on Proxmox):
+- FreeIPA (1 per environment)
+- K8s Masters (3 per environment)
+- K8s Workers (3 per environment)
+
+LXCs (on Proxmox):
+- Vault cluster (3 nodes per environment)
+- Ansible controller
+- GitHub Actions Local Runner
+- NGINX reverse proxy
+
+Pods (on K8s Workers):
+- Prometheus (metrics)
+- Grafana (dashboards)
+- Loki (log aggregation)
+- FluxCD (GitOps CD)
+- Helm (package management)
+- NGINX Ingress (K8s ingress controller)
+
+================================================================================

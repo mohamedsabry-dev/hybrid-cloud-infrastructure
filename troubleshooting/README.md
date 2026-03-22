@@ -9,14 +9,15 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | Category | Description | Count |
 |----------|-------------|-------|
 | [aws/](aws/) | AWS CloudFormation, IAM issues | 1 |
-| [github/](github/) | GitHub Actions, runners, workflows | 2 |
-| [identity/](identity/) | FreeIPA, Kerberos, authentication | 7 |
-| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 4 |
+| [github/](github/) | GitHub runners, workflows | 2 |
+| [github-actions/](github-actions/) | CI/CD workflow issues, cleanup | 5 |
+| [identity/](identity/) | FreeIPA, Kerberos, authentication | 8 |
+| [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 5 |
 | [macos/](macos/) | macOS client configuration | 2 |
-| [network/](network/) | Routing, connectivity issues | 2 |
-| [proxmox/](proxmox/) | Proxmox VE platform issues | 4 |
+| [network/](network/) | Routing, connectivity, hardware issues | 8 |
+| [proxmox/](proxmox/) | Proxmox VE platform issues | 7 |
 | [security/](security/) | Secrets management, incidents | 1 |
-| [terraform/](terraform/) | Terraform IaC issues | 4 |
+| [terraform/](terraform/) | Terraform IaC issues | 6 |
 | [vault/](vault/) | HashiCorp Vault deployment issues | 8 |
 
 ---
@@ -38,6 +39,18 @@ Documentation of issues encountered and resolved during infrastructure setup.
 
 ---
 
+## GitHub Actions
+
+| # | Title | Summary |
+|---|-------|---------|
+| [39](github-actions/39-concurrent-terraform-workflow-lxc-reboot.md) | Concurrent Terraform Workflow LXC Reboot | Concurrent workflows cause LXC reboot conflicts |
+| [44](github-actions/44-delete-workflow-logs.md) | Delete Workflow Logs | Bulk deletion of workflow run logs |
+| [45](github-actions/45-git-history-secrets-cleanup.md) | Git History Secrets Cleanup | Removing secrets from git history |
+| [46](github-actions/46-mac-address-deep-inspection-cleanup.md) | MAC Address Deep Inspection Cleanup | Cleaning MAC addresses from history |
+| [47](github-actions/47-runner-clock-skew-auth-failure.md) | Runner Clock Skew Auth Failure | Kerberos auth fails due to clock drift |
+
+---
+
 ## Identity
 
 | # | Title | Summary |
@@ -49,6 +62,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [33](identity/33-freeipa-dns-recursion-denied.md) | FreeIPA DNS Recursion Denied | BIND defaults to localhost-only recursion |
 | [34](identity/34-freeipa-dns-forwarders-syntax.md) | FreeIPA DNS Forwarders Syntax | ipadnsconfig requires ip_address dict format |
 | [35](identity/35-freeipa-server-sssd-sudo.md) | FreeIPA Server SSSD Sudo | IPA server doesn't use SSSD for sudo lookups |
+| [36](identity/36-keytab-preauthentication-failed.md) | Keytab Preauthentication Failed | Keytab auth fails after password change |
 
 ---
 
@@ -60,6 +74,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [18](linux/18-lxc-ntp-configuration-disabled.md) | LXC NTP Configuration Disabled | LXC containers inherit time from host, can't run chronyd |
 | [21](linux/21-lxc-uid-mapping-initgroups-error.md) | LXC UID Mapping initgroups Error | FreeIPA default UIDs outside LXC mapped range |
 | [24](linux/24-lxc-chronyd-adjtimex-failure.md) | LXC Chronyd adjtimex Failure | Unprivileged LXC cannot adjust clock, configure host instead |
+| [42](linux/42-crontab-overwrite-recovery.md) | Crontab Overwrite Recovery | Recovering overwritten crontab entries |
 
 ---
 
@@ -78,6 +93,12 @@ Documentation of issues encountered and resolved during infrastructure setup.
 |---|-------|---------|
 | [04](network/04-static-route-ssh-disconnect.md) | Static Route SSH Disconnect | SSH disconnects when adding static routes |
 | [05](network/05-asymmetric-routing-ssh-wan-lan.md) | Asymmetric Routing SSH WAN/LAN | SSH fails due to asymmetric routing paths |
+| [43](network/43-switch-port4-link-flapping-loose-connection.md) | Switch Port 4 Link Flapping | Loose cable causing link flapping on switch |
+| [48](network/48-er605-port4-gigabit-negotiation.md) | ER605 Port 4 Gigabit Negotiation | Router port hardware defect, PHY failure |
+| [49](network/49-wireguard-cgnat-port-blocking.md) | WireGuard CGNAT Port Blocking | ISP CGNAT blocking WireGuard ports |
+| [50](network/50-wireguard-nat-timeout-drops.md) | WireGuard NAT Timeout Drops | NAT session timeouts causing VPN drops |
+| [51](network/51-wireguard-vlan-gateway-ping-fail.md) | WireGuard VLAN Gateway Ping Fail | VPN can't reach VLAN gateways |
+| [52](network/52-wireguard-wrong-tunnel-routing.md) | WireGuard Wrong Tunnel Routing | Traffic routed to wrong VPN tunnel |
 
 ---
 
@@ -89,6 +110,9 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [11](proxmox/11-proxmox-ssl-certificate.md) | Proxmox SSL Certificate | Custom SSL certificate configuration |
 | [16](proxmox/16-proxmox-lxc-snapshot-nfs-mount.md) | LXC Snapshot NFS Mount | Snapshots fail when mount points use NFS storage |
 | [20](proxmox/20-vm-ssh-permission-denied-cloud-init.md) | VM SSH Permission Denied Cloud-Init | Cloud-init disables password auth on VMs |
+| [37](proxmox/37-proxmox-backup-missed-not-retried.md) | Proxmox Backup Missed Not Retried | Scheduled backup missed, no automatic retry |
+| [38](proxmox/38-lxc-mount-point-backup-disabled.md) | LXC Mount Point Backup Disabled | Mount points excluded from backup by default |
+| [41](proxmox/41-lxc-clone-vs-template-file-ssh-keys.md) | LXC Clone vs Template SSH Keys | SSH key behavior differs between clone and template |
 
 ---
 
@@ -108,6 +132,8 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [12](terraform/12-terraform-proxmox-cloned-vm-disk-tracking.md) | Terraform Proxmox Cloned VM Disk Tracking | Disk tracking issues with cloned VMs |
 | [13](terraform/13-terraform-proxmox-lxc-mount-point-bug.md) | Terraform Proxmox LXC Mount Point Bug | Mount point configuration bugs |
 | [14](terraform/14-terraform-proxmox-lxc-clone-ssh-keys.md) | Terraform Proxmox LXC Clone SSH Keys | SSH key injection in cloned containers |
+| [40](terraform/40-terraform-security-group-rename-stuck.md) | Terraform Security Group Rename Stuck | AWS SG rename causes dependency cycle |
+| [53](terraform/53-route-table-inline-vs-resource.md) | Route Table Inline vs Resource | Inline routes vs aws_route resource conflicts |
 
 ---
 
