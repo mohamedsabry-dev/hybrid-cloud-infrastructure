@@ -1,6 +1,7 @@
 #!/bin/bash
 #===============================================================================
-# Proxmox PROD Server Network Setup
+# Proxmox Network Setup Script
+# Usage: ./network-setup.sh <dev|prod>
 # Run from console or storage network - NOT over WiFi!
 #===============================================================================
 # 1. Install wpa_supplicant
@@ -14,37 +15,64 @@
 set -e
 
 #===============================================================================
-# HARDCODED CONFIG
+# Environment Selection
 #===============================================================================
-SERVER_TYPE="prod"
-WIFI_INTERFACE="wlp4s0"
+ENV="$1"
+
+if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
+    echo "Usage: $0 <dev|prod>"
+    echo "  dev  - Configure development server (pve-dev)"
+    echo "  prod - Configure production server (pve-prod)"
+    exit 1
+fi
+
+#===============================================================================
+# Environment-Specific Config
+#===============================================================================
+if [[ "$ENV" == "dev" ]]; then
+    WIFI_INTERFACE="wlp1s0"
+    MGMT_IP="10.0.5.110"
+    SERVICE_VLANS="60-65"
+    STORAGE_IP="10.0.40.110"
+    HOSTNAME_SHORT="pve-dev"
+else
+    WIFI_INTERFACE="wlp4s0"
+    MGMT_IP="10.0.5.100"
+    SERVICE_VLANS="50-55"
+    STORAGE_IP="10.0.40.100"
+    HOSTNAME_SHORT="pve-prod"
+fi
+
+# Common Config
 WIFI_SSID="unified_mgmt"
 WIFI_COUNTRY="EG"
-MGMT_IP="10.0.5.100"
 MGMT_NETMASK="255.255.255.0"
 MGMT_GATEWAY="10.0.5.1"
 SERVICE_INTERFACE="svc0"
-SERVICE_VLANS="50-55"
 STORAGE_INTERFACE="stor0"
 STORAGE_VLAN="40"
-STORAGE_IP="10.0.40.100"
 STORAGE_NETMASK="255.255.255.0"
 NAS_STORAGE_IP="10.0.40.120"
-HOSTNAME_SHORT="pve-prod"
-HOSTNAME_FQDN="pve-prod.lab.local"
+HOSTNAME_FQDN="${HOSTNAME_SHORT}.lab.local"
 
 #===============================================================================
-# CHECKS
+# Checks
 #===============================================================================
-
 if [[ $EUID -ne 0 ]]; then
     echo "Run as root"
     exit 1
 fi
 
 echo "==============================================="
-echo "Proxmox ${SERVER_TYPE} Network Setup"
+echo "Proxmox ${ENV^^} Network Setup"
 echo "==============================================="
+echo ""
+echo "Config:"
+echo "  WiFi Interface: ${WIFI_INTERFACE}"
+echo "  Management IP:  ${MGMT_IP}"
+echo "  Storage IP:     ${STORAGE_IP}"
+echo "  Service VLANs:  ${SERVICE_VLANS}"
+echo "  Hostname:       ${HOSTNAME_FQDN}"
 echo ""
 
 # Get WiFi password
@@ -54,13 +82,17 @@ if [[ -z "$WIFI_PASSWORD" ]]; then
 fi
 
 #===============================================================================
-# INSTALL & CONFIGURE
+# 1. Install Packages
 #===============================================================================
-
-echo "Installing packages..."
+echo ""
+echo "[1/6] Installing packages..."
 apt update && apt install -y wpasupplicant wireless-tools
 
-echo "Creating wpa_supplicant config..."
+#===============================================================================
+# 2. Configure WiFi
+#===============================================================================
+echo ""
+echo "[2/6] Creating wpa_supplicant config..."
 cat > /etc/wpa_supplicant/wpa_supplicant-${WIFI_INTERFACE}.conf << EOF
 ctrl_interface=/var/run/wpa_supplicant
 update_config=1
@@ -74,7 +106,11 @@ network={
 EOF
 chmod 600 /etc/wpa_supplicant/wpa_supplicant-${WIFI_INTERFACE}.conf
 
-echo "Testing WiFi..."
+#===============================================================================
+# 3. Test WiFi
+#===============================================================================
+echo ""
+echo "[3/6] Testing WiFi..."
 killall wpa_supplicant 2>/dev/null || true
 wpa_supplicant -B -i ${WIFI_INTERFACE} -c /etc/wpa_supplicant/wpa_supplicant-${WIFI_INTERFACE}.conf
 ip link set ${WIFI_INTERFACE} up
@@ -88,10 +124,15 @@ if ! ping -c 3 ${MGMT_GATEWAY}; then
 fi
 echo "WiFi OK!"
 
-echo "Backing up /etc/network/interfaces..."
+#===============================================================================
+# 4. Configure Network Interfaces
+#===============================================================================
+echo ""
+echo "[4/6] Configuring /etc/network/interfaces..."
+
+echo "Backing up current config..."
 cp /etc/network/interfaces /etc/network/interfaces.backup.$(date +%Y%m%d%H%M%S)
 
-echo "Writing /etc/network/interfaces..."
 cat > /etc/network/interfaces << EOF
 auto lo
 iface lo inet loopback
@@ -130,7 +171,7 @@ iface ${STORAGE_INTERFACE}.${STORAGE_VLAN} inet static
 source /etc/network/interfaces.d/*
 EOF
 
-# Remove old 192.168.0.x config
+# Remove old 192.168.0.x config if exists
 OLD_IP=$(ip addr show vmbr0 2>/dev/null | grep -oP '192\.168\.0\.\d+/24' | head -1)
 if [[ -n "$OLD_IP" ]]; then
     echo "Removing old IP ${OLD_IP} from vmbr0..."
@@ -140,19 +181,28 @@ fi
 
 systemctl enable wpa_supplicant
 
-# Update /etc/hosts with new management IP
-echo "Updating /etc/hosts..."
+#===============================================================================
+# 5. Update /etc/hosts
+#===============================================================================
+echo ""
+echo "[5/6] Updating /etc/hosts..."
 sed -i "/\s${HOSTNAME_SHORT}/d" /etc/hosts
 echo "${MGMT_IP}  ${HOSTNAME_FQDN} ${HOSTNAME_SHORT}" >> /etc/hosts
 
-# Regenerate Proxmox certificate with new IP
-echo "Regenerating Proxmox SSL certificate..."
+#===============================================================================
+# 6. Regenerate SSL Certificate
+#===============================================================================
+echo ""
+echo "[6/6] Regenerating Proxmox SSL certificate..."
 pvecm updatecerts --force
 systemctl restart pveproxy
 
+#===============================================================================
+# Complete
+#===============================================================================
 echo ""
 echo "==============================================="
-echo "DONE!"
+echo "DONE! (${ENV^^})"
 echo "==============================================="
 echo ""
 echo "Current network state:"

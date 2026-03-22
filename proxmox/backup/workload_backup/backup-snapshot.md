@@ -106,7 +106,7 @@ To receive backup status emails, configure Gmail SMTP relay on Proxmox:
 
 ```bash
 # Run the setup script
-./proxmox/scripts/mail-config.sh
+./proxmox/bootstrap_proxmox/mail-config.sh
 ```
 
 Or manually:

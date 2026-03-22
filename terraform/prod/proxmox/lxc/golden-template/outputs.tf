@@ -18,7 +18,7 @@ output "lxc_container" {
     4. Convert to template: pct template ${var.lxc_container.ctid}
 
     Or run the automated script:
-      proxmox/scripts/golden-lxc-setup.sh
+      proxmox/golden_templates/golden-lxc-setup.sh
     EOT
 
     clone_command      = "pct clone ${var.lxc_container.ctid} <new-ctid> --hostname <name> --full"
