@@ -8,7 +8,7 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
   vm_id     = var.lxc_container.ctid
 
   description = "Rocky Linux 10 LXC - Base for golden template"
-  tags        = ["lxc", "golden-image", "rocky10"]
+  tags        = var.tags
 
   # Don't start automatically on boot
   start_on_boot = false
@@ -69,8 +69,8 @@ resource "proxmox_virtual_environment_container" "lxc_golden" {
     }
 
     dns {
-      servers = ["8.8.8.8", "1.1.1.1"]
-      domain  = "lab.local"
+      servers = var.dns_servers
+      domain  = var.search_domain
     }
   }
 }

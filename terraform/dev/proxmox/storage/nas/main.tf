@@ -1,4 +1,9 @@
-# Shared ISO
+#===============================================================================
+# NAS Storage Configuration
+# NFS mounts for ISO images, VM/LXC data, and backups
+#===============================================================================
+
+# Shared ISO/Template Storage (shared across dev and prod)
 resource "proxmox_virtual_environment_storage_nfs" "nas_iso" {
   id      = var.nas_iso.id
   server  = var.nas_iso.server
@@ -7,7 +12,7 @@ resource "proxmox_virtual_environment_storage_nfs" "nas_iso" {
   content = var.nas_iso.content
 }
 
-# Dev storage
+# Environment-Specific Data Storage (VM images, container rootfs)
 resource "proxmox_virtual_environment_storage_nfs" "nas_data" {
   id      = var.nas_data.id
   server  = var.nas_data.server
@@ -20,7 +25,7 @@ resource "proxmox_virtual_environment_storage_nfs" "nas_data" {
   }
 }
 
-# Dev Backup
+# Backup Storage (vzdump backups for VMs and LXCs)
 resource "proxmox_virtual_environment_storage_nfs" "backups" {
   id      = var.backups.id
   server  = var.backups.server

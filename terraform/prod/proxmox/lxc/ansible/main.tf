@@ -8,9 +8,10 @@ resource "proxmox_virtual_environment_container" "ansible" {
 
   node_name = var.node_name
   vm_id     = var.ansible.ctid
-  tags      = ["lxc", "ansible", "infrastructure"]
+  tags      = var.tags
 
-  # Unprivileged container with nesting
+  # Unprivileged container (security best practice - runs without root on host)
+  # Nesting enabled for running containers inside (Docker/Podman support)
   unprivileged = true
 
   features {
@@ -59,7 +60,7 @@ resource "proxmox_virtual_environment_container" "ansible" {
     swap      = var.ansible.swap
   }
 
-  # Network Configuration
+  # Network Configuration (eth0 is standard Linux NIC name, firewall enables PVE firewall)
   network_interface {
     name     = "eth0"
     bridge   = var.ansible.bridge

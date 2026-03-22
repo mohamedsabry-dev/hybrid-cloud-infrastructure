@@ -11,9 +11,10 @@ resource "proxmox_virtual_environment_container" "vault1" {
 
   node_name = var.node_name
   vm_id     = var.vault1.ctid
-  tags      = ["lxc", "vault", "ha-cluster", "prod"]
+  tags      = var.tags
 
-  # Unprivileged container with nesting
+  # Unprivileged container (security best practice - runs without root on host)
+  # Nesting enabled for running containers inside (Docker/Podman support)
   unprivileged = true
 
   features {
@@ -61,7 +62,7 @@ resource "proxmox_virtual_environment_container" "vault1" {
     swap      = var.vault1.swap
   }
 
-  # Network Configuration
+  # Network Configuration (eth0 is standard Linux NIC name, firewall enables PVE firewall)
   network_interface {
     name     = "eth0"
     bridge   = var.vault1.bridge
@@ -107,9 +108,10 @@ resource "proxmox_virtual_environment_container" "vault2" {
 
   node_name = var.node_name
   vm_id     = var.vault2.ctid
-  tags      = ["lxc", "vault", "ha-cluster", "prod"]
+  tags      = var.tags
 
-  # Unprivileged container with nesting
+  # Unprivileged container (security best practice - runs without root on host)
+  # Nesting enabled for running containers inside (Docker/Podman support)
   unprivileged = true
 
   features {
@@ -157,7 +159,7 @@ resource "proxmox_virtual_environment_container" "vault2" {
     swap      = var.vault2.swap
   }
 
-  # Network Configuration
+  # Network Configuration (eth0 is standard Linux NIC name, firewall enables PVE firewall)
   network_interface {
     name     = "eth0"
     bridge   = var.vault2.bridge
@@ -203,9 +205,10 @@ resource "proxmox_virtual_environment_container" "vault3" {
 
   node_name = var.node_name
   vm_id     = var.vault3.ctid
-  tags      = ["lxc", "vault", "ha-cluster", "prod"]
+  tags      = var.tags
 
-  # Unprivileged container with nesting
+  # Unprivileged container (security best practice - runs without root on host)
+  # Nesting enabled for running containers inside (Docker/Podman support)
   unprivileged = true
 
   features {
@@ -253,7 +256,7 @@ resource "proxmox_virtual_environment_container" "vault3" {
     swap      = var.vault3.swap
   }
 
-  # Network Configuration
+  # Network Configuration (eth0 is standard Linux NIC name, firewall enables PVE firewall)
   network_interface {
     name     = "eth0"
     bridge   = var.vault3.bridge
