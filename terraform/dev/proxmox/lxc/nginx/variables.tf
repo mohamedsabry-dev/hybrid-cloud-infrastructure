@@ -2,6 +2,12 @@
 # Nginx LXC Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the LXC container [type, service, category, environment]"
+  type        = list(string)
+  default     = ["lxc", "nginx", "proxy", "dev"]
+}
+
 variable "nginx" {
   description = "Configuration for Nginx LXC container from golden template"
   type = object({

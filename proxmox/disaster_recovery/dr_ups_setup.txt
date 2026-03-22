@@ -1,14 +1,24 @@
 DR UPS Monitor - Quick Setup on Proxmox
 ========================================
 
+0. Make dir:
+   mkdir -p /root/scripts
+
 1. Copy dr_ups_monitor.sh to Proxmox:
-   scp dr_ups_monitor.sh root@proxmox:/root/scripts/
+   scp dr_ups_monitor.sh root@pve-dev:/root/scripts/
+   scp dr_ups_monitor.sh root@pve-prod:/root/scripts/
 
 2. Make executable:
    chmod +x /root/scripts/dr_ups_monitor.sh
 
 3. Add cron (runs every 5 min):
-   (crontab -l 2>/dev/null; echo "*/5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1") | crontab -
+   crontab -e
+   # Add this line:
+   */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
 
-4. Test:
+4. Verify cron was added:
+   crontab -l
+
+5. Test:
    /root/scripts/dr_ups_monitor.sh
+
