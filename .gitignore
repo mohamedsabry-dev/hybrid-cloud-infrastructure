@@ -36,12 +36,12 @@ Key*
 # vault ansible
 .ansible_vault
 
-# Router backups
-backup-ER605*.bin
+# Network device backups (contain credentials)
 *.bin
-
-# Switch config backups (contains credentials)
-network/backups/*.cfg
+network/**/backups/*.cfg
 
 # Device diagnostic logs
-network/logs/**
+network/**/logs/**
+
+# Vendor documentation PDFs
+network/**/docs/*.pdf
