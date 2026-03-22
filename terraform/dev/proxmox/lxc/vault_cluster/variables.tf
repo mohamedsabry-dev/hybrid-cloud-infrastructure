@@ -2,6 +2,12 @@
 # Vault Cluster LXC Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the LXC container [type, service, category, environment]"
+  type        = list(string)
+  default     = ["lxc", "vault", "security", "dev"]
+}
+
 #-------------------------------------------------------------------------------
 # Vault 1
 #-------------------------------------------------------------------------------

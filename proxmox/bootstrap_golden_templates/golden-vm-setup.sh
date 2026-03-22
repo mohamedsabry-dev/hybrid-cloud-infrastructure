@@ -204,11 +204,26 @@ echo "         This will DISCONNECT your SSH session!"
 echo ""
 echo "The VM will automatically shutdown after cleanup."
 echo ""
-read -p "Proceed with cleanup and shutdown? (y/n): " PROCEED </dev/tty
-if [ "$PROCEED" != "y" ]; then
-    echo "Aborted. Run script again when ready."
-    exit 0
-fi
+
+# Flush any buffered input (from accidental Enter presses during install)
+while read -t 0.1 -n 1 </dev/tty 2>/dev/null; do :; done
+
+# Prompt with validation loop - only accept y or n
+while true; do
+    read -p "Proceed with cleanup and shutdown? (y/n): " PROCEED </dev/tty
+    case "$PROCEED" in
+        y|Y)
+            break
+            ;;
+        n|N)
+            echo "Aborted. Run script again when ready."
+            exit 0
+            ;;
+        *)
+            echo "Invalid input. Please enter 'y' or 'n'."
+            ;;
+    esac
+done
 
 #-------------------------------------------------------------------------------
 # 12. Final Cleanup (WILL DISCONNECT SSH)
@@ -222,6 +237,10 @@ rm -f /var/lib/dbus/machine-id
 
 # Remove SSH host keys (regenerate on first boot)
 rm -f /etc/ssh/ssh_host_*
+
+# Clear authorized_keys (cloud-init will inject new keys per VM)
+rm -f /root/.ssh/authorized_keys
+rm -f /home/*/.ssh/authorized_keys 2>/dev/null || true
 
 # Clear network config
 rm -f /etc/NetworkManager/system-connections/*.nmconnection
@@ -249,10 +268,23 @@ echo "     - Convert to template: Right-click VM > Convert to Template"
 echo "==============================================================================="
 echo ""
 
-read -p "Shutdown now? (y/n): " SHUTDOWN </dev/tty
-if [ "$SHUTDOWN" = "y" ]; then
-    echo "Shutting down..."
-    shutdown -h now
-else
-    echo "Skipped shutdown. Run 'shutdown -h now' when ready."
-fi
+# Flush any buffered input
+while read -t 0.1 -n 1 </dev/tty 2>/dev/null; do :; done
+
+# Prompt with validation loop - only accept y or n
+while true; do
+    read -p "Shutdown now? (y/n): " SHUTDOWN </dev/tty
+    case "$SHUTDOWN" in
+        y|Y)
+            echo "Shutting down..."
+            shutdown -h now
+            ;;
+        n|N)
+            echo "Skipped shutdown. Run 'shutdown -h now' when ready."
+            break
+            ;;
+        *)
+            echo "Invalid input. Please enter 'y' or 'n'."
+            ;;
+    esac
+done

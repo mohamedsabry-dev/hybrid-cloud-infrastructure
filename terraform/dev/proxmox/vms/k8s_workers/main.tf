@@ -9,10 +9,12 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
   node_name = var.node_name
   vm_id     = var.k8s_worker1.vmid
   name      = var.k8s_worker1.name
-  tags      = ["k8s", "worker", "clone", "dev"]
+  tags      = var.tags
 
   description = "K8s Worker Node 1 cloned from ${var.template_name} golden image"
 
+  # Clone from template
+  # full=true creates independent copy (safer than linked clone which depends on source template)
   clone {
     vm_id = var.template_vmid
     full  = true
@@ -46,6 +48,7 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
     file_format  = var.disks.data_disk.file_format
   }
 
+  # CPU (sockets=1 standard, type=host for CPU passthrough performance)
   cpu {
     cores   = var.k8s_worker1.cores
     sockets = 1
@@ -93,7 +96,9 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
   }
 
   lifecycle {
-    ignore_changes = []
+    # Ignore clone block changes - VMs are already created, changing template_vmid
+    # should not trigger recreation of existing VMs
+    ignore_changes = [clone]
   }
 }
 
@@ -104,10 +109,12 @@ resource "proxmox_virtual_environment_vm" "k8s_worker2" {
   node_name = var.node_name
   vm_id     = var.k8s_worker2.vmid
   name      = var.k8s_worker2.name
-  tags      = ["k8s", "worker", "clone", "dev"]
+  tags      = var.tags
 
   description = "K8s Worker Node 2 cloned from ${var.template_name} golden image"
 
+  # Clone from template
+  # full=true creates independent copy (safer than linked clone which depends on source template)
   clone {
     vm_id = var.template_vmid
     full  = true
@@ -188,7 +195,9 @@ resource "proxmox_virtual_environment_vm" "k8s_worker2" {
   }
 
   lifecycle {
-    ignore_changes = []
+    # Ignore clone block changes - VMs are already created, changing template_vmid
+    # should not trigger recreation of existing VMs
+    ignore_changes = [clone]
   }
 }
 
@@ -199,10 +208,12 @@ resource "proxmox_virtual_environment_vm" "k8s_worker3" {
   node_name = var.node_name
   vm_id     = var.k8s_worker3.vmid
   name      = var.k8s_worker3.name
-  tags      = ["k8s", "worker", "clone", "dev"]
+  tags      = var.tags
 
   description = "K8s Worker Node 3 cloned from ${var.template_name} golden image"
 
+  # Clone from template
+  # full=true creates independent copy (safer than linked clone which depends on source template)
   clone {
     vm_id = var.template_vmid
     full  = true
@@ -283,6 +294,8 @@ resource "proxmox_virtual_environment_vm" "k8s_worker3" {
   }
 
   lifecycle {
-    ignore_changes = []
+    # Ignore clone block changes - VMs are already created, changing template_vmid
+    # should not trigger recreation of existing VMs
+    ignore_changes = [clone]
   }
 }

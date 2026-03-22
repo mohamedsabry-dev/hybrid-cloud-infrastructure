@@ -2,6 +2,12 @@
 # local_runner LXC Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the LXC container [type, service, category, environment]"
+  type        = list(string)
+  default     = ["lxc", "runner", "cicd", "prod"]
+}
+
 variable "local_runner" {
   description = "Configuration for local_runner LXC container from golden template"
   type = object({

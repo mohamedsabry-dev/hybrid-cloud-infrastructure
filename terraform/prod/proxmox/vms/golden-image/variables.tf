@@ -21,7 +21,7 @@ variable "golden_image" {
   default = {
     vm_id       = 9000
     name        = "rocky10-golden-image"
-    tags        = ["golden-image", "template", "rocky10"]
+    tags        = ["vm", "golden", "template", "prod"]
     description = "Rocky Linux 10.1 Golden Image - Install from ISO, run cleanup script, then convert to template"
     cpu_cores   = 2
     memory      = 2048
