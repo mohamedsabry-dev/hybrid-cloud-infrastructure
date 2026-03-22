@@ -5,10 +5,23 @@
 # Backs up Proxmox VE configuration files for disaster recovery.
 # This does NOT backup VM/LXC data - use vzdump for that.
 #
-# Usage: ./backup-proxmox-config.sh
-# Run on: Each Proxmox host (prod/dev)
+# Location: /root/scripts/backup-proxmox-config.sh (on Proxmox host)
+# Usage: /root/scripts/backup-proxmox-config.sh
+# Run on: Each Proxmox host (pve-dev, pve-prod)
 #
 # Backup stored on: NAS via NFS (nas-backups storage)
+#
+# CRON SETUP (Thursday & Saturday at 9 PM):
+#   crontab -e
+#   # Add this line:
+#   0 21 * * 4,6 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log 2>&1
+#
+# Schedule Reasoning:
+#   - Thursday 9 PM: Before weekend work - ensures config backup before major changes
+#   - Saturday 9 PM: After weekend work - captures any changes made during weekend
+#   - Matches vzdump backup schedule (thu,sat 21:00)
+#   - Environment not running 24/7, so backups timed when system is known to be up
+#
 #===============================================================================
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)

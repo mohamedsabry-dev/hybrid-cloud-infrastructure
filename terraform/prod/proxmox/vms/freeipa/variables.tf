@@ -2,6 +2,12 @@
 # freeipa VM Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the VM [type, service, category, environment]"
+  type        = list(string)
+  default     = ["vm", "freeipa", "identity", "prod"]
+}
+
 variable "freeipa" {
   description = "Configuration for freeipa VM cloned from golden image"
   type = object({
@@ -40,9 +46,9 @@ variable "freeipa" {
 }
 
 variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+  description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {

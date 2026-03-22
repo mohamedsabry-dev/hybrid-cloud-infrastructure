@@ -2,6 +2,12 @@
 # LXC Container Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the LXC container [type, service, category, environment]"
+  type        = list(string)
+  default     = ["lxc", "golden-template", "base", "prod"]
+}
+
 variable "lxc_container" {
   description = "Configuration for LXC container"
   type = object({
@@ -18,7 +24,7 @@ variable "lxc_container" {
   })
 
   default = {
-    ctid        = 9001
+    ctid        = 9010
     hostname    = "rocky10-lxc-golden"
     cores       = 1
     memory      = 1024
@@ -57,6 +63,18 @@ variable "datastore_id" {
   description = "Proxmox datastore for container rootfs"
   type        = string
   default     = "local-lvm"
+}
+
+variable "dns_servers" {
+  description = "DNS servers for container"
+  type        = list(string)
+  default     = ["8.8.8.8", "1.1.1.1"]
+}
+
+variable "search_domain" {
+  description = "DNS search domain"
+  type        = string
+  default     = "lab.local"
 }
 
 #===============================================================================
