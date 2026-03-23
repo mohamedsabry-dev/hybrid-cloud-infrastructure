@@ -2,6 +2,9 @@
 
 When a USB-Ethernet adapter fails, replace it and update the MAC address mapping.
 
+> **Background**: This DR preparation was created after experiencing an outage due to hardware issues.
+> See: [TS Case 43: Switch Port 4 Link Flapping](/troubleshooting/network/43-switch-port4-link-flapping-loose-connection.md)
+
 ---
 
 ## How It Works
@@ -30,9 +33,13 @@ Name=svc0
 ### pve-dev
 | Interface | MAC Address | Adapter |
 |-----------|-------------|---------|
-| svc0 | `XX:XX:XX:XX:XX:XX` | ASIX AX88179B |
-| stor0 | `XX:XX:XX:XX:XX:XX` | |
+| svc0 | `**:**:**:**:**:b2` | ASIX AX88179B (USB-C to ETH) |
+| stor0 | `**:**:**:**:**:fd` | ASIX AX88179B (USB-C to ETH) |
 | wifi0 | `XX:XX:XX:XX:XX:XX` | |
+
+> **Note**: Old MACs commented out in `.link` files for reference:
+> - svc0: `**:**:**:**:**:ad`
+> - stor0: `**:**:**:**:**:3e`
 
 ### pve-prod
 | Interface | MAC Address | Adapter |
@@ -46,6 +53,17 @@ Name=svc0
 ---
 
 ## Replacement Steps
+
+> **WARNING: stor0 Replacement**
+>
+> If replacing stor0 (storage network), unmount NFS **before** unplugging to avoid shutdown hang.
+> See: [TS Case 55: NFS Shutdown Hang](/troubleshooting/proxmox/55-nfs-shutdown-hang-stor0-hotswap.md)
+>
+> ```bash
+> umount -l /mnt/pve/nas-dev-data
+> umount -l /mnt/pve/nas-iso
+> umount -l /mnt/pve/nas-backups
+> ```
 
 ### 1. Plug in new adapter
 
@@ -111,9 +129,58 @@ udevadm info /sys/class/net/svc0 | grep -E "ID_MODEL|ID_SERIAL|MAC"
 
 Keep spare adapters and **pre-document their MACs**:
 
-| Spare # | MAC Address | Model |
-|---------|-------------|-------|
-| 1 | | |
-| 2 | | |
+| Spare # | MAC Address | Model | Type | Notes |
+|---------|-------------|-------|------|-------|
+| 1 | `**:**:**:**:**:ad` | ASIX AX88179B | USB-C to ETH | Former pve-dev svc0 |
+| 2 | `**:**:**:**:**:3e` | ASIX AX88179B | USB-C to ETH | Former pve-dev stor0 |
 
 When a failure occurs, just update the .link file with the spare's MAC.
+
+---
+
+## Emergency Recovery (Adapter Already Failed)
+
+If stor0 fails unexpectedly (not planned swap), NFS is already unreachable. You **cannot** cleanly unmount.
+
+### Procedure
+
+```bash
+# 1. Plug in replacement adapter
+ip link show | grep enx   # Get new MAC
+
+# 2. Update .link file with new MAC
+nano /usr/local/lib/systemd/network/50-pmx-stor0.link
+
+# 3. Force reboot (graceful reboot will hang on NFS)
+systemctl reboot --force --force
+# Or if that doesn't work:
+echo b > /proc/sysrq-trigger
+# Last resort: hold power button 5-10 seconds
+```
+
+### Why Force Reboot?
+
+| Scenario | `reboot` behavior |
+|----------|-------------------|
+| NFS reachable | Clean unmount, clean shutdown |
+| NFS unreachable | Waits 60s+ per mount, hangs |
+| After force reboot | System recovers, NFS remounts automatically |
+
+### After Recovery
+
+```bash
+# Verify stor0 is up
+ip link show stor0
+
+# Verify NFS remounted
+mount | grep nfs
+
+# If NFS not mounted, trigger remount
+systemctl restart pvedaemon pvestatd
+```
+
+---
+
+## Related
+
+- [TS Case 55: NFS Shutdown Hang During stor0 Hot-Swap](/troubleshooting/proxmox/55-nfs-shutdown-hang-stor0-hotswap.md)

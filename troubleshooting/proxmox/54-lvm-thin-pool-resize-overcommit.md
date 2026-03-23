@@ -208,7 +208,7 @@ cat /etc/pve/jobs.cfg
 **Check NAS has enough space:**
 ```bash
 # Estimate: actual usage × 1.5 (compression overhead)
-df -h /mnt/pve/nas-backups
+df -h /mnt/pve/nas-dev-data
 ```
 
 #### Procedure
@@ -220,71 +220,127 @@ Ensure backup job includes:
 - All LXCs (including golden-template)
 - Templates
 
-**2. Shutdown Everything**
+**2. Shutdown Everything (Graceful)**
 ```bash
-# Stop all VMs
-qm list | awk 'NR>1 {print $1}' | xargs -I {} qm stop {}
+# Graceful shutdown all VMs (ACPI shutdown, not hard stop)
+qm list | awk 'NR>1 {print $1}' | xargs -I {} qm shutdown {}
 
-# Stop all LXCs
-pct list | awk 'NR>1 {print $1}' | xargs -I {} pct stop {}
+# Graceful shutdown all LXCs
+pct list | awk 'NR>1 {print $1}' | xargs -I {} pct shutdown {}
+
+# Wait for all to stop (check status)
+watch -n 5 'qm list; echo "---"; pct list'
 ```
 
 **3. Run Full Backup**
 ```bash
 # Via UI: Datacenter → Backup → Run Now
 # Or via CLI:
-vzdump --all --storage nas-backups --mode stop --compress zstd
+vzdump --all --storage nas-dev-data --mode stop --compress zstd
 ```
 
 **4. Verify Backups on NAS**
 ```bash
 # Check backup storage
-ls -la /mnt/pve/nas-backups/dump/
+ls -la /mnt/pve/nas-dev-data/dump/
 ```
 
-**5. Delete Thin Pool**
+> **WARNING: Snapshots NOT included in backup!**
+>
+> Proxmox vzdump does NOT backup snapshots. When you delete the thin pool:
+> - All snapshots will be permanently deleted
+> - Only the current VM/LXC state is backed up
+>
+> If you need snapshots, manually note their names or accept they'll be lost.
+
+**5. Save Current LVM Config (for reference)**
+```bash
+# Save current LVM configuration before deletion
+mkdir -p /root/lvm-backup-$(date +%Y%m%d)
+lvs -a -o +devices > /root/lvm-backup-$(date +%Y%m%d)/lvs-full.txt
+vgs -o +devices > /root/lvm-backup-$(date +%Y%m%d)/vgs-full.txt
+pvs -o +devices > /root/lvm-backup-$(date +%Y%m%d)/pvs-full.txt
+lvdisplay pve/data > /root/lvm-backup-$(date +%Y%m%d)/data-details.txt
+cat /etc/lvm/lvm.conf > /root/lvm-backup-$(date +%Y%m%d)/lvm.conf.bak
+
+# Verify saved
+ls -la /root/lvm-backup-$(date +%Y%m%d)/
+```
+
+**6. Delete Thin Pool**
 ```bash
 # Remove the thin pool
-lvremove /dev/pve/data
+lvremove pve/data
 ```
 
-**6. Recreate at Smaller Size**
+**7. Remove Orphan VM/LXC Configs**
+
+Deleting the thin pool removes disks but NOT config files in `/etc/pve/`. Remove orphans before restore:
+
+```bash
+# List orphan configs (will show "disk not found" in UI)
+ls /etc/pve/qemu-server/
+ls /etc/pve/lxc/
+
+# Remove VM configs
+rm /etc/pve/qemu-server/{9000,9001,1001,1010,1011,1012,1020,1021,1022}.conf
+
+# Remove LXC configs
+rm /etc/pve/lxc/{9010,2001,2002,2003,2004,2005,2006}.conf
+
+# Verify empty
+ls /etc/pve/qemu-server/
+ls /etc/pve/lxc/
+```
+
+Or via UI: Select each orphan → More → Remove (confirm despite missing disk warning).
+
+**8. Recreate at Smaller Size**
 ```bash
 # Create new thin pool at 250 GB (5x current usage)
-lvcreate -L 250G -T pve/data
+lvcreate -L 250G -T /dev/pve/data
 ```
 
-**7. Verify New Allocation**
+**9. Verify New Allocation**
 ```bash
 # Check VG free space (should show ~140 GB free now)
 vgs pve
 
 # Check thin pool
-lvs pve/data
+lvs /dev/pve/data
 ```
 
-**8. Restore from Backup**
+**10. Restore from Backup**
 ```bash
 # Via UI: Select backup → Restore
 # Or via CLI:
-qmrestore /mnt/pve/nas-backups/dump/vzdump-qemu-XXX.vma.zst VMID --storage local-lvm
-pct restore CTID /mnt/pve/nas-backups/dump/vzdump-lxc-XXX.tar.zst --storage local-lvm
+qmrestore /mnt/pve/nas-dev-data/dump/vzdump-qemu-XXX.vma.zst VMID --storage local-lvm
+pct restore CTID /mnt/pve/nas-dev-data/dump/vzdump-lxc-XXX.tar.zst --storage local-lvm
 ```
 
-**9. Enable Auto-Extend**
+**11. Enable Auto-Extend**
 ```bash
-# Edit /etc/lvm/lvm.conf
-sed -i 's/thin_pool_autoextend_threshold = 100/thin_pool_autoextend_threshold = 80/' /etc/lvm/lvm.conf
-sed -i 's/# thin_pool_autoextend_percent = 20/thin_pool_autoextend_percent = 10/' /etc/lvm/lvm.conf
+# Edit /etc/lvm/lvm.conf manually (sed can create duplicates)
+nano /etc/lvm/lvm.conf
+
+# Search for "thin_pool_autoextend" and set these values (uncomment if needed):
+#   thin_pool_autoextend_threshold = 80
+#   thin_pool_autoextend_percent = 10
 
 # Restart LVM monitor
 systemctl restart lvm2-monitor
 
-# Verify settings
-grep -E "thin_pool_autoextend" /etc/lvm/lvm.conf
+# Verify settings (should show only uncommented lines)
+grep -E "thin_pool_autoextend" /etc/lvm/lvm.conf | grep -v "#"
 ```
 
-**10. Start VMs/LXCs**
+Expected output:
+```
+thin_pool_autoextend_threshold = 80
+thin_pool_autoextend_percent = 10
+```
+
+**12. Start VMs/LXCs**
 ```bash
 # Start critical services first
 qm start <freeipa-vmid>
@@ -359,6 +415,67 @@ vgs pve -o vg_name,vg_size,vg_free
 
 ---
 
+## Expected Warning After Fix
+
+After resize and restore, you will **still see warnings** during snapshot operations:
+
+```
+Logical volume "vm-1012-state-Before_K8s_Setup" created.
+WARNING: Sum of all thin volume sizes (398.49 GiB) exceeds the size of thin pool pve/data
+  and the amount of free space in volume group (<121.69 GiB).
+...
+Logical volume "snap_vm-1012-disk-0_Before_K8s_Setup" created.
+WARNING: Sum of all thin volume sizes (423.49 GiB) exceeds the size of thin pool pve/data
+  and the amount of free space in volume group (<121.69 GiB).
+TASK OK
+```
+
+**This is normal.** The warning is about **allocation** (423 GB), not **actual usage**.
+
+### Understanding the Metrics
+
+```bash
+root@pve-dev:~# lvs -o lv_name,lv_size,data_percent pve/data
+  LV   LSize   Data%
+  data 250.00g 15.83   ← Actual usage: only 15.83%
+
+root@pve-dev:~# vgs pve -o vg_name,vg_size,vg_free
+  VG  VSize    VFree
+  pve <475.94g <121.69g  ← 122 GB free for auto-extend
+```
+
+| Metric | Value | Meaning |
+|--------|-------|---------|
+| Allocated | 423 GB | Sum of all thin volumes (triggers warning) |
+| Pool size | 250 GB | Thin pool capacity |
+| **Actual usage** | 15.83% (~40 GB) | Real data written |
+| Auto-extend trigger | 80% (200 GB) | When pool will grow |
+| VG free | 122 GB | Buffer for auto-extend |
+
+**Why warning appears:** Allocated (423 GB) > Pool (250 GB) + VG free (122 GB)
+
+**Why it's safe:** Actual usage (40 GB) is far below the 200 GB auto-extend trigger. The warning is informational - thin provisioning allows overcommit by design.
+
+---
+
 ## Status
 
-PENDING - Backup and resize procedure to be executed
+RESOLVED - Thin pool resized from 374 GB to 250 GB, auto-extend enabled, all VMs/LXCs restored
+
+---
+
+## Note: Prod Environment
+
+After successful completion on pve-dev, the same procedure was repeated on pve-prod.
+
+**What changes:**
+- SSH target: `pve-dev` → `pve-prod`
+- Backup storage: `nas-dev-data` → `nas-prod-data`
+- VM/LXC IDs: follow prod numbering scheme
+
+**What stays the same:**
+- LVM paths: `/dev/pve/data` (same default name on all Proxmox hosts)
+- LVM commands: `lvremove`, `lvcreate`, `lvs`, `vgs`
+- Config paths: `/etc/lvm/lvm.conf`, `/etc/pve/`
+
+The `pve` volume group and `data` thin pool are Proxmox defaults - identical on every host.

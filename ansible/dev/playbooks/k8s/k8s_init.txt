@@ -1,0 +1,120 @@
+
+______________________________
+# 1. Step 1 Init
+kubeadm init --control-plane-endpoint=10.0.61.100:16443 --upload-certs --pod-network-cidr=10.244.0.0/16
+
+# 2. Step 2 After init 
+# To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# 3. Step 3 
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+# Download manifest
+curl -O https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+
+# Change CIDR to match your init
+sed -i 's|192.168.0.0/16|10.244.0.0/16|g' calico.yaml
+
+# Apply
+kubectl apply -f calico.yaml
+______________________________
+
+______________________________
+# On Node master 2 and 3 
+# You can now join any number of the control-plane node running the following command on each as root:
+
+kubeadm join 10.0.61.100:16443 --token 5wkpaa.yla4fvjigekcm3ew --discovery-token-ca-cert-hash sha256:<REDACTED_K8S_CA_HASH> --control-plane --certificate-key 099263cce5880f0a5259b4b26830ae55a3026e1ce455e6d6ff284c9fdeda1edd
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+______________________________
+
+Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
+"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
+# Workers 
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 10.0.61.100:16443 --token 5wkpaa.yla4fvjigekcm3ew --discovery-token-ca-cert-hash sha256:<REDACTED_K8S_CA_HASH> 
+
+
+
+Draft Idea 
+
+❯ see those the steps i did , after i got the output from the ini , so we may      
+  just do the init, capture the output of tokens ? , run plays for the dir and    
+   cp cof and set aithority with same play as mkdir play , and then have play      
+  of curl and gate when file to make the curl idemportant , and the replce         
+  module for sed cider , and shell for applu calico conf ? and add when edit       
+  on the file to makle idempotant , and run the kubejoin gocommand aginst          
+  other 2 masters like k8smasters!master1 , and also same mkdir and cp and         
+  chow related plays , and then run the other kubecm join command on the           
+  worker groups , and thats all , despite the quick explain, im i correct ? if     
+   so i thin making it playbook is easy and fully automation is sutable            
+  ⎿ ⧉ Selected 46 lines from ansible/dev/playbooks/k8s/k8s_init.txt in Visual      
+    Studio Code                                                                    
+                                                                                 
+⏺ Yes, you're correct! That's exactly the right approach. Let me summarize the   
+  automation plan:                                                              
+                                                                                   
+  Automated Flow
+  Play: 1                                                                          
+  Hosts: master1 only                                                            
+  Tasks: kubeadm init, capture tokens                                              
+  ────────────────────────────────────────                                       
+  Play: 2                                                                     
+  Hosts: master1 only
+  Tasks: mkdir, cp, chown kubeconfig
+  ────────────────────────────────────────
+  Play: 3
+  Hosts: master1 only
+  Tasks: curl calico (when: file not exists), sed CIDR, kubectl apply
+  ────────────────────────────────────────
+  Play: 4
+  Hosts: master2, master3
+  Tasks: kubeadm join --control-plane
+  ────────────────────────────────────────
+  Play: 5
+  Hosts: master2, master3
+  Tasks: mkdir, cp, chown kubeconfig
+  ────────────────────────────────────────
+  Play: 6
+  Hosts: workers
+  Tasks: kubeadm join (worker command)
+  Idempotency Checks
+  ┌───────────────┬────────────────────────────────────────────────┐
+  │     Task      │                     Check                      │
+  ├───────────────┼────────────────────────────────────────────────┤
+  │ kubeadm init  │ when: not /etc/kubernetes/admin.conf exists    │
+  ├───────────────┼────────────────────────────────────────────────┤
+  │ curl calico   │ creates: /path/to/calico.yaml                  │
+  ├───────────────┼────────────────────────────────────────────────┤
+  │ kubectl apply │ Check if pods already running or use --dry-run │
+  ├───────────────┼────────────────────────────────────────────────┤
+  │ kubeadm join  │ when: not /etc/kubernetes/kubelet.conf exists  │
+  └───────────────┴────────────────────────────────────────────────┘
+  Token Passing
+
+  # Capture on master1
+  - name: Get join command
+    shell: kubeadm token create --print-join-command
+    register: join_command
+
+  # Use on other nodes
+  - name: Join cluster
+    command: "{{ hostvars['k8s-master1']['join_command'].stdout }}"
+
+  You're right - this is straightforward to automate. Want me to write the full
+  playbook?
+
+───────────────────────────────────────────────────────────────────────────────────
+❯ i will wiite it tomorrow                                                      
+───────────────────────────────────
