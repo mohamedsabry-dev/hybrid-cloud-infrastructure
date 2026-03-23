@@ -2,14 +2,7 @@
 
 Backup load test — monitor CPU, RAM, storage during backup run, record observationsObservationMedium2
 raft backup dir 
-Check The warning TS when craete snapshot it appear
-()
-  Logical volume "snap_vm-2006-disk-0_Before_Vault" created.
-  WARNING: You have not turned on protection against thin pools running out of space.
-  WARNING: Set activation/thin_pool_autoextend_threshold below 100 to trigger automatic extension of thin pools before they get full.
-  Logical volume "snap_vm-2006-disk-1_Before_Vault" created.
-  WARNING: Sum of all thin volume sizes (<350.03 GiB) exceeds the size of thin pool pve/data and the amount of free space in volume group (16.00 GiB).
-TASK OK
+
 
 Backup Proxmox config iteself 
 Backup Raft Config cluster
@@ -19,43 +12,3 @@ Save Network BAckup Config ER + Sw to True nas >> Done created Backup shared dir
 
 Conslidation phasse 
 
-
-Check below LVM< 97% issue
-
-                                                                                                                       
-  Warning Analysis
-  Warning: "not turned on protection against thin pools running out of space"                                              
-  Meaning: LVM auto-extend is disabled                                                                                     
-  ────────────────────────────────────────                                                                                 
-  Warning: "Set thin_pool_autoextend_threshold below 100"                                                                  
-  Meaning: Configure auto-extend trigger point                                                                           
-  ────────────────────────────────────────
-  Warning: "Sum of thin volumes (350GB) exceeds thin pool + free VG (16GB)"
-  Meaning: Over-provisioned - if VMs fill up, you're in trouble
-  The Risk
-
-  Current State:
-  ├── Thin pool size:     374.54 GB
-  ├── Allocated to VMs:   ~350 GB (97%)
-  ├── Actually used:      ~46 GB (12%)     ← You're here now, safe
-  ├── Free in VG:         16 GB            ← Can extend pool by this much
-  └── IF VMs fill up:     350 GB needed, only 390 GB available ⚠️
-
-  Fix: Enable Auto-Extend
-
-  SSH to both Proxmox hosts and edit /etc/lvm/lvm.conf:
-
-  # Find and modify these settings:
-  thin_pool_autoextend_threshold = 80    # Extend when 80% full
-  thin_pool_autoextend_percent = 20      # Extend by 20%
-
-  Or quick one-liner:
-  sed -i 's/thin_pool_autoextend_threshold = 100/thin_pool_autoextend_threshold = 80/' /etc/lvm/lvm.conf
-  sed -i 's/thin_pool_autoextend_percent = 20/thin_pool_autoextend_percent = 20/' /etc/lvm/lvm.conf
-
-  Better Long-Term Fix
-
-  Since you have NAS storage, consider moving data-heavy VMs (K8s workers with 80GB data disks) to nas-dev-data /
-  nas-prod-data to free up local thin pool.
-
-  Want me to create a troubleshooting case for this?

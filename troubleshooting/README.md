@@ -15,7 +15,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [linux/](linux/) | OS-level issues (Rocky Linux, NTP, UID) | 5 |
 | [macos/](macos/) | macOS client configuration | 2 |
 | [network/](network/) | Routing, connectivity, hardware issues | 8 |
-| [proxmox/](proxmox/) | Proxmox VE platform issues | 8 |
+| [proxmox/](proxmox/) | Proxmox VE platform issues | 9 |
 | [security/](security/) | Secrets management, incidents | 1 |
 | [terraform/](terraform/) | Terraform IaC issues | 6 |
 | [vault/](vault/) | HashiCorp Vault deployment issues | 8 |
@@ -114,6 +114,7 @@ Documentation of issues encountered and resolved during infrastructure setup.
 | [38](proxmox/38-lxc-mount-point-backup-disabled.md) | LXC Mount Point Backup Disabled | Mount points excluded from backup by default |
 | [41](proxmox/41-lxc-clone-vs-template-file-ssh-keys.md) | LXC Clone vs Template SSH Keys | SSH key behavior differs between clone and template |
 | [54](proxmox/54-lvm-thin-pool-resize-overcommit.md) | LVM Thin Pool Resize Overcommit | Thin pool warnings, resize via backup/recreate |
+| [55](proxmox/55-nfs-shutdown-hang-stor0-hotswap.md) | NFS Shutdown Hang stor0 Hot-Swap | NFS hard mount blocks shutdown during adapter swap |
 
 ---
 
