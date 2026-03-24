@@ -1,0 +1,117 @@
+---
+- name: Initialize K8s Cluster
+  hosts: k8s-master1.lab.local
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Init master node
+      ansible.builtin.command:
+        cmd: >-
+          kubeadm init
+          --control-plane-endpoint=10.0.61.100:16443
+          --upload-certs
+          --pod-network-cidr=10.244.0.0/16
+        creates: /etc/kubernetes/admin.conf
+      register: init_output
+
+    - name: Generate worker join command
+      ansible.builtin.command:
+        cmd: kubeadm token create --print-join-command
+      register: worker_join_command_output
+      changed_when: false
+
+    - name: Upload certificates and get key
+      ansible.builtin.command:
+        cmd: kubeadm init phase upload-certs --upload-certs
+      register: cert_key_output
+      changed_when: false
+
+    - name: Set certificate key fact
+      ansible.builtin.set_fact:
+        certificate_key: "{{ cert_key_output.stdout_lines[-1] }}"
+
+    - name: Set master join command
+      ansible.builtin.set_fact:
+        master_join_cmd: "{{ worker_join_command_output.stdout.strip() }} --control-plane --certificate-key {{ certificate_key }}"
+
+    - name: Set worker join command
+      ansible.builtin.set_fact:
+        worker_join_cmd: "{{ worker_join_command_output.stdout.strip() }}"
+
+    - name: Setup kubeconfig
+      ansible.builtin.include_tasks:
+        file: tasks/setup-kubeconfig.yml
+
+    - name: Create manifests directory
+      ansible.builtin.file:
+        path: /opt/k8s-manifests
+        state: directory
+        mode: '0755'
+
+    - name: Download Calico manifest
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+        dest: /opt/k8s-manifests/calico.yaml
+        mode: '0644'
+
+    - name: Config Network CIDR
+      ansible.builtin.replace:
+        path: /opt/k8s-manifests/calico.yaml
+        regexp: '192.168.0.0/16'
+        replace: '10.244.0.0/16'
+
+    - name: Apply Calico Config
+      ansible.builtin.command:
+        cmd: kubectl apply -f /opt/k8s-manifests/calico.yaml
+      register: calico_output
+
+- name: Setup Additional Control Nodes
+  hosts: k8s_masters:!k8s-master1.lab.local
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Join control plane node
+      ansible.builtin.shell:
+        cmd: "{{ hostvars['k8s-master1.lab.local']['master_join_cmd'] }}"
+        creates: /etc/kubernetes/admin.conf
+      register: master_join_output
+
+    - name: Setup kubeconfig
+      ansible.builtin.include_tasks:
+        file: tasks/setup-kubeconfig.yml
+
+- name: Join Worker Nodes
+  hosts: k8s_workers
+  become: yes
+  tasks:
+    - name: Join worker to cluster
+      ansible.builtin.shell:
+        cmd: "{{ hostvars['k8s-master1.lab.local']['worker_join_cmd'] }}"
+        creates: /etc/kubernetes/kubelet.conf
+      register: worker_join_output
+
+    - name: Display worker join result
+      ansible.builtin.debug:
+        var: worker_join_output.stdout_lines
+
+- name: Validate Cluster Up
+  hosts: k8s_masters
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Wait for All Nodes to be ready
+      ansible.builtin.pause:
+        prompt: "Waiting for worker nodes to be ready"
+        minutes: 3
+
+    - name: K8s Validation
+      ansible.builtin.command:
+        cmd: kubectl get nodes
+      register: get_node_output
+
+    - name: Display Final Validation
+      ansible.builtin.debug:
+        var: get_node_output.stdout_lines

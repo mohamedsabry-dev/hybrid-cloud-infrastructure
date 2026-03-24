@@ -23,6 +23,9 @@ ansible/prod/
 │       ├── ansible.yml         # Ansible control node (reserved)
 │       ├── local_runner.yml    # CI/CD runners (reserved)
 │       └── nginx.yml           # Nginx proxy (reserved)
+├── examples/                   # Manual operations & usage examples
+│   └── vault/
+│       └── usage.md            # Vault CLI and API examples
 └── playbooks/
     ├── ansible/                # Ansible node setup
     │   ├── README.md
@@ -305,6 +308,7 @@ Each playbook folder has its own README.md with specific documentation:
 
 - **operation_guide.txt** - Day-to-day operations, keytab setup, git workflow
 - **ansible.cfg** - Ansible configuration settings (with detailed comments)
+- **examples/** - Manual operations and usage examples (Vault, K8s, etc.)
 - **/troubleshooting/** - Troubleshooting cases (identity, linux, vault, etc.)
 - **.github/workflows/** - GitHub Actions workflows that run these playbooks
 

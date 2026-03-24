@@ -267,7 +267,7 @@ The ISO approach:
 
 ## Related Files
 
-- Bootstrap scripts: `proxmox/scripts/bootstrap-dev.sh`, `bootstrap-prod.sh`
+- Bootstrap scripts: `proxmox/bootstrap_proxmox/bootstrap.sh` (use `dev` or `prod` argument)
 - Terraform config: `terraform/dev/proxmox/vms/golden-image/`
 - AWS Secrets: `terraform/dev/aws/secrets/main.tf`
-- Cleanup script: `proxmox/scripts/golden-vm-setup.sh`
+- Cleanup script: `proxmox/golden_templates/golden-vm-setup.sh`
