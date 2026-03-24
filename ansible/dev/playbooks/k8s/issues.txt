@@ -1,3 +1,0 @@
-the proxy  cant go up on master 2 and 3 
-the play not idepotent but didnt break anything from re run 
-we do till init with workflow, then continue manually via multiuiple playubooks interactive 

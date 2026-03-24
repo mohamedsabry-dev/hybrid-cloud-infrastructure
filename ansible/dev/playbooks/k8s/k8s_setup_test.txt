@@ -1,2 +1,0 @@
-ansible -i inventory/inventory.ini k8s -m ping
-ansible -i inventory/inventory.ini k8s -m shell
