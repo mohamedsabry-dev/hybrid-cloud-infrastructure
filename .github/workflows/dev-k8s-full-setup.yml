@@ -18,6 +18,7 @@ on:
     paths:
       - 'terraform/dev/proxmox/vms/k8s_masters/**'
       - 'terraform/dev/proxmox/vms/k8s_workers/**'
+      - 'ansible/dev/playbooks/k8s/**'
       - '.github/workflows/dev-k8s-full-setup.yml'
 
 # -----------------------------------------------------------------------------
