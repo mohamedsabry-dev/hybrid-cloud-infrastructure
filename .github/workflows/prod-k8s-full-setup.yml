@@ -218,7 +218,7 @@ jobs:
 
       - name: Pull latest code
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin main"
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin prod"
 
       - name: Run K8s setup playbook
         run: |
