@@ -182,3 +182,18 @@ jobs:
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
+
+  # deploy-k8s-cluster:
+  #   name: "3. Setup K8s Cluster"
+  #   runs-on: dev-local-runner
+  #   needs: deploy-workers
+  #   if: ${{ vars.DEV_SVC_K8S_SETUP != 'true' }}
+  #   steps:
+  #       - name: role assume
+  #       - name: fetch keytab
+  #       - name: ssh to ansible node & pull latest repo and cd /srv/repo/dev/ansible
+  #       - name: extract the injected keytab and run 
+  #       - name: run the setup playbook
+  #       - name: Setup and Initialize K8s Cluster
+  #       - name: destroy keytab 
+  

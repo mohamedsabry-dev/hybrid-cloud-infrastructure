@@ -10,6 +10,13 @@ kubeadm init --control-plane-endpoint=10.0.61.100:16443 --upload-certs --pod-net
   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
   sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
+NotE: 
+1. Ansible automation: Use root with /etc/kubernetes/admin.conf
+2. Human operators: Use /opt/.kube/config (persistent, domain-independent)
+3. Document: Users must `export KUBECONFIG=/opt/.kube/config` in their session
+4. Later with Flux: Doesn't matter - Flux uses ServiceAccounts
+
+
 # 3. Step 3 
 You should now deploy a pod network to the cluster.
 Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
@@ -24,6 +31,16 @@ sed -i 's|192.168.0.0/16|10.244.0.0/16|g' calico.yaml
 # Apply
 kubectl apply -f calico.yaml
 ______________________________
+
+
+
+
+
+
+
+
+
+
 
 ______________________________
 # On Node master 2 and 3 
@@ -45,7 +62,11 @@ Then you can join any number of worker nodes by running the following on each as
 
 kubeadm join 10.0.61.100:16443 --token 5wkpaa.yla4fvjigekcm3ew --discovery-token-ca-cert-hash sha256:05262e05f7e7c450310fc1f685fd35d1b159e8643c6ad1a3fcd34082fb679014 
 
-
+- name: Run kubectl commands
+  ansible.builtin.command: kubectl get nodes
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
 
 Draft Idea 
 
