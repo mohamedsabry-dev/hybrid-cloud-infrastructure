@@ -1,6 +1,6 @@
 ---
 - name: Initialize K8s Cluster
-  hosts: k8s-master1
+  hosts: k8s-master1.lab.local
   become: yes
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
@@ -67,14 +67,14 @@
       register: calico_output
 
 - name: Setup Additional Control Nodes
-  hosts: k8s_masters:!k8s-master1
+  hosts: k8s_masters:!k8s-master1.lab.local
   become: yes
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   tasks:
     - name: Join control plane node
       ansible.builtin.shell:
-        cmd: "{{ hostvars['k8s-master1']['master_join_cmd'] }}"
+        cmd: "{{ hostvars['k8s-master1.lab.local']['master_join_cmd'] }}"
         creates: /etc/kubernetes/admin.conf
       register: master_join_output
 
@@ -88,7 +88,7 @@
   tasks:
     - name: Join worker to cluster
       ansible.builtin.shell:
-        cmd: "{{ hostvars['k8s-master1']['worker_join_cmd'] }}"
+        cmd: "{{ hostvars['k8s-master1.lab.local']['worker_join_cmd'] }}"
         creates: /etc/kubernetes/kubelet.conf
       register: worker_join_output
 
