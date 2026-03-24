@@ -1,0 +1,22 @@
+# While in K8s cluster setup phase , and prepare of the job in the workflow of k8s for the everything be in same place
+i though about 
+modules need dependancy , k8s need freeipa jooin , 
+and figured the loop of dependancy in the workflow because i built the infra and automation while learning it 
+so basicly i figured i can do better integret by make first ansible and local runner and freeipa 
+then set each workflow to setup its owen compute resourecs
+join the domain via playbok and also config and setup same way 
+make the infra clean and easy to redeploy 
+also destigues between the localrunner to anisble ssh run way 
+that need to let local runner itself who run anisble playbooks via the keytab and keep the anisble node for their admins 
+because also workflow do pull with each ryun and it ca  be done by check out on node 
+insted of force pull intop ansible which might conflict with one admin testing or editing on internal files 
+
+the whole operation is complete change and improve, it need time and also consider im in k8s phase, so this draft meant to record the idea to do in parralel with the main work of k8s 
+
+
+migration procedure 
+1- copy ansible install task into local runner workflow 
+2- the installation sequence should be 
+    seprated "ansible node > local runner node > freeipa "runner keep using ssh to jump ansible because ansible have root key injected already 
+    after freeipa and keytab. 
+    the sequence continue > nginx > vault > k8s whule each one run via local runner as ansible platform using the keytab

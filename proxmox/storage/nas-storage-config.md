@@ -49,11 +49,12 @@ Isolated L2 network on FS308GP managed switch (no ER605 routing)
 
 ## NFS Shares
 
-| Share | NFS Path | Access |
-|-------|----------|--------|
-| shared-iso | /volume1/shared-iso | 10.0.40.100 + 10.0.40.110 (RW) |
-| prod-storage | /volume1/prod-storage | 10.0.40.100 only (RW) |
-| dev-storage | /volume1/dev-storage | 10.0.40.110 only (RW) |
+| Share | NFS Path | Access | Content |
+|-------|----------|--------|---------|
+| shared-iso | /volume1/shared-iso | 10.0.40.100 + 10.0.40.110 (RW) | ISOs, CT templates |
+| prod-storage | /volume1/prod-storage | 10.0.40.100 only (RW) | VM images, rootdir |
+| dev-storage | /volume1/dev-storage | 10.0.40.110 only (RW) | VM images, rootdir |
+| Backups | /volume1/Backups | 10.0.40.100 + 10.0.40.110 (RW) | vzdump backups |
 
 **NFS Settings:** root Mapping = root (0), Async = Yes
 
@@ -81,13 +82,23 @@ Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
 
 ## Proxmox Storage Config
 
-**DEV Server** (Datacenter → Storage → Add → NFS):
-- `nas-iso` : 10.0.40.120:/volume1/shared-iso (ISO, CT template)
-- `nas-dev-data` : 10.0.40.120:/volume1/dev-storage (Disk, CT, Backup)
+**Managed via Terraform:** `terraform/dev/proxmox/storage/nas/` and `terraform/prod/proxmox/storage/nas/`
+
+**DEV Server:**
+
+| Storage ID | NFS Export | Content | Retention |
+|------------|------------|---------|-----------|
+| nas-iso | /volume1/shared-iso | iso, vztmpl | - |
+| nas-dev-data | /volume1/dev-storage | images, rootdir, backup | keep_last=2 |
+| nas-backups | /volume1/Backups | backup, rootdir | keep_last=5 |
 
 **PROD Server:**
-- `nas-iso` : 10.0.40.120:/volume1/shared-iso (ISO, CT template)
-- `nas-prod-data` : 10.0.40.120:/volume1/prod-storage (Disk, CT, Backup)
+
+| Storage ID | NFS Export | Content | Retention |
+|------------|------------|---------|-----------|
+| nas-iso | /volume1/shared-iso | iso, vztmpl | - |
+| nas-prod-data | /volume1/prod-storage | images, rootdir, backup | keep_last=2 |
+| nas-backups | /volume1/Backups | backup, rootdir | keep_last=5 |
 
 **Verify:** `showmount -e 10.0.40.120`
 
@@ -100,6 +111,7 @@ Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
 | Share | Size | Content |
 |-------|------|---------|
 | shared-iso | ~50GB | ISOs, container templates |
-| prod-storage | ~600GB | PROD VMs, backups |
-| dev-storage | ~400GB | DEV VMs, backups |
+| prod-storage | ~500GB | PROD VM images, container rootfs |
+| dev-storage | ~300GB | DEV VM images, container rootfs |
+| Backups | ~200GB | vzdump backups (both envs) |
 | Reserved | ~750GB | Future expansion |

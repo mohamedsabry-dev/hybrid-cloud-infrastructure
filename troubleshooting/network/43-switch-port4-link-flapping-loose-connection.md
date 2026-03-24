@@ -10,7 +10,7 @@
 ## Related Issue
 
 **Previous Day (2026-03-21)**: ER605 Router Port 4 failure - migrated to Port 2
-- See: `troubleshooting/network/ts-er605-port4-gigabit-negotiation.md`
+- See: `troubleshooting/network/48-er605-port4-gigabit-negotiation.md`
 - That issue was router-side PHY failure
 - Today's issue is switch-side, different root cause
 
