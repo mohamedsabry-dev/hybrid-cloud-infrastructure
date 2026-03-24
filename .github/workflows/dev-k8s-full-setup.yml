@@ -185,6 +185,7 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
+# Setup Cluster K8s on all nodes
   deploy-k8s-cluster:
     name: "3. Setup K8s Cluster"
     runs-on: dev-local-runner
