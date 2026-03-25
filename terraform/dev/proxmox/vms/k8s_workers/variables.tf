@@ -39,9 +39,9 @@ variable "k8s_worker1" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    startup_delay  = 60      # Wait 60s after masters boot to ensure control plane is ready
     shutdown_delay = 60
-    startup_order  = 11
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -79,9 +79,9 @@ variable "k8s_worker2" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    startup_delay  = 0       # All workers start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 12
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -119,9 +119,9 @@ variable "k8s_worker3" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    startup_delay  = 0       # All workers start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 13
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
