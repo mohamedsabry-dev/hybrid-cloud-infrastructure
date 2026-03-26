@@ -77,8 +77,8 @@ jobs:
           sleep 20
           echo "Review window ended at $(date)"
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
 
       # Post-deployment guide for WireGuard configuration
       - name: WireGuard Setup Guide
