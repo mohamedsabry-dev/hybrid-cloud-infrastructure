@@ -28,17 +28,20 @@
       changed_when: false
 
     - name: Bootstrap Flux
-      ansible.builtin.command: >-
-        flux bootstrap github
-        --owner={{ gh_username }}
-        --repository=hybrid-cloud-infrastructure
-        --branch=dev
-        --path=./kubernetes/flux
-        --personal
-        --token-auth=false
+      ansible.builtin.shell:
+        cmd: >-
+          /usr/local/bin/flux bootstrap github
+          --owner={{ gh_username }}
+          --repository=hybrid-cloud-infrastructure
+          --branch=dev
+          --path=./kubernetes/flux
+          --personal
+          --token-auth=false
       when: flux_ns.rc != 0
       environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
         GITHUB_TOKEN: "{{ gh_admin_pat_token_flux }}"
+
 
     - name: Wait for Flux to be ready
       ansible.builtin.pause:
