@@ -22,19 +22,19 @@ variable "environment" {
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "eu-west-2"
+  default     = "us-east-1"
 }
 
 variable "availability_zone" {
   description = "Availability zone for EC2 instance"
   type        = string
-  default     = "eu-west-2a"
+  default     = "us-east-1a"
 }
 
 variable "ami_id" {
   description = "AMI ID for WireGuard instance (region-specific)"
   type        = string
-  default     = "ami-087c9ba923d9765d8"
+  default     = "ami-02dfbd4ff395f2a1b"
 }
 
 variable "instance_type" {
