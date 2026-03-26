@@ -201,6 +201,16 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_DEV }}
 
+      - name: Fetch GH Admin PAT and assign to ansible variable
+        run: |
+          GH_TOKEN=${{ secrets.GH_ADMIN_PAT_FLUX }}
+          GH_USERNAME=${{ secrets.GH_USERNAME }}
+          echo "::add-mask::${GH_TOKEN}"
+          echo "::add-mask::${GH_USERNAME}"
+          echo "GH_TOKEN=${GH_TOKEN}" >> $GITHUB_ENV
+          echo "GH_USER=${GH_USERNAME}" >> $GITHUB_ENV
+
+
       - name: Fetch Keytab and Initialize Kerberos
         run: |
           # Fetch keytab and pipe to Ansible host - kinit immediately, delete keytab
@@ -215,16 +225,19 @@ jobs:
       - name: Pull latest code
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin dev"
-
+ 
       - name: Run K8s setup playbook
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+            export GH_TOKEN='${{ env.GH_TOKEN }}' && \
+            export GH_USER='${{ env.GH_USER }}' && \
             cd /srv/repo/ansible/dev/ && \
             ansible-playbook -i inventory/inventory.ini playbooks/common/pre_setup.yml --limit k8s && \
             ansible-playbook -i inventory/inventory.ini playbooks/common/ntp.yml --limit k8s && \
-            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_setup.yml
-            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_init.yml"
-
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_setup.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_init.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/flux_setup.yml"
+            
       - name: Cleanup Kerberos ticket
         if: always()
         run: |
