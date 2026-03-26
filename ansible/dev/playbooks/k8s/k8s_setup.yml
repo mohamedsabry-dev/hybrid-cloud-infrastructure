@@ -121,9 +121,9 @@
       ansible.builtin.yum_repository:
         name: kubernetes
         description: Kubernetes Stable
-        baseurl: https://pkgs.k8s.io/core:/stable:/v1.31/rpm/
+        baseurl: https://pkgs.k8s.io/core:/stable:/v1.35/rpm/
         gpgcheck: yes
-        gpgkey: https://pkgs.k8s.io/core:/stable:/v1.31/rpm/repodata/repomd.xml.key
+        gpgkey: https://pkgs.k8s.io/core:/stable:/v1.35/rpm/repodata/repomd.xml.key
         enabled: yes
         exclude:
           - kubelet
