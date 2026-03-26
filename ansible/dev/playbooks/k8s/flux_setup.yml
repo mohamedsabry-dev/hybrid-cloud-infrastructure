@@ -15,7 +15,7 @@
 
     - name: Check flux pre flight
       ansible.builtin.shell:
-        cmd: flux check --pre
+        cmd: /usr/local/bin/flux check --pre
       register: flux_check
       failed_when: flux_check.rc != 0
 
