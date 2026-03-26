@@ -2,6 +2,8 @@
 - name: Install Flux on K8s
   hosts: k8s-master1.lab.local
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tasks:
     - name: Check if Flux is already installed
       ansible.builtin.stat:
