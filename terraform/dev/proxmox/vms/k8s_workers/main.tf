@@ -39,15 +39,6 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
     file_format  = var.disks.os_disk.file_format
   }
 
-  disk {
-    datastore_id = var.disks.data_disk.datastore_id
-    interface    = var.disks.data_disk.interface
-    size         = var.disks.data_disk.size
-    ssd          = var.disks.data_disk.ssd
-    discard      = var.disks.data_disk.discard
-    file_format  = var.disks.data_disk.file_format
-  }
-
   # CPU (sockets=1 standard, type=host for CPU passthrough performance)
   cpu {
     cores   = var.k8s_worker1.cores
@@ -75,16 +66,30 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
       }
     }
 
+    ip_config {
+      ipv4 {
+        address = var.k8s_worker1.ip2
+      }
+    }
+
     dns {
       servers = var.dns_servers
       domain  = var.search_domain
     }
   }
 
+  # Primary network (Service VLAN)
   network_device {
     bridge  = var.k8s_worker1.bridge
     model   = "virtio"
     vlan_id = var.k8s_worker1.vlan_id
+  }
+
+  # Storage network (VLAN 40)
+  network_device {
+    bridge  = var.k8s_worker1.bridge2
+    model   = "virtio"
+    vlan_id = var.k8s_worker1.vlan_id2
   }
 
   agent {
@@ -139,15 +144,6 @@ resource "proxmox_virtual_environment_vm" "k8s_worker2" {
     file_format  = var.disks.os_disk.file_format
   }
 
-  disk {
-    datastore_id = var.disks.data_disk.datastore_id
-    interface    = var.disks.data_disk.interface
-    size         = var.disks.data_disk.size
-    ssd          = var.disks.data_disk.ssd
-    discard      = var.disks.data_disk.discard
-    file_format  = var.disks.data_disk.file_format
-  }
-
   cpu {
     cores   = var.k8s_worker2.cores
     sockets = 1
@@ -174,16 +170,30 @@ resource "proxmox_virtual_environment_vm" "k8s_worker2" {
       }
     }
 
+    ip_config {
+      ipv4 {
+        address = var.k8s_worker2.ip2
+      }
+    }
+
     dns {
       servers = var.dns_servers
       domain  = var.search_domain
     }
   }
 
+  # Primary network (Service VLAN)
   network_device {
     bridge  = var.k8s_worker2.bridge
     model   = "virtio"
     vlan_id = var.k8s_worker2.vlan_id
+  }
+
+  # Storage network (VLAN 40)
+  network_device {
+    bridge  = var.k8s_worker2.bridge2
+    model   = "virtio"
+    vlan_id = var.k8s_worker2.vlan_id2
   }
 
   agent {
@@ -238,15 +248,6 @@ resource "proxmox_virtual_environment_vm" "k8s_worker3" {
     file_format  = var.disks.os_disk.file_format
   }
 
-  disk {
-    datastore_id = var.disks.data_disk.datastore_id
-    interface    = var.disks.data_disk.interface
-    size         = var.disks.data_disk.size
-    ssd          = var.disks.data_disk.ssd
-    discard      = var.disks.data_disk.discard
-    file_format  = var.disks.data_disk.file_format
-  }
-
   cpu {
     cores   = var.k8s_worker3.cores
     sockets = 1
@@ -273,16 +274,30 @@ resource "proxmox_virtual_environment_vm" "k8s_worker3" {
       }
     }
 
+    ip_config {
+      ipv4 {
+        address = var.k8s_worker3.ip2
+      }
+    }
+
     dns {
       servers = var.dns_servers
       domain  = var.search_domain
     }
   }
 
+  # Primary network (Service VLAN)
   network_device {
     bridge  = var.k8s_worker3.bridge
     model   = "virtio"
     vlan_id = var.k8s_worker3.vlan_id
+  }
+
+  # Storage network (VLAN 40)
+  network_device {
+    bridge  = var.k8s_worker3.bridge2
+    model   = "virtio"
+    vlan_id = var.k8s_worker3.vlan_id2
   }
 
   agent {
