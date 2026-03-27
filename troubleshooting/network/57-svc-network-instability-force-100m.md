@@ -189,3 +189,114 @@ Prod server uses **built-in Ethernet NIC** which negotiates at 100M by default. 
 ✅ **Stable** - All SVC ports forced to 100M from router side
 
 **Monitor for:** Any future instability even at 100M (would indicate hardware failure requiring replacement)
+
+---
+
+## Update: Driver Analysis (2026-03-27)
+
+### Hardware Discovery
+
+| Component | Details |
+|-----------|---------|
+| Dev Server | **ASUS VivoBook 15** (economy laptop) |
+| USB Adapter | **UGREEN 2.5G** (ASIX AX88179B chipset) |
+| USB Topology | Single physical chip, multiple ports |
+| Prod Server | Dedicated laptop with **built-in Ethernet** on mainboard |
+
+### Driver Investigation
+
+**Problem Identified:** The AX88179B adapter is using the **wrong kernel driver**.
+
+```bash
+# Expected driver
+driver: ax88179_178a  (native ASIX driver with proper negotiation)
+
+# Actual driver in use
+driver: cdc_ncm       (generic CDC NCM fallback - limited functionality)
+```
+
+**ethtool output with cdc_ncm:**
+```
+Speed: 100Mb/s
+Duplex: Unknown! (255)    <- PROBLEM: No duplex negotiation
+Auto-negotiation: off
+Link detected: yes
+```
+
+### Why cdc_ncm Causes Instability
+
+The `cdc_ncm` driver is a **generic USB network driver** that:
+- Does NOT support proper speed/duplex negotiation
+- Shows "Duplex: Unknown! (255)"
+- Cannot communicate link parameters to switch/router
+- Causes intermittent link flapping
+
+The native `ax88179_178a` driver:
+- Supports full auto-negotiation
+- Reports correct speed/duplex
+- Handles link state properly
+
+### Attempted Fix
+
+```bash
+# 1. Driver module exists
+modinfo ax88179_178a  # ✓ Available in kernel
+
+# 2. Loaded the proper driver
+modprobe ax88179_178a  # ✓ Loaded
+
+# 3. But adapter still binds to cdc_ncm first
+ethtool -i svc0  # Still shows driver: cdc_ncm
+```
+
+**Root Cause:** The AX88179B presents itself as a CDC NCM device first, and the kernel binds to `cdc_ncm` before `ax88179_178a` can claim it.
+
+### Proposed Permanent Fix
+
+Blacklist `cdc_ncm` to force binding to native driver:
+
+```bash
+# Create blacklist
+echo "blacklist cdc_ncm" > /etc/modprobe.d/blacklist-cdc_ncm.conf
+
+# Update initramfs
+update-initramfs -u
+
+# Reboot
+```
+
+**Status:** Pending reboot to test
+
+### Why Prod Server is Stable
+
+| Server | NIC Type | Driver | Negotiation | Stability |
+|--------|----------|--------|-------------|-----------|
+| **Dev** (VivoBook 15) | USB adapter (AX88179B) | cdc_ncm (wrong) | Broken | ❌ Unstable |
+| **Prod** | Built-in Ethernet | Native driver | Works | ✅ Stable |
+
+The Prod server has a **dedicated Ethernet port on the mainboard**, which uses native drivers with proper negotiation. It defaults to 100M naturally without issues.
+
+### Current Configuration
+
+Both Dev and Prod SVC cables connected to **router** (not through switch):
+
+| Server | Cable Path | Router Port | Speed Setting |
+|--------|------------|-------------|---------------|
+| Dev | Direct to router | Port 2 or 4 | 100M Forced |
+| Prod | Direct to router | Port 5 | Auto (100M default) |
+
+### Lessons Learned (Updated)
+
+1. **USB adapter driver matters** - `cdc_ncm` vs `ax88179_178a` makes a huge difference
+2. **Economy laptops have shared USB controllers** - single chip, multiple ports
+3. **Built-in NICs are more reliable** than USB adapters
+4. **Kernel driver binding order** can cause wrong driver to be used
+5. **Duplex "Unknown" is a red flag** - indicates broken negotiation
+
+### Next Steps
+
+- [ ] Reboot Dev server with `cdc_ncm` blacklisted
+- [ ] Verify `ax88179_178a` driver binds on boot
+- [ ] Test if proper driver allows Gigabit without flapping
+- [ ] If still unstable, keep 100M forced as permanent workaround
+- [ ] Consider replacing USB adapter with PCIe NIC for Dev server
