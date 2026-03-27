@@ -39,9 +39,11 @@ Key*
 # Network device backups (contain credentials)
 *.bin
 network/**/backups/*.cfg
+network/router/mikrotik/backups/**
 
 # Device diagnostic logs
 network/**/logs/**
+network/router/mikrotik/logs/**
 
 # Vendor documentation PDFs
 network/**/docs/*.pdf
