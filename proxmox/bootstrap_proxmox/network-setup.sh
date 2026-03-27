@@ -161,12 +161,20 @@ iface vmbr0 inet manual
 auto ${STORAGE_INTERFACE}
 iface ${STORAGE_INTERFACE} inet manual
 
-# Storage VLAN ${STORAGE_VLAN} (tagged)
-auto ${STORAGE_INTERFACE}.${STORAGE_VLAN}
-iface ${STORAGE_INTERFACE}.${STORAGE_VLAN} inet static
+# Storage Bridge (VLAN-aware for VM access to VLAN 40)
+auto vmbr1
+iface vmbr1 inet manual
+    bridge-ports ${STORAGE_INTERFACE}
+    bridge-stp off
+    bridge-fd 0
+    bridge-vlan-aware yes
+    bridge-vids ${STORAGE_VLAN}
+
+# Proxmox host access to VLAN ${STORAGE_VLAN} (NAS)
+auto vmbr1.${STORAGE_VLAN}
+iface vmbr1.${STORAGE_VLAN} inet static
     address ${STORAGE_IP}
     netmask ${STORAGE_NETMASK}
-    vlan-raw-device ${STORAGE_INTERFACE}
 
 source /etc/network/interfaces.d/*
 EOF
