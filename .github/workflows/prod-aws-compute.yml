@@ -63,14 +63,6 @@ jobs:
       - name: Terraform Init
         run: terraform init -upgrade
 
-      - name: Update EIP Association in Terraform State
-        run: |
-          terraform state rm aws_eip.wireguard || true
-          terraform state rm aws_eip_association.wireguard || true
-
-          terraform import -var="allowed_ip=${{ secrets.HOME_PUBLIC_IP }}/32" -var="vpn_public_key=${{ secrets.VPN_PUBLIC_KEY_PROD }}" aws_eip.wireguard eipalloc-09b66b5cab3c250ae
-          terraform import -var="allowed_ip=${{ secrets.HOME_PUBLIC_IP }}/32" -var="vpn_public_key=${{ secrets.VPN_PUBLIC_KEY_PROD }}" aws_eip_association.wireguard eipassoc-0e41c3c75a030c0e5
-
       # Variables are marked sensitive in TF - values will be redacted in plan output
       - name: Terraform Plan
         timeout-minutes: 3
@@ -82,7 +74,7 @@ jobs:
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 20
+          sleep 180
           echo "Review window ended at $(date)"
 
       - name: Terraform Apply
