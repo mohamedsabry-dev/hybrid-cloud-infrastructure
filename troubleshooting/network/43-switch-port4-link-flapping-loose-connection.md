@@ -426,9 +426,71 @@ done
 
 ## Status
 
-✅ **Resolved** - Network stable after reseating cable connections.
+⚠️ **Partially Resolved** - See Update Below
 
-**Monitor for recurrence** - if issue returns, consider:
-- Replace cable
-- Replace USB-Ethernet adapter
-- Use different switch port
+---
+
+## Update: Issue Recurrence (March 26, 2026)
+
+**Related Cases**:
+- `48-er605-port4-gigabit-negotiation.md`
+- `57-svc-network-instability-force-100m.md`
+
+### Issue Returned
+
+The link flapping issue recurred ~1-2 weeks later, despite:
+- Reseating cable connections
+- Replacing cables
+- Replacing USB-Ethernet adapter
+
+### Extended Troubleshooting Performed
+
+All of the recommended prevention steps were tried:
+- ✅ Replaced cable - issue remained
+- ✅ Replaced USB-Ethernet adapter - issue remained
+- ✅ Changed switch port - issue remained
+- ✅ Changed server USB port - issue remained
+- ✅ Bypassed switch entirely - initially failed, then worked randomly
+
+### Root Cause: UNIDENTIFIED
+
+The original diagnosis of "loose cable connection" was **incorrect or incomplete**. The true root cause could not be definitively identified.
+
+### Actual Pattern Discovered
+
+| Component | Status |
+|-----------|--------|
+| Prod server (built-in 100M NIC) | Always stable |
+| Dev server (USB Gigabit adapter) | Intermittently unstable |
+| Gigabit auto-negotiation | Unreliable |
+| Forced 100M | Stable |
+
+### Confirmed Fix
+
+**Force 100M speed on router ports** rather than relying on physical layer fixes.
+
+The issue is NOT:
+- ~~Loose cable~~ (replaced multiple times)
+- ~~Bad adapter~~ (replaced multiple times)
+- ~~Bad switch port~~ (tried multiple ports)
+
+The issue IS:
+- **Gigabit auto-negotiation instability** between USB-Ethernet adapters and ER605 router
+
+### Updated Lessons Learned
+
+| Original Lesson | Updated Lesson |
+|-----------------|----------------|
+| Check physical layer first | Physical layer may not be the issue |
+| Reseat before replacing | Reseating is temporary at best |
+| Avoid USB-Ethernet adapters | **Force 100M if USB adapters must be used** |
+
+### Prevention (Updated)
+
+1. **Force 100M on SVC ports** - don't rely on auto-negotiation
+2. **Use built-in NICs** - USB adapters are inherently less stable at Gigabit
+3. **Accept 100M for reliability** - speed vs stability trade-off
+
+### Current Status
+
+✅ **Stable** - All SVC ports forced to 100M from router side
