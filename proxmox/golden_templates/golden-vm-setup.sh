@@ -138,6 +138,14 @@ systemctl enable cloud-init
 systemctl enable rsyslog
 systemctl enable auditd
 
+# Configure cloud-init to preserve SSH host keys after first generation
+# This prevents cloud-init from regenerating keys when config changes (e.g., Terraform updates)
+cat > /etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg << EOF
+ssh_deletekeys: false
+ssh_genkeytypes: []
+EOF
+echo "NOTE: Cloud-init configured to preserve SSH host keys after first boot."
+
 # Firewalld: disable (installed by default on Rocky, enable via Ansible if needed)
 systemctl disable firewalld
 systemctl stop firewalld 2>/dev/null || true
