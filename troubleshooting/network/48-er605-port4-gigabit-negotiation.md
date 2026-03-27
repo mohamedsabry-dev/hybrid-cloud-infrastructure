@@ -595,4 +595,71 @@ Gateway (10.0.6x.1)
 
 **Permanent Fix**: Migrated Dev_SVC trunk from Port 4 to Port 2
 
-**Status**: ✅ Resolved - Dev network stable on Port 2
+**Status**: ⚠️ Partially Resolved - See Update Below
+
+---
+
+## Update: Issue Recurrence (March 26, 2026)
+
+**Related Case**: `57-svc-network-instability-force-100m.md`
+
+### Issue Returned
+
+The Dev SVC network issue recurred ~1-2 weeks after the original fix, despite:
+- Migration from ER605 Port 4 to Port 2
+- Port mirroring configuration
+- Previous 100M + Flow Control settings
+
+### Extended Troubleshooting Performed
+
+| Action | Result |
+|--------|--------|
+| Changed USB-Ethernet adapter | Issue remained |
+| Changed Ethernet cable | Issue remained |
+| Changed server USB port | Issue remained |
+| Swapped switch ports (3 ↔ 4) | Issue remained |
+| Bypassed switch (direct to router) | Initially failed, then worked randomly |
+| Tested with MikroTik router | Same issue |
+| Disabled port mirror on ER605 Port 2 | Partial improvement |
+| Forced 100M on ER605 ports | **STABLE** |
+
+### Root Cause: UNIDENTIFIED
+
+After extensive isolation, the exact root cause could NOT be definitively identified. The behavior was inconsistent:
+- Same setup would fail, then work without changes
+- Port mirror: was solution in one case, problem in another
+- Multiple components suspected but none confirmed
+
+### Confirmed Workaround
+
+**Force 100M speed on ALL SVC router ports.**
+
+| Port | Setting | Reason |
+|------|---------|--------|
+| ER605 Port 2 | 100M Full | Dev SVC uplink |
+| ER605 Port 4 | 100M Full | Dev SVC (if used) |
+| ER605 Port 5 | Auto (100M default) | Prod SVC - stable because Prod server has built-in NIC that defaults to 100M |
+
+### Why Prod is Stable
+
+Prod server uses **built-in Ethernet** which negotiates at 100M by default. Dev server uses **USB-Ethernet adapter** which attempts Gigabit negotiation - this is where instability occurs.
+
+### Updated Recommendation
+
+| Previous | Updated |
+|----------|---------|
+| Only force 100M on problem port | Force 100M on ALL SVC ports |
+| Migrate to different port | Keep 100M regardless of port |
+| Trust auto-negotiation on working ports | Don't trust auto-negotiation for SVC |
+
+### Lessons Learned (Updated)
+
+1. **Intermittent network issues may never have a clear root cause**
+2. **USB-Ethernet adapters + Gigabit negotiation = unreliable**
+3. **100M is sufficient and more stable for this environment**
+4. **"Working" ports can develop same issues over time**
+5. **Document the workaround even when root cause is unknown**
+
+### Current Status
+
+✅ **Stable** - All SVC ports forced to 100M from router side
