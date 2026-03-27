@@ -33,8 +33,8 @@
           /usr/local/bin/flux bootstrap github
           --owner={{ gh_username }}
           --repository=hybrid-cloud-infrastructure
-          --branch=dev
-          --path=./kubernetes/dev/flux
+          --branch=prod
+          --path=./kubernetes/prod/flux
           --personal
           --token-auth=false
       when: flux_ns.rc != 0
