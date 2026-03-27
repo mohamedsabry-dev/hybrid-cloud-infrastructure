@@ -1,0 +1,19 @@
+---
+- name: Mount NFS share on Kubernetes worker nodes
+  hosts: k8s_workers
+  become: yes
+  tasks:
+  
+  - name: Create mount point directory
+    ansible.builtin.file:
+      path: /mnt/k8s-data
+      state: directory
+      mode: '0755'
+
+  - name: Mount NFS share on workers
+    ansible.posix.mount:
+      path: /mnt/k8s-data
+      src: 10.0.40.120:/volume1/k8s-dev
+      fstype: nfs
+      opts: defaults,_netdev
+      state: mounted
