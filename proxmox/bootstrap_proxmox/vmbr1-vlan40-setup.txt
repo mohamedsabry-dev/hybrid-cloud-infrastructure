@@ -80,6 +80,37 @@ The web GUI cannot do atomic multi-interface restructuring - it validates
 each change individually against the current running state.
 
 ===============================================================================
+COMMANDS REFERENCE
+===============================================================================
+
+Config File Location:
+  /etc/network/interfaces
+
+Edit Command:
+  nano /etc/network/interfaces
+  # or
+  vim /etc/network/interfaces
+
+Backup Before Edit:
+  cp /etc/network/interfaces /etc/network/interfaces.bak
+
+Apply Changes (Recommended - with failsafe restart):
+  ifreload -a; sleep 20; systemctl restart networking
+
+  NOTE: ifreload -a alone may cause network outage on bridge restructuring.
+  The sleep + restart acts as a failsafe to restore connectivity.
+  If SSH disconnects, wait 20 seconds and reconnect.
+
+Alternative Commands:
+  ifreload -a                      # Apply changes (may cause outage)
+  systemctl restart networking     # Full restart (fixes outage)
+
+Verify Changes:
+  ip addr show
+  bridge vlan show
+  ping 10.0.40.120  # Test NAS connectivity
+
+===============================================================================
 VLAN TAGGING VERIFICATION
 ===============================================================================
 
