@@ -28,3 +28,13 @@ metadata:
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Application workloads"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testing
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Temporary testing workloads"
