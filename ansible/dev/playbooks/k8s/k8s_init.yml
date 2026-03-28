@@ -66,6 +66,16 @@
         cmd: kubectl apply -f /opt/k8s-manifests/calico.yaml
       register: calico_output
 
+    - name: Config IP Autodetection for multi-NIC nodes
+      ansible.builtin.command:
+          cmd: kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD="cidr=10.0.64.0/24,10.0.61.0/24"
+
+    - name: Install Calico Ctl
+      ansible.builtin.get_url:
+        url: https://github.com/projectcalico/calico/releases/latest/download/calicoctl-linux-amd64
+        dest: /usr/local/bin/calicoctl
+        mode: '0755'
+
 - name: Setup Additional Control Nodes
   hosts: k8s_masters:!k8s-master1.lab.local
   become: yes

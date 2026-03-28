@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-test
+  namespace: testing
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+    workload: testing
+  annotations:
+    description: "Nginx App Deployment for Testing PV,PVC Config"
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: nginx-test
+
+  template:
+    metadata:
+      labels:
+        app: nginx-test
+        environment: prod
+        workload: testing
+
+    spec:
+      containers:
+        - name: nginx
+          image:  nginx:latest
+          volumeMounts:
+            - name: nfs-vol
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: nfs-vol
+          persistentVolumeClaim:
+            claimName: testing-storage
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-test
+  namespace: testing
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Service for nginx test deployment"
+spec:
+  selector:
+    app: nginx-test
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 80
+      nodePort: 30080

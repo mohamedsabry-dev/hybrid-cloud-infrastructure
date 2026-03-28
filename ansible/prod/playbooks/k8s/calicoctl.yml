@@ -1,0 +1,10 @@
+---
+- name: Setup Calico Ctl tool on all k8s_masters
+  hosts:  k8s_masters
+  become: yes
+  tasks:
+    - name: Install Calico Ctl
+      ansible.builtin.get_url:
+        url: https://github.com/projectcalico/calico/releases/latest/download/calicoctl-linux-amd64
+        dest: /usr/local/bin/calicoctl
+        mode: '0755'
