@@ -4,7 +4,7 @@ kind: Namespace
 metadata:
   name: monitoring
   labels:
-    environment: dev
+    environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Prometheus and Grafana monitoring stack"
@@ -14,7 +14,7 @@ kind: Namespace
 metadata:
   name: logging
   labels:
-    environment: dev
+    environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "ELK/Loki logging stack"
@@ -24,17 +24,7 @@ kind: Namespace
 metadata:
   name: apps
   labels:
-    environment: dev
+    environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Application workloads"
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: testing
-  labels:
-    environment: dev
-    app.kubernetes.io/managed-by: flux
-  annotations:
-    description: "Temporary testing workloads"
