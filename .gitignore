@@ -47,3 +47,6 @@ network/router/mikrotik/logs/**
 
 # Vendor documentation PDFs
 network/**/docs/*.pdf
+
+# Local guides (not tracked)
+git-workflow-guide.txt
