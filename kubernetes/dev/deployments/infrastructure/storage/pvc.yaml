@@ -16,6 +16,8 @@ spec:
     requests:
       storage: 100Gi
   volumeName: nfs-monitoring
+
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -34,6 +36,8 @@ spec:
     requests:
       storage: 100Gi
   volumeName: nfs-logging
+
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -52,6 +56,8 @@ spec:
     requests:
       storage: 100Gi
   volumeName: nfs-apps
+
+  
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
