@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Prometheus and Grafana monitoring stack"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "ELK/Loki logging stack"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Application workloads"
