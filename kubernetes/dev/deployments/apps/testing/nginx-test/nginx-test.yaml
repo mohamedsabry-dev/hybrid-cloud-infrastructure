@@ -9,7 +9,7 @@ metadata:
     workload: testing
   annotations:
     description: "Nginx App Deployment for Testing PV,PVC Config"
-    kubernetes.io/change-cause: "Add ConfigMap for nginx config"
+    kubernetes.io/change-cause: "Add secret volume mount for nginx-secret"
 spec:
   replicas: 3
 
@@ -34,6 +34,9 @@ spec:
 
             - name: nginx-config-vol
               mountPath: /etc/nginx/conf.d
+
+            - name: nginx-secret-vol
+              mountPath: /etc/nginx/secrets
       volumes:
         - name: nfs-vol
           persistentVolumeClaim:
@@ -42,6 +45,10 @@ spec:
         - name: nginx-config-vol
           configMap:
             name: nginx-config
+        
+        - name: nginx-secret-vol
+          secret:
+            secretName: nginx-secret
 
 ---
 apiVersion: v1
