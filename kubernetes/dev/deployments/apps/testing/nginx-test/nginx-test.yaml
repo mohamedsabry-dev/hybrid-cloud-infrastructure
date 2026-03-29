@@ -9,6 +9,7 @@ metadata:
     workload: testing
   annotations:
     description: "Nginx App Deployment for Testing PV,PVC Config"
+    kubernetes.io/change-cause: "Add ConfigMap for nginx config"
 spec:
   replicas: 3
 
