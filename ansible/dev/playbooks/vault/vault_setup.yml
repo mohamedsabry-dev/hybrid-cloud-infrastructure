@@ -206,6 +206,11 @@
         owner: vault
         group: vault
         mode: "0600"
+      when:
+        - vault_aws_access_key_id is defined
+        - vault_aws_access_key_id | length > 0
+        - vault_aws_secret_access_key is defined
+        - vault_aws_secret_access_key | length > 0
       no_log: true
 
     - name: Deploy Vault configuration

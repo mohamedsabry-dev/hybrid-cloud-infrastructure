@@ -1,0 +1,24 @@
+---
+- name: Add DNS Records to FreeIPA
+  hosts: freeipa
+  become: yes
+  tasks:
+    - name: Add Vault VIP DNS record
+      freeipa.ansible_freeipa.ipadnsrecord:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        zone_name: lab.local
+        name: vault
+        record_type: A
+        record_value: "10.0.52.100"
+        state: present
+
+    - name: Add K8s VIP DNS record
+      freeipa.ansible_freeipa.ipadnsrecord:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        zone_name: lab.local
+        name: k8s
+        record_type: A
+        record_value: "10.0.51.100"
+        state: present
