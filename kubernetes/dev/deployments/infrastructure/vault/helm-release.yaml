@@ -15,3 +15,7 @@ spec:
   values:
     global:
       externalVaultAddr: "https://vault.lab.local:8200"
+    server:
+      enabled: false
+    injector:
+      enabled: true

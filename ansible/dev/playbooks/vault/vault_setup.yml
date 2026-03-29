@@ -24,16 +24,6 @@
       failed_when: false
       no_log: true
 
-    - name: Add service managedby for VIP service
-      ansible.builtin.shell: |
-        echo "{{ ipaadmin_password }}" | kinit admin
-        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-        kdestroy
-      failed_when: false
-      no_log: true
-
     - name: Create Vault service principals in FreeIPA
       freeipa.ansible_freeipa.ipaservice:
         ipaadmin_principal: "{{ ipaadmin_principal }}"
@@ -45,6 +35,16 @@
         - vault2.lab.local
         - vault3.lab.local
         - vault.lab.local
+
+    - name: Add service managedby for VIP service
+      ansible.builtin.shell: |
+        echo "{{ ipaadmin_password }}" | kinit admin
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        kdestroy
+      failed_when: false
+      no_log: true
 
 - name:  Configure hashicorp vault user & group on freeipa
   hosts: freeipa

@@ -4,7 +4,6 @@
   vars:
     vip: "10.0.62.100"
     interface: "eth0"
-    vault_keepalived_auth_pass: "{{ vault_keepalived_password }}"
     cluster:
       - { ip: "10.0.62.10", priority: 101 }
       - { ip: "10.0.62.11", priority: 100 }
