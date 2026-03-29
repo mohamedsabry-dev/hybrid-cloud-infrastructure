@@ -38,3 +38,14 @@ metadata:
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Temporary testing workloads"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Vault Injector"

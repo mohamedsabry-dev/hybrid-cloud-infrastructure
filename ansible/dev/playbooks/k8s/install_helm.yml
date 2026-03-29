@@ -1,0 +1,9 @@
+---
+- name: Install Helm
+  hosts: k8s_masters
+  become: true
+  tasks:
+    - name: Install Helm
+      ansible.builtin.dnf:
+        name: helm
+        state: present

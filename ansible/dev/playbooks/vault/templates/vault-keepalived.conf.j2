@@ -1,24 +1,24 @@
-vrrp_script check_haproxy {
-    script "killall -0 haproxy"
+vrrp_script check_vault {
+    script "killall -0 vault"
     interval 2
     weight 2
 }
 
 vrrp_instance VI_1 {
-{% for master in masters %}
-{% if master.ip == ansible_default_ipv4.address %}
+{% for node in cluster %}
+{% if node.ip == ansible_default_ipv4.address %}
     state {{ 'MASTER' if loop.index == 1 else 'BACKUP' }}
-    priority {{ master.priority }}
+    priority {{ node.priority }}
 {% endif %}
 {% endfor %}
 
     interface {{ interface }}
-    virtual_router_id 51
+    virtual_router_id 52
     advert_int 1
 
     authentication {
         auth_type PASS
-        auth_pass {{ k8s_keepalived_auth_pass }}
+        auth_pass {{ vault_keepalived_auth_pass }}
     }
 
     virtual_ipaddress {
@@ -26,6 +26,6 @@ vrrp_instance VI_1 {
     }
 
     track_script {
-        check_haproxy
+        check_vault
     }
 }
