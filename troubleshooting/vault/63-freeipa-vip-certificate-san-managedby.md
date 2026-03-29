@@ -128,6 +128,7 @@ Request ID '20260329180348':
 1. **Syntax Error:** `ipa host-add-managedby --hosts=` doesn't accept comma-separated values
 2. **Missing Command:** `ipa service-add-managedby` does not exist in FreeIPA; must use `ipa service-mod --addattr`
 3. **Permission Model:** For a certificate to include a SAN for another host/VIP, both the HOST and SERVICE managedby relationships must be configured
+4. **Task Ordering:** The `service-mod` task must run AFTER the service principals are created, otherwise the service doesn't exist yet and the managedby relationship is never added
 
 ---
 
@@ -135,7 +136,23 @@ Request ID '20260329180348':
 
 Updated `ansible/dev/playbooks/vault/vault_setup.yml`:
 
+**IMPORTANT:** Task order matters - service principals must be created BEFORE adding managedby relationships:
+
 ```yaml
+# 1. First create the service principals
+- name: Create Vault service principals in FreeIPA
+  freeipa.ansible_freeipa.ipaservice:
+    ipaadmin_principal: "{{ ipaadmin_principal }}"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+    name: "vault/{{ item }}"
+    state: present
+  loop:
+    - vault1.lab.local
+    - vault2.lab.local
+    - vault3.lab.local
+    - vault.lab.local
+
+# 2. Then add host managedby
 - name: Add managedby relationship for Vault VIP
   ansible.builtin.shell: |
     echo "{{ ipaadmin_password }}" | kinit admin
@@ -146,6 +163,7 @@ Updated `ansible/dev/playbooks/vault/vault_setup.yml`:
   failed_when: false
   no_log: true
 
+# 3. Finally add service managedby (AFTER service exists!)
 - name: Add service managedby for VIP service
   ansible.builtin.shell: |
     echo "{{ ipaadmin_password }}" | kinit admin
@@ -165,6 +183,7 @@ Updated `ansible/dev/playbooks/vault/vault_setup.yml`:
 2. Always verify IPA commands exist in your version before using them in automation
 3. The `--addattr=managedby=fqdn=HOSTNAME,cn=computers,cn=accounts,dc=DOMAIN,dc=TLD` syntax is required for service managedby
 4. Use separate calls for multiple hosts instead of comma-separated lists
+5. **Task ordering is critical:** Service managedby must be added AFTER service principals are created - otherwise the service doesn't exist and the command silently fails (due to `failed_when: false`)
 
 ---
 
@@ -191,6 +210,25 @@ ipa-getcert resubmit -i REQUEST_ID
 
 # Verify certificate SANs
 openssl x509 -in /opt/vault/tls/tls.crt -noout -text | grep -A2 "Subject Alternative"
+```
+
+### Recovering from Stuck Certificate Requests
+
+If certificate requests are stuck with `CA_REJECTED` status, use these ansible ad-hoc commands:
+
+```bash
+# 1. Stop tracking the stuck certificate on all vault nodes
+ansible vault_cluster -i inventory/inventory.ini -m command -a "ipa-getcert stop-tracking -f /opt/vault/tls/tls.crt" -b
+
+# 2. Remove old certificate files
+ansible vault_cluster -i inventory/inventory.ini -m file -a "path=/opt/vault/tls/tls.crt state=absent" -b
+ansible vault_cluster -i inventory/inventory.ini -m file -a "path=/opt/vault/tls/tls.key state=absent" -b
+
+# 3. Re-run vault_setup.yml to request new certificates (with correct managedby)
+ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml
+
+# 4. Restart vault to load new certificates
+ansible vault_cluster -i inventory/inventory.ini -m systemd -a "name=vault state=restarted" -b
 ```
 
 ---
