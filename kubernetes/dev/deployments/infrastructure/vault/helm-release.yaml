@@ -19,3 +19,15 @@ spec:
       enabled: false
     injector:
       enabled: true
+
+  # Proper fix later: Mount FreeIPA CA in helm-release.yaml:                                                        
+  # injector:
+  #   extraEnvironmentVars:
+  #     VAULT_CACERT: /etc/ipa/ca.crt                                                                               
+  #   volumes:
+  #     - name: ipa-ca                                                                                              
+  #       hostPath:                                                                                               
+  #         path: /etc/ipa/ca.crt                                                                                 
+  #   volumeMounts:
+  #     - name: ipa-ca
+  #       mountPath: /etc/ipa/ca.crt
