@@ -35,7 +35,6 @@ spec:
         vault.hashicorp.com/tls-skip-verify: "false"
         vault.hashicorp.com/tls-secret: "vault-ca"
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
-        vault.hashicorp.com/service-account-token-audience: "vault"
 
     spec:
       serviceAccountName: nginx-sa
@@ -85,3 +84,10 @@ spec:
     - port: 8080
       targetPort: 80
       nodePort: 30080
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx-sa
+  namespace: testing
