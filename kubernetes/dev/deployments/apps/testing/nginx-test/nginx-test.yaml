@@ -34,7 +34,7 @@ spec:
         vault.hashicorp.com/tls-skip-verify: "false"
         vault.hashicorp.com/tls-secret: "vault-ca"
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
-
+        vault.hashicorp.com/service-account-token-audience: "vault"
 
     spec:
       serviceAccountName: nginx-sa
