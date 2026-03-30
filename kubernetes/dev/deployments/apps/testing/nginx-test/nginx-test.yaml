@@ -28,8 +28,8 @@ spec:
         vault.hashicorp.com/role: "nginx"
         vault.hashicorp.com/agent-inject-secret-config.txt: "secret/data/nginx/config"
         vault.hashicorp.com/tls-skip-verify: "false"
-        vault.hashicorp.com/ca-cert: "/vault/secrets/ca.crt"
-        vault.hashicorp.com/agent-extra-secret: "vault-ca"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
 
 
     spec:
