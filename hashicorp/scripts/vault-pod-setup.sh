@@ -29,7 +29,6 @@ vault write auth/kubernetes/role/${APP_NAME} \
     bound_service_account_names="${SA}" \
     bound_service_account_namespaces="${NAMESPACE}" \
     policies="${APP_NAME}-policy" \
-    audience="vault" \
     ttl="1h"
 
 vault token revoke -self  
