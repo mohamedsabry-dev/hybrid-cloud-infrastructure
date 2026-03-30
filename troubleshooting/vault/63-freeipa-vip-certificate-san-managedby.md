@@ -20,6 +20,58 @@ Individual node certificates worked (e.g., `vault1.lab.local`), but adding the V
 
 ---
 
+## Context & Why This Was Needed
+
+The goal was to add Keepalived VIP (`vault.lab.local → 10.0.62.100`) as a single HA entry point for the 3-node Vault cluster. The VIP DNS record was added to FreeIPA successfully. However, when K8s pods tried to connect via `https://vault.lab.local:8200`, TLS failed because the existing Vault certificates only contained `vault1.lab.local` (or vault2/vault3) as the SAN — not the VIP hostname.
+
+The solution required reissuing all Vault node certs to include `vault.lab.local` as an additional DNS SAN alongside the node's own hostname.
+
+---
+
+## Error Evidence Trail
+
+**Error 1 — Initial curl from K8s master:**
+```
+curl: (60) SSL: no alternative certificate subject name matches target hostname 'vault.lab.local'
+```
+→ Confirmed the cert SAN was missing the VIP hostname.
+
+**Error 2 — After adding `-D vault.lab.local` to cert request:**
+```
+status: CA_UNREACHABLE
+ca-error: 4001 (The service principal for subject alt name vault.lab.local in certificate request does not exist)
+```
+→ FreeIPA requires a service principal for every SAN. `vault/vault.lab.local` didn't exist.
+
+**Error 3 — After adding VIP host + service principal, host managedby was wrong:**
+```
+status: CA_REJECTED
+ca-error: 2100 (Insufficient access: Insufficient privilege to create a certificate with subject alt name 'vault.lab.local')
+stuck: yes
+```
+→ Even with the service principal existing, the vault nodes had no permission to request certs for it. Both HOST and SERVICE managedby were needed.
+
+**Error 4 — Wrong IPA command used:**
+```
+ipa: ERROR: unknown command 'service-add-managedby'
+```
+→ This command doesn't exist in this FreeIPA version. Had to use `ipa service-mod --addattr=managedby=...` instead.
+
+**Error 5 — Comma-separated hosts syntax failed silently:**
+```bash
+# WRONG - accepted but only added vault1, vault2, vault3 as one invalid entry
+ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local,vault2.lab.local,vault3.lab.local
+```
+→ Must be separate calls per host.
+
+**Error 6 — `-w` timeout on cert request (misleading failure):**
+```
+rc: 2 — "New signing request added" but Ansible reported FAILED
+```
+→ The `-w` flag waits for cert issuance. If IPA takes longer than expected, it times out and returns rc:2 even though the request was submitted. Not a real failure — check with `ipa-getcert list` to confirm actual status.
+
+---
+
 ## Investigation Flow
 
 ### Step 1: Initial Playbook Configuration

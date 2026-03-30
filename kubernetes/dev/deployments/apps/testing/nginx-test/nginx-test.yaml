@@ -9,7 +9,7 @@ metadata:
     workload: testing
   annotations:
     description: "Nginx App Deployment for Testing PV,PVC Config"
-    kubernetes.io/change-cause: "Add secret volume mount for nginx-secret"
+    kubernetes.io/change-cause: "Replace K8s secret with Vault injection + FreeIPA CA trust"
 spec:
   replicas: 3
 
@@ -27,7 +27,10 @@ spec:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "nginx"
         vault.hashicorp.com/agent-inject-secret-config.txt: "secret/data/nginx/config"
-        vault.hashicorp.com/tls-skip-verify: "true"  # TODO: Mount FreeIPA CA instead
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/ca-cert: "/vault/secrets/ca.crt"
+        vault.hashicorp.com/agent-extra-secret: "vault-ca"
+
 
     spec:
       serviceAccountName: nginx-sa
