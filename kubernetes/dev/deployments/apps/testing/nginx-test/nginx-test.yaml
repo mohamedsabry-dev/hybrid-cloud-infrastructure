@@ -28,9 +28,9 @@ spec:
         vault.hashicorp.com/role: "nginx"
         vault.hashicorp.com/agent-inject-secret-config.txt: "secret/data/nginx/config"
         vault.hashicorp.com/agent-inject-template-config.txt: |
-          {{- with secret "secret/data/nginx/config" -}}
+          {{ with secret "secret/data/nginx/config" }}
           login-password: {{ .Data.data.login-password }}
-          {{- end }}
+          {{ end }}
         vault.hashicorp.com/tls-skip-verify: "false"
         vault.hashicorp.com/tls-secret: "vault-ca"
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
