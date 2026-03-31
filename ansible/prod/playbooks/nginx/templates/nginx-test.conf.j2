@@ -1,15 +1,15 @@
 upstream k8s_workers {
     least_conn;
-    server 10.0.64.10:30080;
-    server 10.0.64.11:30080;
-    server 10.0.64.12:30080;
+    server 10.0.54.10:30080;
+    server 10.0.54.11:30080;
+    server 10.0.54.12:30080;
 }
 
 server {
     listen 80;
-    server_name nginx-test-dev.lab.local;
+    server_name nginx-test-prod.lab.local;
 
-    access_log /var/log/nginx/nginx-test-dev.log main;
+    access_log /var/log/nginx/nginx-test-prod.log main;
 
     location / {
         proxy_pass http://k8s_workers;

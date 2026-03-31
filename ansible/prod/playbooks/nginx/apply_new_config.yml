@@ -1,0 +1,18 @@
+---
+- name: Add Config file
+  hosts: ex-nginx.lab.local
+  become: yes
+  tasks:
+    - name: Copy Config template
+      ansible.builtin.template:
+        src: templates/nginx-test.conf.j2
+        dest: /etc/nginx/conf.d/nginx-test.conf
+
+    - name: Validate nginx config
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Reload nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded

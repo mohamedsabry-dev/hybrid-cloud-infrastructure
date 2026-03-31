@@ -35,3 +35,9 @@ variable "subnet_mgmt_cidr" {
   type        = string
   default     = "172.17.63.0/24"
 }
+
+variable "dns_ingress_ip" {
+  description = "IP address for Route53 DNS records (ingress/proxy server)"
+  type        = string
+  default     = "10.0.55.10"
+}

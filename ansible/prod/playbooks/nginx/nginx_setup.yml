@@ -1,0 +1,15 @@
+---
+- name: Setup Nginx
+  hosts: ex-nginx.lab.local
+  become: yes
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+
+    - name: Start Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
