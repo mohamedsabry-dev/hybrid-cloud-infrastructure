@@ -1,0 +1,67 @@
+# Idea: Hybrid Cloud Public Traffic Simulation
+# Status: Draft - revisit when ready
+
+---
+
+## Goal
+
+Simulate real public user traffic hitting a workload running on on-prem Kubernetes,
+routed through AWS as the edge layer. Enables real SRE testing — failover, stability,
+disaster simulation — with a publicly accessible URL.
+
+---
+
+## Traffic Flow
+
+  Internet User
+      └── Route 53 (public DNS record → WireGuard EIP)
+              └── WireGuard EC2 (AWS) — port forward 80/443 → on-prem
+                      └── K8s Ingress Controller (NGINX Ingress)
+                              └── App Service → Pods
+
+---
+
+## What Needs to Be Built
+
+1. NGINX Ingress Controller
+   - Deploy on K8s (Flux managed)
+   - Replace NodePort with Ingress resource per app
+   - kubernetes/dev/deployments/infrastructure/ingress/
+
+2. MetalLB (LoadBalancer for bare-metal K8s)
+   - Assigns a stable on-prem IP to the Ingress Controller
+   - kubernetes/dev/deployments/infrastructure/metallb/
+
+3. WireGuard Port Forwarding
+   - Forward port 80/443 from EIP to MetalLB ingress IP
+   - iptables rule on the WireGuard EC2 instance
+   - Add to terraform/prod/aws/compute/ or userdata
+
+4. Route 53 DNS Record
+   - Public A record pointing to WireGuard EIP
+   - terraform/prod/aws/network/ or separate dns/ module
+
+5. TLS — cert-manager + Let's Encrypt
+   - Terminate HTTPS at the Ingress Controller
+   - kubernetes/dev/deployments/infrastructure/cert-manager/
+
+---
+
+## Test Scenarios (SRE Simulation)
+
+- Drain a worker node while browsing the app — does it stay up?
+- Kill vault pod — do secrets stop injecting on new pods?
+- Simulate NFS failure — does PVC-backed content disappear?
+- Route 53 health check — alert if origin goes unreachable
+- Rolling update via Flux — zero downtime?
+
+---
+
+## Notes
+
+- WireGuard EIP is already provisioned in terraform/prod/aws/compute/
+- Route 10.0.0.0/16 via WireGuard ENI already exists in rt-public-prod
+- FreeIPA internal DNS handles lab.local — Route 53 handles public domain
+- Consider a real domain (cheap .com or .dev) for Let's Encrypt to work
+
+---
