@@ -68,10 +68,17 @@ resource "aws_route53_zone" "private" {
   }
 }
 
-resource "aws_route53_record" "nginx_test" {
+locals {
+  dns_records = ["nginx-test", "nginx", "prometheus", "grafana", "loki", "wordpress"]
+}
+
+resource "aws_route53_record" "services" {
+  for_each = toset(local.dns_records)
+  
   zone_id = aws_route53_zone.private.zone_id
-  name    = "nginx-test-dev"
+  name    = "${each.key}-dev"
   type    = "A"
   ttl     = 300
-  records = ["10.0.65.10"]
+  records = [var.dns_ingress_ip]
+  
 }

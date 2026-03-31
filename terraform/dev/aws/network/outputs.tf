@@ -27,3 +27,8 @@ output "igw_id" {
   description = "ID of the Internet Gateway"
   value       = aws_internet_gateway.igw_main.id
 }
+
+output "aws_route53_records" {
+  description = "DNS Records"
+  value = [for i in aws_route53_record.services : i.fqdn]
+}

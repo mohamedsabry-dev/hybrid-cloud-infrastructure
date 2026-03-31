@@ -3,22 +3,21 @@
   hosts: freeipa
   become: yes
   tasks:
-    - name: Add Vault VIP DNS record
+    - name: Add DNS records
       freeipa.ansible_freeipa.ipadnsrecord:
         ipaadmin_principal: "{{ ipaadmin_principal }}"
         ipaadmin_password: "{{ ipaadmin_password }}"
         zone_name: lab.local
-        name: vault
+        name: "{{ item.name }}"
         record_type: A
-        record_value: "10.0.52.100"
+        record_value: "{{ item.ip }}"
         state: present
-
-    - name: Add K8s VIP DNS record
-      freeipa.ansible_freeipa.ipadnsrecord:
-        ipaadmin_principal: "{{ ipaadmin_principal }}"
-        ipaadmin_password: "{{ ipaadmin_password }}"
-        zone_name: lab.local
-        name: k8s
-        record_type: A
-        record_value: "10.0.51.100"
-        state: present
+      loop:
+        - { name: "vault", ip: "10.0.52.100" }
+        - { name: "k8s", ip: "10.0.51.100" }
+        - { name: "nginx-test-prod", ip: "10.0.55.10" }
+        - { name: "nginx-prod", ip: "10.0.55.10" }
+        - { name: "grafana-prod", ip: "10.0.55.10" }
+        - { name: "prometheus-prod", ip: "10.0.55.10" }
+        - { name: "loki-prod", ip: "10.0.55.10" }
+        - { name: "wordpress-prod", ip: "10.0.55.10" }
