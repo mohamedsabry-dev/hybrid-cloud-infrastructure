@@ -15,6 +15,10 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - soft
+    - timeo=30
+    - retrans=3
   nfs:
     server: 10.0.40.120
     path: /volume1/k8s-dev/monitoring
@@ -35,6 +39,10 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - soft
+    - timeo=30
+    - retrans=3
   nfs:
     server: 10.0.40.120
     path: /volume1/k8s-dev/logging
@@ -55,6 +63,10 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - soft
+    - timeo=30
+    - retrans=3
   nfs:
     server: 10.0.40.120
     path: /volume1/k8s-dev/apps
@@ -75,6 +87,10 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Delete
+  mountOptions:
+    - soft
+    - timeo=30
+    - retrans=3
   nfs:
     server: 10.0.40.120
     path: /volume1/k8s-dev/testing

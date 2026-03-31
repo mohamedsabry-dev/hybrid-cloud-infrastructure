@@ -1,0 +1,23 @@
+log_format upstream_log '$remote_addr - [$time_local] "$request" '
+                        '$status upstream: $upstream_addr';
+
+upstream k8s_workers {
+    least_conn;
+    server 10.0.64.10:30080;
+    server 10.0.64.11:30080;
+    server 10.0.64.12:30080;
+}
+
+server {
+    listen 80;
+    server_name nginx-test-dev.local;
+
+    access_log /var/log/nginx/k8s-workers.log upstream_log;
+
+    location / {
+        proxy_pass http://k8s_workers;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
