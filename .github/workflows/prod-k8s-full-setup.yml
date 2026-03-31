@@ -239,6 +239,7 @@ jobs:
             ansible-playbook -i inventory/inventory.ini playbooks/common/ntp.yml --limit k8s && \
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_setup.yml && \
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_init.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_important_tools.yml && \
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/flux_setup.yml"
 
       - name: Cleanup Kerberos ticket

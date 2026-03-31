@@ -1,0 +1,15 @@
+---
+- name: Unmount NFS share from Kubernetes worker nodes
+  hosts: k8s_workers
+  become: yes
+  tasks:
+
+  - name: Unmount and remove from fstab
+    ansible.posix.mount:
+      path: /mnt/k8s-data
+      state: absent
+
+  - name: Remove mount point directory
+    ansible.builtin.file:
+      path: /mnt/k8s-data
+      state: absent

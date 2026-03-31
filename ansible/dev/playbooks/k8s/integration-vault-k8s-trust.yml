@@ -1,0 +1,64 @@
+---
+- name: Get K8s Integration data
+  hosts: k8s-master1.lab.local
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Get cluster API endpoint
+      ansible.builtin.shell:
+        cmd: kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'
+      register: cluster_info
+
+    - name: Get K8s CA cert
+      ansible.builtin.shell:
+        cmd: kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d
+      register: k8s_ca
+
+    - name: Get vault-auth token
+      ansible.builtin.shell:
+        cmd: kubectl create token vault-auth -n kube-system --duration=30000h
+      register: vault_auth_token
+
+    - name: Get issuer
+      ansible.builtin.shell:
+        cmd: kubectl get --raw /.well-known/openid-configuration | python3 -c "import sys,json; print(json.load(sys.stdin)['issuer'])"
+      register: issuer
+
+    - name: Save values as facts
+      set_fact:
+        k8s_host: "{{ cluster_info.stdout }}"
+        k8s_ca_cert: "{{ k8s_ca.stdout }}"
+        k8s_token: "{{ vault_auth_token.stdout }}"
+        k8s_issuer: "{{ issuer.stdout }}"
+
+- name: Setup Vault trust
+  hosts: vault1.lab.local
+  become: yes
+  vars_prompt:
+    - name: vault_admin_token
+      prompt: "Vault admin token"
+      private: yes
+  environment:
+    VAULT_ADDR: "https://vault1.lab.local:8200"
+    VAULT_TOKEN: "{{ vault_admin_token }}"
+    VAULT_CACERT: "/etc/ipa/ca.crt"
+  tasks:
+    - name: Enable KV secret engine
+      ansible.builtin.shell:
+        cmd: vault secrets enable -path=secret kv-v2
+      ignore_errors: yes
+
+    - name: Enable Kubernetes auth method
+      ansible.builtin.shell:
+        cmd: vault auth enable kubernetes
+      ignore_errors: yes
+
+    - name: Config Vault to Trust K8s
+      ansible.builtin.shell: |
+        vault write auth/kubernetes/config \
+          kubernetes_host="{{ hostvars['k8s-master1.lab.local']['k8s_host'] }}" \
+          kubernetes_ca_cert="{{ hostvars['k8s-master1.lab.local']['k8s_ca_cert'] }}" \
+          token_reviewer_jwt="{{ hostvars['k8s-master1.lab.local']['k8s_token'] }}" \
+          issuer="{{ hostvars['k8s-master1.lab.local']['k8s_issuer'] }}" \
+          disable_iss_validation=false
