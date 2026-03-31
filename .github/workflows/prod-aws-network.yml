@@ -72,7 +72,7 @@ jobs:
           echo "3-minute review window started at $(date)"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Plan output is available above for auditor review"
-          sleep 20
+          sleep 180
           echo "Review window ended at $(date)"
 
       - name: Terraform Apply

@@ -20,6 +20,7 @@ Follow these guides **in order**. Each step depends on the previous ones being c
 | 7 | [freeipa-initial-setup-guide.txt](freeipa-initial-setup-guide.txt) | FreeIPA identity management | 1-2 hours |
 | 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster | 1-2 hours |
 | 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster | 2-3 hours |
+| 10 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection | 30 min |
 
 **Total estimated time:** 12-18 hours (full rebuild from scratch)
 

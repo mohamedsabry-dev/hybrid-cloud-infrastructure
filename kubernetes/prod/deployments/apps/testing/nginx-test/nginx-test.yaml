@@ -9,7 +9,7 @@ metadata:
     workload: testing
   annotations:
     description: "Nginx App Deployment for Testing PV,PVC Config"
-    kubernetes.io/change-cause: "Add secret volume mount for nginx-secret"
+    kubernetes.io/change-cause: "Replace K8s secret with Vault injection + FreeIPA CA trust"
 spec:
   replicas: 3
 
@@ -23,8 +23,21 @@ spec:
         app: nginx-test
         environment: prod
         workload: testing
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "nginx"
+        vault.hashicorp.com/agent-inject-secret-config.txt: "secret/data/nginx/config"
+        vault.hashicorp.com/agent-inject-template-config.txt: |
+          {{- with secret "secret/data/nginx/config" }}
+          login-password: {{ index .Data.data "login-password" }}
+          login-token: {{ index .Data.data "login-token" }}
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
 
     spec:
+      serviceAccountName: nginx-sa
       containers:
         - name: nginx
           image:  nginx:latest
@@ -35,8 +48,9 @@ spec:
             - name: nginx-config-vol
               mountPath: /etc/nginx/conf.d
 
-            - name: nginx-secret-vol
-              mountPath: /etc/nginx/secrets
+            # Replaced by Vault injection - vault.hashicorp.com/agent-inject-secret-*
+            # - name: nginx-secret-vol
+            #   mountPath: /etc/nginx/secrets
       volumes:
         - name: nfs-vol
           persistentVolumeClaim:
@@ -46,9 +60,10 @@ spec:
           configMap:
             name: nginx-config
 
-        - name: nginx-secret-vol
-          secret:
-            secretName: nginx-secret
+        # Replaced by Vault injection - secret now comes from Vault
+        # - name: nginx-secret-vol
+        #   secret:
+        #     secretName: nginx-secret
 
 ---
 apiVersion: v1
@@ -69,3 +84,10 @@ spec:
     - port: 8080
       targetPort: 80
       nodePort: 30080
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx-sa
+  namespace: testing

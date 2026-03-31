@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - nginx-test.yaml
   - nginx-configmap.yaml
-  - nginx-secret.yaml
+  - vault-ca-secret.yaml
