@@ -58,3 +58,20 @@ resource "aws_route_table_association" "rta_mgmt" {
   subnet_id      = aws_subnet.subnet_mgmt.id
   route_table_id = aws_route_table.rt_public.id
 }
+
+resource "aws_route53_zone" "private" {
+  name = "lab.local"
+
+  vpc {
+    vpc_id = aws_vpc.vpc_main.id
+    vpc_region = var.aws_region
+  }
+}
+
+resource "aws_route53_record" "nginx_test" {
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "nginx-test-dev"
+  type    = "A"
+  ttl     = 300
+  records = ["10.0.65.10"]
+}
