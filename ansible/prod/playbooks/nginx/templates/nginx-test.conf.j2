@@ -9,7 +9,7 @@ server {
     listen 80;
     server_name nginx-test-prod.lab.local;
 
-    access_log /var/log/nginx/nginx-test-prod.log main;
+    access_log /var/log/nginx/nginx-test-prod.log upstream;
 
     location / {
         proxy_pass http://k8s_workers;

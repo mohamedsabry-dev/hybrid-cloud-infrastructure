@@ -126,18 +126,60 @@ Playbook: ansible/dev/playbooks/nginx/nginx_setup.yml
 
 This playbook:
 - Installs Nginx via dnf
+- Deploys custom nginx.conf with enhanced log formats (see 3.2)
 - Starts and enables the Nginx service
 
   cd ansible/dev/
 
   ansible-playbook -i inventory/inventory.ini playbooks/nginx/nginx_setup.yml
 
-### 3.2 Verify Installation
+### 3.2 Custom Log Formats (nginx.conf)
+
+We manage nginx.conf via Ansible template instead of using the default config.
+
+Template: ansible/dev/playbooks/nginx/templates/nginx.conf.j2
+
+WHY: The default Nginx log format (`main`) doesn't show which upstream server
+handled the request. For a reverse proxy with multiple backends, this info
+is critical for:
+- Debugging which K8s worker handled a request
+- Identifying slow backends via response times
+- Load balancing verification
+- Future integration with log aggregation (Loki, ELK)
+
+Custom log format added:
+```nginx
+log_format upstream '$remote_addr - [$time_local] "$request" '
+                    '$status $body_bytes_sent '
+                    'upstream: $upstream_addr '
+                    'response_time: ${request_time}s '
+                    'upstream_time: ${upstream_response_time}s';
+```
+
+Log fields explained:
+| Field                    | Purpose                                    |
+|--------------------------|--------------------------------------------|
+| $remote_addr             | Client IP address                          |
+| $time_local              | Request timestamp                          |
+| $request                 | HTTP method + URI                          |
+| $status                  | HTTP response code                         |
+| $body_bytes_sent         | Response size in bytes                     |
+| $upstream_addr           | Which backend server handled the request   |
+| $request_time            | Total time from request to response        |
+| $upstream_response_time  | Time backend took to respond               |
+
+Sample log output:
+```
+192.168.100.223 - [01/Apr/2026:00:13:58 +0200] "GET / HTTP/1.1" 200 16 upstream: 10.0.64.12:30080 response_time: 0.003s upstream_time: 0.002s
+```
+
+### 3.3 Verify Installation
 
   ssh ex-nginx.lab.local
 
   nginx -v
   systemctl status nginx
+  grep "log_format upstream" /etc/nginx/nginx.conf
 
 ---
 
@@ -160,7 +202,7 @@ server {
     listen 80;
     server_name nginx-test-dev.lab.local;
 
-    access_log /var/log/nginx/nginx-test-dev.log main;
+    access_log /var/log/nginx/nginx-test-dev.log upstream;
 
     location / {
         proxy_pass http://k8s_workers;
@@ -171,6 +213,8 @@ server {
     }
 }
 ```
+
+Note: We use `upstream` log format (not `main`) to see which backend handled each request.
 
 ### 4.2 Apply Configuration
 
@@ -282,7 +326,8 @@ Monitor the workflow run in GitHub Actions after pushing changes.
 |--------------------------|-----------------------------------------------------|
 | Nginx Setup Playbook     | ansible/dev/playbooks/nginx/nginx_setup.yml         |
 | Nginx Config Playbook    | ansible/dev/playbooks/nginx/apply_new_config.yml    |
-| Nginx Templates          | ansible/dev/playbooks/nginx/templates/              |
+| Nginx Main Config        | ansible/dev/playbooks/nginx/templates/nginx.conf.j2 |
+| Nginx Site Templates     | ansible/dev/playbooks/nginx/templates/*.conf.j2     |
 | FreeIPA DNS Playbook     | ansible/dev/playbooks/freeipa/add_dns_records.yml   |
 | AWS Network TF           | terraform/dev/aws/network/main.tf                   |
 | AWS Network Variables    | terraform/dev/aws/network/variables.tf              |

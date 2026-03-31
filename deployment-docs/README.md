@@ -21,8 +21,9 @@ Follow these guides **in order**. Each step depends on the previous ones being c
 | 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster | 1-2 hours |
 | 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster | 2-3 hours |
 | 10 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection | 30 min |
+| 11 | [nginx-setup-guide.txt](nginx-setup-guide.txt) | Nginx reverse proxy for K8s services | 30 min |
 
-**Total estimated time:** 12-18 hours (full rebuild from scratch)
+**Total estimated time:** 13-19 hours (full rebuild from scratch)
 
 ---
 
@@ -47,6 +48,7 @@ Ansible + Runner (Step 6)
     └── FreeIPA (Step 7)     ← All services depend on FreeIPA for DNS/auth
             ├── Vault (Step 8)
             └── Kubernetes (Step 9)
+                    └── Nginx (Step 11)  ← Reverse proxy for K8s services
 ```
 
 ---
@@ -121,6 +123,7 @@ All troubleshooting documentation is in the `troubleshooting/` folder, organized
 | troubleshooting/github-actions/ | Workflow, runner issues |
 | troubleshooting/aws/ | IAM, secrets, OIDC issues |
 | troubleshooting/kubernetes/ | K8s cluster issues |
+| troubleshooting/nginx/ | Reverse proxy, upstream, logging issues |
 | troubleshooting/linux/ | General Linux issues |
 
 ---
