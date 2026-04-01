@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - pv.yaml
   - pvc.yaml
+  - nfs-csi-driver.yaml
