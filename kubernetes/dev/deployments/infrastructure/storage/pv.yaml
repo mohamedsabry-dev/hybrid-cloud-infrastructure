@@ -70,27 +70,3 @@ spec:
   nfs:
     server: 10.0.40.120
     path: /volume1/k8s-dev/apps
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: nfs-testing
-  labels:
-    type: nfs
-    environment: dev
-    app.kubernetes.io/managed-by: flux
-  annotations:
-    description: "NFS storage for testing - temporary workloads"
-spec:
-  capacity:
-    storage: 100Gi
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Delete
-  mountOptions:
-    - soft
-    - timeo=30
-    - retrans=3
-  nfs:
-    server: 10.0.40.120
-    path: /volume1/k8s-dev/testing
