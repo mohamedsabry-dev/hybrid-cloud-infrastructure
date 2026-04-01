@@ -6,7 +6,6 @@ provisioner: nfs.csi.k8s.io
 parameters:
   server: "10.0.40.120"
   share: "/volume1/k8s-dev/testing"
-  onDeletePolicy: delete
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
