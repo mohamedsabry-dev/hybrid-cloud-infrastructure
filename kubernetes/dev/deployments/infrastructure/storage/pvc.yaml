@@ -72,7 +72,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
+  storageClassName: nfs-csi-testing
   resources:
     requests:
       storage: 100Gi
-  volumeName: nfs-testing
