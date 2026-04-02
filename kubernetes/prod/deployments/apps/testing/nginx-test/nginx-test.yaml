@@ -48,22 +48,14 @@ spec:
             - name: nginx-config-vol
               mountPath: /etc/nginx/conf.d
 
-            # Replaced by Vault injection - vault.hashicorp.com/agent-inject-secret-*
-            # - name: nginx-secret-vol
-            #   mountPath: /etc/nginx/secrets
       volumes:
         - name: nfs-vol
           persistentVolumeClaim:
-            claimName: testing-storage
+            claimName: nginx-test-data
 
         - name: nginx-config-vol
           configMap:
             name: nginx-config
-
-        # Replaced by Vault injection - secret now comes from Vault
-        # - name: nginx-secret-vol
-        #   secret:
-        #     secretName: nginx-secret
 
 ---
 apiVersion: v1
