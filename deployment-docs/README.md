@@ -8,22 +8,20 @@ This folder contains setup guides for deploying the hybrid cloud infrastructure 
 
 Follow these guides **in order**. Each step depends on the previous ones being complete.
 
-| Order | Guide | Purpose | Time Est. |
-|-------|-------|---------|-----------|
-| 0 | [network-setup-guide.txt](network-setup-guide.txt) | Physical network (router, switch, AP) | 2-3 hours |
-| 1 | [proxmox-setup-guide.txt](proxmox-setup-guide.txt) | Proxmox VE hypervisor installation | 1-2 hours |
-| 2 | [aws-bootstrap-setup-guide.txt](aws-bootstrap-setup-guide.txt) | AWS OIDC, state bucket, IAM bootstrap | 30 min |
-| 3 | [github-setup-guide.txt](github-setup-guide.txt) | GitHub secrets, variables, runners | 1 hour |
-| 4 | [aws-secrets-setup-guide.txt](aws-secrets-setup-guide.txt) | AWS Secrets Manager placeholders | 30 min |
-| 5 | [vpn-setup-guide.txt](vpn-setup-guide.txt) | WireGuard VPN to AWS | 1-2 hours |
-| 6 | [ansible-runner-setup-guide.txt](ansible-runner-setup-guide.txt) | Ansible LXC + GitHub Runner LXC | 1 hour |
-| 7 | [freeipa-initial-setup-guide.txt](freeipa-initial-setup-guide.txt) | FreeIPA identity management | 1-2 hours |
-| 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster | 1-2 hours |
-| 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster | 2-3 hours |
-| 10 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection | 30 min |
-| 11 | [nginx-setup-guide.txt](nginx-setup-guide.txt) | Nginx reverse proxy for K8s services | 30 min |
-
-**Total estimated time:** 13-19 hours (full rebuild from scratch)
+| Order | Guide | Purpose |
+|-------|-------|---------|
+| 0 | [network-setup-guide.txt](network-setup-guide.txt) | Physical network (router, switch, AP) |
+| 1 | [proxmox-setup-guide.txt](proxmox-setup-guide.txt) | Proxmox VE hypervisor installation |
+| 2 | [aws-bootstrap-setup-guide.txt](aws-bootstrap-setup-guide.txt) | AWS OIDC, state bucket, IAM bootstrap |
+| 3 | [github-setup-guide.txt](github-setup-guide.txt) | GitHub secrets, variables, runners |
+| 4 | [aws-secrets-setup-guide.txt](aws-secrets-setup-guide.txt) | AWS Secrets Manager placeholders |
+| 5 | [vpn-setup-guide.txt](vpn-setup-guide.txt) | WireGuard VPN to AWS |
+| 6 | [ansible-runner-setup-guide.txt](ansible-runner-setup-guide.txt) | Ansible LXC + GitHub Runner LXC |
+| 7 | [freeipa-initial-setup-guide.txt](freeipa-initial-setup-guide.txt) | FreeIPA identity management |
+| 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster |
+| 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster |
+| 10 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection |
+| 11 | [nginx-setup-guide.txt](nginx-setup-guide.txt) | Nginx reverse proxy for K8s services |
 
 ---
 

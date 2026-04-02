@@ -1,9 +1,10 @@
-# Troubleshooting: Dev SVC Network Down - ER605 Port 4 Instability
+# Case 4: ER605 Port 4 Gigabit Negotiation Failure
 
-**Date**: March 2026
-**Duration**: ~45 minutes troubleshooting
-**Affected**: Dev environment - all VMs/LXCs on SVC VLANs (60-65)
-**Resolution**: Force 100M Full-duplex + Enable Flow Control on ER605 Port 4
+## Status: PARTIALLY RESOLVED (See Update)
+## Date: 2026-03-21
+## Duration: ~45 minutes troubleshooting
+## Environment: Dev SVC VLANs (60-65)
+## Related: Case 3 (Link Flapping), Case 9 (Force 100M Resolution)
 
 ---
 
@@ -601,7 +602,7 @@ Gateway (10.0.6x.1)
 
 ## Update: Issue Recurrence (March 26, 2026)
 
-**Related Case**: `57-svc-network-instability-force-100m.md`
+**Related Case**: Case 9 (`9-svc-network-instability-force-100m.md`)
 
 ### Issue Returned
 

@@ -1,9 +1,9 @@
-# Troubleshooting: LXC Clone vs Template File - SSH Key Injection
+# Case 7: LXC Clone vs Template File — SSH Key Injection
 
-**Date:** 2026-03-22
-**Environment:** Dev/Prod (pve-dev, pve-prod)
-**Provider:** bpg/proxmox
-**Category:** Architecture Decision
+## Status: RESOLVED (Architecture Decision)
+## Date: 2026-03-22
+## Environment: Dev/Prod (pve-dev, pve-prod)
+## Provider: bpg/proxmox
 
 ---
 

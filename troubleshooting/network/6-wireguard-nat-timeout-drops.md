@@ -1,7 +1,11 @@
-# TS: ISP NAT Timeout Causing Tunnel Drops
+# Case 6: ISP NAT Timeout Causing WireGuard Tunnel Drops
 
-## Date
-2026-03-11
+## Status: RESOLVED
+## Date: 2026-03-11
+## Environment: WireGuard tunnels to AWS
+## Related: Case 5 (CGNAT), Case 7 (VLAN Gateway), Case 8 (Wrong Tunnel)
+
+---
 
 ## Symptoms
 - WireGuard tunnel worked initially
@@ -91,5 +95,21 @@ Tunnel now survives:
 - EC2 reboots (service auto-starts)
 - Network interruptions (service auto-restarts)
 
-## Status
-RESOLVED
+---
+
+## Commands Reference
+
+```bash
+# Check WireGuard status
+sudo wg show wg0
+
+# Check keepalive service
+sudo systemctl status wg-keepalive
+journalctl -u wg-keepalive -f
+
+# Watch handshake times
+watch -n 60 'sudo wg show wg0 latest-handshakes'
+
+# Check NAT type in ISP router
+# Look for 100.64.0.0/10 in routing table = CGNAT
+```

@@ -1,9 +1,9 @@
-# LXC Mount Point (mp0) Not Included in Proxmox Backups
+# Case 6: LXC Mount Point (mp0) Not Included in Backups
 
-## Issue ID: 38
+## Status: RESOLVED
 ## Date: 2026-03-20
 ## Environment: Dev & Prod (pve-dev, pve-prod)
-## Status: Resolved
+## Related: Case 5 (Backup Missed)
 
 ---
 
@@ -208,7 +208,7 @@ Check backup job details periodically to ensure all disks show "Yes" for backup 
 
 ## Related Issues
 
-- [37-proxmox-backup-missed-not-retried.md](./37-proxmox-backup-missed-not-retried.md) - Missing `repeat-missed` flag
+- Case 5: `5-proxmox-backup-missed-not-retried.md` - Missing `repeat-missed` flag
 
 ## References
 

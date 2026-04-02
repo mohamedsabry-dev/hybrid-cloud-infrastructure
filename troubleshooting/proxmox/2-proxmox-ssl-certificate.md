@@ -1,6 +1,12 @@
-# Proxmox SSL Certificate - Wrong IP in SAN
+# Case 2: Proxmox SSL Certificate — Wrong IP in SAN
 
-## Issue
+## Status: RESOLVED
+## Date: 2026-02-20
+## Environment: Dev & Prod Proxmox servers
+
+---
+
+## Symptoms
 
 After changing Proxmox management IP from `192.168.0.x` to `10.0.5.x`, the browser shows certificate warning. The certificate still contains the old IP in Subject Alternative Name (SAN).
 
@@ -76,6 +82,26 @@ The `network-setup-dev.sh` and `network-setup-prod.sh` scripts now automatically
 - The network setup script wasn't used
 - Certificate needs regeneration for other reasons
 
-## Date Recorded
+---
 
-2026-02-20
+## Commands Reference
+
+```bash
+# Check current certificate SAN
+openssl x509 -in /etc/pve/local/pve-ssl.pem -text | grep -A1 "Subject Alternative Name"
+
+# Update /etc/hosts with new IP
+sed -i 's/OLD_IP/NEW_IP/' /etc/hosts
+
+# Regenerate certificate
+pvecm updatecerts --force
+
+# Restart proxy service
+systemctl restart pveproxy
+
+# Trust CA on macOS
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/Desktop/pve-root-ca.pem
+
+# Find trusted cert on macOS
+security find-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
+```

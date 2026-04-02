@@ -1,6 +1,12 @@
-# Proxmox LXC Snapshot Failure - NFS Mount Point
+# Case 3: LXC Snapshot Failure — NFS Mount Point
 
-## Issue
+## Status: RESOLVED
+## Date: 2026-03-08
+## Environment: Proxmox VE 8.x with NFS storage
+
+---
+
+## Symptoms
 
 When attempting to take a snapshot of an LXC container, Proxmox displays:
 
@@ -176,6 +182,35 @@ When creating new LXC containers that need snapshot capability:
 - Proxmox Forum: Mount points on NFS preventing snapshots
 - bpg/proxmox Terraform provider: Volume move requires container recreation
 
-## Date
+---
 
-2026-03-08
+## Commands Reference
+
+```bash
+# Check container config
+pct config <ctid>
+
+# Stop container
+pct stop <ctid>
+
+# Move mount point to local-lvm
+pct move-volume <ctid> mp0 local-lvm
+
+# Start container
+pct start <ctid>
+
+# Delete unused disk
+pct set <ctid> --delete unused0
+
+# Take snapshot
+pct snapshot <ctid> test-snapshot
+
+# List snapshots
+pct listsnapshot <ctid>
+
+# Delete snapshot
+pct delsnapshot <ctid> test-snapshot
+
+# Sync Terraform state after manual changes
+terraform apply -refresh-only
+```

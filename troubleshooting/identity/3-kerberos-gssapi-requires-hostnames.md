@@ -1,4 +1,4 @@
-# TS-006: Kerberos/GSSAPI Authentication Requires Hostnames
+# Case 3: Kerberos/GSSAPI Authentication Requires Hostnames
 
 **Date:** 2026-03-05
 **Environment:** DEV (lab.local)

@@ -1,8 +1,14 @@
-# Proxmox Golden Image Terraform Setup - Troubleshooting Guide
+# Case 1: Proxmox Golden Image Terraform Setup — QCOW2 Issues
 
-## Overview
+## Status: RESOLVED (Workaround)
+## Date: 2026-02
+## Environment: Proxmox VE with bpg/proxmox Terraform provider
 
-This document records issues encountered while setting up Rocky Linux 10.1 golden image VM using Terraform with the bpg/proxmox provider, specifically attempting to use QCOW2 cloud images.
+---
+
+## Symptoms
+
+Multiple issues encountered while setting up Rocky Linux 10.1 golden image VM using Terraform with the bpg/proxmox provider, specifically attempting to use QCOW2 cloud images.
 
 **Final Resolution:** Reverted to standard ISO installation approach due to multiple provider limitations with QCOW2 cloud images.
 

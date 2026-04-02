@@ -1,4 +1,4 @@
-# TS-036: Keytab Preauthentication Failed After Password Change
+# Case 8: Keytab Preauthentication Failed After Password Change
 
 **Date:** 2026-03-20
 **Environment:** DEV (lab.local)

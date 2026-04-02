@@ -1,4 +1,4 @@
-# Case 27: FreeIPA CA Rejected CSR — Hostname Mismatch
+# Case 3: FreeIPA CA Rejected CSR — Hostname Mismatch
 
 **Component:** HashiCorp Vault | FreeIPA | Certmonger
 **Date:** March 17, 2026

@@ -1,9 +1,8 @@
-# Troubleshooting: macOS Local Network Permission
+# Case 1: macOS Local Network Permission Blocking Apps
 
-## Case: Apps Unable to Reach Proxmox Server on Local Network
-
-**Date:** 2026-02-04
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-02-04
+## Environment: macOS Monterey+
 
 ---
 
@@ -53,3 +52,15 @@ apps like Chrome, VS Code, and Node.js (GitHub runner) are not.
 When some apps can reach a local device but others cannot on macOS,
 check Local Network permissions first before investigating firewall
 or routing issues.
+
+---
+
+## Commands Reference
+
+```bash
+# Test connectivity from Terminal (always works)
+ping 192.168.0.XX
+
+# Open Local Network permissions
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"
+```

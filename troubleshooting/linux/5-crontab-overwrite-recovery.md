@@ -1,8 +1,9 @@
-# Troubleshooting: Crontab Accidentally Overwritten - Recovery via Backup
+# Case 5: Crontab Accidentally Overwritten - Recovery via Backup
 
-**Date:** 2026-03-22
-**Environment:** pve-dev (Proxmox)
-**Category:** Linux / Cron
+## Status: RESOLVED
+## Date: 2026-03-22
+## Environment: pve-dev (Proxmox)
+## Category: Linux / Cron
 
 ---
 

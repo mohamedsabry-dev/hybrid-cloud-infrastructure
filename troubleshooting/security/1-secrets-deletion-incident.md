@@ -1,17 +1,14 @@
-================================================================================
-                    INCIDENT REPORT: AWS Secrets Deletion
-================================================================================
+# Case 1: AWS Secrets Deletion Incident
 
-Incident ID: INC-2026-02-14-001
-Date: February 14, 2026
-Time: 10:00 AM EGT
-Severity: HIGH
-Status: RESOLVED
-Environment: AWS Dev Account (REDACTED_AWS_DEV)
+## Status: RESOLVED
+## Date: 2026-02-14
+## Severity: HIGH
+## Environment: AWS Dev Account (REDACTED_AWS_DEV)
+## Incident ID: INC-2026-02-14-001
 
-================================================================================
-                              EXECUTIVE SUMMARY
-================================================================================
+---
+
+## Executive Summary
 
 Terraform workflow accidentally scheduled deletion of all AWS Secrets Manager
 secrets in dev environment due to code change. State file became corrupted
@@ -22,9 +19,7 @@ Impact Duration: ~30 minutes
 Data Loss: None (secrets restored from deletion queue)
 Service Disruption: None (caught before deletion completed)
 
-================================================================================
-                              INCIDENT TIMELINE
-================================================================================
+## Incident Timeline
 
 February 12, 2026 (~8:00 PM):
   - Made "small name change" to Terraform secrets configuration
@@ -57,9 +52,7 @@ Recovery Actions (10:00 AM - 10:30 AM):
   13. Verified state stable and matching code
   14. System restored to normal operation
 
-================================================================================
-                              ROOT CAUSE ANALYSIS
-================================================================================
+## Root Cause Analysis
 
 Primary Cause:
   Terraform name change triggered resource replacement:
@@ -83,9 +76,7 @@ Why Cancel Failed to Prevent Deletion:
   - OR: State update committed before apply was fully canceled
   - Exact mechanism unclear - requires further investigation
 
-================================================================================
-                           AFFECTED RESOURCES
-================================================================================
+## Affected Resources
 
 Secrets Scheduled for Deletion (6-7 total):
   - dev/proxmox/terraform-token (CRITICAL - Proxmox API access)
@@ -103,9 +94,7 @@ State Files:
   - DynamoDB lock: Checksum mismatch with S3 state
   - Both manually repaired
 
-================================================================================
-                              IMPACT ASSESSMENT
-================================================================================
+## Impact Assessment
 
 Actual Impact:
   - No data loss (secrets restored from deletion queue)
@@ -127,9 +116,7 @@ Risk Level: HIGH
   - Solo operation - no team to assist recovery
   - Working knowledge of state recovery required
 
-================================================================================
-                              LESSONS LEARNED
-================================================================================
+## Lessons Learned
 
 What Went Well:
   ✓ Noticed state file size anomaly (299 bytes)
@@ -151,9 +138,7 @@ Knowledge Gaps Identified:
   - What causes state file corruption to 299 bytes?
   - How to prevent checksum mismatches?
 
-================================================================================
-                           PREVENTION MEASURES
-================================================================================
+## Prevention Measures
 
 Implemented Immediately:
 
@@ -208,9 +193,7 @@ Planned for Future:
    - Validate destructive changes before dev/prod
    - Lower priority - budget constraints
 
-================================================================================
-                           RECOVERY PROCEDURES
-================================================================================
+## Recovery Procedures
 
 State Checksum Mismatch Recovery:
 
@@ -274,9 +257,7 @@ State File Corruption Recovery:
 4. Compare with current state and restore if needed
 5. Update DynamoDB checksum to match restored state
 
-================================================================================
-                              NEXT STEPS
-================================================================================
+## Next Steps
 
 Immediate (Today):
   [✓] Add 3-minute delay to all workflows
@@ -295,9 +276,7 @@ This Month:
   [ ] Document all terraform workflows
   [ ] Add pre-apply validation checks
 
-================================================================================
-                           TECHNICAL DETAILS
-================================================================================
+## Technical Details
 
 Environment Details:
   - AWS Account: REDACTED_AWS_DEV (dev)
@@ -320,9 +299,7 @@ Checksum Details:
   - DynamoDB checksum: ae0fd0e5a2f149fb1f7ffc54d85a9507
   - Resolution: Manual update to match S3
 
-================================================================================
-                              REFERENCES
-================================================================================
+## References
 
 Related Documentation:
   - aws/bootstrap.md (AWS setup)
@@ -338,9 +315,7 @@ AWS Secrets Manager:
   - Recovery: Possible before deletion window expires
   - https://docs.aws.amazon.com/secretsmanager/
 
-================================================================================
-                           INCIDENT REPORT METADATA
-================================================================================
+## Incident Report Metadata
 
 Report Created: February 14, 2026, 10:45 AM EGT
 Created By: Infrastructure Engineer (Solo)
@@ -353,4 +328,4 @@ Sign-off:
   Technical Lead: Self (solo operation)
   Post-Incident Review: Scheduled for February 21, 2026
 
-================================================================================
+---

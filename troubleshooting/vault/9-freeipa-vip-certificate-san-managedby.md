@@ -1,4 +1,4 @@
-# Case 63: FreeIPA VIP Certificate SAN — Managedby Permissions for Multi-Host Certificates
+# Case 9: FreeIPA VIP Certificate SAN — Managedby Permissions for Multi-Host Certificates
 
 **Component:** HashiCorp Vault | FreeIPA | Certmonger | Keepalived
 **Date:** March 29, 2026

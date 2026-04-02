@@ -1,4 +1,4 @@
-# Case 32: Task Ordering — RPM Post-Install Running Before Ansible Tasks
+# Case 8: Task Ordering — RPM Post-Install Running Before Ansible Tasks
 
 **Component:** Ansible | RPM | HashiCorp Vault
 **Date:** March 17, 2026

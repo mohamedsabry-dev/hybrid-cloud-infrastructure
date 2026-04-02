@@ -1,4 +1,4 @@
-# Case 64: Vault KMS Auto-Unseal Credentials Overwritten by Empty Ansible Variables
+# Case 10: Vault KMS Auto-Unseal Credentials Overwritten by Empty Ansible Variables
 
 **Component:** HashiCorp Vault | AWS KMS | Ansible | GitHub Actions
 **Date:** March 29, 2026

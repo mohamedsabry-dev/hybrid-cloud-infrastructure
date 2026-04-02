@@ -1,4 +1,4 @@
-# Case 35: FreeIPA Server Doesn't Use SSSD for Sudo
+# Case 7: FreeIPA Server Doesn't Use SSSD for Sudo
 
 **Component:** FreeIPA | SSSD | Sudo
 **Date:** March 2026

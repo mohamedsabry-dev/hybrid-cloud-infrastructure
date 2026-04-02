@@ -1,4 +1,4 @@
-# Case 29: vault status Defaulting to 127.0.0.1 — TLS IP SAN Error
+# Case 5: vault status Defaulting to 127.0.0.1 — TLS IP SAN Error
 
 **Component:** HashiCorp Vault | TLS
 **Date:** March 17, 2026

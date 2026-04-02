@@ -1,9 +1,9 @@
-# TS-037: Proxmox Backup Not Retrying After Missed Schedule
+# Case 5: Proxmox Backup Not Retrying After Missed Schedule
 
-**Date:** 2026-03-20
-**Environment:** DEV (pve-dev)
-**Affected Systems:** All DEV VMs/LXCs
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-03-20
+## Environment: DEV (pve-dev)
+## Affected: All DEV VMs/LXCs
 
 ---
 

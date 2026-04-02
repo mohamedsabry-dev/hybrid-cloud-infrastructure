@@ -1,15 +1,17 @@
-# TS-60: Cloud-Init SSH Host Key Regeneration After Terraform Update
+# Case 8: Cloud-Init SSH Host Key Regeneration After Terraform Update
 
-## Problem Statement
+## Status: RESOLVED
+## Date: 2026-03-27
+## Environment: Proxmox pve-dev/pve-prod, FreeIPA with SSSD
+## Affected: K8s workers (1020, 1021, 1022) SSH connections
+
+---
+
+## Symptoms
+
 After updating K8s worker VMs via Terraform (adding second network interface and ip_config),
 cloud-init regenerated SSH host keys, breaking SSH authentication for all clients that had
 the original host keys stored (FreeIPA/SSSD, known_hosts, etc.).
-
-## Environment
-- Proxmox: pve-dev, pve-prod
-- K8s Workers: 1020, 1021, 1022
-- Authentication: FreeIPA with SSSD (KnownHostsCommand)
-- Affected: All SSH connections to workers
 
 ## Root Cause
 
@@ -199,6 +201,3 @@ scp root@k8s-worker1:/tmp/ssh_host_keys.tar.gz ./backup/worker1_ssh_keys.tar.gz
 - `terraform/dev/proxmox/vms/k8s_workers/main.tf` - Terraform VM config
 - `/etc/ssh/ssh_config.d/04-ipa.conf` - FreeIPA SSH known hosts config
 - `/etc/ssh/ssh_host_*` - SSH host key files
-
-## Date
-2026-03-27

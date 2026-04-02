@@ -1,7 +1,10 @@
-# TS: Route Table Inline Routes vs aws_route Resource Conflict
+# Case 6: Route Table Inline Routes vs aws_route Resource Conflict
 
-## Date
-2026-03-14
+## Status: RESOLVED
+## Date: 2026-03-14
+## Environment: AWS VPC with Terraform cross-state modules
+
+---
 
 ## Symptoms
 - Network module tries to remove routes added by compute module

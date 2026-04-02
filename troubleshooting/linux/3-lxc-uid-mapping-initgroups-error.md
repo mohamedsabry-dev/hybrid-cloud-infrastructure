@@ -1,9 +1,9 @@
-# TS-005: LXC UID Mapping - initgroups Invalid Argument
+# Case 3: LXC UID Mapping - initgroups Invalid Argument
 
-**Date:** 2026-03-05
-**Environment:** DEV (lab.local)
-**Affected Systems:** All unprivileged LXC containers
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-03-05
+## Environment: DEV (lab.local)
+## Affected Systems: All unprivileged LXC containers
 
 ---
 
@@ -190,6 +190,53 @@ ssh super_bot@vault1.lab.local
 2. **Limited user capacity:** Range 60001-65500 = ~5500 users max. Sufficient for small/medium deployments.
 
 3. **For larger deployments:** Consider using privileged containers or VMs, or implement proper subuid mapping on Proxmox hosts.
+
+---
+
+## Commands Reference
+
+### Check User UID
+```bash
+# Check UID of a user
+id <username>
+
+# Check UID range assigned by FreeIPA
+getent passwd <username>
+```
+
+### Check FreeIPA ID Range
+```bash
+# View ID range configuration
+ipa idrange-show LAB.LOCAL_id_range
+
+# List all ID ranges
+ipa idrange-find
+```
+
+### Check LXC UID Mapping
+```bash
+# On Proxmox host - check container config
+cat /etc/pve/lxc/<container-id>.conf | grep -E "^lxc|unprivileged"
+
+# Check subuid/subgid mapping
+cat /etc/subuid
+cat /etc/subgid
+```
+
+### Debug SSH Issues
+```bash
+# Check sshd logs on container
+journalctl -u sshd -n 50
+
+# Test SSH with verbose output
+ssh -v <user>@<host>
+```
+
+### Check Login Defs
+```bash
+# View UID limits
+grep -E "^UID" /etc/login.defs
+```
 
 ---
 

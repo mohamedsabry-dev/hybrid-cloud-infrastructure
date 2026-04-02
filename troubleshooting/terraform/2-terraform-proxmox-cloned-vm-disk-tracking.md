@@ -1,14 +1,15 @@
-# Terraform Proxmox Provider: Cloned VM Disk State Tracking Issue
+# Case 2: Cloned VM Disk State Tracking Issue
 
-## Overview
+## Status: RESOLVED
+## Date: 2026-03
+## Environment: Terraform 1.14.3, bpg/proxmox provider
+## Affected: FreeIPA VM (ID 1001) cloned from golden-image (ID 9000)
+
+---
+
+## Symptoms
 
 When using the `bpg/proxmox` Terraform provider to clone a VM and later add a data disk, Terraform may exhibit unexpected behavior due to how it tracks disk state for cloned VMs.
-
-## Environment
-
-- Terraform: 1.14.3
-- Provider: bpg/proxmox
-- VM: FreeIPA (ID 1001) cloned from golden-image (ID 9000)
 
 ## The Issue
 

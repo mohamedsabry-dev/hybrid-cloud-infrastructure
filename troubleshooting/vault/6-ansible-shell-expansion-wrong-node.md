@@ -1,4 +1,4 @@
-# Case 30: $(hostname -f) Expanding on Control Node Instead of Remote
+# Case 6: $(hostname -f) Expanding on Control Node Instead of Remote
 
 **Component:** Ansible | Shell
 **Date:** March 17, 2026

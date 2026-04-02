@@ -1,9 +1,9 @@
-# TS-004: VM SSH Permission Denied - Cloud-Init Override
+# Case 4: VM SSH Permission Denied — Cloud-Init Override
 
-**Date:** 2026-03-05
-**Environment:** DEV (lab.local)
-**Affected Systems:** All VMs provisioned with cloud-init (k8s_masters, k8s_workers)
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-03-05
+## Environment: DEV (lab.local)
+## Affected: All VMs provisioned with cloud-init (k8s_masters, k8s_workers)
 
 ---
 

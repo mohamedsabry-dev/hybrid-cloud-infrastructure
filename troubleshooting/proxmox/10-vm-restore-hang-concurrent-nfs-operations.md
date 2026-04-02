@@ -1,9 +1,9 @@
-# Troubleshooting: VM Restore Hang - Concurrent NFS Operations
+# Case 10: VM Restore Hang — Concurrent NFS Operations
 
-**Date**: 2026-03-26
-**Duration**: ~15 minutes
-**Affected**: Dev environment - Multiple VM restores from NFS backup storage
-**Resolution**: Cancel stuck tasks, cleanup orphaned LVM volumes, restore sequentially
+## Status: RESOLVED
+## Date: 2026-03-26
+## Duration: ~15 minutes
+## Environment: Dev environment - Multiple VM restores from NFS backup storage
 
 ---
 
@@ -185,7 +185,7 @@ If restore hangs:
 
 ## Related Issues
 
-- `55-nfs-shutdown-hang-stor0-hotswap.md` - NFS storage hang during shutdown
+- Case 9: `9-nfs-shutdown-hang-stor0-hotswap.md` - NFS storage hang during shutdown
 
 ---
 

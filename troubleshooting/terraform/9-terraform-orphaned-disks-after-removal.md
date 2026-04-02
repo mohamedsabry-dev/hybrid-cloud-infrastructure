@@ -1,17 +1,19 @@
-# TS-61: Terraform Orphaned Disks After Removal from Configuration
+# Case 9: Terraform Orphaned Disks After Removal from Configuration
 
-## Problem Statement
+## Status: RESOLVED
+## Date: 2026-03-27
+## Environment: Proxmox pve-dev/pve-prod, NFS storage
+## Affected: K8s workers (1020, 1021, 1022)
+
+---
+
+## Symptoms
+
 After removing a disk block from Terraform configuration, Terraform updated its state file but did NOT:
 1. Detach the disk from the VM
 2. Delete the disk image from storage
 
 This left orphaned disks attached to VMs and consuming storage space.
-
-## Environment
-- Proxmox: pve-dev, pve-prod
-- K8s Workers: 1020, 1021, 1022
-- Storage: nas-dev-data, nas-prod-data (NFS)
-- Terraform Provider: bpg/proxmox
 
 ## Root Cause
 
@@ -186,6 +188,3 @@ done
 ## Related Files
 - `terraform/dev/proxmox/vms/k8s_workers/main.tf`
 - `terraform/prod/proxmox/vms/k8s_workers/main.tf`
-
-## Date
-2026-03-27

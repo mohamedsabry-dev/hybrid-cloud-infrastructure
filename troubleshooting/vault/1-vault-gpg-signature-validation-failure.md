@@ -1,4 +1,4 @@
-# Case 25: GPG Signature Validation Failure on Vault Install
+# Case 1: GPG Signature Validation Failure on Vault Install
 
 **Component:** HashiCorp Vault | Rocky Linux LXC | Ansible
 **Date:** March 17, 2026

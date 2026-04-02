@@ -1,8 +1,8 @@
-# Troubleshooting: LVM Thin Pool Resize and Overcommit Warning
+# Case 8: LVM Thin Pool Resize and Overcommit Warning
 
-**Date**: 2026-03-23
-**Affected**: pve-dev (also applicable to pve-prod)
-**Resolution**: Delete and recreate thin pool at smaller size + enable auto-extend
+## Status: RESOLVED
+## Date: 2026-03-23
+## Environment: pve-dev (also applicable to pve-prod)
 
 ---
 
@@ -409,8 +409,8 @@ vgs pve -o vg_name,vg_size,vg_free
 
 ## Related
 
-- [43: Switch Port 4 Link Flapping](../network/43-switch-port4-link-flapping-loose-connection.md) - discovered during same session
-- [48: ER605 Port 4 Gigabit Negotiation](../network/48-er605-port4-gigabit-negotiation.md) - related hardware issue
+- Case 3: `../network/3-switch-port4-link-flapping-loose-connection.md` - discovered during same session
+- Case 4: `../network/4-er605-port4-gigabit-negotiation.md` - related hardware issue
 - Proxmox Forum: https://forum.proxmox.com/threads/resizing-pve-data.30506/
 
 ---

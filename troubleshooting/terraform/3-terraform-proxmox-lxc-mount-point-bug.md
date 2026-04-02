@@ -1,15 +1,15 @@
-# Terraform Proxmox Provider: LXC Container mount_point Bug
+# Case 3: LXC Container mount_point Bug (Provider 0.93.x)
 
-## Overview
+## Status: RESOLVED
+## Date: 2026-03
+## Environment: Terraform 1.14.3, bpg/proxmox (initially 0.93.1)
+## Affected: Ansible LXC (CTID 2001)
+
+---
+
+## Symptoms
 
 When using the `bpg/proxmox` Terraform provider to manage LXC containers with mount_points, the provider fails to create or track mount_points properly, causing perpetual drift and forced container replacement.
-
-## Environment
-
-- Terraform: 1.14.3
-- Provider: bpg/proxmox (initially 0.93.1)
-- Container: Ansible LXC (CTID 2001)
-- Runner: Mac Mini (darwin_arm64) with local provider mirror
 
 ## The Problem
 
