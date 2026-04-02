@@ -1,4 +1,4 @@
-# Case 34: FreeIPA DNS Forwarders Dictionary Syntax Error
+# Case 6: FreeIPA DNS Forwarders Dictionary Syntax Error
 
 **Component:** FreeIPA | ansible-freeipa | ipadnsconfig
 **Date:** March 2026

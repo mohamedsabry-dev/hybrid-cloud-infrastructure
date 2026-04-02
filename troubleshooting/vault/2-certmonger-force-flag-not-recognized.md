@@ -1,4 +1,4 @@
-# Case 26: ipa-getcert --force Flag Not Recognized
+# Case 2: ipa-getcert --force Flag Not Recognized
 
 **Component:** HashiCorp Vault | Certmonger | Rocky Linux 10
 **Date:** March 17, 2026

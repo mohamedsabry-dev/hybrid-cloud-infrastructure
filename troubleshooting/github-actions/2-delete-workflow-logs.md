@@ -1,7 +1,7 @@
-# TS: Delete GitHub Workflow Logs with Exposed Secrets
+# Case 2: Delete GitHub Workflow Logs with Exposed Secrets
 
-## Date
-2026-03-14
+## Status: RESOLVED
+## Date: 2026-03-14
 
 ## Problem
 Past workflow runs may have logged sensitive data before proper masking was implemented.

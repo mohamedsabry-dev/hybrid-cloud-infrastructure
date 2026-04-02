@@ -1,4 +1,9 @@
-# GitHub Actions Runner - Stuck Job After Reboot
+# Case 1: GitHub Actions Runner - Stuck Job After Reboot
+
+## Status: RESOLVED
+## Date: 2026-03
+
+---
 
 ## Issue
 After Mac Mini reboot, the GitHub Actions self-hosted runner doesn't start automatically. Jobs triggered during downtime get stuck in "Waiting for a runner to pick up this job..." state and won't cancel via the web UI.

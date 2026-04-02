@@ -1,9 +1,10 @@
-# TS-002: LXC NTP Configuration Disabled
+# Case 2: LXC NTP Configuration Disabled
 
-**Date:** 2026-03-05
-**Environment:** DEV (lab.local)
-**Affected Systems:** All LXC containers
-**Status:** RESOLVED (by design)
+## Status: RESOLVED (by design)
+## Date: 2026-03-05
+## Environment: DEV (lab.local)
+## Affected Systems: All LXC containers
+## Related: Case 4 (Chronyd adjtimex failure)
 
 ---
 
@@ -68,6 +69,42 @@ Proxmox Host
 ## Simple Explanation
 
 LXC containers are like apartments in a building - they share the building's clock (host kernel). You can't set a different time in your apartment. VMs are like separate houses - each has its own clock that needs synchronization.
+
+---
+
+## Commands Reference
+
+### Check Time on LXC Container
+```bash
+# Check current time and sync status
+timedatectl
+
+# Check timezone
+timedatectl show --property=Timezone
+```
+
+### Check NTP on Proxmox Host
+```bash
+# Check chrony status on host
+systemctl status chrony
+chronyc tracking
+chronyc sources -v
+```
+
+### Set Timezone on Container
+```bash
+# Set timezone manually
+timedatectl set-timezone Africa/Cairo
+
+# List available timezones
+timedatectl list-timezones | grep Cairo
+```
+
+### Verify FreeIPA NTP Settings
+```bash
+# Check if ipaclient_no_ntp is working
+grep -r "ntp" /etc/ipa/default.conf
+```
 
 ---
 

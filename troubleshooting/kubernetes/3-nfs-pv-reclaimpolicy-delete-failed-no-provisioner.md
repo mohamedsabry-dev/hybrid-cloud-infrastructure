@@ -1,9 +1,10 @@
-# TS-64: NFS PV Stuck in Failed State — reclaimPolicy Delete Without CSI Provisioner
+# Case 3: NFS PV Stuck in Failed State — reclaimPolicy Delete Without CSI Provisioner
 
 ## Status: RESOLVED
 ## Date: 2026-04-01
 ## Severity: Medium
 ## Environment: k8s-dev / k8s-prod clusters
+## Related: Case 4 (StorageClass Immutability), Case 6 (Complete NFS Storage Guide — recommended)
 
 ---
 

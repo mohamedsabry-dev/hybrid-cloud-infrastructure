@@ -1,4 +1,4 @@
-# Case 33: FreeIPA DNS Recursion Denied for Clients
+# Case 5: FreeIPA DNS Recursion Denied for Clients
 
 **Component:** FreeIPA | BIND DNS
 **Date:** March 2026

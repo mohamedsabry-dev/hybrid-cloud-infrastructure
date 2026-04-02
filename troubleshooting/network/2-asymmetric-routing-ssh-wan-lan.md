@@ -1,9 +1,8 @@
-# Troubleshooting: Asymmetric Routing SSH Issue
+# Case 2: Asymmetric Routing SSH Issue — WAN to LAN Hanging
 
-## Case: SSH from WAN to LAN Hanging (Connection Reset)
-
-**Date:** 2026-02-12
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-02-12
+## Environment: WAN to Proxmox DEV via ER605
 
 ---
 

@@ -1,4 +1,4 @@
-# Case 65: Vault Agent Injector — K8s TLS CA Trust Setup & Secret Injection
+# Case 11: Vault Agent Injector — K8s TLS CA Trust Setup & Secret Injection
 
 **Component:** HashiCorp Vault | Vault Agent Injector | Kubernetes | FreeIPA CA
 **Date:** March 30, 2026

@@ -1,8 +1,9 @@
-# Troubleshooting Case #15: Rocky Linux DNF Metadata Download Error
+# Case 1: Rocky Linux DNF Metadata Download Error
 
-**Date:** 2026-02-24
-**Environment:** Rocky Linux 10.1 (LXC containers)
-**Component:** DNF package manager
+## Status: RESOLVED
+## Date: 2026-02-24
+## Environment: Rocky Linux 10.1 (LXC containers)
+## Component: DNF package manager
 
 ---
 

@@ -1,4 +1,4 @@
-# TS-003: FreeIPA DNS Configuration Issues
+# Case 2: FreeIPA DNS Configuration Issues
 
 **Date:** 2026-03-05
 **Environment:** DEV (lab.local)

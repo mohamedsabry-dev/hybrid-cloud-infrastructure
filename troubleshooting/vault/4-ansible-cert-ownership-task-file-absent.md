@@ -1,4 +1,4 @@
-# Case 28: Ownership Task Failing — Cert Not Written Yet
+# Case 4: Ownership Task Failing — Cert Not Written Yet
 
 **Component:** HashiCorp Vault | Ansible | Certmonger
 **Date:** March 17, 2026

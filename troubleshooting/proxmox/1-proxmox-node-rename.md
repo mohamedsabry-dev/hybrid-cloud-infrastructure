@@ -1,9 +1,8 @@
-# Troubleshooting: Proxmox Node Rename
+# Case 1: Proxmox Node Rename and Domain Update
 
-## Case: Rename Proxmox Node and Update Domain Name
-
-**Date:** 2026-02-04
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-02-04
+## Environment: Proxmox VE 9.1.5, single node
 
 ---
 

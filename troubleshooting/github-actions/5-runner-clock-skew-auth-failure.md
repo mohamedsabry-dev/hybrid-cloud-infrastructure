@@ -1,7 +1,7 @@
-# TS: GitHub Actions Runner Clock Skew Authentication Failure
+# Case 5: GitHub Actions Runner Clock Skew Authentication Failure
 
-## Date
-2026-03-14
+## Status: RESOLVED
+## Date: 2026-03-14
 
 ## Symptoms
 - Runner shows "Offline" in GitHub Actions

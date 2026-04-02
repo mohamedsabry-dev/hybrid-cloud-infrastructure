@@ -1,9 +1,10 @@
-# TS-024: LXC Chronyd adjtimex Failure
+# Case 4: LXC Chronyd adjtimex Failure
 
-**Date:** 2026-03-15
-**Environment:** DEV (lab.local)
-**Affected Systems:** All unprivileged LXC containers
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-03-15
+## Environment: DEV (lab.local)
+## Affected Systems: All unprivileged LXC containers
+## Related: Case 2 (LXC NTP Configuration)
 
 ---
 
@@ -119,4 +120,4 @@ timedatectl
 
 ## Related Cases
 
-- [TS-018: LXC NTP Configuration Disabled](18-lxc-ntp-configuration-disabled.md)
+- [Case 2: LXC NTP Configuration Disabled](2-lxc-ntp-configuration-disabled.md)

@@ -1,9 +1,10 @@
-# Troubleshooting: CGNAT Port Blocking - Prod Tunnel Down
+# Case 5: CGNAT Port Blocking — Prod WireGuard Tunnel Down
 
-**Date**: March 2026
-**Duration**: ~5 days downtime
-**Affected**: prod_tunnel only (dev_tunnel working fine)
-**Resolution**: Changed ER605 Listen Port from 51821 to 51830
+## Status: RESOLVED
+## Date: 2026-03
+## Duration: ~5 days downtime
+## Environment: Prod WireGuard tunnel to AWS
+## Related: Case 6 (NAT Timeout), Case 7 (VLAN Gateway), Case 8 (Wrong Tunnel)
 
 ---
 

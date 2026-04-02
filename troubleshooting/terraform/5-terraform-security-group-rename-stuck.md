@@ -1,7 +1,10 @@
-# TS: Security Group Rename Gets Stuck (Delete-Before-Create with Attached ENI)
+# Case 5: Security Group Rename Stuck — Delete-Before-Create with Attached ENI
 
-## Date
-2026-03-21
+## Status: RESOLVED
+## Date: 2026-03-21
+## Environment: AWS EC2 with Terraform
+
+---
 
 ## Symptoms
 - `terraform apply` stuck on "Still destroying..." for security group

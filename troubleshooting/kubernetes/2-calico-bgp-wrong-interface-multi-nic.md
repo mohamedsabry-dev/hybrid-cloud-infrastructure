@@ -1,9 +1,10 @@
-# TS-63: Calico BGP Peering on Wrong Interface After Adding Secondary NIC
+# Case 2: Calico BGP Peering on Wrong Interface After Adding Secondary NIC
 
 ## Status: RESOLVED
 ## Date: 2026-03-28
 ## Severity: Medium
 ## Environment: k8s-dev cluster
+## Related: Case 5 (NFS Hard Mount), Case 3-4, Case 6 (NFS Storage Guide)
 
 ---
 

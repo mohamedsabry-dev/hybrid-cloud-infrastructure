@@ -1,7 +1,7 @@
-# TS: MAC Address & Deep Security Inspection Cleanup
+# Case 4: MAC Address & Deep Security Inspection Cleanup
 
-## Date
-2026-03-16
+## Status: RESOLVED
+## Date: 2026-03-16
 
 ## Summary
 Comprehensive deep inspection and cleanup of MAC addresses and other sensitive hardware identifiers from git history, following up on previous secrets cleanup.

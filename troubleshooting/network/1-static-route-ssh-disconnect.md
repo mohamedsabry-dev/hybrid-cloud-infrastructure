@@ -1,9 +1,8 @@
-# Troubleshooting: Static Route SSH Disconnect
+# Case 1: Static Route SSH Disconnect — ISP Router Causes Disconnects
 
-## Case: ISP Router Static Route Causes SSH Disconnects
-
-**Date:** 2026-02-12
-**Status:** RESOLVED
+## Status: RESOLVED
+## Date: 2026-02-12
+## Environment: Home Network (Mac Mini to ER605)
 
 ---
 

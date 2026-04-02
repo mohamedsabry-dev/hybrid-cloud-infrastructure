@@ -1,8 +1,8 @@
-# Troubleshooting: NFS Shutdown Hang During stor0 Hot-Swap
+# Case 9: NFS Shutdown Hang During stor0 Hot-Swap
 
-**Date**: 2026-03-23
-**Affected**: pve-dev (applicable to any Proxmox host with NFS storage over USB-Ethernet)
-**Resolution**: Lazy unmount NFS before unplugging storage network adapter
+## Status: RESOLVED
+## Date: 2026-03-23
+## Environment: pve-dev (applicable to any Proxmox host with NFS storage over USB-Ethernet)
 
 ---
 
@@ -179,7 +179,7 @@ For hot-swap scenarios, lazy unmount is safer than changing to soft mounts.
 ## Related
 
 - [USB-Ethernet Adapter Replacement Guide](../../proxmox/disaster_recovery/hardware/usb-ethernet-adapter-replacement.md)
-- [Case 16: LXC Snapshot NFS Mount](16-proxmox-lxc-snapshot-nfs-mount.md) - NFS mount limitations
+- Case 3: `3-proxmox-lxc-snapshot-nfs-mount.md` - NFS mount limitations
 
 ---
 

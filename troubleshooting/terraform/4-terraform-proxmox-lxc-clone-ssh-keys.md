@@ -1,9 +1,9 @@
-# Troubleshooting: Terraform Proxmox LXC Clone SSH Keys Issue
+# Case 4: LXC Clone SSH Keys Injection Fails
 
-**Date:** 2026-02-23
-**Environment:** Dev (pve-dev)
-**Provider:** bpg/proxmox v0.96.0
-**Proxmox Version:** 8.x
+## Status: RESOLVED (Limitation Documented)
+## Date: 2026-02-23
+## Environment: Dev (pve-dev), bpg/proxmox v0.96.0
+## Related: proxmox/7-lxc-clone-vs-template-file-ssh-keys.md
 
 ---
 

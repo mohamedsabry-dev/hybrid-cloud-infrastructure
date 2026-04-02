@@ -1,17 +1,20 @@
-# TS-59: Terraform VM Update Behavior and Manual Testing Strategy
+# Case 7: Terraform VM Update Behavior and Manual Testing Strategy
 
-## Problem Statement
-When modifying existing VMs via Terraform, understanding whether changes will be:
+## Status: RESOLVED
+## Date: 2026-03-27
+## Environment: Proxmox with bpg/proxmox Terraform provider
+## Affected: K8s workers (1020, 1021, 1022)
+
+---
+
+## Symptoms
+
+When modifying existing VMs via Terraform, need to understand whether changes will be:
 - **In-place update** (safe, VM continues running)
 - **Replace/Destroy** (dangerous, VM recreated, data loss)
 
 This case documents the strategy of manual testing before Terraform apply and
 understanding API behavior during partial failures.
-
-## Environment
-- Terraform Provider: bpg/proxmox
-- Resources: proxmox_virtual_environment_vm
-- VMs: k8s-worker1 (1020), k8s-worker2 (1021), k8s-worker3 (1022)
 
 ## Changes Required
 1. Remove 80GB data disk (scsi1)
@@ -197,6 +200,3 @@ lifecycle {
 ## Related Files
 - `terraform/dev/proxmox/vms/k8s_workers/main.tf`
 - `terraform/dev/proxmox/vms/k8s_workers/variables.tf`
-
-## Date
-2026-03-27

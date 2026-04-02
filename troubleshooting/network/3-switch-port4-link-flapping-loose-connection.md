@@ -1,16 +1,17 @@
-# Troubleshooting: Switch Port 4 Link Flapping - Loose Cable Connection
+# Case 3: Switch Port 4 Link Flapping — Loose Cable Connection
 
-**Date**: 2026-03-22
-**Duration**: ~1.5 hours troubleshooting
-**Affected**: Dev environment - all VMs/LXCs on SVC VLANs (60-65)
-**Resolution**: Reseat cable connections on both ends (Proxmox NIC and Switch port)
+## Status: PARTIALLY RESOLVED (See Update)
+## Date: 2026-03-22
+## Duration: ~1.5 hours troubleshooting
+## Environment: Dev SVC VLANs (60-65)
+## Related: Case 4 (ER605 Port Failure), Case 9 (Force 100M Resolution)
 
 ---
 
 ## Related Issue
 
 **Previous Day (2026-03-21)**: ER605 Router Port 4 failure - migrated to Port 2
-- See: `troubleshooting/network/48-er605-port4-gigabit-negotiation.md`
+- See: Case 4 (`4-er605-port4-gigabit-negotiation.md`)
 - That issue was router-side PHY failure
 - Today's issue is switch-side, different root cause
 
@@ -433,8 +434,8 @@ done
 ## Update: Issue Recurrence (March 26, 2026)
 
 **Related Cases**:
-- `48-er605-port4-gigabit-negotiation.md`
-- `57-svc-network-instability-force-100m.md`
+- Case 4: `4-er605-port4-gigabit-negotiation.md`
+- Case 9: `9-svc-network-instability-force-100m.md`
 
 ### Issue Returned
 

@@ -1,8 +1,8 @@
-# Troubleshooting: IAM Policy Replacement Failure
+# Case 1: CloudFormation IAM Policy Replacement Failure
 
-## Case: CloudFormation Policy Update Failed with "Duplicate Name"
-
-**Date:** 2026-01-30
+## Status: RESOLVED
+## Date: 2026-01-30
+## Environment: CloudFormation Policy Update Failed with "Duplicate Name"
 **Stack:** `hybrid-policies`
 **Resource:** `SecurityAuditControlPolicy`
 

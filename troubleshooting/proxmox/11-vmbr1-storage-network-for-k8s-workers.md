@@ -1,12 +1,18 @@
-# TS-58: Storage Network (VLAN 40) for K8s Workers
+# Case 11: Storage Network (VLAN 40) Bridge for K8s Workers
 
-## Problem Statement
+## Status: RESOLVED
+## Date: 2026-03-27
+## Environment: pve-dev
+
+---
+
+## Symptoms
+
 K8s workers need direct access to NAS (10.0.40.x) for NFS-based Persistent Volumes.
 The storage network (VLAN 40) was only accessible by Proxmox host via `stor0.40` interface.
 VMs had no bridge to reach VLAN 40.
 
-## Environment
-- Proxmox: pve-dev
+**Affected Systems:**
 - K8s Workers: 1020, 1021, 1022
 - Storage Network: VLAN 40 (10.0.40.0/24)
 - NAS: 10.0.40.120
@@ -191,5 +197,23 @@ you have alternative access (console, other network).
 - `proxmox/bootstrap_proxmox/network-setup.sh` - Bootstrap script (updated)
 - `proxmox/bootstrap_proxmox/vmbr1-vlan40-setup.txt` - Detailed documentation
 
-## Date
-2026-03-27
+---
+
+## Commands Reference
+
+```bash
+# Show bridge VLAN configuration
+bridge vlan show
+
+# Show IP addresses on vmbr1.40
+ip addr show vmbr1.40
+
+# Verify NAS connectivity
+ping 10.0.40.120
+
+# Apply network changes with failsafe
+ifreload -a; sleep 20; systemctl restart networking
+
+# On K8s workers - verify storage NIC
+ip a | grep -A3 ens19
+```

@@ -1,4 +1,4 @@
-# TS-001: LXC Kerberos Keyring Authentication Failure
+# Case 1: LXC Kerberos Keyring Authentication Failure
 
 **Date:** 2026-03-05
 **Environment:** DEV (lab.local)

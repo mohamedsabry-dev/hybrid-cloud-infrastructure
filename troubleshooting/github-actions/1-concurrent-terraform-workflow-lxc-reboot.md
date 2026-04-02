@@ -1,4 +1,4 @@
-# TS-39: Concurrent Terraform Workflows Caused LXC Reboot and Workflow Failure
+# Case 1: Concurrent Terraform Workflows Caused LXC Reboot and Workflow Failure
 
 ## Issue Summary
 

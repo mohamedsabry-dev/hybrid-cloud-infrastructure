@@ -1,7 +1,11 @@
-# TS: Wrong Tunnel Routing on ER605
+# Case 8: Wrong WireGuard Tunnel Routing on ER605
 
-## Date
-2026-03-11
+## Status: RESOLVED
+## Date: 2026-03-11
+## Environment: ER605 WireGuard multi-tunnel setup
+## Related: Case 5 (CGNAT), Case 6 (NAT Timeout), Case 7 (VLAN Gateway)
+
+---
 
 ## Symptoms
 - Prod internal hosts (10.0.5x.x) could not reach Prod AWS EC2 (172.17.x.x)
@@ -99,5 +103,18 @@ traceroute to 172.17.65.73 (172.17.65.73), 30 hops max, 60 byte packets
 
 This also solved **cross-tunnel reachability** - both tunnel endpoints can now ping each other since they're in routable VPC ranges.
 
-## Status
-RESOLVED
+---
+
+## Commands Reference
+
+```bash
+# Check routing path
+traceroute 172.17.65.73
+
+# Check WireGuard peer AllowedIPs
+sudo wg show wg0
+
+# Ping tunnel endpoint
+ping 172.17.200.1  # Prod tunnel
+ping 172.16.200.1  # Dev tunnel
+```

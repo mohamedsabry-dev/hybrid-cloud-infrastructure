@@ -1,4 +1,4 @@
-# Case 31: Cert Issuer Check Failing Hard on Missing File
+# Case 7: Cert Issuer Check Failing Hard on Missing File
 
 **Component:** Ansible | OpenSSL
 **Date:** March 17, 2026

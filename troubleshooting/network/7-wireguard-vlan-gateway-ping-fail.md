@@ -1,7 +1,11 @@
-# TS: VLAN Interface Not Responding to Ping
+# Case 7: VLAN Gateway Not Responding to Ping via WireGuard
 
-## Date
-2026-03-11
+## Status: RESOLVED (workaround)
+## Date: 2026-03-11
+## Environment: Prod EC2 to VLAN 55 gateway
+## Related: Case 5 (CGNAT), Case 6 (NAT Timeout), Case 8 (Wrong Tunnel)
+
+---
 
 ## Symptoms
 - Prod EC2 could ping hosts in VLAN 55 (10.0.55.x)
@@ -45,5 +49,15 @@ Since tunnel IPs are now in VPC range, pinging the ER605 tunnel IP (172.17.200.1
 
 This issue became moot after moving tunnel IPs into VPC range, as the keepalive target changed to the tunnel IP anyway.
 
-## Status
-RESOLVED (workaround applied)
+---
+
+## Commands Reference
+
+```bash
+# Test connectivity to VLAN host vs gateway
+ping 10.0.55.10   # Host in VLAN
+ping 10.0.55.1    # VLAN gateway
+
+# Check tunnel IP (use this for keepalive instead)
+ping 172.17.200.1  # ER605 tunnel IP
+```

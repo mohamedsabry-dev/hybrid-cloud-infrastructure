@@ -1,4 +1,4 @@
-# TS-62: Git Branch Merge Conflicts with Flux GitOps Multi-Environment Setup
+# Case 3: Git Branch Merge Conflicts with Flux GitOps Multi-Environment Setup
 
 ## Problem Statement
 After Flux bootstrap on prod cluster created commits directly to the prod branch, merging prod→dev to sync those files caused a cascading series of merge conflicts. The git history became a "spaghetti tree" with constant conflicts between dev and prod branches.

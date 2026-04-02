@@ -1,16 +1,17 @@
-# Troubleshooting: Dev SVC Network Instability - Force 100M Resolution
+# Case 9: Dev SVC Network Instability — Force 100M Resolution
 
-**Date**: 2026-03-26
-**Duration**: ~2+ hours troubleshooting
-**Affected**: Dev environment - all VMs/LXCs on SVC VLANs (60-65)
-**Resolution**: Force 100M on all SVC router ports
+## Status: RESOLVED
+## Date: 2026-03-26
+## Duration: ~2+ hours troubleshooting
+## Environment: Dev SVC VLANs (60-65)
+## Related: Case 3 (Link Flapping), Case 4 (ER605 Port Failure)
 
 ---
 
 ## Related Issues
 
-- **Case 43**: `43-switch-port4-link-flapping-loose-connection.md` - Initial loose cable diagnosis
-- **Case 48**: `48-er605-port4-gigabit-negotiation.md` - ER605 Port 4 PHY failure, migration to Port 2
+- **Case 3**: `3-switch-port4-link-flapping-loose-connection.md` - Initial loose cable diagnosis
+- **Case 4**: `4-er605-port4-gigabit-negotiation.md` - ER605 Port 4 PHY failure, migration to Port 2
 
 Both previous cases recurred. This case consolidates the final resolution.
 

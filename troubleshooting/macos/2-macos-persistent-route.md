@@ -1,6 +1,13 @@
-# macOS - Persistent Static Route
+# Case 2: macOS Persistent Static Route
 
-## Issue
+## Status: RESOLVED
+## Date: 2026-02-16 (Updated: 2026-02-20)
+## Environment: macOS with LaunchDaemon
+
+---
+
+## Symptoms
+
 Routes added via `route add` are lost after Mac reboot.
 
 ## Solution
@@ -107,5 +114,3 @@ exit 1
 </plist>
 ```
 
-## Date Recorded
-2026-02-16 (Updated: 2026-02-20)

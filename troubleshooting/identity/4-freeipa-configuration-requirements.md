@@ -1,4 +1,4 @@
-# TS-007: FreeIPA Configuration Requirements and Gotchas
+# Case 4: FreeIPA Configuration Requirements and Gotchas
 
 **Date:** 2026-03-05
 **Environment:** DEV (lab.local)
