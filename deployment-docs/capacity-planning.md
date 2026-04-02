@@ -28,9 +28,9 @@
 | K8s Master 1 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 2GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 2GB | 2 | Control plane |
-| K8s Worker 1 | VM | 25GB | 80GB | 2.75GB | 2 | Prom + Grafana |
-| K8s Worker 2 | VM | 25GB | 80GB | 2.75GB | 2 | NGINX Ingress + Loki |
-| K8s Worker 3 | VM | 25GB | 80GB | 2.75GB | 2 | Helm + FluxCD |
+| K8s Worker 1 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads |
+| K8s Worker 2 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads |
+| K8s Worker 3 | VM | 25GB | 80GB | 2.75GB | 2 | Workloads |
 | Vault 1 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
 | Vault 2 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
 | Vault 3 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
@@ -40,14 +40,7 @@
 
 ### Pod Distribution
 
-| Pod | Worker | RAM | Purpose |
-|-----|--------|-----|---------|
-| Prometheus | Worker 1 | 0.5GB | Metrics |
-| Grafana | Worker 1 | 0.5GB | Dashboards |
-| NGINX Ingress | Worker 2 | 0.25GB | K8s Ingress |
-| Loki | Worker 2 | 0.5GB | Log aggregation |
-| Helm | Worker 3 | 0.5GB | Package mgmt |
-| FluxCD | Worker 3 | 0.5GB | GitOps CD |
+Pods will be distributed across workers based on actual workload requirements and resource availability. No specific pod-to-worker assignments are predefined - Kubernetes scheduler handles placement dynamically.
 
 ### Summary
 
@@ -71,9 +64,9 @@
 | K8s Master 1 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 2 | VM | 25GB | - | 4GB | 2 | Control plane |
 | K8s Master 3 | VM | 25GB | - | 4GB | 2 | Control plane |
-| K8s Worker 1 | VM | 25GB | 80GB | 8GB | 4 | Prom + Grafana |
-| K8s Worker 2 | VM | 25GB | 80GB | 8GB | 4 | NGINX Ingress + Loki |
-| K8s Worker 3 | VM | 25GB | 80GB | 8GB | 4 | Helm + FluxCD |
+| K8s Worker 1 | VM | 25GB | 80GB | 8GB | 4 | Workloads |
+| K8s Worker 2 | VM | 25GB | 80GB | 8GB | 4 | Workloads |
+| K8s Worker 3 | VM | 25GB | 80GB | 8GB | 4 | Workloads |
 | Vault 1 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
 | Vault 2 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
 | Vault 3 | LXC | 10GB | 5GB | 0.75GB | 1 | Secrets mgmt |
@@ -83,14 +76,7 @@
 
 ### Pod Distribution
 
-| Pod | Worker | RAM | vCPU | Purpose |
-|-----|--------|-----|------|---------|
-| Prometheus | Worker 1 | 1.5GB | 1 | Metrics |
-| Grafana | Worker 1 | 1GB | 0.5 | Dashboards |
-| NGINX Ingress | Worker 2 | 0.5GB | 1 | K8s Ingress |
-| Loki | Worker 2 | 1.5GB | 1 | Log aggregation |
-| Helm | Worker 3 | 1GB | 0.5 | Package mgmt |
-| FluxCD | Worker 3 | 1GB | 0.5 | GitOps CD |
+Pods will be distributed across workers based on actual workload requirements and resource availability. No specific pod-to-worker assignments are predefined - Kubernetes scheduler handles placement dynamically.
 
 ### Summary
 
