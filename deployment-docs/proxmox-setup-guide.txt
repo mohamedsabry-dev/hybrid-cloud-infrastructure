@@ -157,14 +157,14 @@ Storage IP: 10.0.40.120
 
 Create shares via NAS web interface:
 
-| Share          | NFS Path               | Access                    |
-|----------------|------------------------|---------------------------|
-| shared-iso     | /volume1/shared-iso    | 10.0.40.100 + 10.0.40.110 |
-| prod-storage   | /volume1/prod-storage  | 10.0.40.100 only          |
-| dev-storage    | /volume1/dev-storage   | 10.0.40.110 only          |
-| Backups        | /volume1/Backups       | 10.0.40.100 + 10.0.40.110 |
-| k8s-dev        | /volume1/k8s-dev       | K8s cluster access        |
-| k8s-prod       | /volume1/k8s-prod      | K8s cluster access        |
+| Share          | NFS Path               | Access                           |
+|----------------|------------------------|----------------------------------|
+| shared-iso     | /volume1/shared-iso    | 10.0.40.100 + 10.0.40.110        |
+| prod-storage   | /volume1/prod-storage  | 10.0.40.100 only                 |
+| dev-storage    | /volume1/dev-storage   | 10.0.40.110 only                 |
+| Backups        | /volume1/Backups       | 10.0.40.100 + 10.0.40.110        |
+| k8s-dev        | /volume1/k8s-dev       | 10.0.40.201-203 (K8s workers)    |
+| k8s-prod       | /volume1/k8s-prod      | 10.0.40.201-203 (K8s workers)    |
 
 NFS Settings: root Mapping = root (0), Async = Yes
 
@@ -191,15 +191,40 @@ Note: Upload ISOs to shared-iso/template/iso/ (not root)
 
 ---
 
-## Phase 5: K8s Shared Storage (Optional)
+## Phase 5: K8s Shared Storage
 
-For Kubernetes persistent volumes, additional NFS shares are needed:
+For Kubernetes persistent volumes, dedicated NFS shares are configured on the NAS:
 
-NAS Paths:
-- /volume1/k8s-dev/ (with subdirs: monitoring, logging, apps, testing)
-- /volume1/k8s-prod/ (with subdirs: monitoring, logging, apps, testing)
+### 5.1 NFS Shares for K8s
 
-These are referenced in: kubernetes/dev/deployments/infrastructure/storage/pv.yaml
+| Share     | NFS Path          | Allowed Clients              | Purpose                    |
+|-----------|-------------------|------------------------------|----------------------------|
+| k8s-dev   | /volume1/k8s-dev  | 10.0.40.201, 202, 203        | Dev K8s PV storage         |
+| k8s-prod  | /volume1/k8s-prod | 10.0.40.201, 202, 203        | Prod K8s PV storage        |
+
+### 5.2 NAS NFS Configuration
+
+On ASUSTOR NAS (https://10.0.5.120:8001):
+1. Control Panel → Shared Folders → Create k8s-dev and k8s-prod
+2. Control Panel → NFS → Enable NFS, add permissions:
+   - Path: /volume1/k8s-dev
+   - IP: 10.0.40.201, 10.0.40.202, 10.0.40.203 (or 10.0.40.201-203)
+   - Privilege: Read/Write
+   - Root Mapping: Map to root (0)
+   - Async: Yes
+3. Repeat for /volume1/k8s-prod
+
+### 5.3 Subdirectory Structure
+
+Create subdirectories for workload separation:
+  mkdir -p /volume1/k8s-dev/{monitoring,logging,apps,testing}
+  mkdir -p /volume1/k8s-prod/{monitoring,logging,apps,production}
+
+### 5.4 K8s Storage References
+
+- NFS CSI Driver: kubernetes/dev/deployments/infrastructure/storage/
+- StorageClass: nfs-csi (dynamic provisioning)
+- Troubleshooting: troubleshooting/kubernetes/6-nfs-storage-complete-guide-static-to-dynamic.md
 
 ---
 
