@@ -27,7 +27,7 @@ metadata:
     environment: dev
     app.kubernetes.io/managed-by: flux
   annotations:
-    description: "Application workloads"
+    description: "Application Workloads"
 ---
 apiVersion: v1
 kind: Namespace
@@ -37,7 +37,7 @@ metadata:
     environment: dev
     app.kubernetes.io/managed-by: flux
   annotations:
-    description: "Temporary testing workloads"
+    description: "Temporary testing Workloads"
 
 ---
 apiVersion: v1
@@ -49,3 +49,14 @@ metadata:
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Vault Injector"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Database Workloads"
