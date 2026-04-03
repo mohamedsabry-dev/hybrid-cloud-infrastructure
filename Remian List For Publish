@@ -1,0 +1,32 @@
+Remaining in plan 
+Hands on CLI On K8s ++
+
+1- Ingress & Nginx 
+2- Monitor Apps 
+3- Logging Apps
+4- Wordpress + DB
+
+5- Desaster Simulation 
+    - Node Down 
+    - DB Down
+    - Backup trigger in middle of workload
+    - High Load pressure Test 
+    - Host Down 
+    - Emergency Recoevey
+    - Emergency Workarround
+    - ETCD Backup & Restore 
+    - Vault Radt Backup and Restore 
+[[ Publish ]]
+    - Monitor and loggin in Helm
+    - Create Custome Image 
+    - AWS GUI For External Load Operation Test 
+    - Routre Down Operation
+    - Electricity Down Operation and soft shutdown procedure
+
+
+6- K8s Logging
+7- certmanager
+[[ Publish ?? ]]
+8- RHCSA Prep Start
+9- CKA Prep Start 
+10- python script learning

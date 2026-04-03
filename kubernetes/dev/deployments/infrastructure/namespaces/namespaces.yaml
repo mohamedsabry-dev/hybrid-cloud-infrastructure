@@ -60,3 +60,14 @@ metadata:
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Database Workloads"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Ingress Nginx"
