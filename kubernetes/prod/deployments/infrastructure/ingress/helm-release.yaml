@@ -1,0 +1,35 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ingress-nginx
+      sourceRef:
+        kind: HelmRepository
+        name: ingress-nginx
+        namespace: ingress-nginx
+  values:
+    controller:
+      replicaCount: 3
+      service:
+        type: NodePort
+        nodePorts:
+          http: 30080
+          https: 30443
+      ingressClassResource:
+        name: nginx
+        default: true
+      # Spread pods across nodes (soft anti-affinity)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ingress-nginx
+              topologyKey: kubernetes.io/hostname

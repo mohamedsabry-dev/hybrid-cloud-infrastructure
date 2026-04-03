@@ -23,3 +23,13 @@ spec:
       ingressClassResource:
         name: nginx
         default: true
+      # Spread pods across nodes (soft anti-affinity)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ingress-nginx
+              topologyKey: kubernetes.io/hostname

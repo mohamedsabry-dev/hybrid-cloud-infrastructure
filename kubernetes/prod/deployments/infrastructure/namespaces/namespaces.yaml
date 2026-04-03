@@ -49,3 +49,13 @@ metadata:
     app.kubernetes.io/managed-by: flux
   annotations:
     description: "Vault Injector"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "NGINX Ingress Controller"
