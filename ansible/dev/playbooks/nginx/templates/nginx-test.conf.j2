@@ -7,7 +7,7 @@ upstream k8s_workers {
 
 server {
     listen 80;
-    server_name nginx-test-dev.lab.local;
+    server_name *.lab.local;
 
     access_log /var/log/nginx/nginx-test-dev.log upstream;
 
