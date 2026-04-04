@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  namespace: database
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+spec:
+  serviceName: mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        environment: dev
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "mariadb"
+        vault.hashicorp.com/agent-inject-secret-db-creds: "secret/data/mariadb/config"
+        vault.hashicorp.com/agent-inject-template-db-creds: |
+          {{- with secret "secret/data/mariadb/config" -}}
+          MYSQL_ROOT_PASSWORD={{ .Data.data.root_password }}
+          MYSQL_PASSWORD={{ .Data.data.user_password }}
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+    spec:
+      serviceAccountName: mariadb-sa
+      containers:
+        - name: mariadb
+          image: mariadb:10.11
+          ports:
+            - containerPort: 3306
+              name: mysql
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Source Vault secrets
+              if [ -f /vault/secrets/db-creds ]; then
+                export $(cat /vault/secrets/db-creds | xargs)
+              fi
+              exec docker-entrypoint.sh mysqld
+          env:
+            - name: MYSQL_DATABASE
+              value: wordpress
+            - name: MYSQL_USER
+              value: wordpress
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mariadb-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: nfs-retain
+        resources:
+          requests:
+            storage: 15Gi
