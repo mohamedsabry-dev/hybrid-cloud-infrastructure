@@ -1,19 +1,15 @@
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mariadb-data
-  namespace: database
+  name: wordpress-data
+  namespace: apps
   labels:
-    environment: dev
+    environment: prod
     app.kubernetes.io/managed-by: flux
-    app: wordpress
-  annotations:
-    description: "Permenant storage for mariadb"
 spec:
   accessModes:
     - ReadWriteMany
   storageClassName: nfs-retain
   resources:
     requests:
-      storage: 15Gi
+      storage: 30Gi

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  namespace: database
+  labels:
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: flux
+    environment: prod
+spec:
+  serviceName: mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        app.kubernetes.io/name: mariadb
+        environment: prod
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "mariadb"
+        vault.hashicorp.com/agent-inject-secret-db-creds: "secret/data/mariadb/config"
+        vault.hashicorp.com/agent-inject-template-db-creds: |
+          {{- with secret "secret/data/mariadb/config" -}}
+          MYSQL_ROOT_PASSWORD={{ .Data.data.root_password }}
+          MYSQL_PASSWORD={{ .Data.data.user_password }}
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+    spec:
+      serviceAccountName: mariadb-sa
+      securityContext:
+        fsGroup: 999  # mysql group
+      containers:
+        - name: mariadb
+          image: mariadb:10.11.11  # Pinned version
+          ports:
+            - containerPort: 3306
+              name: mysql
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Source Vault secrets
+              if [ -f /vault/secrets/db-creds ]; then
+                export $(cat /vault/secrets/db-creds | xargs)
+              fi
+              exec docker-entrypoint.sh mysqld
+          env:
+            - name: MYSQL_DATABASE
+              value: wordpress
+            - name: MYSQL_USER
+              value: wordpress
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mariadb-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: nfs-retain
+        resources:
+          requests:
+            storage: 50Gi
