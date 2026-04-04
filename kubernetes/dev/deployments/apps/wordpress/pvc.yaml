@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-data
+  namespace: apps
+  labels:
+    environment: dev
+    app.kubernetes.io/managed-by: flux
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-retain
+  resources:
+    requests:
+      storage: 15Gi
