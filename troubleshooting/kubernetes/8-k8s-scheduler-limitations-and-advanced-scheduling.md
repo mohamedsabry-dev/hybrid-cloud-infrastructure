@@ -18,9 +18,11 @@ While investigating memory over-commitment in [Case 7](./7-k8s-dev-memory-overco
 4. **No automatic rebalancing of existing pods**
 
 **Solution Chosen:**
-Implement two production-grade tools to address these limitations:
+After exploring options (Trimaran scheduler plugins, custom schedulers, setting requests=limits), we decided to implement two production-grade tools:
 - **Vertical Pod Autoscaler (VPA)**: Auto-tune resource requests based on actual usage
 - **Descheduler**: Automatically rebalance pods across nodes
+
+Both are official Kubernetes SIG projects, widely used in production, and complement each other well.
 
 ---
 
@@ -451,428 +453,32 @@ Worker3: 384Mi requests,  2994Mi limits (126%)  ← Most over-committed
 
 ---
 
-## 6. Available Solutions
+## 6. Chosen Solution: VPA + Descheduler
 
-### 6.1 Overview of Options
+After exploring available options:
+- Trimaran scheduler plugins (metrics-based scheduling) - High complexity
+- Custom scheduler - Very high effort, rarely done
+- Setting requests=limits - Wastes resources
+- **VPA + Descheduler** - Production-proven, official Kubernetes SIG projects
 
-| Solution | Effort | What It Solves | Production Use |
-|----------|--------|----------------|----------------|
-| **Vertical Pod Autoscaler (VPA)** | Medium | Right-sizes requests automatically | ✅ Very common |
-| **Descheduler** | Low-Medium | Rebalances pods across nodes | ✅ Very common |
-| Trimaran Scheduler Plugins | High | Metrics-based scheduling | ⚠️ Less common |
-| Custom Scheduler | Very High | Full control | ❌ Rare |
-| Set requests=limits | Low | Prevents over-commit | ⚠️ Wastes resources |
-
-### 6.2 Chosen Solution: VPA + Descheduler
-
-We chose these two because:
+We chose **Vertical Pod Autoscaler (VPA)** and **Descheduler** because:
 
 1. **Both are official Kubernetes SIG projects** (well-maintained)
 2. **Both are widely used in production** (proven solutions)
-3. **They complement each other** (VPA fixes requests, Descheduler fixes placement)
-4. **Reasonable complexity** (suitable for learning and homelab)
+3. **They complement each other**:
+   - VPA: Right-sizes pod requests based on actual usage → Scheduler gets accurate data
+   - Descheduler: Rebalances pods across nodes → Fixes historical imbalances
+4. **Reasonable complexity** (suitable for learning and production)
+
+**References:**
+- [Kubernetes VPA GitHub](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
+- [Kubernetes Descheduler GitHub](https://github.com/kubernetes-sigs/descheduler)
 
 ---
 
-## 7. Solution 1: Vertical Pod Autoscaler (VPA)
+## 7. Lessons Learned
 
-### 7.1 What VPA Does
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    VPA OPERATION                                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  BEFORE VPA:                                                            │
-│  ═══════════                                                            │
-│  You guess: requests=500Mi, limits=1Gi                                  │
-│  Reality: Pod uses 80-150Mi most of the time                            │
-│  Result: Scheduler reserves 500Mi, wastes 350Mi+                        │
-│                                                                         │
-│  WITH VPA:                                                              │
-│  ═════════                                                              │
-│                                                                         │
-│  Week 1: VPA observes actual usage                                      │
-│          ├── Pod typically uses: 80-150Mi                               │
-│          ├── Peak usage: 200Mi                                          │
-│          └── P95: 180Mi                                                 │
-│                                                                         │
-│  Week 2: VPA recommends:                                                │
-│          ├── requests: 150Mi (covers typical + buffer)                  │
-│          └── limits: 300Mi (covers peaks + headroom)                    │
-│                                                                         │
-│  Week 3+: VPA auto-applies (if configured) or you apply manually        │
-│                                                                         │
-│  RESULT:                                                                │
-│  ════════                                                               │
-│  Scheduler now sees ACCURATE resource needs                             │
-│  Better placement decisions                                             │
-│  Less over-commitment                                                   │
-│  More efficient cluster utilization                                     │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 7.2 VPA Modes
-
-| Mode | Behavior | Risk | Use Case |
-|------|----------|------|----------|
-| **Off** | Only recommends, doesn't apply | None | Learning, initial setup |
-| **Initial** | Sets requests on pod creation only | Low | Conservative approach |
-| **Auto** | Updates running pods (causes restarts) | Medium | Full automation |
-
-### 7.3 VPA Installation
-
-```bash
-# Clone the autoscaler repository
-git clone https://github.com/kubernetes/autoscaler.git
-cd autoscaler/vertical-pod-autoscaler
-
-# Install VPA components
-./hack/vpa-up.sh
-
-# Verify installation
-kubectl get pods -n kube-system | grep vpa
-```
-
-**Expected output:**
-```
-vpa-admission-controller-xxx   1/1     Running
-vpa-recommender-xxx            1/1     Running
-vpa-updater-xxx                1/1     Running
-```
-
-### 7.4 VPA Configuration Example
-
-```yaml
-# vpa-flux-controllers.yaml
-apiVersion: autoscaling.k8s.io/v1
-kind: VerticalPodAutoscaler
-metadata:
-  name: flux-helm-controller-vpa
-  namespace: flux-system
-spec:
-  targetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: helm-controller
-  updatePolicy:
-    updateMode: "Off"  # Start with recommendations only
-  resourcePolicy:
-    containerPolicies:
-    - containerName: manager
-      minAllowed:
-        cpu: 50m
-        memory: 64Mi
-      maxAllowed:
-        cpu: 1
-        memory: 1Gi
-```
-
-### 7.5 Reading VPA Recommendations
-
-```bash
-kubectl describe vpa flux-helm-controller-vpa -n flux-system
-```
-
-**Sample output:**
-```yaml
-Recommendation:
-  Container Recommendations:
-    Container Name: manager
-    Lower Bound:
-      Cpu:     25m
-      Memory:  64Mi
-    Target:
-      Cpu:     50m
-      Memory:  128Mi     ← Recommended requests
-    Uncapped Target:
-      Cpu:     50m
-      Memory:  128Mi
-    Upper Bound:
-      Cpu:     100m
-      Memory:  256Mi     ← Recommended limits
-```
-
----
-
-## 8. Solution 2: Descheduler
-
-### 8.1 What Descheduler Does
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    DESCHEDULER OPERATION                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  PROBLEM: Scheduler doesn't rebalance existing pods                     │
-│  ═════════════════════════════════════════════════                      │
-│                                                                         │
-│  Scenario: New worker node added                                        │
-│                                                                         │
-│  Before:                                                                │
-│  Worker1: [pod1] [pod2] [pod3] [pod4] [pod5]                            │
-│  Worker2: [pod6] [pod7] [pod8] [pod9] [pod10]                           │
-│  Worker3: (new, empty)  ← Scheduler won't move existing pods here       │
-│                                                                         │
-│  ────────────────────────────────────────────────────────────────────── │
-│                                                                         │
-│  DESCHEDULER SOLUTION:                                                  │
-│  ═════════════════════                                                  │
-│                                                                         │
-│  Runs periodically (e.g., every 5 minutes):                             │
-│                                                                         │
-│  1. Analyzes cluster state                                              │
-│  2. Identifies imbalances                                               │
-│  3. EVICTS pods from overloaded nodes                                   │
-│  4. Scheduler reschedules evicted pods to better nodes                  │
-│                                                                         │
-│  After Descheduler:                                                     │
-│  Worker1: [pod1] [pod2] [pod3]                                          │
-│  Worker2: [pod6] [pod7] [pod8]                                          │
-│  Worker3: [pod4] [pod5] [pod9] [pod10]  ← Now balanced!                 │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 8.2 Descheduler Strategies
-
-| Strategy | What It Does | Use Case |
-|----------|--------------|----------|
-| **RemoveDuplicates** | Evicts duplicate pods from same node | Anti-affinity violations |
-| **LowNodeUtilization** | Moves pods from busy to idle nodes | Balance utilization |
-| **HighNodeUtilization** | Consolidates pods to fewer nodes | Cost savings |
-| **RemovePodsViolatingInterPodAntiAffinity** | Fixes anti-affinity violations | After rolling updates |
-| **RemovePodsViolatingNodeAffinity** | Fixes node affinity violations | After node changes |
-| **RemovePodsViolatingTopologySpreadConstraint** | Ensures even spread | Zone/region balance |
-
-### 8.3 Descheduler Installation
-
-```bash
-# Add Helm repo
-helm repo add descheduler https://kubernetes-sigs.github.io/descheduler
-helm repo update
-
-# Install with default config
-helm install descheduler descheduler/descheduler \
-  --namespace kube-system \
-  --set schedule="*/5 * * * *"  # Run every 5 minutes
-```
-
-### 8.4 Descheduler Configuration Example
-
-```yaml
-# descheduler-policy.yaml
-apiVersion: "descheduler/v1alpha2"
-kind: "DeschedulerPolicy"
-profiles:
-  - name: default
-    pluginConfig:
-    - name: "RemoveDuplicates"
-    - name: "RemovePodsViolatingInterPodAntiAffinity"
-    - name: "LowNodeUtilization"
-      args:
-        thresholds:
-          cpu: 20
-          memory: 20
-          pods: 20
-        targetThresholds:
-          cpu: 50
-          memory: 50
-          pods: 50
-    plugins:
-      balance:
-        enabled:
-          - "RemoveDuplicates"
-          - "RemovePodsViolatingInterPodAntiAffinity"
-          - "LowNodeUtilization"
-```
-
-### 8.5 How LowNodeUtilization Works
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    LOW NODE UTILIZATION STRATEGY                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Configuration:                                                         │
-│  thresholds:        # Node considered "underutilized" if BELOW these    │
-│    cpu: 20%                                                             │
-│    memory: 20%                                                          │
-│  targetThresholds:  # Node considered "overutilized" if ABOVE these     │
-│    cpu: 50%                                                             │
-│    memory: 50%                                                          │
-│                                                                         │
-│  Example:                                                               │
-│  ─────────                                                              │
-│  Worker1: CPU 60%, Memory 55%  → OVERUTILIZED (above 50%)               │
-│  Worker2: CPU 45%, Memory 40%  → NORMAL                                 │
-│  Worker3: CPU 10%, Memory 15%  → UNDERUTILIZED (below 20%)              │
-│                                                                         │
-│  Action:                                                                │
-│  Descheduler evicts pods from Worker1 (overutilized)                    │
-│  Scheduler places them on Worker3 (underutilized)                       │
-│                                                                         │
-│  After:                                                                 │
-│  Worker1: CPU 40%, Memory 35%  → NORMAL                                 │
-│  Worker2: CPU 45%, Memory 40%  → NORMAL                                 │
-│  Worker3: CPU 30%, Memory 30%  → NORMAL                                 │
-│                                                                         │
-│  Result: Balanced cluster!                                              │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 9. How VPA and Descheduler Work Together
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    VPA + DESCHEDULER SYNERGY                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  STEP 1: VPA Learns Actual Usage                                        │
-│  ════════════════════════════════                                       │
-│  "Flux helm-controller typically uses 80Mi, not 1Gi"                    │
-│  → Recommends requests: 100Mi, limits: 256Mi                            │
-│                                                                         │
-│  STEP 2: VPA Updates Requests                                           │
-│  ═══════════════════════════                                            │
-│  Deployment updated with accurate requests                              │
-│  Scheduler now has truthful data                                        │
-│                                                                         │
-│  STEP 3: Scheduler Makes Better Decisions                               │
-│  ════════════════════════════════════════                               │
-│  New pods placed based on realistic resource needs                      │
-│  Less over-commitment, better distribution                              │
-│                                                                         │
-│  STEP 4: Descheduler Fixes Historical Imbalances                        │
-│  ═══════════════════════════════════════════════                        │
-│  "Worker1 is overloaded, Worker3 is underutilized"                      │
-│  → Evicts pods from Worker1                                             │
-│  → Scheduler places them on Worker3                                     │
-│                                                                         │
-│  STEP 5: Continuous Optimization                                        │
-│  ════════════════════════════════                                       │
-│  VPA keeps learning and adjusting                                       │
-│  Descheduler keeps rebalancing                                          │
-│  Cluster stays optimized automatically                                  │
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                                                                 │    │
-│  │  VPA: "Here's what pods ACTUALLY need"                          │    │
-│  │         ↓                                                       │    │
-│  │  Scheduler: "I can now place pods accurately"                   │    │
-│  │         ↓                                                       │    │
-│  │  Descheduler: "I'll fix any imbalance over time"                │    │
-│  │                                                                 │    │
-│  │  Result: Right-sized pods, evenly distributed, stable cluster   │    │
-│  │                                                                 │    │
-│  └─────────────────────────────────────────────────────────────────┘    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 10. Implementation Plan
-
-### 10.1 Phase 1: Descheduler (Simpler, Start Here)
-
-| Step | Action | Timeline |
-|------|--------|----------|
-| 1 | Install Descheduler via Helm | Day 1 |
-| 2 | Configure LowNodeUtilization strategy | Day 1 |
-| 3 | Monitor cluster rebalancing | Week 1 |
-| 4 | Tune thresholds based on observations | Week 2 |
-
-### 10.2 Phase 2: VPA
-
-| Step | Action | Timeline |
-|------|--------|----------|
-| 1 | Install VPA components | Week 2 |
-| 2 | Create VPA resources in "Off" mode (recommendations only) | Week 2 |
-| 3 | Observe recommendations for 1-2 weeks | Week 2-4 |
-| 4 | Apply recommendations manually | Week 4 |
-| 5 | Consider switching to "Auto" mode | Month 2 |
-
-### 10.3 Files to Create
-
-```
-kubernetes/
-├── dev/
-│   └── deployments/
-│       └── infrastructure/
-│           ├── descheduler/
-│           │   ├── kustomization.yaml
-│           │   ├── namespace.yaml
-│           │   └── helm-release.yaml
-│           └── vpa/
-│               ├── kustomization.yaml
-│               ├── namespace.yaml
-│               └── helm-release.yaml
-└── prod/
-    └── deployments/
-        └── infrastructure/
-            ├── descheduler/
-            │   └── (same structure)
-            └── vpa/
-                └── (same structure)
-```
-
----
-
-## 11. Verification Commands
-
-### 11.1 Check Pod Distribution
-
-```bash
-# Count pods per node
-kubectl get pods -A -o wide --no-headers | awk '{print $8}' | sort | uniq -c
-
-# Detailed view per node
-for node in k8s-worker1 k8s-worker2 k8s-worker3; do
-  echo "=== $node ==="
-  kubectl get pods -A --field-selector spec.nodeName=$node.lab.local --no-headers | wc -l
-done
-```
-
-### 11.2 Check Resource Allocation
-
-```bash
-# Per-node summary
-kubectl describe nodes | grep -E "(Name:|Allocated)" -A 6
-
-# Specific namespace
-kubectl describe nodes | grep -E "(Name:|memory)"
-```
-
-### 11.3 Check VPA Recommendations
-
-```bash
-# List all VPAs
-kubectl get vpa -A
-
-# Get recommendations
-kubectl describe vpa <vpa-name> -n <namespace>
-```
-
-### 11.4 Check Descheduler Activity
-
-```bash
-# View descheduler logs
-kubectl logs -n kube-system -l app=descheduler --tail=100
-
-# Check for eviction events
-kubectl get events -A --sort-by='.lastTimestamp' | grep -i evict
-```
-
----
-
-## 12. Lessons Learned
-
-### 12.1 Scheduler Behavior
+### 7.1 Scheduler Behavior
 
 1. **Scheduler uses REQUESTS, not limits or actual usage**
    - This is by design for performance
@@ -891,26 +497,23 @@ kubectl get events -A --sort-by='.lastTimestamp' | grep -i evict
    - New nodes stay empty unless pods are evicted
    - Descheduler fills this gap
 
-### 12.2 Best Practices
+### 7.2 Best Practices
 
-1. **Start with recommendations before auto-tuning**
-   - VPA "Off" mode first, observe before applying
-
-2. **Use soft anti-affinity for critical pods**
+1. **Use soft anti-affinity for critical pods**
    - Availability > perfect distribution
    - Hard anti-affinity can block scheduling entirely
 
-3. **Right-size requests based on actual usage**
+2. **Right-size requests based on actual usage**
    - Over-provisioned requests waste resources
    - Under-provisioned requests cause bad scheduling decisions
 
-4. **Implement gradual rebalancing**
+3. **Implement gradual rebalancing**
    - Descheduler with conservative thresholds
    - Avoid excessive pod churn
 
 ---
 
-## 13. Open Questions for Future Investigation
+## 8. Open Questions for Future Investigation
 
 1. **How does VPA interact with HPA (Horizontal Pod Autoscaler)?**
    - VPA adjusts per-pod resources
@@ -929,16 +532,7 @@ kubectl get events -A --sort-by='.lastTimestamp' | grep -i evict
 
 ---
 
-## 14. References
-
-- [Kubernetes VPA GitHub](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
-- [Kubernetes Descheduler GitHub](https://github.com/kubernetes-sigs/descheduler)
-- [Kubernetes Scheduler Documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/)
-- [Case 7: Memory Over-Commitment Strategy](./7-k8s-dev-memory-overcommit-strategy.md)
-
----
-
-## 15. Resolution Status
+## 9. Resolution Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|

@@ -14,7 +14,7 @@ During NGINX Ingress Controller deployment on the dev cluster, we discovered mem
 
 **Strategy Adopted:**
 - Dev cluster: Test one application at a time, then promote to prod and delete from dev
-- Prod cluster: Increase worker memory from 8GB to 10GB to run all apps simultaneously
+- Prod cluster: Run all apps simultaneously (adequate RAM available)
 
 **Additional Discovery:**
 During investigation, we uncovered fundamental Kubernetes scheduler limitations regarding memory scheduling. This led to implementing advanced scheduling solutions (VPA + Descheduler). See [Case 8](./8-k8s-scheduler-limitations-and-advanced-scheduling.md) for details.
@@ -203,7 +203,7 @@ Worker1 Memory Budget:
 │  • CoreDNS                                 2. Promote to Prod           │
 │  • CSI NFS driver                             (copy manifests)          │
 │                                            3. Delete from Dev           │
-│  Estimated: ~1.5GB limits                     (remove from kustomization)│
+│  Estimated: ~1.5GB limits                     (remove from kustomization)
 │  Leaves: ~1GB for testing                  4. Deploy Prometheus         │
 │                                               ↓ Test metrics            │
 │                                            5. Promote to Prod           │
@@ -218,64 +218,11 @@ Worker1 Memory Budget:
 - Once tested, app moves to prod where RAM is adequate
 - Dev stays lean, prod runs everything
 
-### 4.2 Prod Cluster Strategy (Adequate RAM)
-
-**Current State:**
-```
-Prod workers: 8GB each
-Allocatable: ~7.5GB per worker
-```
-
-**Problem:**
-With all planned applications, 8GB may not be sufficient:
-
-| Component | Memory Limits | Notes |
-|-----------|---------------|-------|
-| Flux controllers | ~4GB | 4 × 1GB default |
-| Ingress Controller | ~1GB | 3 replicas × 300Mi |
-| Vault | ~500Mi | Agent injector |
-| WordPress + MariaDB | ~1GB | Database + PHP |
-| Prometheus | ~1GB | Metrics storage |
-| Grafana | ~500Mi | Dashboards |
-| Loki | ~1GB | Log aggregation |
-| **Total** | **~9GB** | Exceeds 7.5GB allocatable |
-
-**Solution: Increase prod worker RAM**
-
-```hcl
-# terraform/prod/proxmox/vms/k8s_workers/variables.tf
-
-# BEFORE:
-variable "memory" {
-  default = 8192  # 8GB
-}
-
-# AFTER:
-variable "memory" {
-  default = 10240  # 10GB → ~9.5GB allocatable
-}
-```
-
-**New Capacity:**
-```
-Prod workers: 10GB each
-Allocatable: ~9.5GB per worker
-Total cluster: 3 × 9.5GB = 28.5GB allocatable
-Planned usage: ~9GB distributed across nodes
-Headroom: ~65% free for spikes and growth
-```
-
 ---
 
 ## 5. Files Modified
 
-### 5.1 Terraform Changes
-
-| File | Change | Purpose |
-|------|--------|---------|
-| `terraform/prod/proxmox/vms/k8s_workers/variables.tf` | memory: 8192 → 10240 | Increase prod worker RAM |
-
-### 5.2 Kubernetes Changes (Related to Anti-Affinity)
+### 5.1 Kubernetes Changes (Anti-Affinity)
 
 See [Case 8](./8-k8s-scheduler-limitations-and-advanced-scheduling.md) for pod distribution fixes.
 
@@ -347,72 +294,7 @@ kubectl get events -A --sort-by='.lastTimestamp' | grep -i oom
 
 ---
 
-## 7. Planned Applications Memory Budget
-
-### 7.1 Dev Cluster Budget
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     DEV CLUSTER MEMORY BUDGET                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Total Allocatable: 3 workers × 2.4GB = 7.2GB                           │
-│                                                                         │
-│  ALWAYS RUNNING:                                                        │
-│  ├── Flux controllers (4 pods)      ~256Mi requests, ~4GB limits        │
-│  ├── Ingress Controller (3 pods)    ~300Mi requests, ~900Mi limits      │
-│  ├── Vault Agent Injector (1 pod)   ~50Mi requests, ~256Mi limits       │
-│  ├── Calico (3 pods, per node)      ~150Mi requests, ~300Mi limits      │
-│  ├── CoreDNS (2 pods)               ~140Mi requests, ~340Mi limits      │
-│  ├── CSI NFS (4 pods)               ~200Mi requests, ~400Mi limits      │
-│  └── kube-proxy (3 pods)            ~100Mi requests, ~300Mi limits      │
-│      ─────────────────────────────────────────────────────────          │
-│      SUBTOTAL:                      ~1.2GB requests, ~6.5GB limits      │
-│                                                                         │
-│  REMAINING FOR TESTING:             ~1GB per application                │
-│                                                                         │
-│  Strategy: Run ONE application at a time for testing                    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 7.2 Prod Cluster Budget (After RAM Increase)
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    PROD CLUSTER MEMORY BUDGET                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Total Allocatable: 3 workers × 9.5GB = 28.5GB                          │
-│                                                                         │
-│  INFRASTRUCTURE:                                                        │
-│  ├── Flux controllers               ~256Mi requests, ~4GB limits        │
-│  ├── Ingress Controller             ~300Mi requests, ~900Mi limits      │
-│  ├── Vault + Agent                  ~100Mi requests, ~512Mi limits      │
-│  ├── System pods (Calico, DNS, etc) ~600Mi requests, ~1.5GB limits      │
-│      ─────────────────────────────────────────────────────────          │
-│      SUBTOTAL:                      ~1.3GB requests, ~7GB limits        │
-│                                                                         │
-│  APPLICATIONS:                                                          │
-│  ├── WordPress                      ~256Mi requests, ~512Mi limits      │
-│  ├── MariaDB                        ~256Mi requests, ~512Mi limits      │
-│  ├── Prometheus                     ~512Mi requests, ~1GB limits        │
-│  ├── Grafana                        ~128Mi requests, ~256Mi limits      │
-│  ├── Loki                           ~256Mi requests, ~512Mi limits      │
-│      ─────────────────────────────────────────────────────────          │
-│      SUBTOTAL:                      ~1.4GB requests, ~2.8GB limits      │
-│                                                                         │
-│  TOTAL:                             ~2.7GB requests, ~9.8GB limits      │
-│  HEADROOM:                          ~25.8GB requests available          │
-│                                                                         │
-│  Strategy: Run ALL applications simultaneously                          │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 8. Lessons Learned
+## 7. Lessons Learned
 
 1. **Limits ≠ Usage**: High limits don't mean high actual usage. Requests show real consumption.
 
@@ -430,7 +312,7 @@ kubectl get events -A --sort-by='.lastTimestamp' | grep -i oom
 
 ---
 
-## 9. Open Questions Addressed in Case 8
+## 8. Open Questions Addressed in Case 8
 
 During this investigation, we discovered deeper scheduler limitations:
 
@@ -443,11 +325,11 @@ These questions are fully addressed in [Case 8: Kubernetes Scheduler Limitations
 
 ---
 
-## 10. Resolution Summary
+## 9. Resolution Summary
 
 | Item | Dev Cluster | Prod Cluster |
 |------|-------------|--------------|
-| Worker RAM | 2.5GB (unchanged) | 8GB → 10GB |
+| Worker RAM | 2.5GB (unchanged) | Adequate |
 | Strategy | Test one app at a time | Run all apps |
 | Anti-affinity | ✅ Implemented | ✅ Implemented |
 | Advanced scheduling | 🔄 Planned (VPA + Descheduler) | 🔄 Planned |
