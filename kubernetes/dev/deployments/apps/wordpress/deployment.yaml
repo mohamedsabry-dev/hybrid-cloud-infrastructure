@@ -4,8 +4,10 @@ metadata:
   name: wordpress
   namespace: apps
   labels:
-    environment: dev
+    app.kubernetes.io/name: wordpress
+    app.kubernetes.io/component: frontend
     app.kubernetes.io/managed-by: flux
+    environment: dev
 spec:
   replicas: 3
   selector:
@@ -15,6 +17,7 @@ spec:
     metadata:
       labels:
         app: wordpress
+        app.kubernetes.io/name: wordpress
         environment: dev
       annotations:
         vault.hashicorp.com/agent-inject: "true"
@@ -29,6 +32,16 @@ spec:
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
       serviceAccountName: wordpress-sa
+      # Spread pods across different nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: wordpress
+                topologyKey: kubernetes.io/hostname
       initContainers:
         - name: wait-for-mariadb
           image: busybox:1.36
@@ -41,9 +54,16 @@ spec:
                 sleep 2
               done
               echo "MariaDB is ready!"
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
       containers:
         - name: wordpress
-          image: wordpress:6.9.4-php8.2-apache  # Pinned version - supports latest plugins
+          image: wordpress:6.7.1-php8.2-apache  # Pinned version - supports latest plugins
           ports:
             - containerPort: 80
               name: http
@@ -63,6 +83,29 @@ spec:
               value: wordpress
             - name: WORDPRESS_DB_USER
               value: wordpress
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /wp-includes/images/blank.gif
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /wp-includes/images/blank.gif
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: wordpress-data
               mountPath: /var/www/html/wp-content
