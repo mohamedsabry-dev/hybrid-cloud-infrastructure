@@ -34,9 +34,11 @@ spec:
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
       serviceAccountName: mariadb-sa
+      securityContext:
+        fsGroup: 999  # mysql group
       containers:
         - name: mariadb
-          image: mariadb:10.11
+          image: mariadb:10.11.11  # Pinned version
           ports:
             - containerPort: 3306
               name: mysql
@@ -48,12 +50,33 @@ spec:
               if [ -f /vault/secrets/db-creds ]; then
                 export $(cat /vault/secrets/db-creds | xargs)
               fi
-              exec docker-entrypoint.sh mysqld
+              exec docker-entrypoint.sh mysqld --innodb-flush-method=fsync
           env:
             - name: MYSQL_DATABASE
               value: wordpress
             - name: MYSQL_USER
               value: wordpress
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: mariadb-data
               mountPath: /var/lib/mysql
