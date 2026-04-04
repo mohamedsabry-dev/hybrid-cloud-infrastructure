@@ -34,11 +34,9 @@ spec:
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
       serviceAccountName: mariadb-sa
-      securityContext:
-        fsGroup: 999  # mysql group
       containers:
         - name: mariadb
-          image: mariadb:10.11.11  # Pinned version
+          image: mariadb:10.11
           ports:
             - containerPort: 3306
               name: mysql
@@ -56,27 +54,6 @@ spec:
               value: wordpress
             - name: MYSQL_USER
               value: wordpress
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "1Gi"
-              cpu: "1000m"
-          livenessProbe:
-            tcpSocket:
-              port: 3306
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            tcpSocket:
-              port: 3306
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
           volumeMounts:
             - name: mariadb-data
               mountPath: /var/lib/mysql
