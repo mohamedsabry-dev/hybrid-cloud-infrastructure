@@ -4,7 +4,7 @@
 ## Date: 2026-04-03
 ## Severity: Medium
 ## Environment: k8s-dev cluster
-## Related: Ingress Controller deployment, Flux controllers
+## Related Cases: [Case 8: Kubernetes Scheduler Limitations and Advanced Scheduling](./8-k8s-scheduler-limitations-and-advanced-scheduling.md)
 
 ---
 
@@ -16,259 +16,440 @@ During NGINX Ingress Controller deployment on the dev cluster, we discovered mem
 - Dev cluster: Test one application at a time, then promote to prod and delete from dev
 - Prod cluster: Increase worker memory from 8GB to 10GB to run all apps simultaneously
 
+**Additional Discovery:**
+During investigation, we uncovered fundamental Kubernetes scheduler limitations regarding memory scheduling. This led to implementing advanced scheduling solutions (VPA + Descheduler). See [Case 8](./8-k8s-scheduler-limitations-and-advanced-scheduling.md) for details.
+
 ---
 
 ## 2. Issue Discovery
 
-### Symptom
+### 2.1 Initial Symptom
 
-After deploying NGINX Ingress Controller (3 replicas), memory analysis showed:
+After deploying NGINX Ingress Controller (3 replicas), memory analysis showed severe over-commitment on worker1.
 
+### 2.2 Investigation Commands and Output
+
+**Command: Check node memory allocation**
 ```bash
 kubectl describe nodes | grep -E "(Name:|memory)"
 ```
 
-**Results:**
-
-| Node | Total RAM | Allocatable | Requests | Limits |
-|------|-----------|-------------|----------|--------|
-| k8s-master1 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |
-| k8s-master2 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |
-| k8s-master3 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |
-| **k8s-worker1** | 2.5GB | 2.4GB | 406Mi (17%) | **4596Mi (194%)** ⚠️ |
-| k8s-worker2 | 2.5GB | 2.4GB | 220Mi (9%) | 670Mi (28%) |
-| k8s-worker3 | 2.5GB | 2.4GB | 320Mi (13%) | 1970Mi (83%) |
-
-### Root Cause
-
-**Worker1** hosts all 4 Flux controllers (helm-controller, kustomize-controller, notification-controller, source-controller), each with ~1GB memory limits by default.
-
+**Output:**
 ```
-4 Flux controllers × ~1GB limits = ~4GB limits on a 2.4GB node
+Name:               k8s-master1.lab.local
+  memory:             1772304Ki
+  memory:             1569904Ki
+  memory             160Mi (10%)  500Mi (32%)
+Name:               k8s-master2.lab.local
+  memory:             1772304Ki
+  memory:             1569904Ki
+  memory             160Mi (10%)  500Mi (32%)
+Name:               k8s-master3.lab.local
+  memory:             1772304Ki
+  memory:             1569904Ki
+  memory             160Mi (10%)  500Mi (32%)
+Name:               k8s-worker1.lab.local
+  memory:             2517080Ki
+  memory:             2414680Ki
+  memory             406Mi (17%)  4596Mi (194%)   ← CRITICAL: 194% over-committed
+Name:               k8s-worker2.lab.local
+  memory:             2517080Ki
+  memory:             2414680Ki
+  memory             220Mi (9%)   670Mi (28%)
+Name:               k8s-worker3.lab.local
+  memory:             2517080Ki
+  memory:             2414680Ki
+  memory             320Mi (13%)  1970Mi (83%)
+```
+
+**Analysis:**
+
+| Node | Total RAM | Allocatable | Requests | Limits | Status |
+|------|-----------|-------------|----------|--------|--------|
+| k8s-master1 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
+| k8s-master2 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
+| k8s-master3 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
+| **k8s-worker1** | 2.5GB | 2.4GB | 406Mi (17%) | **4596Mi (194%)** | ⚠️ CRITICAL |
+| k8s-worker2 | 2.5GB | 2.4GB | 220Mi (9%) | 670Mi (28%) | ✅ OK |
+| k8s-worker3 | 2.5GB | 2.4GB | 320Mi (13%) | 1970Mi (83%) | ⚠️ Warning |
+
+### 2.3 Root Cause Analysis
+
+**Command: Check pods on worker1**
+```bash
+kubectl get pods -A -o wide --field-selector spec.nodeName=k8s-worker1.lab.local
+```
+
+**Output:**
+```
+NAMESPACE     NAME                                      READY   STATUS    NODE
+flux-system   helm-controller-xxx                       1/1     Running   k8s-worker1.lab.local
+flux-system   kustomize-controller-xxx                  1/1     Running   k8s-worker1.lab.local
+flux-system   notification-controller-xxx               1/1     Running   k8s-worker1.lab.local
+flux-system   source-controller-xxx                     1/1     Running   k8s-worker1.lab.local
+kube-system   calico-node-xxx                           1/1     Running   k8s-worker1.lab.local
+kube-system   csi-nfs-node-xxx                          3/3     Running   k8s-worker1.lab.local
+kube-system   kube-proxy-xxx                            1/1     Running   k8s-worker1.lab.local
+```
+
+**Root Cause Identified:**
+- All 4 Flux controllers landed on worker1 by random scheduling
+- Each Flux controller has ~1GB memory limit by default
+- 4 controllers × ~1GB = ~4GB limits on a 2.4GB allocatable node = 194% over-commitment
+
+**Command: Verify Flux controller resource limits**
+```bash
+kubectl describe deployment helm-controller -n flux-system | grep -A 10 "Limits"
+```
+
+**Output:**
+```
+    Limits:
+      memory:  1Gi
+    Requests:
+      cpu:        100m
+      memory:     64Mi
 ```
 
 ---
 
 ## 3. Concepts Clarified
 
-### Requests vs Limits
+### 3.1 Requests vs Limits
 
-| Metric | Meaning | Risk |
-|--------|---------|------|
-| **Requests** | What pods are actually using | Low = OK |
-| **Limits** | Maximum pods CAN use | Over 100% = OOM risk under load |
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     KUBERNETES MEMORY MODEL                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  REQUESTS (what scheduler uses):                                        │
+│  ════════════════════════════════                                       │
+│  • Guaranteed memory for the pod                                        │
+│  • Scheduler uses this to place pods                                    │
+│  • Sum of requests ≤ Node allocatable = OK                              │
+│                                                                         │
+│  LIMITS (maximum allowed):                                              │
+│  ═════════════════════════                                              │
+│  • Maximum memory pod CAN use                                           │
+│  • Can be > 100% of node (over-commitment allowed)                      │
+│  • If pod exceeds limit → OOM killed                                    │
+│  • If node runs out of actual memory → OOM killer picks victims         │
+│                                                                         │
+│  EXAMPLE:                                                               │
+│  ─────────                                                              │
+│  Node has 2GB allocatable                                               │
+│  Pod A: requests=100Mi, limits=1Gi                                      │
+│  Pod B: requests=100Mi, limits=1Gi                                      │
+│  Pod C: requests=100Mi, limits=1Gi                                      │
+│                                                                         │
+│  Total requests: 300Mi (15%) ← Scheduler sees this, says "OK"           │
+│  Total limits: 3Gi (150%) ← Over-committed, but allowed                 │
+│                                                                         │
+│  Risk: If all 3 pods try to use 1Gi simultaneously → OOM                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-### Why It's OK for Now
+| Metric | Meaning | Scheduler Uses? | Risk When High |
+|--------|---------|-----------------|----------------|
+| **Requests** | Guaranteed allocation | ✅ Yes | Low requests = pods may starve |
+| **Limits** | Maximum allowed | ❌ No | Over 100% = OOM risk under load |
 
-- Actual usage (requests) is low (~17% on worker1)
-- Limits only matter if pods actually try to use that memory
-- Dev cluster has light workloads
+### 3.2 Why 194% Over-Commitment is Risky
 
-### Why It's a Problem for Future
+**Current State:**
+```
+Worker1 Memory Budget:
+├── Allocatable: 2414Mi (2.4GB)
+├── Requests: 406Mi (17%) ← Actual guaranteed
+├── Limits: 4596Mi (194%) ← Maximum if all pods burst
+└── Gap: 4190Mi that pods COULD request but node CANNOT provide
+```
 
-Planned applications need significant memory:
+**Scenarios:**
 
-| Application | Estimated Memory |
-|-------------|-----------------|
-| WordPress + MariaDB | 500MB - 1GB |
-| Prometheus | 500MB - 1GB |
-| Grafana | 200MB - 500MB |
-| Loki | 500MB - 1GB |
-| **Total** | ~3-4GB |
+| Scenario | What Happens |
+|----------|--------------|
+| Normal operation | Pods use ~requests, no problem |
+| One pod spikes | Pod gets extra memory up to limit, others unaffected |
+| All pods spike | Node runs out of memory → OOM killer → random pod deaths |
+| Memory leak | Pod keeps growing → hits limit → OOM killed |
 
-With only 2.4GB allocatable per worker, cannot run all simultaneously on dev.
+### 3.3 Why It's Acceptable for Dev (For Now)
+
+1. **Actual usage is low** - requests only at 17%
+2. **Light workloads** - no production traffic
+3. **Monitoring in place** - we watch for issues
+4. **Temporary** - strategy to manage this going forward
 
 ---
 
 ## 4. Strategy Adopted
 
-### Dev Cluster (Limited RAM)
+### 4.1 Dev Cluster Strategy (Limited RAM)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    DEV WORKFLOW                             │
-│                                                             │
-│   Always Running:              Test ONE at a time:          │
-│   • Flux controllers           1. Deploy WordPress          │
-│   • Ingress Controller            ↓ test OK                 │
-│   • Vault Injector             2. Promote to prod           │
-│   • System pods                3. Delete from dev           │
-│                                4. Deploy Prometheus         │
-│                                   ↓ test OK                 │
-│                                5. Promote to prod           │
-│                                6. Delete from dev           │
-│                                ... repeat ...               │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        DEV CLUSTER WORKFLOW                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ALWAYS RUNNING (Infrastructure):         TEST ONE AT A TIME (Apps):   │
+│  ══════════════════════════════════        ═══════════════════════════  │
+│                                                                         │
+│  • Flux controllers (~256Mi actual)        1. Deploy WordPress          │
+│  • Ingress Controller (3 replicas)            ↓ Test functionality      │
+│  • Vault Agent Injector                       ↓ Verify Ingress          │
+│  • Calico CNI (per node)                      ↓ Check logs              │
+│  • CoreDNS                                 2. Promote to Prod           │
+│  • CSI NFS driver                             (copy manifests)          │
+│                                            3. Delete from Dev           │
+│  Estimated: ~1.5GB limits                     (remove from kustomization)│
+│  Leaves: ~1GB for testing                  4. Deploy Prometheus         │
+│                                               ↓ Test metrics            │
+│                                            5. Promote to Prod           │
+│                                            6. Delete from Dev           │
+│                                               ... repeat ...            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Prod Cluster (Adequate RAM)
+**Why This Works:**
+- Dev only needs one app at a time for testing
+- Once tested, app moves to prod where RAM is adequate
+- Dev stays lean, prod runs everything
 
-**Action:** Increase worker memory from 8GB to 10GB in Terraform.
+### 4.2 Prod Cluster Strategy (Adequate RAM)
+
+**Current State:**
+```
+Prod workers: 8GB each
+Allocatable: ~7.5GB per worker
+```
+
+**Problem:**
+With all planned applications, 8GB may not be sufficient:
+
+| Component | Memory Limits | Notes |
+|-----------|---------------|-------|
+| Flux controllers | ~4GB | 4 × 1GB default |
+| Ingress Controller | ~1GB | 3 replicas × 300Mi |
+| Vault | ~500Mi | Agent injector |
+| WordPress + MariaDB | ~1GB | Database + PHP |
+| Prometheus | ~1GB | Metrics storage |
+| Grafana | ~500Mi | Dashboards |
+| Loki | ~1GB | Log aggregation |
+| **Total** | **~9GB** | Exceeds 7.5GB allocatable |
+
+**Solution: Increase prod worker RAM**
 
 ```hcl
 # terraform/prod/proxmox/vms/k8s_workers/variables.tf
-# Change: memory = 8192  → memory = 10240
+
+# BEFORE:
+variable "memory" {
+  default = 8192  # 8GB
+}
+
+# AFTER:
+variable "memory" {
+  default = 10240  # 10GB → ~9.5GB allocatable
+}
 ```
 
-This provides ~9.5GB allocatable per worker, enough to run:
-- Flux + Ingress + Vault + System (~1.5GB)
-- All applications (~4GB)
-- Headroom for spikes (~4GB)
+**New Capacity:**
+```
+Prod workers: 10GB each
+Allocatable: ~9.5GB per worker
+Total cluster: 3 × 9.5GB = 28.5GB allocatable
+Planned usage: ~9GB distributed across nodes
+Headroom: ~65% free for spikes and growth
+```
 
 ---
 
 ## 5. Files Modified
 
-| File | Change |
-|------|--------|
-| `terraform/prod/proxmox/vms/k8s_workers/variables.tf` | memory: 8192 → 10240 (all 3 workers) |
+### 5.1 Terraform Changes
+
+| File | Change | Purpose |
+|------|--------|---------|
+| `terraform/prod/proxmox/vms/k8s_workers/variables.tf` | memory: 8192 → 10240 | Increase prod worker RAM |
+
+### 5.2 Kubernetes Changes (Related to Anti-Affinity)
+
+See [Case 8](./8-k8s-scheduler-limitations-and-advanced-scheduling.md) for pod distribution fixes.
+
+| File | Change | Purpose |
+|------|--------|---------|
+| `kubernetes/dev/flux/flux-system/flux-pod-anti-affinity.yaml` | Created | Spread Flux pods |
+| `kubernetes/prod/flux/flux-system/flux-pod-anti-affinity.yaml` | Created | Spread Flux pods |
+| `kubernetes/dev/deployments/infrastructure/ingress/helm-release.yaml` | Added affinity | Spread Ingress pods |
+| `kubernetes/prod/deployments/infrastructure/ingress/helm-release.yaml` | Added affinity | Spread Ingress pods |
 
 ---
 
-## 6. Commands for Monitoring
+## 6. Monitoring Commands Reference
+
+### 6.1 Node Memory Status
 
 ```bash
-# Check node memory (without metrics-server)
+# Quick overview - requests and limits per node
 kubectl describe nodes | grep -E "(Name:|memory)"
 
-# Check pods per node
-kubectl get pods -A -o wide --field-selector spec.nodeName=<node-name>
-
-# Check specific pod resources
-kubectl describe pod <pod-name> -n <namespace> | grep -A 5 "Limits"
-
-# With metrics-server (if installed)
-kubectl top nodes
-kubectl top pods -A
+# Detailed breakdown per node
+kubectl describe node k8s-worker1.lab.local | grep -A 10 "Allocated resources"
 ```
 
----
-
-## 7. Future Considerations
-
-1. **Install metrics-server** for real-time memory monitoring
-2. **Consider pod anti-affinity** to spread Flux controllers across nodes
-3. **Reduce Flux controller limits** if memory pressure occurs
-4. **Add more workers** if workload grows beyond prod capacity
-
----
-
-## 8. Flux Pod Distribution Fix
-
-### Problem
-All 4 Flux controllers landed on worker1 by chance during initial scheduling, creating a single point of failure.
-
-### Root Cause
-- Scheduler uses **requests** (low) for decisions, ignores **limits** (high)
-- No pod anti-affinity configured by default
-- Scheduler doesn't rebalance existing pods
-
-### Solution: GitOps Kustomize Patch
-
-Added anti-affinity patch to Flux's own configuration in Git. Flux manages itself and applies the patch automatically.
-
-**Files Created:**
+**Sample Output:**
 ```
-kubernetes/dev/flux/flux-system/flux-pod-anti-affinity.yaml
-kubernetes/prod/flux/flux-system/flux-pod-anti-affinity.yaml
+Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests     Limits
+  --------           --------     ------
+  cpu                680m (34%)   2 (100%)
+  memory             348Mi (14%)  2718Mi (115%)
 ```
 
-**Files Modified:**
-```
-kubernetes/dev/flux/flux-system/kustomization.yaml
-kubernetes/prod/flux/flux-system/kustomization.yaml
-```
-
-**Patch Content:**
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: helm-controller  # (repeated for all 4 controllers)
-  namespace: flux-system
-spec:
-  template:
-    spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/part-of: flux
-              topologyKey: kubernetes.io/hostname
-```
-
-**Kustomization Update:**
-```yaml
-patches:
-- path: flux-pod-anti-affinity.yaml
-```
-
-### Why GitOps Patch (Not kubectl patch)
-
-| Method | Persistent | In Git | Survives Reinstall |
-|--------|------------|--------|-------------------|
-| `kubectl patch` | No | No | No |
-| **Kustomize patch** | Yes | Yes | Yes |
-
-### Verification
+### 6.2 Pods Per Node
 
 ```bash
-# After push, wait ~2-3 min then check
-kubectl get pods -n flux-system -o wide
-# Pods should be distributed across worker1, worker2, worker3
+# All pods on a specific node
+kubectl get pods -A -o wide --field-selector spec.nodeName=k8s-worker1.lab.local
+
+# Count pods per node
+kubectl get pods -A -o wide --no-headers | awk '{print $8}' | sort | uniq -c
+
+# Loop through all workers
+for node in k8s-worker1 k8s-worker2 k8s-worker3; do
+  echo "=== $node ==="
+  kubectl get pods -A --field-selector spec.nodeName=$node.lab.local --no-headers | wc -l
+  echo "pods"
+done
+```
+
+### 6.3 Resource Usage (Requires metrics-server)
+
+```bash
+# If metrics-server is installed
+kubectl top nodes
+kubectl top pods -A --sort-by=memory
+```
+
+### 6.4 Check for Memory Pressure
+
+```bash
+# Check node conditions
+kubectl describe nodes | grep -E "(Name:|MemoryPressure)"
+
+# Check for OOM events
+kubectl get events -A --sort-by='.lastTimestamp' | grep -i oom
 ```
 
 ---
 
-## 8b. Ingress Controller Anti-Affinity
+## 7. Planned Applications Memory Budget
 
-Added explicit soft anti-affinity to NGINX Ingress Controller via Helm values.
+### 7.1 Dev Cluster Budget
 
-**Files Modified:**
 ```
-kubernetes/dev/deployments/infrastructure/ingress/helm-release.yaml
-kubernetes/prod/deployments/infrastructure/ingress/helm-release.yaml
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     DEV CLUSTER MEMORY BUDGET                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Total Allocatable: 3 workers × 2.4GB = 7.2GB                           │
+│                                                                         │
+│  ALWAYS RUNNING:                                                        │
+│  ├── Flux controllers (4 pods)      ~256Mi requests, ~4GB limits        │
+│  ├── Ingress Controller (3 pods)    ~300Mi requests, ~900Mi limits      │
+│  ├── Vault Agent Injector (1 pod)   ~50Mi requests, ~256Mi limits       │
+│  ├── Calico (3 pods, per node)      ~150Mi requests, ~300Mi limits      │
+│  ├── CoreDNS (2 pods)               ~140Mi requests, ~340Mi limits      │
+│  ├── CSI NFS (4 pods)               ~200Mi requests, ~400Mi limits      │
+│  └── kube-proxy (3 pods)            ~100Mi requests, ~300Mi limits      │
+│      ─────────────────────────────────────────────────────────          │
+│      SUBTOTAL:                      ~1.2GB requests, ~6.5GB limits      │
+│                                                                         │
+│  REMAINING FOR TESTING:             ~1GB per application                │
+│                                                                         │
+│  Strategy: Run ONE application at a time for testing                    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Helm Values Added:**
-```yaml
-controller:
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: ingress-nginx
-          topologyKey: kubernetes.io/hostname
+### 7.2 Prod Cluster Budget (After RAM Increase)
+
 ```
-
-### Why Soft (Preferred) Not Hard (Required)?
-
-| Type | Behavior | Risk |
-|------|----------|------|
-| **Soft (preferred)** | Spread if possible, but allow same node if needed | None - always schedules |
-| **Hard (required)** | Never same node, pod stays Pending if no node | Pod stuck forever |
-
-**We use soft** because availability > perfect distribution.
-
-### What is Weight 100?
-
-Weight (1-100) = priority of this rule. `100` = maximum priority.
-
-If multiple preferences exist, scheduler adds weights to calculate best node.
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PROD CLUSTER MEMORY BUDGET                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Total Allocatable: 3 workers × 9.5GB = 28.5GB                          │
+│                                                                         │
+│  INFRASTRUCTURE:                                                        │
+│  ├── Flux controllers               ~256Mi requests, ~4GB limits        │
+│  ├── Ingress Controller             ~300Mi requests, ~900Mi limits      │
+│  ├── Vault + Agent                  ~100Mi requests, ~512Mi limits      │
+│  ├── System pods (Calico, DNS, etc) ~600Mi requests, ~1.5GB limits      │
+│      ─────────────────────────────────────────────────────────          │
+│      SUBTOTAL:                      ~1.3GB requests, ~7GB limits        │
+│                                                                         │
+│  APPLICATIONS:                                                          │
+│  ├── WordPress                      ~256Mi requests, ~512Mi limits      │
+│  ├── MariaDB                        ~256Mi requests, ~512Mi limits      │
+│  ├── Prometheus                     ~512Mi requests, ~1GB limits        │
+│  ├── Grafana                        ~128Mi requests, ~256Mi limits      │
+│  ├── Loki                           ~256Mi requests, ~512Mi limits      │
+│      ─────────────────────────────────────────────────────────          │
+│      SUBTOTAL:                      ~1.4GB requests, ~2.8GB limits      │
+│                                                                         │
+│  TOTAL:                             ~2.7GB requests, ~9.8GB limits      │
+│  HEADROOM:                          ~25.8GB requests available          │
+│                                                                         │
+│  Strategy: Run ALL applications simultaneously                          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 9. Lessons Learned
+## 8. Lessons Learned
 
-1. **Limits ≠ Usage**: High limits don't mean high actual usage
-2. **Plan for growth**: Size prod cluster for all planned workloads
-3. **Dev can be small**: Dev only needs to run one app at a time for testing
-4. **Monitor early**: Check memory before deploying new applications
-5. **Spread critical pods**: Use anti-affinity for controllers (Flux, Ingress)
-6. **GitOps for everything**: Even Flux config changes should go through Git
+1. **Limits ≠ Usage**: High limits don't mean high actual usage. Requests show real consumption.
+
+2. **Over-commitment is allowed**: Kubernetes allows limits > node capacity by design. It's a feature, not a bug.
+
+3. **Plan for growth**: Size prod cluster for all planned workloads upfront.
+
+4. **Dev can be small**: Dev only needs to run one app at a time for testing.
+
+5. **Monitor early**: Check memory before deploying new applications.
+
+6. **Spread critical pods**: Use anti-affinity for controllers. See [Case 8](./8-k8s-scheduler-limitations-and-advanced-scheduling.md).
+
+7. **GitOps for everything**: Even infrastructure config changes should go through Git.
+
+---
+
+## 9. Open Questions Addressed in Case 8
+
+During this investigation, we discovered deeper scheduler limitations:
+
+1. **Why did all Flux pods land on one node?** → Scheduler doesn't rebalance; anti-affinity needed
+2. **Why didn't anti-affinity work on first deploy?** → Rolling update saw OLD pods on worker1
+3. **Why doesn't scheduler consider limits?** → By design, uses only requests
+4. **Can we make scheduling smarter?** → Yes, with VPA + Descheduler
+
+These questions are fully addressed in [Case 8: Kubernetes Scheduler Limitations and Advanced Scheduling](./8-k8s-scheduler-limitations-and-advanced-scheduling.md).
+
+---
+
+## 10. Resolution Summary
+
+| Item | Dev Cluster | Prod Cluster |
+|------|-------------|--------------|
+| Worker RAM | 2.5GB (unchanged) | 8GB → 10GB |
+| Strategy | Test one app at a time | Run all apps |
+| Anti-affinity | ✅ Implemented | ✅ Implemented |
+| Advanced scheduling | 🔄 Planned (VPA + Descheduler) | 🔄 Planned |
+
+**Status: RESOLVED** - Strategy defined and initial mitigations in place. Advanced scheduling to be implemented as part of Case 8.
