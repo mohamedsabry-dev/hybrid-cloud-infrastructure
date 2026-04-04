@@ -64,23 +64,15 @@ spec:
               memory: "1Gi"
               cpu: "1000m"
           livenessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
+            tcpSocket:
+              port: 3306
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
+            tcpSocket:
+              port: 3306
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
