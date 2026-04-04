@@ -4,8 +4,10 @@ metadata:
   name: mariadb
   namespace: database
   labels:
-    environment: dev
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: flux
+    environment: dev
 spec:
   serviceName: mariadb
   replicas: 1
@@ -16,6 +18,7 @@ spec:
     metadata:
       labels:
         app: mariadb
+        app.kubernetes.io/name: mariadb
         environment: dev
       annotations:
         vault.hashicorp.com/agent-inject: "true"
@@ -31,9 +34,11 @@ spec:
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
       serviceAccountName: mariadb-sa
+      securityContext:
+        fsGroup: 999  # mysql group
       containers:
         - name: mariadb
-          image: mariadb:10.11
+          image: mariadb:10.11.11  # Pinned version
           ports:
             - containerPort: 3306
               name: mysql
@@ -51,6 +56,35 @@ spec:
               value: wordpress
             - name: MYSQL_USER
               value: wordpress
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           volumeMounts:
             - name: mariadb-data
               mountPath: /var/lib/mysql
