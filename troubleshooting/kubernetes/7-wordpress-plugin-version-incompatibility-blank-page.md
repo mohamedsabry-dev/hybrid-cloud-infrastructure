@@ -458,6 +458,70 @@ kubectl exec -it <wordpress-pod> -n apps -c wordpress -- \
 
 ---
 
+---
+
+## Additional Issue: Password Reset After Image Update
+
+### Symptoms
+
+- Login fails with "incorrect password" after WordPress image version change
+- Password hash in database changed from MD5 to WordPress bcrypt/phpass format
+- Issue persists across multiple browsers and incognito mode
+
+### Suspected Causes (Not Confirmed)
+
+| Possible Cause | Likelihood | Notes |
+|----------------|------------|-------|
+| WordPress upgrade routines triggered by image version change | Suspected | WP may run DB migrations on version change |
+| Fresh wp-config.php with new AUTH_KEY salts | Possible | Invalidates existing cookies/sessions |
+| WordPress install wizard partially re-ran | Low | Database already had user data |
+
+### Investigation Commands
+
+```bash
+# Check if WordPress is reinstalling on startup
+kubectl logs -n apps -l app=wordpress | grep -i "WordPress not found\|copying now\|install"
+
+# Check when user was created/modified
+kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+  "SELECT user_login, user_registered FROM wordpress.wp_users;"
+
+# Check current password hash format
+kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+  "SELECT user_login, LEFT(user_pass, 10) as hash_prefix FROM wordpress.wp_users WHERE ID = 1;"
+```
+
+### Resolution
+
+Reset password via database after image version changes:
+
+```bash
+kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+  "UPDATE wordpress.wp_users SET user_pass = MD5('your-password-here') WHERE ID = 1;"
+```
+
+**IMPORTANT:** Restart WordPress pods after resetting password via database:
+```bash
+kubectl rollout restart deployment wordpress -n apps
+```
+
+### Key Observations
+
+1. Password persists across normal pod restarts (same image version)
+2. Password may be affected when WordPress image version changes
+3. WordPress auto-upgrades MD5 hash to bcrypt/phpass after successful login (expected behavior)
+4. Only `wp-content` is on PVC - WordPress core + wp-config.php regenerate on each restart
+
+### Recommendation
+
+When changing WordPress image version:
+1. Plan for potential password reset
+2. Test login immediately after deployment
+3. Keep image version stable in production
+4. Consider mounting entire `/var/www/html` to PVC for full persistence
+
+---
+
 ## Status
 
 **Resolved** - Plugin disabled via database, site operational.

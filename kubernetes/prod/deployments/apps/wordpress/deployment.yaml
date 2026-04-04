@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: wordpress
     app.kubernetes.io/component: frontend
     app.kubernetes.io/managed-by: flux
-    environment: dev
+    environment: prod
 spec:
   replicas: 3
   selector:
@@ -18,7 +18,7 @@ spec:
       labels:
         app: wordpress
         app.kubernetes.io/name: wordpress
-        environment: dev
+        environment: prod
       annotations:
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "wordpress"
@@ -85,11 +85,11 @@ spec:
               value: wordpress
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "256Mi"
+              cpu: "200m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /wp-includes/images/blank.gif
