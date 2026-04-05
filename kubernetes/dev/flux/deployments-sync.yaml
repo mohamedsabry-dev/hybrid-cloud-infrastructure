@@ -5,8 +5,6 @@ metadata:
   name: deployments
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: infrastructure
   interval: 5m0s
   path: ./kubernetes/dev/deployments
   prune: true
