@@ -1,0 +1,15 @@
+---
+- name: Install & Setup Node exporter
+  hosts: All!k8s
+  become: yes
+  tasks:
+    - name: Install Packages
+      ansible.builtin.dnf:
+        name: prometheus-node-exporter
+        state: present
+    
+    - name: Enable Node Exporter 
+      ansible.builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
