@@ -88,7 +88,7 @@ spec:
             - -c
             - |
               if [ -f /vault/secrets/db-creds ]; then
-                . /vault/secrets/db-creds
+                export $(cat /vault/secrets/db-creds | xargs)
               fi
               export DATA_SOURCE_NAME="wordpress:${MYSQL_PASSWORD}@(127.0.0.1:3306)/"
               exec /bin/mysqld_exporter
