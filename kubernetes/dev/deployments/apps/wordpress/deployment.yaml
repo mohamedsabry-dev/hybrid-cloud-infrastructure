@@ -75,6 +75,15 @@ spec:
               if [ -f /vault/secrets/db-creds ]; then
                 export $(cat /vault/secrets/db-creds | xargs)
               fi
+              # Enable Apache mod_status for apache_exporter
+              a2enmod status
+              cat > /etc/apache2/conf-enabled/server-status.conf << 'EOF'
+              ExtendedStatus On
+              <Location /server-status>
+                SetHandler server-status
+                Require local
+              </Location>
+              EOF
               exec docker-entrypoint.sh apache2-foreground
           env:
             - name: WORDPRESS_DB_HOST
@@ -109,6 +118,22 @@ spec:
           volumeMounts:
             - name: wordpress-data
               mountPath: /var/www/html/wp-content
+
+        - name: apache-exporter
+          image: lusotycoon/apache-exporter:v0.11.0
+          args:
+            - --scrape_uri=http://localhost/server-status?auto
+          ports:
+            - containerPort: 9117
+              name: metrics
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
+
       volumes:
         - name: wordpress-data
           persistentVolumeClaim:

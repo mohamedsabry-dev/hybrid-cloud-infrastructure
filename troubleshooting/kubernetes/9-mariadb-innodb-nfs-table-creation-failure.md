@@ -8,7 +8,7 @@ ERROR 1005 (HY000): Can't create table `wordpress`.`wp_users` (errno: 168 "Unkno
 
 ## Environment
 - **Cluster**: Kubernetes with Flux GitOps
-- **Storage**: NFS (Synology NAS) via nfs-csi driver
+- **Storage**: NFS (ASUSTOR NAS) via nfs-csi driver
 - **Database**: MariaDB 10.11.11 StatefulSet
 - **Namespace**: database
 
