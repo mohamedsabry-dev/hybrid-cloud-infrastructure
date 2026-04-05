@@ -35,6 +35,9 @@ spec:
     - port: 3306
       targetPort: 3306
       name: mysql
+    - port: 9104
+      targetPort: 9104
+      name: metrics
   type: ClusterIP  # Internal only - no ingress for DBs
 
 ---
