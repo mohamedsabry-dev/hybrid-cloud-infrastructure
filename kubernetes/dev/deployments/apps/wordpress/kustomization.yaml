@@ -5,4 +5,4 @@ resources:
   - pvc.yaml
   - service.yaml
   - deployment.yaml
-  # - servicemonitor.yaml  # Enable after kube-prometheus-stack is deployed
+  - servicemonitor.yaml
