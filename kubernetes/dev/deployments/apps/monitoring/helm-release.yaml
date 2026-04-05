@@ -18,7 +18,9 @@ spec:
     # Grafana
     # ---------------------------------------------------------------------------
     grafana:
-      serviceAccountName: grafana-sa
+      serviceAccount:
+        create: false
+        name: grafana-sa
 
       # Vault agent injection — mirrors MariaDB/WordPress pattern
       podAnnotations:
