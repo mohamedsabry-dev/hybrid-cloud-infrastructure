@@ -81,28 +81,6 @@ spec:
             - name: mariadb-data
               mountPath: /var/lib/mysql
 
-        - name: mysqld-exporter
-          image: prom/mysqld-exporter:v0.15.1
-          command:
-            - /bin/sh
-            - -c
-            - |
-              if [ -f /vault/secrets/db-creds ]; then
-                export $(cat /vault/secrets/db-creds | xargs)
-              fi
-              export DATA_SOURCE_NAME="wordpress:${MYSQL_PASSWORD}@(127.0.0.1:3306)/"
-              exec /bin/mysqld_exporter
-          ports:
-            - containerPort: 9104
-              name: metrics
-          resources:
-            requests:
-              memory: "32Mi"
-              cpu: "50m"
-            limits:
-              memory: "64Mi"
-              cpu: "100m"
-
   volumeClaimTemplates:
     - metadata:
         name: mariadb-data
