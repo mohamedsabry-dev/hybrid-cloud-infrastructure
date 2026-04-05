@@ -1,15 +1,20 @@
 ---
 - name: Install & Setup Node exporter
-  hosts: All!k8s
+  hosts: "all:!k8s"
   become: yes
   tasks:
-    - name: Install Packages
+    - name: Enable EPEL repo
       ansible.builtin.dnf:
-        name: prometheus-node-exporter
+        name: epel-release
         state: present
-    
-    - name: Enable Node Exporter 
+
+    - name: Install node_exporter
+      ansible.builtin.dnf:
+        name: node_exporter
+        state: present
+
+    - name: Enable Node Exporter
       ansible.builtin.service:
-        name: prometheus-node-exporter
+        name: node_exporter
         state: started
         enabled: yes
