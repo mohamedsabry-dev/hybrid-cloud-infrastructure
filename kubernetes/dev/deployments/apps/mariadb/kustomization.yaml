@@ -4,4 +4,4 @@ resources:
   - vault-ca-secret.yaml
   - service.yaml
   - statefulset.yaml
-  # - servicemonitor.yaml  # Enable after kube-prometheus-stack is deployed
+  - servicemonitor.yaml
