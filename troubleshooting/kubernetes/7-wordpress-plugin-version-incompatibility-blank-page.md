@@ -9,7 +9,9 @@
 
 ## Summary
 
-After server reboot, WordPress displayed blank/empty pages in browser while `curl` returned HTML content. Login page loaded but authentication failed with "wrong password" errors. Root cause was Yoast SEO plugin version incompatibility - plugin required WordPress 6.5+ function but deployment used WordPress 6.4 image.
+After server reboot, WordPress displayed blank/empty pages in browser while `curl` returned HTML content. Root cause was Yoast SEO plugin version incompatibility - plugin required WordPress 6.5+ function but deployment used WordPress 6.4 image.
+
+**Note:** Password-related login issues are a separate problem documented in Case 14.
 
 ---
 
@@ -455,70 +457,6 @@ kubectl exec -it <wordpress-pod> -n apps -c wordpress -- \
 - [Stack Overflow: Fatal error on WordPress - Call to undefined function wp](https://stackoverflow.com/questions/31031133/fatal-error-on-wordpress-call-to-undefined-function-wp-in-wp-blog-header-php)
 - [WordPress 6.5 Release Notes - wp_is_serving_rest_request()](https://developer.wordpress.org/reference/functions/wp_is_serving_rest_request/)
 - [Yoast SEO Plugin Requirements](https://yoast.com/help/requirements-for-yoast-seo/)
-
----
-
----
-
-## Additional Issue: Password Reset After Image Update
-
-### Symptoms
-
-- Login fails with "incorrect password" after WordPress image version change
-- Password hash in database changed from MD5 to WordPress bcrypt/phpass format
-- Issue persists across multiple browsers and incognito mode
-
-### Suspected Causes (Not Confirmed)
-
-| Possible Cause | Likelihood | Notes |
-|----------------|------------|-------|
-| WordPress upgrade routines triggered by image version change | Suspected | WP may run DB migrations on version change |
-| Fresh wp-config.php with new AUTH_KEY salts | Possible | Invalidates existing cookies/sessions |
-| WordPress install wizard partially re-ran | Low | Database already had user data |
-
-### Investigation Commands
-
-```bash
-# Check if WordPress is reinstalling on startup
-kubectl logs -n apps -l app=wordpress | grep -i "WordPress not found\|copying now\|install"
-
-# Check when user was created/modified
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
-  "SELECT user_login, user_registered FROM wordpress.wp_users;"
-
-# Check current password hash format
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
-  "SELECT user_login, LEFT(user_pass, 10) as hash_prefix FROM wordpress.wp_users WHERE ID = 1;"
-```
-
-### Resolution
-
-Reset password via database after image version changes:
-
-```bash
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
-  "UPDATE wordpress.wp_users SET user_pass = MD5('your-password-here') WHERE ID = 1;"
-```
-
-**IMPORTANT:** Restart WordPress pods after resetting password via database:
-```bash
-kubectl rollout restart deployment wordpress -n apps
-```
-
-### Key Observations
-
-1. Password persists across normal pod restarts (same image version)
-2. Password may be affected when WordPress image version changes
-3. WordPress auto-upgrades MD5 hash to bcrypt/phpass after successful login (expected behavior)
-4. Only `wp-content` is on PVC - WordPress core + wp-config.php regenerate on each restart
-
-### Recommendation
-
-When changing WordPress image version:
-1. Plan for potential password reset
-2. Test login immediately after deployment
-3. Keep image version stable in production
-4. Consider mounting entire `/var/www/html` to PVC for full persistence
 
 ---
 
