@@ -107,16 +107,6 @@ id admin  # Show user ID and groups
 groups admin  # Show user groups
 ls -la /volume1/homes/  # List user home directories
 
-# ============================================================================
-# DOCKER (IF INSTALLED)
-# ============================================================================
-docker ps  # List running containers
-docker ps -a  # List all containers
-docker images  # List images
-docker logs <container-id>  # View container logs
-docker exec -it <container-id> bash  # Enter container
-docker-compose up -d  # Start containers from compose file
-docker-compose down  # Stop containers
 
 # ============================================================================
 # SCHEDULED TASKS (CRON)
@@ -125,37 +115,6 @@ crontab -l  # List cron jobs
 crontab -e  # Edit cron jobs
 # Example: Backup every day at 2 AM
 # 0 2 * * * rsync -avz /volume1/shares/ /volume2/backup/
-
-# ============================================================================
-# SNAPSHOTS (IF BTRFS)
-# ============================================================================
-# ASUSTOR uses Btrfs snapshots (managed via web UI)
-# CLI snapshot management (advanced):
-btrfs subvolume list /volume1  # List subvolumes
-btrfs subvolume snapshot /volume1/shares /volume1/.snapshots/manual-$(date +%Y%m%d)  # Create snapshot
-
-# ============================================================================
-# APP CENTRAL APPS
-# ============================================================================
-# Apps installed via App Central can be managed in:
-# /usr/local/AppCentral/
-ls -la /usr/local/AppCentral/  # List installed apps
-
-# ============================================================================
-# DOWNLOAD CENTER
-# ============================================================================
-# Download tasks stored in:
-ls -la /volume1/downloads/  # Default download location
-
-# ============================================================================
-# PLEX MEDIA SERVER (IF INSTALLED)
-# ============================================================================
-# Plex data location:
-ls -la /volume1/.@plugins/AppCentral/plexmediaserver/
-
-# Restart Plex:
-systemctl restart plexmediaserver  # If systemd service
-/usr/local/AppCentral/plexmediaserver/CONTROL/start-stop.sh restart  # Alternative
 
 # ============================================================================
 # SYSTEM MAINTENANCE

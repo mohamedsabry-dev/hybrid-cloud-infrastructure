@@ -89,15 +89,6 @@ aws iam get-policy --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess  # Get po
 aws iam list-attached-user-policies --user-name john  # List user's attached policies
 aws iam list-user-policies --user-name john  # List user's inline policies
 
-# ============================================================================
-# RDS DATABASES
-# ============================================================================
-aws rds describe-db-instances  # List RDS instances
-aws rds describe-db-instances --db-instance-identifier mydb  # Specific instance
-aws rds start-db-instance --db-instance-identifier mydb  # Start RDS instance
-aws rds stop-db-instance --db-instance-identifier mydb  # Stop RDS instance
-aws rds create-db-snapshot --db-instance-identifier mydb --db-snapshot-identifier mydb-snapshot-$(date +%Y%m%d)  # Create snapshot
-aws rds describe-db-snapshots --db-instance-identifier mydb  # List snapshots
 
 # ============================================================================
 # CLOUDWATCH LOGS
@@ -117,22 +108,6 @@ aws lambda update-function-code --function-name my-function --zip-file fileb://f
 aws lambda list-aliases --function-name my-function  # List aliases
 aws lambda get-function-configuration --function-name my-function  # Get configuration
 
-# ============================================================================
-# ELB/ALB LOAD BALANCERS
-# ============================================================================
-aws elbv2 describe-load-balancers  # List load balancers
-aws elbv2 describe-target-groups  # List target groups
-aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:...  # Check target health
-aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:...  # List listeners
-
-# ============================================================================
-# AUTO SCALING
-# ============================================================================
-aws autoscaling describe-auto-scaling-groups  # List ASGs
-aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names my-asg  # Specific ASG
-aws autoscaling set-desired-capacity --auto-scaling-group-name my-asg --desired-capacity 3  # Set capacity
-aws autoscaling suspend-processes --auto-scaling-group-name my-asg  # Suspend scaling
-aws autoscaling resume-processes --auto-scaling-group-name my-asg  # Resume scaling
 
 # ============================================================================
 # CLOUDFORMATION STACKS
