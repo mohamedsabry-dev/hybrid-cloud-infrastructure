@@ -34,7 +34,7 @@ variable "k8s_master1" {
     vmid           = 1010
     name           = "k8s-master1"
     cores          = 2
-    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.10/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
@@ -74,7 +74,7 @@ variable "k8s_master2" {
     vmid           = 1011
     name           = "k8s-master2"
     cores          = 2
-    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.11/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
@@ -114,7 +114,7 @@ variable "k8s_master3" {
     vmid           = 1012
     name           = "k8s-master3"
     cores          = 2
-    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.12/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"

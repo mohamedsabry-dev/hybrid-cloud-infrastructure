@@ -36,7 +36,7 @@ variable "freeipa" {
     gateway         = "10.0.50.1"
     bridge          = "vmbr0"
     vlan_id         = 50
-    startup_delay   = 60
+    startup_delay   = 180
     shutdown_delay  = 60
     startup_order   = 1
     started         = true
