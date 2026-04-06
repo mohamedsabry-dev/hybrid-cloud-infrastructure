@@ -1,0 +1,7 @@
+6 april , 7 and 8 
+Review and test the command sheets # On-it 
+Mirror dev to prod for the app 
+Review current deployments 
+Update the masters of dev mem via tf 
+take backup and snapshots of k8s workers and master from stable point 
+design the test of DR flow. 

@@ -47,14 +47,6 @@ sudo ./svc.sh uninstall  # Uninstall service
 ./config.sh remove --token YOUR_TOKEN  # Remove runner from GitHub
 rm -rf ~/actions-runner  # Delete runner directory
 
-# ============================================================================
-# RUNNER CONFIGURATION FILES
-# ============================================================================
-# .runner file: Contains runner configuration
-# .credentials file: Contains runner credentials (DO NOT SHARE)
-# .path file: Contains PATH environment
-# _diag/ directory: Diagnostic logs
-# _work/ directory: Job workspaces
 
 # ============================================================================
 # MONITORING & LOGS
@@ -65,42 +57,6 @@ ls -lh _diag/  # List diagnostic logs
 journalctl -u actions.runner.* -n 100  # Last 100 log lines
 journalctl -u actions.runner.* --since "1 hour ago"  # Logs from last hour
 
-# ============================================================================
-# RUNNER LABELS
-# ============================================================================
-# Labels are configured during setup:
-# ./config.sh --labels linux,x64,self-hosted,gpu
-# Default labels: self-hosted, linux/windows/macOS, x64/arm64
-# Custom labels: Add any custom labels during configuration
-
-# ============================================================================
-# WORKFLOW SYNTAX (USING SELF-HOSTED RUNNERS)
-# ============================================================================
-# .github/workflows/example.yml:
-# jobs:
-#   build:
-#     runs-on: self-hosted  # Use any self-hosted runner
-#     steps:
-#       - uses: actions/checkout@v3
-#       - run: echo "Running on self-hosted runner"
-
-# Using specific labels:
-# jobs:
-#   build:
-#     runs-on: [self-hosted, linux, x64]  # Match multiple labels
-
-# ============================================================================
-# RUNNER ENVIRONMENT
-# ============================================================================
-# Set environment variables in runner:
-export MY_VAR=value  # Temporary (session only)
-
-# Permanent environment (add to ~/.bashrc or ~/.profile):
-echo 'export MY_VAR=value' >> ~/.bashrc
-
-# Runner environment files:
-cat .env  # Runner environment variables
-cat .path  # PATH additions
 
 # ============================================================================
 # RUNNER UPDATES
@@ -139,22 +95,6 @@ du -sh _work/*  # Check workspace size
 rm -rf _work/*  # Clean workspaces (BE CAREFUL)
 
 # ============================================================================
-# SECURITY BEST PRACTICES
-# ============================================================================
-# - Run runner as dedicated non-root user
-# - Never share .credentials or .runner files
-# - Use runner groups for access control
-# - Rotate runner tokens regularly
-# - Monitor runner activity in GitHub UI
-# - Keep runner software updated
-# - Isolate runner environment (container/VM)
-
-# Create dedicated runner user:
-sudo useradd -m -s /bin/bash runner
-sudo su - runner
-# Install runner as this user
-
-# ============================================================================
 # MACOS SPECIFIC
 # ============================================================================
 # Install as LaunchAgent (macOS):
@@ -166,21 +106,6 @@ tail -f ~/Library/Logs/actions.runner.*  # View logs
 # Uninstall (macOS):
 ./svc.sh stop
 ./svc.sh uninstall
-
-# ============================================================================
-# DOCKER RUNNER (ALTERNATIVE)
-# ============================================================================
-# Using official GitHub Actions runner Docker image:
-docker run -d --name github-runner \
-  -e REPO_URL="https://github.com/OWNER/REPO" \
-  -e RUNNER_TOKEN="YOUR_TOKEN" \
-  -e RUNNER_NAME="docker-runner" \
-  -e RUNNER_LABELS="docker,linux" \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  myoung34/github-runner:latest
-
-# Check Docker runner:
-docker logs github-runner -f
 
 # ============================================================================
 # COMMON WORKFLOWS

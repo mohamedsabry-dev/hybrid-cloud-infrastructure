@@ -1,78 +1,284 @@
-From Up to down scale 
-1- normal website explorer while pod down >> 
-2- same while 2 down >> 
-3- same while 3 down >>
-4 same but the worker node down >>
-5- same but the 2 worker node down >>
-6- same but the 3 worker node down >>
-7- same but 2 worker down and 1 master down >>
-8- same but 2 worker down and 2 master down >>
-9- same but 2 worker down and 3 master down >>
-10 - same but 3 worker down and  master down >>
-11 - customer upload video while check from nginx which node he is on and tear it down or tear this pod down in mid way 
-12 - same but tear down the worker node in mid way while uploading video and check if the video is uploaded or not and check from nginx which node he is on and tear it down or tear this pod down in mid way
-14- recover db after mid transaction fail if any 
-15- break worker node connection with nfs while pod is running with no actions on web serv 
-16 repat in video scenario 
-17- same but tear down the worker node in mid way while uploading video and check if the video is uploaded or not and check from nginx which node he is on and tear it down or tear this pod down in mid way and then recover the worker node and check if the video is uploaded or not
-18- tear down 2 workers connection with nfs while pods are running with no actions on web serv and then recover the worker nodes and check if the pods are running or not
-19- tear down 1 master node will put load on the other masters or not in term of mem and cpu , monitor from graf 
-20 teat 2 masrer down and 2 workers, what is the prioriy pods ? what jappne to flux ? helm? db ? and app ? 
-21- descalaer when the load is low and check if the app is working or not and then scale up again and check if the app is working or not
-22- tear down 1 vault and check the app if it is working or not and then recover the vault and check if the app is working or not
-23- tear down 2 vault led the clsuter to lose quorm and see if current pod can hold secrets and new pods can fetch or not 
-24- tear down 3 vault led the clsuter to lose quorm and see if current pod can hold secrets and new pods can fetch or not
-26- backup etcd and restore in normal operation 
-27- backup raft and restore with normal operation 
-28- shutdown 2 masters from prox shutdown and see if any errors will be printed in the logs and check if the app is working or not and then recover the masters and check if the app is working or not and etcd 
-29 - shutdown 3 masters from prox shutdown and see if any errors will be printed in the logs and check if the app is working or not and then recover the masters and check if the app is working or not and etcd
-30 do force stop on 2 masters and check if the app is working or not and then recover the masters and check if the app is working or not and etcd
-31 force stop on 3 masters and check if the app is working or not and then recover the masters and check if the app is working or not and etcd
-32 force stop 2 vault and check if cluster will survie , do with 3 also 
-33- what pods has priority in case of master and worker down ?
-34 - if worker down for long time like 1 h , let master trigger to lambda to trigger to proxmox to force stop the node and restore the latest backup of this node in the storage and then start the node and check if the app is working or not and etcd is working or not "and send email tirgger from prox " 
-35 - same with master and monitor the pattern 
-37- same with vault and monitor the pattern
-38- same with vault but trigger to restore the vault from backup and check if the app is working or not and etcd is working or not "and send email tirgger from prox "
-39- network connection drop with prox and router on svc level or storage lvl , and use email to nify urgency using the mgmt path 
-40- electricy down and network and stroage drop , the smooth action transition to shutddown sequence for the whole env basd on the monitor scrip 
-41- same but with backup and restore of the whole env in case of electricty down and network and storage drop
-42- Complete down nas and see how the cluster will react and recover and check if the app is working or not and etcd is working or not "and send email tirgger from prox " and then recover the nas and check if the app is working or not and etcd is working or not "and send email tirgger from prox "
-43- break the unseal auto with aws for missing or changed secrets and show how to recover the vault and check if the app is working or not and etcd is working or not "and send email tirgger from prox "
-44- ipa domain down and see how the cluster will react and recover and check if the app is working or not and etcd is working or not "and send email tirgger from prox " and then recover the ipa domain and check if the app is working or not and etcd is working or not "and send email tirgger from prox "
-45 - we dont count on create new node, we rather have 2 options, do shutdown on node x and do create new vmid from the latest backup of the node and hope things be good , we have bi daily backup so this should work usually or reduce the scale of the issu ein shaa allah 
-46- same but with master node and monitor the pattern
-47- same but with vault and monitor the pattern
+# Kubernetes & Vault Cluster Chaos Engineering Test Plan
 
-- we simulated faikures levels 
-    - pod 
-    - worker node
-    - master node
-    - vault
-    - network
-    - storage
-    - electricty
-    - backup and restore
-    - proxmox connection
-    - ipa domain
-    - database
-    - apps
-# We dont have replica of ipa domain 
-# We dont have flow to update keytab yet 
-# We dont have flow to update vault unseal auto with aws yet but can use gh actions to trigger vault unseal auto with aws update in case of missing or changed secrets
-# We can make use of lambda but i dont know how 
-# We can make use of proxmox api to trigger force stop and restore from backup and start the node again but i dont know how to do it yet
-# We can make use of email to notify the urgency of the issue and the recovery process but i dont know how to do it yet
-# we dont have multi database mariadb yet, need to test if the only 1 we have down will cause the app to be down or not and how to recover it and check if the app is working or not and etcd is working or not "and send email tirgger from prox " also how to make db active and backup and restore in case of failure and have standby db in case of failure and how to switch between them and check if the app is working or not and etcd is working or not "and send email tirgger from prox "
-# Do we need backup of our config data to be saved on s3 ? as well as nas ? not sure but not on the list for testing this month 
+Test 1: [Pod Level Failures - Cover reaction of wordpress, mariadb, vault injector, ingress nginx, helm, flux, prometheus, exporters]
 
+## Pod Operations:
+    - We need to see the application wordpress stability while [Browsing + Uploading Videos] and we do operations on the cluster led to:
+        - pod down and up "restart"
+        - pod down and up "recreate"
+        - pod down and up "force delete"
+        - 2 pods down intentionally out of the scale of 3 
+        - 3 pods down intentionally out of the scale of 3
+        - Scale up and Scale down automation based on the load and status
+        - Customer upload video while checking from nginx which node/pod they're on and tear it down mid-way upload
+        - Check if mid-upload video data persists, can be resumed, or if DB transaction fails with duplicate name conflict
+        - Monitor pod restart patterns and CrashLoopBackOff scenarios
+        - Test pod eviction under memory/CPU pressure
+        - What pods have priority in scheduling? What happens to flux? helm? db? and app pods during resource contention?
 
-AI Opinion: 
-The scenarios fall into three categories. The first category is foundational and must be done — scenarios 1 through 6, 11, 12, 15, 22, 23, 26, 27, 28, 29, 44. These cover the core failure modes that any SRE interview will ask about and that any production platform will actually encounter. Pod failures, node failures, worker NFS disconnection, Vault quorum loss, etcd backup and restore, graceful versus force shutdown of masters, IPA domain down. These are 15 scenarios and they're achievable in two weeks with proper preparation.
+# Worker Node Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+        - worker node down and up "restart"
+        - worker node down and up "force shutdown"
+        - 2 worker nodes down intentionally out of the scale of 3 
+        - 3 worker nodes down intentionally out of the scale of 3
+        - Disconnect worker node from nfs while pod is running with no actions on web server and then recover the connection and check if the pods are running or not
+        - Repeat with disconnect the nfs connection itself on all nodes and see if it can be recovered auto or will hang forever 
+        - Will the uploaded mid-way data exist or disappear, will it be able to upload same file or db will crash because of mid-way transaction fail with same name 
+        - Recover db after mid transaction fail if any
+        - Test Node NotReady vs actual node down - how long until pods are rescheduled?
+        - Customer upload video, check from nginx which worker node they're on, tear down that specific worker mid-upload and verify behavior
+        - Monitor node resource usage (CPU/mem) during adjacent node failures from Grafana
 
-The second category is advanced and impressive if done but not blocking — scenarios 34, 35, 37, 38, 39, 40, 41, 42, 43. The automated remediation with Lambda and Proxmox API, the full environment electricity-down shutdown sequence, the NAS complete failure recovery. These are genuinely sophisticated scenarios that go beyond what most junior to mid SRE roles would expect. They're worth doing eventually but not at the cost of delaying the job search significantly.
+# Master Node Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+    - Test Cluster Stability and ETCD survival, restore its backup 
+        - master node down and up "restart"
+        - master node down and up "force shutdown"
+        - 2 master nodes down intentionally out of the scale of 3 
+        - 3 master nodes down intentionally out of the scale of 3
+        - Force stop 2 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
+        - Force stop 3 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
+        - Tear down 1 master node and monitor from Grafana if it puts load on the other masters in terms of mem and cpu
+        - Test API server availability during master failures - can kubectl commands execute?
+        - Test scheduler and controller-manager behavior with reduced master quorum
 
-The third category is future architecture work — multi-database MariaDB with active-standby, IPA replica, S3 config backup, keytab update flow. These are improvements to the architecture not tests of the current architecture. They belong on a post-job-search roadmap not on the pre-publication checklist.
+# Combined Failure Scenarios (Multi-Component):
+    - Critical combined failure testing:
+        - 2 workers down + 1 master down - check app stability, pod rescheduling, what happens to flux? helm? db? app?
+        - 2 workers down + 2 masters down - verify minimum viable cluster state
+        - 2 workers down + 3 masters down - expect total control plane failure
+        - 3 workers down + 1 master down - all worker capacity gone, control plane partially available
+        - What is the pod priority order during these combined failures? Which workloads survive and which get evicted?
 
+# Vault Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+        - vault down and up "restart"
+        - vault down and up "force shutdown"
+        - 2 vault nodes down intentionally out of the scale of 3 
+        - 3 vault nodes down intentionally out of the scale of 3
+        - Tear down 2 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not 
+        - Tear down 3 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not
+        - Test Vault seal/unseal cycles - manual seal and auto-unseal behavior
+        - Break the unseal auto with AWS for missing or changed secrets and show how to recover the vault and check if the app is working or not
+        - Test existing pods with cached secrets vs new pod deployments during Vault outage
+        - Verify vault-injector sidecar behavior when Vault cluster is degraded
 
-My recommendation is this. Execute the 15 foundational scenarios thoroughly with proper documentation. Note the advanced scenarios and the future architecture items in exactly the way you've already done in this document — as known gaps with honest acknowledgment of what's missing and why. That honest gap analysis in the repository is actually more impressive than pretending those gaps don't exist. Every mature SRE knows that no system is perfectly resilient and the engineers who understand the failure modes they haven't solved yet are more valuable than the ones who don't know what they don't know.
+Test 2: [Network & Ingress Level Failures]
+
+## External NGINX (Rocky Linux LXC):
+    - Stop nginx service on ex-nginx (10.0.65.10) and check if the app is working or not, then recover nginx and verify
+    - Kill nginx process vs graceful stop - different behavior?
+    - Test least_conn load balancing behavior when one backend worker is down
+
+## Ingress NGINX Controller (In-Cluster):
+    - Stop ingress nginx pod 1 of 3 and check if the app is working or not, then recover the pod and verify
+    - Stop ingress nginx pod 2 of 3 and check if the app is working or not, then recover the pod and verify
+    - Stop ingress nginx pod 3 of 3 and check if the app is working or not, then recover the pod and verify
+    - Test ingress controller during worker node failures - does it reschedule correctly?
+
+## Network Connectivity:
+    - Network connection drop with proxmox and router on svc0 level or storage level network, use email to notify urgency using the mgmt path
+    - Test Calico CNI plugin failure - stop calico-node daemonset pods
+    - Test CoreDNS failure - stop coredns pods and verify service discovery impact
+    - Test cross-node pod communication during network partition scenarios
+
+Test 3: [Storage Level Failures]
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+        - Stop nfs server completely and check if the app is working or not, then recover the nfs server and verify
+        - Break worker node connection with nfs while pod is running with no actions on web server, then recover the worker node and check if the pods are running or not
+        - Tear down 2 workers connection with nfs while pods are running with no actions on web server, then recover the worker nodes and check if the pods are running or not
+        - Customer uploads video mid-way, disconnect NFS on that specific worker, verify if upload completes or fails
+        - Test PVC orphaning - delete PV while PVC exists, verify behavior
+        - Verify NFS soft mount options (timeo=30, retrans=3) prevent pod hang vs hard mount
+        - Test storage class dynamic provisioning during NFS outage
+        - Complete down NAS and see how the cluster will react and recover, check if the app is working or not and etcd is working or not "and send email trigger from proxmox", then recover the NAS and verify
+
+Test 4: [Infrastructure Level Failures]
+
+## Power & Environment:
+    - Electricity down and network and storage drop scenario
+        - Test the smooth action transition to shutdown sequence for the whole environment based on the monitor script 
+        - Same but with backup and restore of the whole environment in case of electricity down and network and storage drop
+        - UPS behavior and graceful shutdown order: apps -> k8s workers -> k8s masters -> vault -> proxmox
+
+## Authentication & Identity:
+    - IPA domain down and see how the cluster will react and recover, check if the app is working or not and etcd is working or not "and send email trigger from proxmox", then recover the IPA domain and verify
+    - Test kerberos ticket expiration during IPA outage
+    - Verify pods with keytab mounts during IPA unavailability
+
+## Proxmox Integration:
+    - Network connection drop between proxmox host and management network
+    - Proxmox API unavailable - test impact on monitoring and automation
+
+Test 5: [Backup and Restore Operations]
+
+## ETCD Backup/Restore:
+    - Backup etcd and restore in normal operation 
+    - Backup etcd during active workload, restore, verify data integrity
+    - Test etcd snapshot corruption scenarios
+
+## Vault Raft Backup/Restore:
+    - Backup raft and restore with normal operation
+    - Verify Vault backup integrity before restore
+    - Test restore with different quorum scenarios
+
+## Application Data:
+    - Backup WordPress data (uploads + DB) during active operations
+    - Restore and verify data consistency
+    - Test point-in-time recovery for MariaDB
+
+Test 6: [Automated Remediation Framework]
+
+## Auto-Recovery Actions:
+    If any node of specific type is down for long time like 1 hour (master, worker, or vault node):
+        - Trigger proxmox API to force stop the node 
+        - Copy the node to different vmid or ct id for further log analysis later
+        - Restore the latest backup of this node in the storage 
+        - Start the node 
+        - Check if the node will join its related cluster or not and verify app working and etcd working "and send email trigger from proxmox"
+        - Monitor recovery pattern for each node type (master vs worker vs vault)
+
+Test 7: [Observability & Monitoring]
+
+## Monitoring During Failures:
+    - Monitor from Grafana during each failure scenario:
+        - CPU/memory pressure on remaining nodes
+        - Network traffic patterns during rescheduling
+        - etcd leader election timing
+        - Pod restart counts and reasons
+        - Storage I/O during NFS failures
+    - Test Prometheus scraping during target failures
+    - Verify alerting pipeline end-to-end (Prometheus -> AlertManager -> Email/Slack)
+
+Test 8: [GitOps & Release Management]
+
+## Flux Behavior:
+    - Flux reconciliation during master node failures
+    - Flux behavior when Git repository is unreachable
+    - Test Flux rollback on failed deployments during chaos
+
+## Helm Operations:
+    - Helm release state during worker/master failures
+    - Test helm rollback during node failures
+    - Verify helm secrets in etcd during master quorum loss
+
+Test 9: [Certificate & Secret Management]
+
+## Certificate Lifecycle:
+    - Test cert-manager behavior during API server instability
+    - Simulate certificate expiration and rotation during failures
+    - Verify TLS certificate chain during partial cluster outage
+
+## Secret Injection:
+    - Vault secret injection to new pods during Vault degraded state
+    - Test secret rotation during node failures
+    - Verify sidecar injection when vault-injector pod is rescheduling
+
+Test 10: [NFS CSI Driver Failures]
+
+## CSI Controller Failure:
+    - Kill nfs-csi-controller pod and try to create new PVC - does it succeed or fail?
+    - Kill nfs-csi-controller mid-way during PVC creation - does the PVC get stuck in Pending?
+    - With 1 replica controller down, how long until new PVC requests succeed again?
+    - Test leader election if running 2 controller replicas
+
+## CSI Node DaemonSet Failure:
+    - Kill nfs-csi-node pod on worker-1 while existing pods have mounted volumes - do mounts survive?
+    - Kill nfs-csi-node pod on worker-2 and try to schedule NEW pod with PVC to that node - does mount succeed?
+    - Tear down worker node entirely - does CSI node pod reschedule prevent stuck mounts on other nodes?
+    - Delete nfs-csi-node daemonset entirely - what happens to existing mounted volumes? Can new pods mount?
+
+## Dynamic Provisioning During Failures:
+    - Create PVC while nfs-csi-controller is down - verify it succeeds after controller recovery
+    - Create PVC while NFS server itself is unreachable - does PVC stay Pending or fail?
+    - Test StorageClass provisioner behavior when CSI driver is degraded
+
+## Combined CSI + NFS Server Failure:
+    - NFS server down + CSI controller down - recovery order matters?
+    - CSI node pod restart on worker with active mounts using soft mount options (timeo=30, retrans=3)
+
+Test 11: [CSI Node Priority & Startup Order]
+
+## Priority Class Verification:
+    - Verify nfs-csi-node pods have system-node-critical priority class
+    - Verify app pods have default (0) or custom priority
+    - Check priority class values: kubectl get priorityclass
+
+## Node Recovery Startup Order:
+    - Force shutdown worker-1 (has both app pods and CSI node pod)
+    - Start worker-1 and monitor pod startup order with `kubectl get pods -A -w`
+    - Measure: time until CSI node pod is Ready vs time until app pods are Ready
+    - Expected: CSI pod starts first due to higher priority
+
+## App Pod Mount Failure & Retry:
+    - Manually delete nfs-csi-node pod on worker-2
+    - Immediately delete wordpress pod on worker-2 to trigger restart
+    - Watch app pod stuck in ContainerCreating with FailedMount events
+    - Count retry attempts and backoff timing
+    - CSI node pod restarts automatically (daemonset controller)
+    - Verify app pod succeeds on next mount retry
+    - Measure total delay from CSI recovery to app pod Running
+
+## Resource Pressure Eviction Order:
+    - Create memory pressure on worker node
+    - Verify CSI node pod is NOT evicted (system-node-critical protection)
+    - Verify app pods ARE evicted first
+    - This proves priority class is working
+
+## Manual Priority Class Testing:
+    - If CSI node doesn't have system-node-critical, add it:
+```yaml
+      priorityClassName: system-node-critical
+```
+    - Retest node recovery scenarios
+---
+
+# Future Improvements & Known Gaps:
+
+## Not Yet Implemented:
+    - We don't have replica of IPA domain yet
+    - We don't have flow to update keytab automatically yet 
+    - We don't have flow to update vault unseal auto with AWS yet but can use GitHub Actions to trigger vault unseal auto with AWS update in case of missing or changed secrets
+    - We can make use of Lambda but don't know how yet
+    - We can make use of Proxmox API to trigger force stop and restore from backup and start the node again but don't know how to do it yet
+    - We can make use of email to notify the urgency of the issue and the recovery process but don't know how to do it yet
+    - We don't have multi-database MariaDB yet, need to test if the only 1 we have down will cause the app to be down or not and how to recover it and check if the app is working or not and etcd is working or not "and send email trigger from proxmox" - also how to make DB active backup and restore in case of failure and have standby DB in case of failure and how to switch between them
+    - Do we need backup of our config data to be saved on S3 as well as NAS? Not sure but not on the list for testing this month
+
+## Future Setup Tasks:
+    1. Deploy CloudWatch or Prometheus AlertManager to monitor the cluster and set up alerts for the following scenarios:
+        - Node down (pod, worker, master, vault)
+        - NFS connection drop
+        - Proxmox connection drop
+        - IPA domain down
+        - Certificate expiration warnings
+        - etcd backup failures
+        - Vault seal events
+    
+    2. IPA Domain replica and test the failover and recovery process
+    
+    3. Multi-database MariaDB with active-standby and test the failover and recovery process
+    
+    4. Automated keytab refresh mechanism integrated with FreeIPA
+    
+    5. Lambda-based automated remediation for node failures
+    
+    6. S3 backup strategy for critical configuration data
+    
+    7. Disaster recovery runbook automation
+
+---
+
+## Execution Priority (Per AI Recommendation):
+
+### Tier 1 - Foundational (Execute First - 2 weeks):
+Tests 1 (pod/worker/master/vault basics), Test 2 (networking), Test 3 (storage NFS), Test 5 (etcd/raft backup), Infrastructure IPA domain, Combined failures (2W+1M scenario), Video upload mid-transaction tests, Vault quorum loss
+
+### Tier 2 - Advanced (After Job Offer):
+Test 4 (electricity/infrastructure), Test 6 (automated remediation), Lambda integration, Proxmox API automation
+
+### Tier 3 - Architecture Improvements (Post-Employment):
+Multi-DB MariaDB, IPA replica, S3 config backup, automated keytab rotation
+
+The honest acknowledgment of these gaps demonstrates mature understanding of system boundaries rather than pretending complete coverage.
