@@ -1,4 +1,4 @@
-# TS-002: Kubernetes Master Node Resource Exhaustion
+# Kubernetes Master Node Resource Exhaustion
 
 ## Problem Summary
 Kubernetes master node becomes unresponsive due to memory exhaustion, causing kubectl commands to hang and control plane components to fail.

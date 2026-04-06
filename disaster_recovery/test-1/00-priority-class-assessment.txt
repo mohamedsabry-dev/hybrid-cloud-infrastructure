@@ -1,0 +1,295 @@
+================================================================================
+DR TEST 1 - STEP 0: PRIORITY CLASS ASSESSMENT
+================================================================================
+Date: 2026-04-06
+Environment: Dev (k8s-master1.lab.local)
+Purpose: Verify pod priority configuration before disaster recovery testing
+
+================================================================================
+1. OBJECTIVE
+================================================================================
+
+Before starting DR Test 1, we must verify that critical pods have proper
+priority classes configured. This ensures correct scheduling and eviction
+order during node failures and resource pressure scenarios.
+
+================================================================================
+2. REQUIRED PRIORITY ORDER (Highest to Lowest)
+================================================================================
+
+Priority 1 - Infrastructure (system-node-critical / system-cluster-critical):
+    - NFS CSI Driver (storage mounts must be available first)
+    - Vault Injector (secrets injection for new pods)
+    - Ingress NGINX (external traffic routing)
+    - Flux Controllers (GitOps reconciliation)
+
+Priority 2 - Database (database-critical):
+    - MariaDB (data layer must be ready before apps)
+
+Priority 3 - Application (app-standard):
+    - WordPress (depends on database)
+
+Priority 4 - Monitoring (default/0):
+    - Prometheus, Grafana, Alertmanager (observability, non-critical)
+
+================================================================================
+3. CURRENT STATE ASSESSMENT
+================================================================================
+
+3.1 Available Priority Classes
+--------------------------------------------------------------------------------
+Command:
+    kubectl get priorityclass
+
+Output:
+    NAME                      VALUE        GLOBAL-DEFAULT   AGE   PREEMPTIONPOLICY
+    system-cluster-critical   2000000000   false            10d   PreemptLowerPriority
+    system-node-critical      2000001000   false            10d   PreemptLowerPriority
+
+Finding: Only system priority classes exist. Custom classes needed for db/app.
+
+--------------------------------------------------------------------------------
+3.2 CSI NFS Driver Pods
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n kube-system | grep -i csi
+
+Output:
+    csi-nfs-controller-7d8bbb9d89-tz5jd   5/5   Running   59 (13h ago)   5d2h
+    csi-nfs-node-2ld84                    3/3   Running   30 (13h ago)   5d2h
+    csi-nfs-node-4lqlj                    3/3   Running   31 (13h ago)   5d2h
+    csi-nfs-node-4pjdv                    3/3   Running   31 (13h ago)   5d2h
+    csi-nfs-node-pc8pz                    3/3   Running   31 (13h ago)   5d2h
+    csi-nfs-node-vwnjj                    3/3   Running   31 (13h ago)   5d2h
+    csi-nfs-node-wqpnp                    3/3   Running   31 (13h ago)   5d2h
+
+Command:
+    kubectl describe pod csi-nfs-controller-7d8bbb9d89-tz5jd -n kube-system | grep -i priority
+
+Output:
+    Priority:             2000000000
+    Priority Class Name:  system-cluster-critical
+
+Command:
+    kubectl describe pod csi-nfs-node-2ld84 -n kube-system | grep -i priority
+
+Output:
+    Priority:             2000000000
+    Priority Class Name:  system-cluster-critical
+
+Finding: CSI pods have system-cluster-critical. OK.
+
+--------------------------------------------------------------------------------
+3.3 Vault Injector
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n vault
+
+Output:
+    NAME                                   READY   STATUS    RESTARTS       AGE
+    vault-agent-injector-94c4bcc6c-ln296   1/1     Running   13 (13h ago)   7d22h
+
+Command:
+    kubectl describe pod vault-agent-injector-94c4bcc6c-ln296 -n vault | grep -i priority
+
+Output:
+    Priority:         0
+
+Finding: NO PRIORITY CLASS SET - NEEDS FIX
+
+--------------------------------------------------------------------------------
+3.4 Ingress NGINX Controller
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n ingress-nginx
+
+Output:
+    NAME                                       READY   STATUS    RESTARTS      AGE
+    ingress-nginx-controller-ccdf84b85-6hwwl   1/1     Running   8 (13h ago)   2d18h
+    ingress-nginx-controller-ccdf84b85-kvw6x   1/1     Running   8 (13h ago)   2d18h
+    ingress-nginx-controller-ccdf84b85-n649w   1/1     Running   8 (13h ago)   2d18h
+
+Command:
+    kubectl describe pod ingress-nginx-controller-ccdf84b85-kvw6x -n ingress-nginx | grep -i priority
+
+Output:
+    Priority:         0
+
+Finding: NO PRIORITY CLASS SET - NEEDS FIX
+
+--------------------------------------------------------------------------------
+3.5 Flux System Controllers
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n flux-system -o wide
+
+Output:
+    NAME                                       READY   STATUS    RESTARTS       AGE     IP               NODE
+    helm-controller-844f6958dc-bzqs7           1/1     Running   10 (13h ago)   2d18h   10.244.29.165    k8s-worker3.lab.local
+    kustomize-controller-67486f5bfd-hsvmf      1/1     Running   9 (13h ago)    2d18h   10.244.207.115   k8s-worker2.lab.local
+    notification-controller-7f5d7cb966-x5ggw   1/1     Running   11 (13h ago)   2d18h   10.244.62.21     k8s-worker1.lab.local
+    source-controller-6d8d58659f-frmw8         1/1     Running   10 (13h ago)   2d18h   10.244.207.118   k8s-worker2.lab.local
+
+Commands:
+    kubectl describe pod helm-controller-844f6958dc-bzqs7 -n flux-system | grep -i priority
+    kubectl describe pod kustomize-controller-67486f5bfd-hsvmf -n flux-system | grep -i priority
+    kubectl describe pod source-controller-6d8d58659f-frmw8 -n flux-system | grep -i priority
+    kubectl describe pod notification-controller-7f5d7cb966-x5ggw -n flux-system | grep -i priority
+
+Output:
+    helm-controller:          Priority: 2000000000 (system-cluster-critical)
+    kustomize-controller:     Priority: 2000000000 (system-cluster-critical)
+    source-controller:        Priority: 2000000000 (system-cluster-critical)
+    notification-controller:  Priority: 0 (default)
+
+Finding: 3/4 Flux controllers have proper priority. notification-controller at default (acceptable).
+
+--------------------------------------------------------------------------------
+3.6 Database (MariaDB)
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n database
+
+Output:
+    NAME        READY   STATUS    RESTARTS      AGE
+    mariadb-0   2/2     Running   2 (13h ago)   22h
+
+Command:
+    kubectl describe pod mariadb-0 -n database | grep -i priority
+
+Output:
+    Priority:         0
+
+Finding: NO PRIORITY CLASS SET - NEEDS CUSTOM CLASS
+
+--------------------------------------------------------------------------------
+3.7 Application (WordPress)
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n apps
+
+Output:
+    NAME                         READY   STATUS    RESTARTS      AGE
+    wordpress-6fbdd48889-g7k5b   2/2     Running   2 (13h ago)   22h
+    wordpress-6fbdd48889-r59mb   2/2     Running   2 (13h ago)   22h
+    wordpress-6fbdd48889-zqntw   2/2     Running   2 (13h ago)   22h
+
+Command:
+    kubectl describe pod wordpress-6fbdd48889-r59mb -n apps | grep -i priority
+
+Output:
+    Priority:         0
+
+Finding: NO PRIORITY CLASS SET - NEEDS CUSTOM CLASS
+
+--------------------------------------------------------------------------------
+3.8 Monitoring Stack
+--------------------------------------------------------------------------------
+Command:
+    kubectl get pods -n monitoring
+
+Output:
+    NAME                                                        READY   STATUS    RESTARTS      AGE
+    alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running   2 (13h ago)   23h
+    kube-prometheus-stack-grafana-76d659dc49-5qhjt              4/4     Running   4 (13h ago)   23h
+    kube-prometheus-stack-kube-state-metrics-567d49447b-4dn8f   1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-operator-7479866ff6-fjsfs             1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-55kt4        1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-cvz9g        1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-h9fmq        1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-mdkxr        1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-q7qgg        1/1     Running   1 (13h ago)   23h
+    kube-prometheus-stack-prometheus-node-exporter-rd82d        1/1     Running   1 (13h ago)   23h
+    prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   2 (13h ago)   23h
+
+Command:
+    kubectl describe pods -n monitoring | grep -i priority
+
+Output:
+    Priority: 0 (all 11 pods)
+
+Finding: All monitoring pods at default priority. OK (lowest priority as expected).
+
+--------------------------------------------------------------------------------
+3.9 Helm Chart Available Values
+--------------------------------------------------------------------------------
+Command:
+    helm show values vault --repo https://helm.releases.hashicorp.com | grep priorityClassName
+
+Output:
+    priorityClassName: ""
+    priorityClassName: ""
+    priorityClassName: ""
+
+Command:
+    helm show values ingress-nginx --repo https://kubernetes.github.io/ingress-nginx | grep priorityClassName
+
+Output:
+    priorityClassName: ""
+    priorityClassName: ""
+    priorityClassName: ""
+
+Finding: Both charts support priorityClassName but not configured.
+
+================================================================================
+4. FINDINGS SUMMARY
+================================================================================
+
++---------------------------+------------------------+------------+
+| Component                 | Current Priority       | Status     |
++---------------------------+------------------------+------------+
+| CSI NFS Controller        | system-cluster-critical| OK         |
+| CSI NFS Node (DaemonSet)  | system-cluster-critical| OK         |
+| Vault Injector            | 0 (default)            | NEEDS FIX  |
+| Ingress NGINX             | 0 (default)            | NEEDS FIX  |
+| Flux Controllers (3/4)    | system-cluster-critical| OK         |
+| Flux notification-ctrl    | 0 (default)            | ACCEPTABLE |
+| MariaDB                   | 0 (default)            | NEEDS FIX  |
+| WordPress                 | 0 (default)            | NEEDS FIX  |
+| Monitoring (all)          | 0 (default)            | OK         |
++---------------------------+------------------------+------------+
+
+================================================================================
+5. ACTION PLAN (STEP 0 REMEDIATION)
+================================================================================
+
+1. CREATE CUSTOM PRIORITY CLASSES
+   - database-critical (value: 1000000)
+   - app-standard (value: 500000)
+   Location: kubernetes/*/deployments/infrastructure/priority-classes/
+
+2. UPDATE INFRASTRUCTURE HELM RELEASES
+   - Vault Injector: Add priorityClassName: system-cluster-critical
+   - Ingress NGINX: Add priorityClassName: system-cluster-critical
+   - NFS CSI Driver: Add explicit priority + replicas=2 for controller HA
+
+3. UPDATE APPLICATION WORKLOADS
+   - MariaDB StatefulSet: Add priorityClassName: database-critical
+   - WordPress Deployment: Add priorityClassName: app-standard
+
+4. VERIFY MONITORING (NO CHANGE NEEDED)
+   - Monitoring pods should remain at default priority (0)
+   - They are non-critical and should be evicted first during pressure
+
+================================================================================
+6. TARGET STATE (After Remediation)
+================================================================================
+
++---------------------------+------------------------+-----------+
+| Component                 | Priority Class         | Value     |
++---------------------------+------------------------+-----------+
+| CSI NFS Node              | system-node-critical   | 2000001000|
+| CSI NFS Controller        | system-cluster-critical| 2000000000|
+| Vault Injector            | system-cluster-critical| 2000000000|
+| Ingress NGINX             | system-cluster-critical| 2000000000|
+| Flux Controllers          | system-cluster-critical| 2000000000|
+| MariaDB                   | database-critical      | 1000000   |
+| WordPress                 | app-standard           | 500000    |
+| Monitoring                | (default)              | 0         |
++---------------------------+------------------------+-----------+
+
+Startup/Eviction Order: Storage -> Infrastructure -> Database -> App -> Monitoring
+
+================================================================================
+END OF ASSESSMENT
+================================================================================

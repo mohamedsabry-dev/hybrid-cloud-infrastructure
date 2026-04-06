@@ -1,4 +1,4 @@
-# TS-003: Vault Kubernetes Auth - Service Account Not Authorized
+# Vault Kubernetes Auth - Service Account Not Authorized
 
 ## Problem Summary
 Pods with Vault Agent injection get stuck in `Init:1/2` or `PodInitializing` state because the Vault Kubernetes auth role doesn't allow the actual service account being used by the pod.

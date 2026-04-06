@@ -1,4 +1,4 @@
-# TS-001: Flux Kustomization CRD Dependency Failure
+# Flux Kustomization CRD Dependency Failure
 
 ## Problem Summary
 ServiceMonitor resources fail to deploy because the Custom Resource Definition (CRD) from kube-prometheus-stack is not yet installed when Flux tries to apply them.
