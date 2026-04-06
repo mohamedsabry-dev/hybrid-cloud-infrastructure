@@ -1,0 +1,17 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: database-critical
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority for database workloads (MariaDB, PostgreSQL). Higher than apps, lower than system."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: app-standard
+value: 500000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority for standard application workloads (WordPress, APIs). Lower than databases."

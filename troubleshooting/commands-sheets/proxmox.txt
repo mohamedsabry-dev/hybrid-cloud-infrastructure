@@ -1,0 +1,253 @@
+#!/bin/bash
+# ============================================================================
+# PROXMOX VE - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# CLUSTER & NODE MANAGEMENT
+# ============================================================================
+pvecm status  # Show cluster status
+pvecm nodes  # List cluster nodes
+pvecm expected 1  # Set expected votes (quorum recovery)
+pveversion  # Show Proxmox version
+pvesr status  # Show replication status
+
+# ============================================================================
+# VM MANAGEMENT (QEMU/KVM)
+# ============================================================================
+qm list  # List all VMs
+qm status 100  # Show VM status (100 = VMID)
+qm start 100  # Start VM
+qm stop 100  # Stop VM (ACPI shutdown)
+qm shutdown 100  # Graceful shutdown
+qm reset 100  # Reset VM (hard reboot)
+qm reboot 100  # Reboot VM (ACPI)
+qm suspend 100  # Suspend VM
+qm resume 100  # Resume VM
+qm destroy 100  # Delete VM
+qm clone 100 200 --name newvm  # Clone VM 100 to VMID 200
+qm create 100 --name test-vm --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0  # Create VM
+qm set 100 --memory 4096  # Set VM memory
+qm set 100 --cores 4  # Set CPU cores
+qm config 100  # Show VM config
+
+# ============================================================================
+# CONTAINER MANAGEMENT (LXC)
+# ============================================================================
+pct list  # List all containers
+pct status 100  # Show container status
+pct start 100  # Start container
+pct stop 100  # Stop container
+pct shutdown 100  # Graceful shutdown
+pct reboot 100  # Reboot container
+pct destroy 100  # Delete container
+pct clone 100 200 --hostname newct  # Clone container
+pct create 100 local:vztmpl/debian-11-standard_11.3-1_amd64.tar.zst --hostname test --memory 1024 --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=dhcp  # Create container
+pct set 100 --memory 2048  # Set container memory
+pct config 100  # Show container config
+pct enter 100  # Enter container console
+
+# ============================================================================
+# STORAGE MANAGEMENT
+# ============================================================================
+pvesm status  # List storage
+pvesm list local  # List content in storage
+pvesm alloc local 100 vm-100-disk-0.qcow2 10G  # Allocate disk
+pvesm free local:100/vm-100-disk-0.qcow2  # Free disk
+pvesm scan lvm  # Scan for LVM volume groups
+pvesm scan nfs 192.168.1.100  # Scan NFS server
+
+# ============================================================================
+# BACKUP & RESTORE
+# ============================================================================
+vzdump 100  # Backup VM/CT 100 (default to /var/lib/vz/dump/)
+vzdump 100 --mode snapshot --storage backup-nas  # Backup to NFS
+vzdump 100 --mode stop  # Stop mode backup
+vzdump --all  # Backup all VMs/CTs
+vzdump 100 101 102  # Backup multiple VMs
+qmrestore /var/lib/vz/dump/vzdump-qemu-100-*.vma 200  # Restore VM to new VMID
+pct restore 200 /var/lib/vz/dump/vzdump-lxc-100-*.tar.zst  # Restore container
+
+# ============================================================================
+# SNAPSHOTS
+# ============================================================================
+qm snapshot 100 snap1  # Create VM snapshot
+qm listsnapshot 100  # List VM snapshots
+qm rollback 100 snap1  # Rollback to snapshot
+qm delsnapshot 100 snap1  # Delete snapshot
+pct snapshot 100 snap1  # Create container snapshot
+pct listsnapshot 100  # List container snapshots
+pct rollback 100 snap1  # Rollback container
+pct delsnapshot 100 snap1  # Delete container snapshot
+
+# ============================================================================
+# NETWORKING
+# ============================================================================
+cat /etc/network/interfaces  # Show network config
+ip addr show vmbr0  # Show bridge interface
+brctl show  # Show bridge info (legacy)
+ip link show  # Show all interfaces
+pvesh get /nodes/pve/network  # Get network config via API
+
+# ============================================================================
+# FIREWALL
+# ============================================================================
+# Cluster level:
+cat /etc/pve/firewall/cluster.fw  # Cluster firewall rules
+
+# Node level:
+cat /etc/pve/nodes/pve/host.fw  # Host firewall rules
+
+# VM/CT level:
+cat /etc/pve/firewall/100.fw  # VM/CT 100 firewall rules
+
+# ============================================================================
+# DISK MANAGEMENT
+# ============================================================================
+qm disk rescan  # Rescan disks
+qm resize 100 scsi0 +10G  # Resize VM disk by 10GB
+qm disk move 100 scsi0 --storage local-lvm  # Move disk to different storage
+lvs  # Show LVM volumes
+vgs  # Show volume groups
+pvs  # Show physical volumes
+lsblk  # List block devices
+
+# ============================================================================
+# TEMPLATES
+# ============================================================================
+qm template 100  # Convert VM to template
+pct template 100  # Convert container to template
+qm clone 100 200 --name from-template  # Clone from template
+
+# ============================================================================
+# MIGRATION
+# ============================================================================
+qm migrate 100 pve2  # Migrate VM to node pve2 (offline)
+qm migrate 100 pve2 --online  # Live migration
+pct migrate 100 pve2  # Migrate container (offline)
+pct migrate 100 pve2 --restart  # Migrate with restart
+
+# ============================================================================
+# MONITORING & LOGS
+# ============================================================================
+qm monitor 100  # Enter QEMU monitor
+pveperf  # Test node performance
+pvesr status  # Replication status
+journalctl -u pvedaemon -f  # Follow Proxmox daemon logs
+journalctl -u pveproxy -f  # Follow web interface logs
+tail -f /var/log/pve/tasks/active  # Active tasks log
+cat /var/log/pve/tasks/index  # Task history
+
+# ============================================================================
+# RESOURCE USAGE
+# ============================================================================
+pvesh get /cluster/resources  # Show cluster resources
+pvesh get /nodes/pve/status  # Node status
+pvesh get /nodes/pve/qemu  # List VMs
+pvesh get /nodes/pve/lxc  # List containers
+top  # Show process CPU/memory
+htop  # Interactive process viewer
+free -h  # Show memory usage
+df -h  # Show disk usage
+
+# ============================================================================
+# USER & PERMISSIONS
+# ============================================================================
+pveum user list  # List users
+pveum user add user@pve --password <password>  # Add user
+pveum user modify user@pve --email user@example.com  # Modify user
+pveum user delete user@pve  # Delete user
+pveum role list  # List roles
+pveum acl modify / --roles Administrator --users user@pve  # Grant admin role
+pveum pool create mypool  # Create resource pool
+
+# ============================================================================
+# UPDATES & PACKAGES
+# ============================================================================
+pveversion -v  # Show all package versions
+apt update  # Update package lists
+apt list --upgradable  # Show upgradable packages
+apt upgrade  # Upgrade packages (without Proxmox)
+apt dist-upgrade  # Full upgrade including Proxmox
+pveupdate  # Check for Proxmox updates (deprecated, use apt)
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# Check cluster health:
+pvecm status
+pvecm nodes
+cat /etc/pve/corosync.conf
+
+# Check quorum issues:
+pvecm expected 1  # Set expected votes temporarily
+
+# Reset VM if stuck:
+qm stop 100
+qm unlock 100
+qm start 100
+
+# Check VM/CT config:
+cat /etc/pve/qemu-server/100.conf  # VM config
+cat /etc/pve/lxc/100.conf  # Container config
+
+# Clear task log if full:
+rm /var/log/pve/tasks/active
+
+# Check storage:
+pvesm status
+df -h
+lvs
+vgs
+
+# Web interface not accessible:
+systemctl status pveproxy
+systemctl restart pveproxy
+systemctl status pvedaemon
+systemctl restart pvedaemon
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Create and start VM:
+qm create 100 --name web-server --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0 --scsi0 local-lvm:32
+qm set 100 --ide2 local:iso/debian-11.iso,media=cdrom
+qm start 100
+
+# Backup all VMs:
+vzdump --all --mode snapshot --storage backup-nas --compress zstd
+
+# Clone VM for testing:
+qm clone 100 999 --name test-clone
+qm start 999
+
+# Migrate VM to another node:
+qm migrate 100 pve2 --online
+
+# Restore from backup:
+qmrestore /mnt/backup/vzdump-qemu-100-2024_01_15-12_00_00.vma.zst 100
+
+# Resize disk:
+qm resize 100 scsi0 +20G
+
+# ============================================================================
+# API ACCESS (EXAMPLES)
+# ============================================================================
+# Get node status:
+pvesh get /nodes/pve/status
+
+# List VMs:
+pvesh get /nodes/pve/qemu
+
+# Start VM:
+pvesh create /nodes/pve/qemu/100/status/start
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# qm <command> <vmid> [options]
+# pct <command> <ctid> [options]
+# vzdump <vmid> [options]
+# pvecm <command> [options]
+# pvesm <command> <storage> [options]
+# pveum <type> <action> <object> [options]
