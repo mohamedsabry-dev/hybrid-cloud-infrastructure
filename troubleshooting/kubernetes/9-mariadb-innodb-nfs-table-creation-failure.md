@@ -37,8 +37,8 @@ InnoDB: Retry attempts for reading partial data failed.
 1. Vault secrets injection working correctly:
 ```bash
 kubectl exec mariadb-0 -n database -c mariadb -- cat /vault/secrets/db-creds
-# MYSQL_ROOT_PASSWORD=Change_Me
-# MYSQL_PASSWORD=REDACTED_PASSWORD
+# MYSQL_ROOT_PASSWORD=<redacted>
+# MYSQL_PASSWORD=<redacted>
 ```
 
 2. Database and user created successfully:
