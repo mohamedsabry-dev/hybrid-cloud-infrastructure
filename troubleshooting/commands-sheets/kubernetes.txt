@@ -1,0 +1,219 @@
+#!/bin/bash
+# ============================================================================
+# KUBERNETES (K8S) - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# CONTEXT & CLUSTER
+# ============================================================================
+kubectl config current-context  # Show current context
+kubectl config get-contexts  # List all contexts
+kubectl config use-context prod-cluster  # Switch context
+kubectl config set-context --current --namespace=my-ns  # Set default namespace
+kubectl cluster-info  # Show cluster info
+kubectl version  # Client and server version
+kubectl api-resources  # List all resource types
+
+# ============================================================================
+# BASIC RESOURCE OPERATIONS
+# ============================================================================
+kubectl get pods  # List pods in current namespace
+kubectl get pods -o wide  # More details (node, IP)
+kubectl get pods -n my-namespace  # Specific namespace
+kubectl get pods -A  # All namespaces
+kubectl get pods -l app=nginx  # Filter by label
+kubectl get pods -w  # Watch for changes
+kubectl get all  # Common resources in namespace
+kubectl get all -A  # All resources, all namespaces
+kubectl describe pod my-pod  # Detailed info + events
+kubectl delete pod my-pod  # Delete pod
+kubectl delete -f deployment.yaml  # Delete from file
+
+# ============================================================================
+# PODS - MANAGEMENT & DEBUGGING
+# ============================================================================
+kubectl run nginx --image=nginx  # Create pod quickly
+kubectl run busybox --image=busybox --rm -it -- sh  # Interactive debug pod (auto-delete)
+kubectl logs my-pod  # View logs
+kubectl logs my-pod -f  # Follow/stream logs
+kubectl logs my-pod --previous  # Previous container (if crashed)
+kubectl logs my-pod -c container-name  # Specific container
+kubectl logs my-pod --tail=100  # Last 100 lines
+kubectl exec -it my-pod -- bash  # Interactive shell
+kubectl exec my-pod -- ls /app  # Run command
+kubectl cp my-pod:/path/file ./local  # Copy from pod
+kubectl cp ./local my-pod:/path/file  # Copy to pod
+kubectl port-forward pod/my-pod 8080:80  # Port forward (local:remote)
+
+# ============================================================================
+# APPLY & CREATE
+# ============================================================================
+kubectl apply -f deployment.yaml  # Create or update
+kubectl apply -f ./configs/  # Apply directory
+kubectl create -f deployment.yaml  # Create only (fails if exists)
+kubectl replace -f deployment.yaml  # Replace existing
+kubectl edit pod my-pod  # Edit in-place
+
+# ============================================================================
+# DEPLOYMENTS
+# ============================================================================
+kubectl create deployment nginx --image=nginx --replicas=3  # Create deployment
+kubectl get deployments  # List deployments
+kubectl describe deployment nginx  # Detailed info
+kubectl scale deployment nginx --replicas=5  # Scale manually
+kubectl set image deployment/nginx nginx=nginx:1.21  # Update image
+kubectl rollout status deployment/nginx  # Check rollout progress
+kubectl rollout history deployment/nginx  # Show rollout history
+kubectl rollout undo deployment/nginx  # Rollback to previous
+kubectl rollout undo deployment/nginx --to-revision=2  # Rollback to specific
+kubectl rollout restart deployment/nginx  # Restart all pods
+
+# ============================================================================
+# SERVICES
+# ============================================================================
+kubectl expose deployment nginx --port=80 --type=ClusterIP  # Create service
+kubectl expose deployment nginx --port=80 --type=NodePort  # NodePort service
+kubectl get svc  # List services
+kubectl get endpoints  # Show service endpoints
+kubectl describe svc nginx  # Service details
+kubectl port-forward svc/nginx 8080:80  # Port forward to service
+
+# ============================================================================
+# CONFIGMAPS & SECRETS
+# ============================================================================
+kubectl create configmap my-config --from-literal=key1=value1  # From literal
+kubectl create configmap my-config --from-file=config.txt  # From file
+kubectl get configmaps  # List ConfigMaps
+kubectl describe configmap my-config  # View ConfigMap
+kubectl create secret generic my-secret --from-literal=password=secret123  # Create secret
+kubectl create secret docker-registry regcred --docker-server=registry.io --docker-username=user --docker-password=pass  # Registry secret
+kubectl get secrets  # List secrets
+kubectl get secret my-secret -o jsonpath='{.data.password}' | base64 -d  # Decode secret
+
+# ============================================================================
+# STORAGE
+# ============================================================================
+kubectl get pv  # List PersistentVolumes (cluster-wide)
+kubectl get pvc  # List PersistentVolumeClaims
+kubectl get pvc -A  # All namespaces
+kubectl describe pvc my-pvc  # PVC details
+kubectl get storageclass  # List StorageClasses
+
+# ============================================================================
+# NAMESPACES
+# ============================================================================
+kubectl get namespaces  # List namespaces
+kubectl create namespace dev  # Create namespace
+kubectl delete namespace dev  # Delete namespace (deletes all resources)
+kubectl config set-context --current --namespace=dev  # Set default namespace
+
+# ============================================================================
+# LABELS & SELECTORS
+# ============================================================================
+kubectl get pods --show-labels  # Show all labels
+kubectl get pods -L app,env  # Show specific labels as columns
+kubectl label pod my-pod env=prod  # Add label
+kubectl label pod my-pod env=staging --overwrite  # Update label
+kubectl label pod my-pod env-  # Remove label
+kubectl get pods -l env=prod  # Select by label
+kubectl get pods -l 'env in (prod,staging)'  # Multiple values
+
+# ============================================================================
+# NODES
+# ============================================================================
+kubectl get nodes  # List nodes
+kubectl get nodes -o wide  # More details
+kubectl describe node node1  # Node details
+kubectl top nodes  # Node resource usage (requires metrics-server)
+kubectl cordon node1  # Mark unschedulable
+kubectl uncordon node1  # Mark schedulable
+kubectl drain node1 --ignore-daemonsets --delete-emptydir-data  # Evict pods safely
+kubectl label node node1 disktype=ssd  # Label node
+kubectl taint nodes node1 key=value:NoSchedule  # Add taint
+
+# ============================================================================
+# RBAC
+# ============================================================================
+kubectl get serviceaccounts  # List service accounts
+kubectl create serviceaccount my-sa  # Create service account
+kubectl get roles  # List roles in namespace
+kubectl get clusterroles  # List cluster roles
+kubectl create role pod-reader --verb=get,list,watch --resource=pods  # Create role
+kubectl create rolebinding my-binding --role=pod-reader --serviceaccount=default:my-sa  # Bind role
+kubectl auth can-i create pods  # Check permissions
+kubectl auth can-i create pods --as=system:serviceaccount:default:my-sa  # Check as SA
+
+# ============================================================================
+# EVENTS & TROUBLESHOOTING
+# ============================================================================
+kubectl get events --sort-by='.metadata.creationTimestamp'  # Recent events
+kubectl get events --field-selector involvedObject.name=my-pod  # Pod-specific events
+kubectl get pods --field-selector=status.phase=Pending  # Filter by status
+kubectl top pods  # Pod resource usage (requires metrics-server)
+kubectl describe pod my-pod  # Most useful TS command
+kubectl logs my-pod --previous  # Crashed container logs
+kubectl run debug --image=busybox --rm -it --restart=Never -- sh  # Debug pod
+
+# ============================================================================
+# JOBS & CRONJOBS
+# ============================================================================
+kubectl create job my-job --image=busybox -- echo "Hello"  # Create job
+kubectl get jobs  # List jobs
+kubectl logs job/my-job  # Job logs
+kubectl create cronjob my-cron --image=busybox --schedule="*/5 * * * *" -- echo "Hello"  # Create CronJob
+kubectl get cronjobs  # List CronJobs
+
+# ============================================================================
+# VALIDATION & DRY-RUN
+# ============================================================================
+kubectl apply -f deployment.yaml --dry-run=client  # Client-side validation
+kubectl apply -f deployment.yaml --dry-run=server  # Server-side validation
+kubectl diff -f deployment.yaml  # Show differences before apply
+kubectl run nginx --image=nginx --dry-run=client -o yaml  # Generate YAML without creating
+kubectl create deployment nginx --image=nginx --dry-run=client -o yaml > deploy.yaml  # Save to file
+
+# ============================================================================
+# OUTPUT FORMATS
+# ============================================================================
+kubectl get pods -o yaml  # YAML output
+kubectl get pods -o json  # JSON output
+kubectl get pods -o wide  # Extra columns
+kubectl get pods -o name  # Just names
+kubectl get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase  # Custom columns
+kubectl get pods -o jsonpath='{.items[*].metadata.name}'  # JSONPath query
+kubectl get pods --sort-by=.metadata.creationTimestamp  # Sort output
+
+# ============================================================================
+# COMMON TROUBLESHOOTING PATTERNS
+# ============================================================================
+# Pod stuck in Pending:
+kubectl describe pod my-pod  # Check events for scheduling issues
+
+# Pod CrashLoopBackOff:
+kubectl logs my-pod --previous  # Check previous container logs
+kubectl describe pod my-pod  # Check exit codes
+
+# ImagePullBackOff:
+kubectl describe pod my-pod  # Check image pull errors
+
+# Service not accessible:
+kubectl get endpoints my-service  # Verify endpoints exist
+kubectl run curl --image=curlimages/curl -i --rm --restart=Never -- curl http://my-service  # Test from cluster
+
+# DNS issues:
+kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup kubernetes.default  # Test DNS
+
+# Node NotReady:
+kubectl describe node my-node  # Check conditions and events
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# kubectl <verb> <resource> <name> [options]
+# kubectl get <resource> [-n namespace] [-l label=value] [-o format]
+# kubectl describe <resource> <name>
+# kubectl logs <pod> [-c container] [-f] [--previous]
+# kubectl exec <pod> [-c container] [-it] -- <command>
+# kubectl apply -f <file> [--dry-run=client|server]
+# kubectl create <resource> <name> [options]
+# kubectl delete <resource> <name>

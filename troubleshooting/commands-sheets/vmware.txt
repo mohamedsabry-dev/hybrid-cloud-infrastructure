@@ -1,0 +1,244 @@
+#!/bin/bash
+# ============================================================================
+# VMWARE ESXi/vSphere - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# CONNECTION & BASICS
+# ============================================================================
+# SSH into ESXi:
+ssh root@esxi-host.example.com
+
+# Enable SSH (via DCUI or web UI)
+# Disable SSH when not needed for security
+
+# ESXi version:
+vmware -v
+
+# ESXi host info:
+esxcli system version get
+
+# ============================================================================
+# VM MANAGEMENT
+# ============================================================================
+vim-cmd vmsvc/getallvms  # List all VMs
+vim-cmd vmsvc/power.getstate <vmid>  # Get VM power state
+vim-cmd vmsvc/power.on <vmid>  # Power on VM
+vim-cmd vmsvc/power.off <vmid>  # Power off VM (hard)
+vim-cmd vmsvc/power.shutdown <vmid>  # Graceful shutdown (requires VMware Tools)
+vim-cmd vmsvc/power.reboot <vmid>  # Reboot VM (requires VMware Tools)
+vim-cmd vmsvc/power.reset <vmid>  # Reset VM (hard reboot)
+vim-cmd vmsvc/power.suspend <vmid>  # Suspend VM
+vim-cmd vmsvc/get.summary <vmid>  # Get VM summary
+vim-cmd vmsvc/get.config <vmid>  # Get VM configuration
+
+# ============================================================================
+# VM SNAPSHOTS
+# ============================================================================
+vim-cmd vmsvc/snapshot.create <vmid> "Snapshot Name" "Description" 0 0  # Create snapshot (0 0 = no memory, no quiesce)
+vim-cmd vmsvc/snapshot.create <vmid> "Pre-Update" "Before update" 1 1  # With memory and quiesce
+vim-cmd vmsvc/get.snapshot <vmid>  # List snapshots
+vim-cmd vmsvc/snapshot.revert <vmid> <snapshotId>  # Revert to snapshot
+vim-cmd vmsvc/snapshot.removeall <vmid>  # Remove all snapshots
+
+# ============================================================================
+# DATASTORE MANAGEMENT
+# ============================================================================
+esxcli storage filesystem list  # List datastores
+esxcli storage vmfs extent list  # List VMFS extents
+df -h  # Show datastore space (ESXi filesystem view)
+ls /vmfs/volumes/  # List datastore volumes
+esxcli storage core device list  # List storage devices
+esxcli storage nfs list  # List NFS mounts
+esxcli storage nfs add -H 192.168.1.100 -s /export/vmfs -v nfs-datastore  # Add NFS datastore
+esxcli storage nfs remove -v nfs-datastore  # Remove NFS datastore
+
+# ============================================================================
+# NETWORKING
+# ============================================================================
+esxcli network nic list  # List physical NICs
+esxcli network vswitch standard list  # List standard vswitches
+esxcli network vswitch standard portgroup list  # List portgroups
+esxcli network ip interface list  # List VMkernel interfaces
+esxcli network ip interface ipv4 get  # Get IPv4 configuration
+esxcli network ip route ipv4 list  # Show routing table
+esxcfg-vswitch -l  # List vswitches (legacy)
+esxcfg-vmknic -l  # List VMkernel NICs (legacy)
+
+# ============================================================================
+# HOST MANAGEMENT
+# ============================================================================
+esxcli system hostname get  # Get hostname
+esxcli system hostname set --host=esxi01  # Set hostname
+esxcli system maintenanceMode get  # Check maintenance mode
+esxcli system maintenanceMode set --enable true  # Enter maintenance mode
+esxcli system maintenanceMode set --enable false  # Exit maintenance mode
+esxcli system shutdown reboot -r "Applying updates"  # Reboot host
+esxcli system shutdown poweroff -r "Scheduled maintenance"  # Power off host
+uptime  # Show uptime
+
+# ============================================================================
+# SERVICES
+# ============================================================================
+/etc/init.d/hostd status  # Check hostd (management) status
+/etc/init.d/hostd restart  # Restart hostd
+/etc/init.d/vpxa status  # Check vCenter agent status
+/etc/init.d/vpxa restart  # Restart vCenter agent
+esxcli network firewall get  # Show firewall status
+esxcli network firewall set --enabled false  # Disable firewall (NOT RECOMMENDED)
+esxcli network firewall ruleset list  # List firewall rules
+esxcli network firewall ruleset set --ruleset-id=sshServer --enabled=true  # Enable SSH firewall rule
+
+# ============================================================================
+# PATCHES & UPDATES
+# ============================================================================
+esxcli software profile get  # Show current image profile
+esxcli software sources profile list -d /vmfs/volumes/datastore1/updates/update.zip  # List profiles in update bundle
+esxcli software vib list  # List installed VIBs (packages)
+esxcli software vib install -d /vmfs/volumes/datastore1/updates/update.zip  # Install update
+esxcli software vib update -d /vmfs/volumes/datastore1/updates/update.zip  # Update VIBs
+esxcli software vib remove -n vib-name  # Remove VIB
+
+# ============================================================================
+# LOGS
+# ============================================================================
+tail -f /var/log/vmkernel.log  # Follow vmkernel log
+tail -f /var/log/hostd.log  # Follow management log
+tail -f /var/log/vpxa.log  # Follow vCenter agent log
+tail -f /var/log/vmware/fdm.log  # Follow HA log
+cat /var/log/syslog.log  # View syslog
+vm-support  # Generate diagnostic bundle
+
+# ============================================================================
+# PERFORMANCE MONITORING
+# ============================================================================
+esxtop  # Real-time performance monitor (interactive)
+# Press 'c' for CPU, 'm' for memory, 'd' for disk, 'n' for network
+resxtop --server vcenter.example.com  # Remote esxtop via vCenter
+esxcli hardware memory get  # Show memory info
+esxcli hardware cpu list  # Show CPU info
+esxcli storage core device stats get  # Storage I/O stats
+
+# ============================================================================
+# VM FILES & OPERATIONS
+# ============================================================================
+# VM files location: /vmfs/volumes/<datastore>/VM-Name/
+ls -lh /vmfs/volumes/datastore1/myvm/  # List VM files
+# .vmx = VM configuration
+# .vmdk = Virtual disk
+# .nvram = BIOS/UEFI settings
+# .vswp = Swap file
+# *-flat.vmdk = Actual disk data
+
+# Register VM:
+vim-cmd solo/registervm /vmfs/volumes/datastore1/myvm/myvm.vmx
+
+# Unregister VM:
+vim-cmd vmsvc/unregister <vmid>
+
+# Clone VM (manual):
+vmkfstools -i /vmfs/volumes/datastore1/source.vmdk /vmfs/volumes/datastore1/clone.vmdk -d thin
+
+# ============================================================================
+# VCENTER (PowerCLI) COMMANDS
+# ============================================================================
+# Connect to vCenter (PowerShell):
+# Connect-VIServer -Server vcenter.example.com
+
+# List VMs:
+# Get-VM
+
+# Power on VM:
+# Start-VM -VM "VM-Name"
+
+# Create snapshot:
+# New-Snapshot -VM "VM-Name" -Name "Snapshot-Name"
+
+# Get host info:
+# Get-VMHost
+
+# Enter maintenance mode:
+# Set-VMHost -VMHost esxi01.example.com -State Maintenance
+
+# ============================================================================
+# ESXCLI SYSTEM INFO
+# ============================================================================
+esxcli system stats installtime get  # Show install time
+esxcli system time get  # Show system time
+esxcli system visorfs get  # Show hypervisor filesystem info
+esxcli system uuid get  # Show system UUID
+esxcli system welcomemsg get  # Show welcome message
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# VM won't power on:
+vim-cmd vmsvc/get.summary <vmid>  # Check VM state
+tail -f /var/log/vmware.log  # Check VM-specific log
+vim-cmd vmsvc/get.config <vmid> | grep vmPathName  # Verify VM files exist
+
+# Host not responding:
+ping esxi-host
+ssh root@esxi-host
+/etc/init.d/hostd status
+/etc/init.d/hostd restart
+
+# Storage issues:
+esxcli storage core device list  # Check devices
+esxcli storage filesystem list  # Check filesystems
+esxcli storage core adapter list  # Check storage adapters
+
+# Network issues:
+esxcli network nic list  # Check NIC status
+vmkping 192.168.1.1  # Ping from VMkernel
+esxcli network ip connection list  # Show network connections
+
+# High CPU/Memory:
+esxtop  # Interactive monitoring
+vim-cmd vmsvc/getallvms  # List all VMs and their resource usage
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Restart management services:
+/etc/init.d/hostd restart
+/etc/init.d/vpxa restart
+
+# Create VM snapshot before change:
+vim-cmd vmsvc/snapshot.create <vmid> "Pre-Change" "Before applying changes" 0 0
+
+# Enter maintenance mode:
+esxcli system maintenanceMode set --enable true
+# Perform maintenance
+esxcli system maintenanceMode set --enable false
+
+# Backup VM configuration:
+vim-cmd vmsvc/get.config <vmid> > vm-backup-$(date +%Y%m%d).txt
+
+# Emergency VM shutdown:
+vim-cmd vmsvc/power.off <vmid>  # Hard power off if shutdown fails
+
+# ============================================================================
+# BACKUP & RECOVERY
+# ============================================================================
+# Export VM configuration:
+vim-cmd vmsvc/get.config <vmid> > /vmfs/volumes/backup/vm-config.txt
+
+# VM file backup (copy):
+cp -r /vmfs/volumes/datastore1/myvm /vmfs/volumes/backup/
+
+# Backup host configuration:
+vim-cmd hostsvc/firmware/backup_config  # Creates backup bundle
+
+# Download configuration backup via SCP:
+# scp root@esxi-host:/scratch/downloads/configBundle-*.tgz ./
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# vim-cmd vmsvc/<command> <vmid> [options]
+# esxcli <namespace> <command> [options]
+# esxcli system <command>
+# esxcli network <command>
+# esxcli storage <command>
+# esxcli software vib <install|update|remove>
