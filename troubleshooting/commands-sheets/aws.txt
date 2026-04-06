@@ -1,0 +1,216 @@
+#!/bin/bash
+# ============================================================================
+# AWS CLI - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# CONFIGURATION & CREDENTIALS
+# ============================================================================
+aws configure  # Interactive configuration
+aws configure list  # Show configuration
+aws configure get region  # Get specific config value
+aws sts get-caller-identity  # Show current IAM identity
+aws sts assume-role --role-arn arn:aws:iam::123456789012:role/MyRole --role-session-name session1  # Assume role
+
+# ============================================================================
+# EC2 INSTANCES
+# ============================================================================
+aws ec2 describe-instances  # List all instances
+aws ec2 describe-instances --instance-ids i-1234567890abcdef0  # Specific instance
+aws ec2 describe-instances --filters "Name=tag:Name,Values=WebServer"  # Filter by tag
+aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,PrivateIpAddress]' --output table  # Custom output
+aws ec2 start-instances --instance-ids i-1234567890abcdef0  # Start instance
+aws ec2 stop-instances --instance-ids i-1234567890abcdef0  # Stop instance
+aws ec2 terminate-instances --instance-ids i-1234567890abcdef0  # Terminate instance
+aws ec2 reboot-instances --instance-ids i-1234567890abcdef0  # Reboot instance
+aws ec2 run-instances --image-id ami-12345678 --instance-type t3.micro --key-name MyKey --subnet-id subnet-12345678  # Launch instance
+
+# ============================================================================
+# EC2 KEY PAIRS & SECURITY GROUPS
+# ============================================================================
+aws ec2 describe-key-pairs  # List key pairs
+aws ec2 create-key-pair --key-name MyKey --query 'KeyMaterial' --output text > MyKey.pem  # Create key pair
+aws ec2 delete-key-pair --key-name MyKey  # Delete key pair
+aws ec2 describe-security-groups  # List security groups
+aws ec2 describe-security-groups --group-ids sg-12345678  # Specific security group
+aws ec2 authorize-security-group-ingress --group-id sg-12345678 --protocol tcp --port 22 --cidr 0.0.0.0/0  # Add rule
+aws ec2 revoke-security-group-ingress --group-id sg-12345678 --protocol tcp --port 22 --cidr 0.0.0.0/0  # Remove rule
+
+# ============================================================================
+# VPC & NETWORKING
+# ============================================================================
+aws ec2 describe-vpcs  # List VPCs
+aws ec2 describe-subnets  # List subnets
+aws ec2 describe-route-tables  # List route tables
+aws ec2 describe-internet-gateways  # List internet gateways
+aws ec2 describe-nat-gateways  # List NAT gateways
+aws ec2 allocate-address  # Allocate Elastic IP
+aws ec2 describe-addresses  # List Elastic IPs
+aws ec2 associate-address --instance-id i-1234567890abcdef0 --allocation-id eipalloc-12345678  # Associate EIP
+
+# ============================================================================
+# S3 BUCKETS & OBJECTS
+# ============================================================================
+aws s3 ls  # List all buckets
+aws s3 ls s3://my-bucket/  # List objects in bucket
+aws s3 ls s3://my-bucket/prefix/ --recursive  # List recursively
+aws s3 cp file.txt s3://my-bucket/  # Upload file
+aws s3 cp s3://my-bucket/file.txt .  # Download file
+aws s3 cp s3://my-bucket/ . --recursive  # Download directory
+aws s3 sync ./local-dir s3://my-bucket/  # Sync directory
+aws s3 rm s3://my-bucket/file.txt  # Delete object
+aws s3 rm s3://my-bucket/ --recursive  # Delete all objects
+aws s3 mb s3://my-new-bucket  # Create bucket
+aws s3 rb s3://my-bucket  # Remove empty bucket
+aws s3 rb s3://my-bucket --force  # Remove bucket and all objects
+aws s3api list-buckets  # List buckets (API)
+aws s3api get-bucket-versioning --bucket my-bucket  # Check versioning status
+
+# ============================================================================
+# IAM USERS & GROUPS
+# ============================================================================
+aws iam list-users  # List IAM users
+aws iam get-user --user-name john  # Get user details
+aws iam create-user --user-name john  # Create user
+aws iam delete-user --user-name john  # Delete user
+aws iam create-access-key --user-name john  # Create access key
+aws iam delete-access-key --user-name john --access-key-id AKIAIOSFODNN7EXAMPLE  # Delete access key
+aws iam list-groups  # List groups
+aws iam add-user-to-group --user-name john --group-name developers  # Add user to group
+aws iam attach-user-policy --user-name john --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess  # Attach policy
+
+# ============================================================================
+# IAM ROLES & POLICIES
+# ============================================================================
+aws iam list-roles  # List IAM roles
+aws iam get-role --role-name MyRole  # Get role details
+aws iam list-policies  # List policies
+aws iam get-policy --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess  # Get policy
+aws iam list-attached-user-policies --user-name john  # List user's attached policies
+aws iam list-user-policies --user-name john  # List user's inline policies
+
+# ============================================================================
+# RDS DATABASES
+# ============================================================================
+aws rds describe-db-instances  # List RDS instances
+aws rds describe-db-instances --db-instance-identifier mydb  # Specific instance
+aws rds start-db-instance --db-instance-identifier mydb  # Start RDS instance
+aws rds stop-db-instance --db-instance-identifier mydb  # Stop RDS instance
+aws rds create-db-snapshot --db-instance-identifier mydb --db-snapshot-identifier mydb-snapshot-$(date +%Y%m%d)  # Create snapshot
+aws rds describe-db-snapshots --db-instance-identifier mydb  # List snapshots
+
+# ============================================================================
+# CLOUDWATCH LOGS
+# ============================================================================
+aws logs describe-log-groups  # List log groups
+aws logs describe-log-streams --log-group-name /aws/lambda/my-function  # List log streams
+aws logs tail /aws/lambda/my-function --follow  # Tail logs (like tail -f)
+aws logs filter-log-events --log-group-name /aws/lambda/my-function --filter-pattern "ERROR"  # Filter logs
+
+# ============================================================================
+# LAMBDA FUNCTIONS
+# ============================================================================
+aws lambda list-functions  # List Lambda functions
+aws lambda get-function --function-name my-function  # Get function details
+aws lambda invoke --function-name my-function output.txt  # Invoke function
+aws lambda update-function-code --function-name my-function --zip-file fileb://function.zip  # Update code
+aws lambda list-aliases --function-name my-function  # List aliases
+aws lambda get-function-configuration --function-name my-function  # Get configuration
+
+# ============================================================================
+# ELB/ALB LOAD BALANCERS
+# ============================================================================
+aws elbv2 describe-load-balancers  # List load balancers
+aws elbv2 describe-target-groups  # List target groups
+aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:...  # Check target health
+aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:...  # List listeners
+
+# ============================================================================
+# AUTO SCALING
+# ============================================================================
+aws autoscaling describe-auto-scaling-groups  # List ASGs
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names my-asg  # Specific ASG
+aws autoscaling set-desired-capacity --auto-scaling-group-name my-asg --desired-capacity 3  # Set capacity
+aws autoscaling suspend-processes --auto-scaling-group-name my-asg  # Suspend scaling
+aws autoscaling resume-processes --auto-scaling-group-name my-asg  # Resume scaling
+
+# ============================================================================
+# CLOUDFORMATION STACKS
+# ============================================================================
+aws cloudformation list-stacks  # List all stacks
+aws cloudformation describe-stacks --stack-name my-stack  # Describe stack
+aws cloudformation create-stack --stack-name my-stack --template-body file://template.yaml --parameters file://params.json  # Create stack
+aws cloudformation update-stack --stack-name my-stack --template-body file://template.yaml  # Update stack
+aws cloudformation delete-stack --stack-name my-stack  # Delete stack
+aws cloudformation describe-stack-events --stack-name my-stack  # Show stack events
+
+# ============================================================================
+# ROUTE53 DNS
+# ============================================================================
+aws route53 list-hosted-zones  # List hosted zones
+aws route53 list-resource-record-sets --hosted-zone-id Z1234567890ABC  # List DNS records
+aws route53 change-resource-record-sets --hosted-zone-id Z1234567890ABC --change-batch file://change.json  # Update records
+
+# ============================================================================
+# SECRETS MANAGER
+# ============================================================================
+aws secretsmanager list-secrets  # List secrets
+aws secretsmanager get-secret-value --secret-id my-secret  # Get secret value
+aws secretsmanager get-secret-value --secret-id my-secret --query SecretString --output text  # Get value only
+aws secretsmanager create-secret --name my-secret --secret-string "my-password"  # Create secret
+aws secretsmanager update-secret --secret-id my-secret --secret-string "new-password"  # Update secret
+
+# ============================================================================
+# SYSTEMS MANAGER (SSM)
+# ============================================================================
+aws ssm describe-instance-information  # List managed instances
+aws ssm send-command --instance-ids i-1234567890abcdef0 --document-name "AWS-RunShellScript" --parameters 'commands=["uptime"]'  # Run command
+aws ssm get-parameter --name /myapp/config/db_host  # Get parameter
+aws ssm get-parameter --name /myapp/config/db_pass --with-decryption  # Get encrypted parameter
+aws ssm put-parameter --name /myapp/config/key --value "value" --type String  # Put parameter
+
+# ============================================================================
+# ECS (CONTAINERS)
+# ============================================================================
+aws ecs list-clusters  # List ECS clusters
+aws ecs list-services --cluster my-cluster  # List services
+aws ecs list-tasks --cluster my-cluster --service-name my-service  # List tasks
+aws ecs update-service --cluster my-cluster --service my-service --force-new-deployment  # Force deployment
+aws ecs describe-tasks --cluster my-cluster --tasks task-id  # Describe task
+
+# ============================================================================
+# ECR (CONTAINER REGISTRY)
+# ============================================================================
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com  # Docker login
+aws ecr describe-repositories  # List repositories
+aws ecr list-images --repository-name my-app  # List images
+
+# ============================================================================
+# COMMON OPTIONS
+# ============================================================================
+# --region us-east-1  # Specify region
+# --profile prod  # Use specific profile
+# --output json|text|table  # Output format
+# --query 'Items[*].[Name,Status]'  # JMESPath query
+# --filter "Name=tag:Environment,Values=prod"  # Filter results
+
+# ============================================================================
+# TROUBLESHOOTING PATTERNS
+# ============================================================================
+# Check credentials:
+aws sts get-caller-identity
+
+# Check region:
+aws configure get region
+
+# Verbose output:
+aws ec2 describe-instances --debug
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# aws <service> <operation> [options]
+# aws ec2 <operation> --instance-ids <id> [options]
+# aws s3 <operation> s3://bucket/path [options]
+# aws iam <operation> --user-name <user> [options]
+# Common options: --region, --profile, --output, --query, --filter

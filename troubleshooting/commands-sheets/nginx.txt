@@ -1,0 +1,278 @@
+#!/bin/bash
+# ============================================================================
+# NGINX - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# SERVICE MANAGEMENT
+# ============================================================================
+systemctl status nginx  # Check NGINX status
+systemctl start nginx  # Start NGINX
+systemctl stop nginx  # Stop NGINX
+systemctl restart nginx  # Restart NGINX
+systemctl reload nginx  # Reload config without dropping connections
+systemctl enable nginx  # Enable at boot
+nginx -v  # Show version
+nginx -V  # Show version with compile options
+
+# ============================================================================
+# CONFIGURATION TESTING
+# ============================================================================
+nginx -t  # Test configuration syntax
+nginx -T  # Test and dump configuration
+nginx -t -c /etc/nginx/nginx.conf  # Test specific config file
+nginx -s reload  # Reload config (alternative to systemctl reload)
+nginx -s quit  # Graceful shutdown
+nginx -s stop  # Fast shutdown
+
+# ============================================================================
+# CONFIGURATION FILES
+# ============================================================================
+# Main config: /etc/nginx/nginx.conf
+# Site configs: /etc/nginx/sites-available/
+# Enabled sites: /etc/nginx/sites-enabled/
+# Modules: /etc/nginx/modules-enabled/
+# Logs: /var/log/nginx/
+
+# Enable site (Debian/Ubuntu):
+ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/
+
+# Disable site:
+rm /etc/nginx/sites-enabled/mysite
+
+# ============================================================================
+# LOGS & MONITORING
+# ============================================================================
+tail -f /var/log/nginx/access.log  # Follow access log
+tail -f /var/log/nginx/error.log  # Follow error log
+journalctl -u nginx -f  # Follow systemd logs
+grep "HTTP/1.1\" 404" /var/log/nginx/access.log  # Find 404 errors
+grep "error" /var/log/nginx/error.log  # Find errors
+awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -10  # Top 10 IPs
+
+# ============================================================================
+# BASIC SERVER BLOCK (VIRTUAL HOST)
+# ============================================================================
+# /etc/nginx/sites-available/example.com:
+# server {
+#     listen 80;
+#     server_name example.com www.example.com;
+#     root /var/www/example.com;
+#     index index.html index.php;
+#
+#     access_log /var/log/nginx/example.com.access.log;
+#     error_log /var/log/nginx/example.com.error.log;
+#
+#     location / {
+#         try_files $uri $uri/ =404;
+#     }
+# }
+
+# ============================================================================
+# REVERSE PROXY
+# ============================================================================
+# location / {
+#     proxy_pass http://localhost:3000;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+# }
+
+# ============================================================================
+# LOAD BALANCING
+# ============================================================================
+# upstream backend {
+#     least_conn;  # or ip_hash, or no directive for round-robin
+#     server backend1.example.com:8080 weight=3;
+#     server backend2.example.com:8080;
+#     server backend3.example.com:8080 backup;
+# }
+#
+# server {
+#     location / {
+#         proxy_pass http://backend;
+#     }
+# }
+
+# ============================================================================
+# SSL/TLS CONFIGURATION
+# ============================================================================
+# server {
+#     listen 443 ssl http2;
+#     server_name example.com;
+#
+#     ssl_certificate /etc/nginx/ssl/example.com.crt;
+#     ssl_certificate_key /etc/nginx/ssl/example.com.key;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#
+#     # HSTS
+#     add_header Strict-Transport-Security "max-age=31536000" always;
+# }
+#
+# # Redirect HTTP to HTTPS:
+# server {
+#     listen 80;
+#     server_name example.com;
+#     return 301 https://$server_name$request_uri;
+# }
+
+# ============================================================================
+# PHP-FPM INTEGRATION
+# ============================================================================
+# location ~ \.php$ {
+#     include snippets/fastcgi-php.conf;
+#     fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+#     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+#     include fastcgi_params;
+# }
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+# In http block:
+# limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
+#
+# In server/location block:
+# limit_req zone=mylimit burst=20 nodelay;
+
+# ============================================================================
+# ACCESS CONTROL
+# ============================================================================
+# Allow/deny by IP:
+# location /admin {
+#     allow 192.168.1.0/24;
+#     deny all;
+# }
+
+# Basic auth:
+# location /admin {
+#     auth_basic "Restricted Area";
+#     auth_basic_user_file /etc/nginx/.htpasswd;
+# }
+
+# Create htpasswd file:
+# htpasswd -c /etc/nginx/.htpasswd username
+
+# ============================================================================
+# STATIC FILE CACHING
+# ============================================================================
+# location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+#     expires 30d;
+#     add_header Cache-Control "public, immutable";
+# }
+
+# ============================================================================
+# GZIP COMPRESSION
+# ============================================================================
+# In http block:
+# gzip on;
+# gzip_vary on;
+# gzip_proxied any;
+# gzip_comp_level 6;
+# gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss;
+
+# ============================================================================
+# REDIRECTS
+# ============================================================================
+# Permanent redirect:
+# rewrite ^/old-url$ /new-url permanent;
+# return 301 /new-url;
+
+# Temporary redirect:
+# return 302 /new-url;
+
+# Redirect all to HTTPS:
+# return 301 https://$server_name$request_uri;
+
+# ============================================================================
+# DEBUGGING & TROUBLESHOOTING
+# ============================================================================
+# Enable debug log (in http or server block):
+# error_log /var/log/nginx/debug.log debug;
+
+# Check which config file is being used:
+nginx -V 2>&1 | grep -o '\-\-conf-path=\S*'
+
+# Check listening ports:
+ss -tulpn | grep nginx
+
+# Check NGINX processes:
+ps aux | grep nginx
+
+# Check NGINX master process PID:
+cat /var/run/nginx.pid
+
+# Send signal to master process:
+kill -HUP $(cat /var/run/nginx.pid)  # Reload config
+kill -USR1 $(cat /var/run/nginx.pid)  # Reopen log files
+kill -QUIT $(cat /var/run/nginx.pid)  # Graceful shutdown
+
+# ============================================================================
+# PERFORMANCE TUNING
+# ============================================================================
+# worker_processes auto;  # Auto-detect CPU cores
+# worker_connections 1024;  # Max connections per worker
+# keepalive_timeout 65;
+# client_max_body_size 100M;  # Max upload size
+
+# ============================================================================
+# COMMON TROUBLESHOOTING PATTERNS
+# ============================================================================
+# 502 Bad Gateway:
+# - Check upstream service is running
+# - Check firewall/SELinux not blocking
+# - Check proxy_pass URL is correct
+
+# 403 Forbidden:
+# - Check file permissions
+# - Check NGINX user has access
+# - Check directory index is set
+# - Check SELinux context (if RHEL/CentOS)
+
+# 404 Not Found:
+# - Check root directive
+# - Check try_files directive
+# - Check file exists on disk
+
+# Config test fails:
+nginx -t  # See specific error
+# Check syntax, missing semicolons, brackets
+
+# SELinux issues (RHEL/CentOS):
+getsebool -a | grep httpd  # Check booleans
+setsebool -P httpd_can_network_connect 1  # Allow proxy
+setenforce 0  # Temporarily disable (testing only)
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Add new site:
+vim /etc/nginx/sites-available/newsite
+ln -s /etc/nginx/sites-available/newsite /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+
+# Update configuration:
+vim /etc/nginx/sites-available/mysite
+nginx -t
+systemctl reload nginx
+
+# Emergency reload:
+nginx -s reload
+
+# Rotate logs manually:
+mv /var/log/nginx/access.log /var/log/nginx/access.log.1
+nginx -s reopen
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# nginx -t  # Test config
+# nginx -s <signal>  # Send signal (reload|reopen|stop|quit)
+# systemctl <action> nginx  # Service management
+# Server block: server { listen 80; server_name example.com; ... }
+# Location block: location / { ... }
+# Proxy: proxy_pass http://backend;

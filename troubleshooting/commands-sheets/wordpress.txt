@@ -1,0 +1,266 @@
+#!/bin/bash
+# ============================================================================
+# WORDPRESS - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# WP-CLI INSTALLATION
+# ============================================================================
+# Install WP-CLI:
+curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+chmod +x wp-cli.phar
+sudo mv wp-cli.phar /usr/local/bin/wp
+
+# Verify installation:
+wp --info
+
+# ============================================================================
+# WORDPRESS INSTALLATION
+# ============================================================================
+wp core download  # Download WordPress
+wp config create --dbname=wordpress --dbuser=wpuser --dbpass=password  # Create wp-config.php
+wp core install --url=example.com --title="My Site" --admin_user=admin --admin_password=password --admin_email=admin@example.com  # Install WordPress
+wp core update  # Update WordPress core
+wp core update-db  # Update database after core update
+
+# ============================================================================
+# PLUGINS
+# ============================================================================
+wp plugin list  # List all plugins
+wp plugin install akismet  # Install plugin
+wp plugin install contact-form-7 --activate  # Install and activate
+wp plugin activate akismet  # Activate plugin
+wp plugin deactivate akismet  # Deactivate plugin
+wp plugin delete akismet  # Delete plugin
+wp plugin update --all  # Update all plugins
+wp plugin update akismet  # Update specific plugin
+wp plugin search security  # Search for plugins
+
+# ============================================================================
+# THEMES
+# ============================================================================
+wp theme list  # List all themes
+wp theme install twentytwentythree  # Install theme
+wp theme activate twentytwentythree  # Activate theme
+wp theme delete twentytwentyone  # Delete theme
+wp theme update --all  # Update all themes
+wp theme update twentytwentythree  # Update specific theme
+
+# ============================================================================
+# USERS
+# ============================================================================
+wp user list  # List all users
+wp user create john john@example.com --role=editor  # Create user
+wp user create jane jane@example.com --role=author --user_pass=password  # Create with password
+wp user update 1 --user_pass=newpassword  # Update user password
+wp user delete 2  # Delete user
+wp user delete 2 --reassign=1  # Delete and reassign content
+wp user list --role=administrator  # List users by role
+wp user meta list 1  # List user meta
+
+# ============================================================================
+# POSTS & PAGES
+# ============================================================================
+wp post list  # List all posts
+wp post list --post_type=page  # List pages
+wp post create --post_title="My Post" --post_content="Hello World" --post_status=publish  # Create post
+wp post update 123 --post_title="Updated Title"  # Update post
+wp post delete 123  # Move post to trash
+wp post delete 123 --force  # Delete permanently
+wp post list --post_status=trash  # List trashed posts
+
+# ============================================================================
+# DATABASE
+# ============================================================================
+wp db export  # Export database to SQL file
+wp db export backup.sql  # Export to specific file
+wp db import backup.sql  # Import database
+wp db optimize  # Optimize database
+wp db repair  # Repair database
+wp db query "SELECT * FROM wp_users"  # Run SQL query
+wp db search "old-domain.com"  # Search database for string
+wp db size --human-readable  # Show database size
+
+# ============================================================================
+# SEARCH & REPLACE
+# ============================================================================
+wp search-replace 'http://old-site.com' 'https://new-site.com'  # Replace URLs
+wp search-replace 'http://old-site.com' 'https://new-site.com' --dry-run  # Dry run (test only)
+wp search-replace 'old-email@example.com' 'new-email@example.com' wp_users  # Replace in specific table
+wp search-replace 'old-domain.com' 'new-domain.com' --skip-columns=guid  # Skip GUID column
+
+# ============================================================================
+# CACHE & TRANSIENTS
+# ============================================================================
+wp cache flush  # Flush object cache
+wp transient delete --all  # Delete all transients
+wp transient delete my_transient  # Delete specific transient
+wp rewrite flush  # Flush rewrite rules
+
+# ============================================================================
+# OPTIONS
+# ============================================================================
+wp option list  # List all options
+wp option get siteurl  # Get specific option
+wp option update siteurl 'https://example.com'  # Update option
+wp option delete my_option  # Delete option
+wp option add my_option 'value'  # Add option
+
+# ============================================================================
+# MEDIA
+# ============================================================================
+wp media regenerate --yes  # Regenerate all thumbnails
+wp media regenerate 123  # Regenerate specific attachment
+wp media import photo.jpg --post_id=45  # Import image and attach to post
+
+# ============================================================================
+# CRON JOBS
+# ============================================================================
+wp cron event list  # List scheduled cron events
+wp cron event run --due-now  # Run due cron events
+wp cron test  # Test WP-Cron
+
+# ============================================================================
+# MAINTENANCE MODE
+# ============================================================================
+wp maintenance-mode activate  # Enable maintenance mode
+wp maintenance-mode deactivate  # Disable maintenance mode
+wp maintenance-mode status  # Check maintenance mode status
+
+# ============================================================================
+# FILE PERMISSIONS
+# ============================================================================
+# Recommended permissions:
+find /var/www/html -type d -exec chmod 755 {} \;  # Directories
+find /var/www/html -type f -exec chmod 644 {} \;  # Files
+chmod 600 wp-config.php  # wp-config.php
+chown -R www-data:www-data /var/www/html  # Ownership (Debian/Ubuntu)
+chown -R apache:apache /var/www/html  # Ownership (RHEL/CentOS)
+
+# ============================================================================
+# DEBUGGING
+# ============================================================================
+# Enable debug mode (wp-config.php):
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );  # Log to wp-content/debug.log
+define( 'WP_DEBUG_DISPLAY', false );  # Don't display errors
+
+# View debug log:
+tail -f wp-content/debug.log
+
+# ============================================================================
+# SECURITY
+# ============================================================================
+# Change security keys (wp-config.php):
+# Visit: https://api.wordpress.org/secret-key/1.1/salt/
+
+# Disable file editing (wp-config.php):
+define( 'DISALLOW_FILE_EDIT', true );
+
+# Change table prefix (manual process):
+# 1. Backup database
+# 2. Search/replace wp_ to newprefix_ in database
+# 3. Update wp-config.php: $table_prefix = 'newprefix_';
+
+# Limit login attempts (use plugin):
+wp plugin install limit-login-attempts-reloaded --activate
+
+# ============================================================================
+# BACKUPS
+# ============================================================================
+# Backup files:
+tar -czf wordpress-files-$(date +%Y%m%d).tar.gz /var/www/html/
+
+# Backup database:
+wp db export wordpress-backup-$(date +%Y%m%d).sql
+
+# Full backup (files + database):
+wp db export backup.sql && tar -czf wordpress-full-$(date +%Y%m%d).tar.gz /var/www/html/ backup.sql
+
+# ============================================================================
+# WORDPRESS CONFIGURATION (wp-config.php)
+# ============================================================================
+# Database settings:
+# define( 'DB_NAME', 'wordpress' );
+# define( 'DB_USER', 'wpuser' );
+# define( 'DB_PASSWORD', 'password' );
+# define( 'DB_HOST', 'localhost' );
+
+# Debug mode:
+# define( 'WP_DEBUG', true );
+
+# Memory limit:
+# define( 'WP_MEMORY_LIMIT', '256M' );
+
+# Force HTTPS:
+# define( 'FORCE_SSL_ADMIN', true );
+
+# ============================================================================
+# MULTISITE
+# ============================================================================
+wp core multisite-convert  # Convert to multisite
+wp site list  # List sites in network
+wp site create --slug=newsite  # Create new site
+wp site delete 2 --yes  # Delete site
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Fresh WordPress install:
+wp core download
+wp config create --dbname=wordpress --dbuser=wpuser --dbpass=password
+wp core install --url=example.com --title="My Site" --admin_user=admin --admin_password=password --admin_email=admin@example.com
+wp plugin install akismet wordfence --activate
+wp theme install twentytwentythree --activate
+
+# Migrate site to new domain:
+wp db export backup.sql
+wp search-replace 'http://old-domain.com' 'https://new-domain.com' --dry-run
+wp search-replace 'http://old-domain.com' 'https://new-domain.com'
+wp cache flush
+
+# Update everything:
+wp core update
+wp plugin update --all
+wp theme update --all
+wp db optimize
+
+# Security hardening:
+chmod 600 wp-config.php
+wp plugin install wordfence --activate
+# Add to wp-config.php: define( 'DISALLOW_FILE_EDIT', true );
+
+# Reset admin password (via MySQL):
+# mysql -u root -p wordpress -e "UPDATE wp_users SET user_pass = MD5('newpassword') WHERE user_login = 'admin';"
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# White screen of death:
+# 1. Check wp-content/debug.log
+# 2. Disable plugins: wp plugin deactivate --all
+# 3. Switch to default theme: wp theme activate twentytwentythree
+# 4. Increase memory: define( 'WP_MEMORY_LIMIT', '256M' );
+
+# Database connection error:
+wp config get DB_NAME  # Verify database name
+wp config get DB_USER  # Verify database user
+mysql -u wpuser -p wordpress  # Test database connection
+
+# Plugin causing issues:
+wp plugin deactivate problematic-plugin
+wp plugin delete problematic-plugin
+
+# Stuck in maintenance mode:
+rm .maintenance  # Delete maintenance file
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# wp <command> <subcommand> [options]
+# wp core <download|install|update>
+# wp plugin <list|install|activate|deactivate|update|delete>
+# wp theme <list|install|activate|update|delete>
+# wp user <list|create|update|delete>
+# wp db <export|import|optimize|repair>
+# wp search-replace <old> <new> [--dry-run]
