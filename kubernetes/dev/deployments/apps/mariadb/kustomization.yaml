@@ -4,3 +4,4 @@ resources:
   - vault-ca-secret.yaml
   - service.yaml
   - statefulset.yaml
+  # - servicemonitor.yaml

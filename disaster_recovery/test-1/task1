@@ -1,0 +1,65 @@
+# Kubernetes & Vault Cluster Chaos Engineering Test Plan
+
+Test 1: [Pod Level Failures - Cover reaction of wordpress, mariadb, vault injector, ingress nginx, helm, flux, prometheus, exporters]
+
+## Pod Operations:
+    - We need to see the application wordpress stability while [Browsing + Uploading Videos] and we do operations on the cluster led to:
+        - pod down and up "restart"
+        - pod down and up "recreate"
+        - pod down and up "force delete"
+        - 2 pods down intentionally out of the scale of 3 
+        - 3 pods down intentionally out of the scale of 3
+        - Scale up and Scale down automation based on the load and status
+        - Customer upload video while checking from nginx which node/pod they're on and tear it down mid-way upload
+        - Check if mid-upload video data persists, can be resumed, or if DB transaction fails with duplicate name conflict
+        - Monitor pod restart patterns and CrashLoopBackOff scenarios
+        - Test pod eviction under memory/CPU pressure
+        - What pods have priority in scheduling? What happens to flux? helm? db? and app pods during resource contention?
+
+# Worker Node Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+        - worker node down and up "restart"
+        - worker node down and up "force shutdown"
+        - 2 worker nodes down intentionally out of the scale of 3 
+        - 3 worker nodes down intentionally out of the scale of 3
+        - Disconnect worker node from nfs while pod is running with no actions on web server and then recover the connection and check if the pods are running or not
+        - Repeat with disconnect the nfs connection itself on all nodes and see if it can be recovered auto or will hang forever 
+        - Will the uploaded mid-way data exist or disappear, will it be able to upload same file or db will crash because of mid-way transaction fail with same name 
+        - Recover db after mid transaction fail if any
+        - Test Node NotReady vs actual node down - how long until pods are rescheduled?
+        - Customer upload video, check from nginx which worker node they're on, tear down that specific worker mid-upload and verify behavior
+        - Monitor node resource usage (CPU/mem) during adjacent node failures from Grafana
+
+# Master Node Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+    - Test Cluster Stability and ETCD survival, restore its backup 
+        - master node down and up "restart"
+        - master node down and up "force shutdown"
+        - 2 master nodes down intentionally out of the scale of 3 
+        - 3 master nodes down intentionally out of the scale of 3
+        - Force stop 2 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
+        - Force stop 3 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
+        - Tear down 1 master node and monitor from Grafana if it puts load on the other masters in terms of mem and cpu
+        - Test API server availability during master failures - can kubectl commands execute?
+        - Test scheduler and controller-manager behavior with reduced master quorum
+
+# Combined Failure Scenarios (Multi-Component):
+    - Critical combined failure testing:
+        - 2 workers down + 1 master down - check app stability, pod rescheduling, what happens to flux? helm? db? app?
+        - 2 workers down + 2 masters down - verify minimum viable cluster state
+        - 2 workers down + 3 masters down - expect total control plane failure
+        - 3 workers down + 1 master down - all worker capacity gone, control plane partially available
+        - What is the pod priority order during these combined failures? Which workloads survive and which get evicted?
+
+# Vault Level:
+    - We need to see the application wordpress stability while we do operations on the cluster led to:
+        - vault down and up "restart"
+        - vault down and up "force shutdown"
+        - 2 vault nodes down intentionally out of the scale of 3 
+        - 3 vault nodes down intentionally out of the scale of 3
+        - Tear down 2 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not 
+        - Tear down 3 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not
+        - Test Vault seal/unseal cycles - manual seal and auto-unseal behavior
+        - Break the unseal auto with AWS for missing or changed secrets and show how to recover the vault and check if the app is working or not
+        - Test existing pods with cached secrets vs new pod deployments during Vault outage
+        - Verify vault-injector sidecar behavior when Vault cluster is degraded

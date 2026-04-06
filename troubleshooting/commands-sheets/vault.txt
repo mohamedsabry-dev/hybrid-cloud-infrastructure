@@ -1,0 +1,179 @@
+#!/bin/bash
+# ============================================================================
+# HASHICORP VAULT - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# BASIC OPERATIONS & AUTH
+# ============================================================================
+vault status  # Check server status and seal state
+vault login  # Interactive login with token
+vault login <token>  # Login with token directly
+vault login -method=userpass username=myuser  # Userpass auth
+vault login -method=ldap username=myuser  # LDAP auth
+vault token lookup  # Check current token info
+vault token renew  # Renew current token
+vault token revoke -self  # Logout (revoke current token)
+
+# ============================================================================
+# KV SECRETS ENGINE v2 (VERSIONED)
+# ============================================================================
+vault kv put secret/myapp/config username=admin password=secret123  # Write secret (creates version)
+vault kv put secret/app/db host=localhost port=5432 password=dbpass  # Multiple key-value pairs
+vault kv get secret/myapp/config  # Read latest version
+vault kv get -format=json secret/myapp/config  # JSON output
+vault kv get -field=password secret/myapp/config  # Get specific field only
+vault kv get -version=2 secret/myapp/config  # Read specific version
+vault kv list secret/  # List secrets at path
+vault kv delete secret/myapp/config  # Soft delete (can undelete)
+vault kv undelete -versions=2 secret/myapp/config  # Undelete version
+vault kv destroy -versions=1,2 secret/myapp/config  # Permanent delete
+vault kv metadata get secret/myapp/config  # Get metadata (versions, times)
+vault kv patch secret/myapp/config new_field=new_value  # Update specific fields only
+
+# ============================================================================
+# SECRETS ENGINES MANAGEMENT
+# ============================================================================
+vault secrets enable -path=secret kv-v2  # Enable KV v2 engine
+vault secrets enable database  # Enable database engine
+vault secrets enable pki  # Enable PKI engine
+vault secrets list  # List enabled secrets engines
+vault secrets disable secret/  # Disable secrets engine
+
+# ============================================================================
+# AUTH METHODS
+# ============================================================================
+vault auth list  # List enabled auth methods
+vault auth enable userpass  # Enable userpass auth
+vault auth enable -path=kubernetes kubernetes  # Enable Kubernetes auth
+vault auth disable userpass  # Disable auth method
+vault write auth/userpass/users/myuser password=mypass policies=default,app-policy  # Create user
+vault write auth/kubernetes/config kubernetes_host=https://k8s:443  # Configure K8s auth
+vault write auth/kubernetes/role/myapp bound_service_account_names=myapp-sa bound_service_account_namespaces=default policies=myapp-policy ttl=1h  # K8s role
+
+# ============================================================================
+# POLICIES
+# ============================================================================
+vault policy list  # List all policies
+vault policy read default  # Read policy
+vault policy write myapp-policy myapp-policy.hcl  # Write policy from file
+vault policy delete myapp-policy  # Delete policy
+# Example policy (myapp-policy.hcl):
+# path "secret/data/myapp/*" {
+#   capabilities = ["create", "read", "update", "delete", "list"]
+# }
+
+# ============================================================================
+# TOKEN MANAGEMENT
+# ============================================================================
+vault token create  # Create new token
+vault token create -policy=myapp-policy -ttl=1h  # Token with policy and TTL
+vault token create -orphan -policy=myapp-policy  # Orphan token (no parent)
+vault token create -period=24h -policy=myapp-policy  # Periodic token (renewable indefinitely)
+vault token lookup <token>  # Lookup token info
+vault token renew <token>  # Renew token
+vault token revoke <token>  # Revoke token
+
+# ============================================================================
+# DATABASE SECRETS ENGINE
+# ============================================================================
+vault secrets enable database  # Enable database engine
+vault write database/config/postgresql plugin_name=postgresql-database-plugin allowed_roles="readonly" connection_url="postgresql://{{username}}:{{password}}@postgres:5432/mydb" username="vault-admin" password="vault-pass"  # Configure PostgreSQL
+vault write database/roles/readonly db_name=postgresql creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" default_ttl="1h" max_ttl="24h"  # Create role
+vault read database/creds/readonly  # Generate dynamic credentials
+vault write -f database/rotate-root/postgresql  # Rotate root credentials
+
+# ============================================================================
+# PKI SECRETS ENGINE
+# ============================================================================
+vault secrets enable pki  # Enable PKI
+vault write -field=certificate pki/root/generate/internal common_name="My Root CA" ttl=87600h  # Generate root CA
+vault write pki/roles/example-dot-com allowed_domains="example.com" allow_subdomains=true max_ttl="720h"  # Create role
+vault write pki/issue/example-dot-com common_name="app.example.com" ttl="24h"  # Issue certificate
+vault read -field=certificate pki/cert/ca  # Read CA cert
+
+# ============================================================================
+# TRANSIT SECRETS ENGINE (ENCRYPTION)
+# ============================================================================
+vault secrets enable transit  # Enable transit engine
+vault write -f transit/keys/myapp  # Create encryption key
+vault write transit/encrypt/myapp plaintext=$(echo "my secret data" | base64)  # Encrypt
+vault write -field=plaintext transit/decrypt/myapp ciphertext="vault:v1:..." | base64 -d  # Decrypt
+vault write -f transit/keys/myapp/rotate  # Rotate key
+
+# ============================================================================
+# SEAL/UNSEAL OPERATIONS
+# ============================================================================
+vault operator unseal <key-share-1>  # Unseal with key share
+vault operator unseal <key-share-2>  # Continue unsealing (repeat until threshold)
+vault operator seal  # Seal vault (requires sudo capability)
+
+# ============================================================================
+# HA / RAFT OPERATIONS
+# ============================================================================
+vault operator raft list-peers  # Show Raft cluster members
+vault operator raft join https://vault-node-1:8200  # Join cluster (from new node)
+vault operator raft remove-peer <node-id>  # Remove peer
+vault operator raft snapshot save backup.snap  # Backup cluster
+vault operator raft snapshot restore backup.snap  # Restore from backup
+
+# ============================================================================
+# AUDIT LOGGING
+# ============================================================================
+vault audit enable file file_path=/var/log/vault/audit.log  # Enable file audit
+vault audit enable syslog  # Enable syslog audit
+vault audit list  # List enabled audit devices
+vault audit disable file/  # Disable audit device
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+vault status  # Check seal status, HA mode, version
+vault token capabilities secret/data/myapp/config  # Check token permissions on path
+vault policy read myapp-policy  # Verify policy contents
+vault lease lookup <lease-id>  # Check lease details
+vault lease renew <lease-id>  # Renew lease
+vault lease revoke <lease-id>  # Revoke lease
+vault read -format=json sys/health  # Health check (API)
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Read secret workflow:
+vault login -method=userpass username=myuser
+vault kv get -field=password secret/myapp/config
+
+# Write secret workflow:
+vault kv put secret/myapp/config password=newsecret
+
+# Generate DB creds workflow:
+vault read database/creds/readonly
+
+# Backup workflow:
+vault operator raft snapshot save vault-backup-$(date +%Y%m%d).snap
+
+# Emergency seal:
+vault operator seal
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# export VAULT_ADDR=https://vault.example.com:8200
+# export VAULT_TOKEN=<your-token>
+# export VAULT_NAMESPACE=engineering  # Enterprise only
+# export VAULT_SKIP_VERIFY=true  # Skip TLS verification (DEV ONLY)
+# export VAULT_FORMAT=json  # Output format
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# vault <command> [subcommand] [options]
+# vault kv <operation> <path> [key=value ...]
+# vault read <path>
+# vault write <path> <key=value>
+# vault list <path>
+# vault login -method=<method> [options]
+# vault token <operation> [options]
+# vault policy <operation> <n> [file]
+# vault secrets <operation> [options]
+# vault auth <operation> [options]

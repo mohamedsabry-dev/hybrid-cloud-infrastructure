@@ -1,0 +1,206 @@
+#!/bin/bash
+# ============================================================================
+# ASUSTOR NAS - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# SSH CONNECTION
+# ============================================================================
+# Enable SSH via web UI: Services > Terminal > Enable SSH
+ssh admin@nas.example.com  # Connect as admin
+ssh -p 22 admin@192.168.1.100  # Connect with specific port
+
+# ============================================================================
+# SYSTEM INFORMATION
+# ============================================================================
+uname -a  # System info
+cat /etc/nas.conf  # NAS configuration
+/usr/builtin/bin/asustor-version  # ASUSTOR version
+uptime  # System uptime
+df -h  # Disk space usage
+free -m  # Memory usage
+top  # Process monitor
+htop  # Interactive process viewer (if installed)
+
+# ============================================================================
+# VOLUME & STORAGE
+# ============================================================================
+df -h  # Show volumes and space
+mount | grep /volume  # Show mounted volumes
+ls -la /volume1/  # List volume1 contents
+du -sh /volume1/* | sort -hr  # Disk usage by folder (sorted)
+lsblk  # List block devices
+cat /proc/mdstat  # RAID status
+smartctl -a /dev/sda  # SMART info for disk (if smartmontools installed)
+
+# ============================================================================
+# FILE OPERATIONS
+# ============================================================================
+ls -lh /volume1/shares/  # List shared folders
+ls -lh /volume1/homes/  # List user home directories
+chown -R admin:administrators /volume1/shares/myshare  # Change ownership
+chmod -R 755 /volume1/shares/myshare  # Change permissions
+find /volume1/shares/ -name "*.log" -mtime +30 -delete  # Delete old logs (30+ days)
+rsync -avz --progress /volume1/source/ /volume1/backup/  # Sync directories
+tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/shares/data/  # Create backup archive
+
+# ============================================================================
+# NETWORK CONFIGURATION
+# ============================================================================
+ifconfig  # Show network interfaces
+ip addr show  # Show IP addresses
+ip route show  # Show routing table
+ping 8.8.8.8  # Test connectivity
+traceroute google.com  # Trace route
+netstat -tulpn  # Show listening ports
+ss -tulpn  # Show listening sockets (modern)
+
+# ============================================================================
+# SERVICES MANAGEMENT
+# ============================================================================
+# Most services managed via web UI: Services menu
+# Some services can be controlled via command line:
+
+# AFP (Apple File Protocol):
+/usr/syno/bin/synoservice --status afp  # Check AFP status (if available)
+
+# SMB/CIFS:
+systemctl status smb  # SMB status
+systemctl restart smb  # Restart SMB
+
+# NFS:
+systemctl status nfs-server  # NFS status
+showmount -e localhost  # Show NFS exports
+exportfs -v  # Show NFS export details
+
+# rsync:
+systemctl status rsyncd  # rsync daemon status
+
+# ============================================================================
+# LOGS
+# ============================================================================
+tail -f /var/log/messages  # System messages
+tail -f /var/log/syslog  # System log
+journalctl -f  # Follow systemd journal
+journalctl -u smb -f  # Follow SMB service logs
+dmesg | tail -50  # Last 50 kernel messages
+cat /var/log/auth.log  # Authentication log
+
+# ============================================================================
+# BACKUPS (RSYNC)
+# ============================================================================
+# Backup to external drive:
+rsync -avz --delete /volume1/shares/ /volume2/backup/
+
+# Backup to remote NAS:
+rsync -avz --delete /volume1/shares/ admin@remote-nas:/volume1/backup/
+
+# Backup with exclude:
+rsync -avz --delete --exclude='*.tmp' --exclude='Thumbs.db' /volume1/shares/ /volume2/backup/
+
+# ============================================================================
+# USERS & PERMISSIONS
+# ============================================================================
+# Most user management done via web UI: Access Control > Users
+cat /etc/passwd  # List users
+id admin  # Show user ID and groups
+groups admin  # Show user groups
+ls -la /volume1/homes/  # List user home directories
+
+
+# ============================================================================
+# SCHEDULED TASKS (CRON)
+# ============================================================================
+crontab -l  # List cron jobs
+crontab -e  # Edit cron jobs
+# Example: Backup every day at 2 AM
+# 0 2 * * * rsync -avz /volume1/shares/ /volume2/backup/
+
+# ============================================================================
+# SYSTEM MAINTENANCE
+# ============================================================================
+# Check disk health via web UI: Storage Manager > Disks
+# Manual disk check:
+smartctl -a /dev/sda  # SMART status
+badblocks -sv /dev/sda  # Check for bad blocks (DESTRUCTIVE if -w used)
+
+# Clear cache:
+sync  # Flush filesystem buffers
+echo 3 > /proc/sys/vm/drop_caches  # Clear page cache (as root)
+
+# ============================================================================
+# SHUTDOWN & REBOOT
+# ============================================================================
+shutdown -h now  # Shutdown immediately
+shutdown -r now  # Reboot immediately
+shutdown -h +10  # Shutdown in 10 minutes
+reboot  # Reboot system
+
+# ============================================================================
+# PACKAGE MANAGEMENT (OPKG - OPTIONAL)
+# ============================================================================
+# If Entware installed (optional third-party package manager):
+opkg update  # Update package lists
+opkg list  # List available packages
+opkg install htop  # Install package
+opkg remove htop  # Remove package
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# Web UI not accessible:
+systemctl status nginx  # Check web server
+systemctl restart nginx  # Restart web server
+netstat -tulpn | grep 8000  # Check if web UI port listening
+
+# SMB not working:
+systemctl status smb
+systemctl restart smb
+testparm  # Test Samba configuration
+
+# NFS not working:
+systemctl status nfs-server
+showmount -e localhost
+exportfs -ra  # Re-export all shares
+
+# High disk usage:
+df -h  # Check space
+du -sh /volume1/* | sort -hr  # Find large directories
+find /volume1 -type f -size +1G  # Find files larger than 1GB
+
+# Network slow:
+iperf3 -s  # Run iperf server on NAS
+# From client: iperf3 -c nas.example.com
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Daily backup to external drive:
+rsync -avz --delete /volume1/shares/ /volume2/backup/
+
+# Check RAID status:
+cat /proc/mdstat
+mdadm --detail /dev/md0
+
+# Create tarball backup:
+tar -czf /volume2/backup/shares-$(date +%Y%m%d).tar.gz /volume1/shares/
+
+# Find and delete old files:
+find /volume1/downloads/ -type f -mtime +60 -delete
+
+# Monitor disk I/O:
+iostat -x 2  # Update every 2 seconds
+
+# Check what's using disk space:
+du -sh /volume1/* | sort -hr | head -10
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# SSH: ssh admin@<nas-ip>
+# rsync: rsync -avz <source> <destination>
+# systemctl <status|start|stop|restart> <service>
+# df -h  # Disk space
+# du -sh <path>  # Directory size
+# tail -f <logfile>  # Follow logs
+# docker <command>  # Docker operations

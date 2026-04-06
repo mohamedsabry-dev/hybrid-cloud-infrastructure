@@ -1,0 +1,202 @@
+#!/bin/bash
+# ============================================================================
+# TERRAFORM - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# INITIALIZATION & SETUP
+# ============================================================================
+terraform init  # Initialize working directory (downloads providers)
+terraform init -upgrade  # Upgrade providers to latest allowed version
+terraform init -reconfigure  # Reconfigure backend (ignore existing state)
+terraform init -migrate-state  # Migrate state to new backend
+terraform version  # Show Terraform version
+
+# ============================================================================
+# PLANNING & VALIDATION
+# ============================================================================
+terraform plan  # Show execution plan (what will change)
+terraform plan -out=tfplan  # Save plan to file
+terraform plan -var="environment=prod"  # Override variable
+terraform plan -var-file="prod.tfvars"  # Use variables file
+terraform plan -target=aws_instance.web  # Plan specific resource only
+terraform plan -destroy  # Show destroy plan
+terraform validate  # Validate configuration syntax
+terraform fmt  # Format code (auto-fix spacing)
+terraform fmt -check  # Check if formatting needed (CI/CD)
+terraform fmt -recursive  # Format all files in subdirectories
+
+# ============================================================================
+# APPLYING CHANGES
+# ============================================================================
+terraform apply  # Apply changes (prompts for confirmation)
+terraform apply -auto-approve  # Apply without confirmation (use with caution)
+terraform apply tfplan  # Apply saved plan file
+terraform apply -var="instance_type=t3.medium"  # Override variable
+terraform apply -var-file="prod.tfvars"  # Use variables file
+terraform apply -target=aws_instance.web  # Apply specific resource only
+terraform apply -parallelism=20  # Increase parallel operations (default: 10)
+
+# ============================================================================
+# DESTROYING RESOURCES
+# ============================================================================
+terraform destroy  # Destroy all managed infrastructure
+terraform destroy -auto-approve  # Destroy without confirmation
+terraform destroy -target=aws_instance.web  # Destroy specific resource only
+terraform destroy -var-file="prod.tfvars"  # Destroy with variables
+
+# ============================================================================
+# STATE MANAGEMENT
+# ============================================================================
+terraform state list  # List all resources in state
+terraform state show aws_instance.web  # Show specific resource details
+terraform state pull  # Download and display remote state
+terraform state push  # Upload local state to remote
+terraform state mv aws_instance.web aws_instance.web_server  # Rename resource in state
+terraform state rm aws_instance.web  # Remove resource from state (doesn't destroy)
+terraform state replace-provider registry.terraform.io/hashicorp/aws registry.terraform.io/hashicorp/aws  # Replace provider
+
+# ============================================================================
+# WORKSPACES
+# ============================================================================
+terraform workspace list  # List workspaces
+terraform workspace show  # Show current workspace
+terraform workspace new dev  # Create new workspace
+terraform workspace select dev  # Switch workspace
+terraform workspace delete dev  # Delete workspace
+
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+terraform output  # Show all outputs
+terraform output instance_ip  # Show specific output
+terraform output -json  # JSON format
+terraform output -raw instance_ip  # Raw value (no quotes)
+
+# ============================================================================
+# IMPORT & TAINTING
+# ============================================================================
+terraform import aws_instance.web i-1234567890abcdef0  # Import existing resource
+terraform taint aws_instance.web  # Mark resource for recreation
+terraform untaint aws_instance.web  # Remove taint
+
+# ============================================================================
+# PROVIDERS & MODULES
+# ============================================================================
+terraform providers  # Show required providers
+terraform providers lock  # Generate provider lock file
+terraform get  # Download/update modules
+terraform get -update  # Update modules to latest version
+
+# ============================================================================
+# DEBUGGING & TROUBLESHOOTING
+# ============================================================================
+terraform console  # Interactive console for expressions
+terraform refresh  # Update state with real infrastructure
+terraform show  # Show current state or saved plan
+terraform show tfplan  # Show saved plan
+terraform graph | dot -Tsvg > graph.svg  # Generate dependency graph (requires graphviz)
+# Enable debug logging:
+# export TF_LOG=DEBUG
+# export TF_LOG_PATH=./terraform.log
+
+# ============================================================================
+# BACKEND CONFIGURATION
+# ============================================================================
+# S3 backend example (backend.tf):
+# terraform {
+#   backend "s3" {
+#     bucket         = "my-terraform-state"
+#     key            = "prod/terraform.tfstate"
+#     region         = "us-east-1"
+#     dynamodb_table = "terraform-locks"
+#     encrypt        = true
+#   }
+# }
+
+# ============================================================================
+# COMMON WORKFLOWS
+# ============================================================================
+# Initial project setup:
+terraform init
+terraform fmt
+terraform validate
+terraform plan
+
+# Safe deployment workflow:
+terraform plan -out=tfplan  # 1. Create plan
+terraform show tfplan  # 2. Review plan
+terraform apply tfplan  # 3. Apply plan
+
+# Variable file workflow:
+terraform plan -var-file="prod.tfvars"
+terraform apply -var-file="prod.tfvars"
+
+# Workspace workflow:
+terraform workspace new prod
+terraform workspace select prod
+terraform apply -var-file="prod.tfvars"
+
+# Import existing resource:
+terraform import aws_instance.web i-1234567890abcdef0
+terraform state show aws_instance.web
+# Add corresponding config to .tf file
+terraform plan  # Verify no changes
+
+# State migration workflow:
+# Edit backend configuration
+terraform init -migrate-state
+
+# ============================================================================
+# BEST PRACTICES COMMANDS
+# ============================================================================
+terraform fmt -check  # CI: Check formatting
+terraform validate  # CI: Validate syntax
+terraform plan -out=tfplan  # CI: Generate plan
+terraform show -json tfplan > plan.json  # CI: Export plan for review
+terraform apply -auto-approve tfplan  # CI: Apply in automated pipeline
+
+# ============================================================================
+# COMMON VARIABLE PATTERNS
+# ============================================================================
+# CLI: terraform apply -var="instance_type=t3.medium"
+# File: terraform apply -var-file="prod.tfvars"
+# Environment: export TF_VAR_instance_type=t3.medium
+
+# ============================================================================
+# TROUBLESHOOTING PATTERNS
+# ============================================================================
+# State locked:
+# terraform force-unlock <lock-id>  # Use with caution
+
+# Provider version conflicts:
+terraform init -upgrade
+
+# State out of sync:
+terraform refresh
+terraform plan
+
+# Resource stuck in state:
+terraform state rm aws_instance.web  # Remove from state
+# Then import or recreate
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# export TF_LOG=DEBUG  # Enable debug logging (TRACE, DEBUG, INFO, WARN, ERROR)
+# export TF_LOG_PATH=./terraform.log  # Log file path
+# export TF_VAR_variable_name=value  # Set variable
+# export TF_CLI_ARGS_plan="-var-file=prod.tfvars"  # Default args for plan
+# export TF_DATA_DIR=./.terraform  # Override data directory
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# terraform <command> [options]
+# terraform init [-upgrade] [-reconfigure]
+# terraform plan [-out=file] [-var="key=value"] [-var-file="file.tfvars"] [-target=resource]
+# terraform apply [tfplan] [-auto-approve] [-var="key=value"] [-var-file="file.tfvars"]
+# terraform destroy [-auto-approve] [-target=resource]
+# terraform state <subcommand>
+# terraform workspace <subcommand>
+# terraform output [name] [-json]

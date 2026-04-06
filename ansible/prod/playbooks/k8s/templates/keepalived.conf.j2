@@ -18,7 +18,7 @@ vrrp_instance VI_1 {
 
     authentication {
         auth_type PASS
-        auth_pass K8sHA2026
+        auth_pass {{ k8s_keepalived_auth_pass }}
     }
 
     virtual_ipaddress {

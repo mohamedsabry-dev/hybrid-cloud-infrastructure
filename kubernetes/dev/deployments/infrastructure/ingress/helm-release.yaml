@@ -8,6 +8,7 @@ spec:
   chart:
     spec:
       chart: ingress-nginx
+      version: "4.15.1"
       sourceRef:
         kind: HelmRepository
         name: ingress-nginx
@@ -23,6 +24,7 @@ spec:
       ingressClassResource:
         name: nginx
         default: true
+      priorityClassName: system-cluster-critical
       # Spread pods across nodes (soft anti-affinity)
       affinity:
         podAntiAffinity:

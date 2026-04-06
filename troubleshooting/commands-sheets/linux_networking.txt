@@ -1,0 +1,219 @@
+#!/bin/bash
+# ============================================================================
+# LINUX NETWORKING - Production Daily Commands (Pattern Reference)
+# ============================================================================
+
+# ============================================================================
+# INTERFACE MANAGEMENT
+# ============================================================================
+ip addr show  # Show all interfaces and IPs
+ip addr show eth0  # Show specific interface
+ip link show  # Show link status
+ip link set eth0 up  # Bring interface up
+ip link set eth0 down  # Bring interface down
+ip addr add 192.168.1.10/24 dev eth0  # Add IP address
+ip addr del 192.168.1.10/24 dev eth0  # Remove IP address
+ip link set eth0 mtu 9000  # Set MTU (jumbo frames)
+
+# ============================================================================
+# ROUTING
+# ============================================================================
+ip route show  # Show routing table
+ip route get 8.8.8.8  # Show route to specific destination
+ip route add 10.0.0.0/8 via 192.168.1.1  # Add static route
+ip route add default via 192.168.1.1  # Add default gateway
+ip route del 10.0.0.0/8  # Delete route
+ip route flush cache  # Flush routing cache
+
+# ============================================================================
+# ARP & NEIGHBORS
+# ============================================================================
+ip neigh show  # Show ARP table
+arp -a  # Show ARP table (legacy)
+ip neigh add 192.168.1.100 lladdr 00:11:22:33:44:55 dev eth0  # Add static ARP
+ip neigh del 192.168.1.100 dev eth0  # Delete ARP entry
+ip neigh flush dev eth0  # Flush ARP cache for interface
+
+# ============================================================================
+# DNS & NAME RESOLUTION
+# ============================================================================
+nslookup google.com  # DNS lookup (basic)
+dig google.com  # DNS lookup (detailed)
+dig google.com +short  # Short output (IP only)
+dig @8.8.8.8 google.com  # Query specific DNS server
+dig -x 8.8.8.8  # Reverse DNS lookup
+host google.com  # Simple DNS lookup
+cat /etc/resolv.conf  # Show DNS servers
+systemd-resolve --status  # Show DNS resolver status (systemd)
+resolvectl status  # Show DNS resolver status (modern systemd)
+
+# ============================================================================
+# CONNECTIVITY TESTING
+# ============================================================================
+ping 8.8.8.8  # Test connectivity
+ping -c 4 8.8.8.8  # Ping 4 times
+ping -I eth0 8.8.8.8  # Ping from specific interface
+traceroute google.com  # Show network path
+mtr google.com  # Continuous traceroute (combines ping + traceroute)
+nc -zv google.com 80  # Test TCP port connectivity
+telnet google.com 80  # Test TCP port (interactive)
+timeout 5 bash -c '</dev/tcp/google.com/80' && echo "Port open" || echo "Port closed"  # Quick port test
+
+# ============================================================================
+# NETWORK STATISTICS & MONITORING
+# ============================================================================
+ss -tuln  # Show listening TCP/UDP sockets
+ss -tulpn  # Show listening sockets with process info (requires root)
+ss -tan  # Show all TCP connections
+ss -s  # Show socket statistics summary
+netstat -tuln  # Show listening sockets (legacy)
+netstat -tulpn  # Show with process info (legacy, requires root)
+netstat -rn  # Show routing table (legacy)
+lsof -i :80  # Show what's using port 80
+lsof -i TCP:80  # Show TCP connections on port 80
+
+# ============================================================================
+# FIREWALL (iptables/nftables)
+# ============================================================================
+iptables -L -n -v  # List all rules with counters
+iptables -L INPUT -n -v  # List INPUT chain rules
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT  # Allow SSH
+iptables -A INPUT -s 192.168.1.0/24 -j ACCEPT  # Allow from subnet
+iptables -A INPUT -j DROP  # Drop all other INPUT
+iptables -D INPUT 5  # Delete rule 5 from INPUT chain
+iptables -F  # Flush all rules (CAUTION)
+iptables-save > /etc/iptables/rules.v4  # Save rules
+iptables-restore < /etc/iptables/rules.v4  # Restore rules
+
+# ============================================================================
+# FIREWALL (firewalld - RHEL/CentOS)
+# ============================================================================
+firewall-cmd --state  # Check firewalld status
+firewall-cmd --get-active-zones  # Show active zones
+firewall-cmd --list-all  # List all rules in default zone
+firewall-cmd --zone=public --list-all  # List rules in specific zone
+firewall-cmd --zone=public --add-service=http --permanent  # Add service
+firewall-cmd --zone=public --add-port=8080/tcp --permanent  # Add port
+firewall-cmd --zone=public --add-source=192.168.1.0/24 --permanent  # Add source
+firewall-cmd --reload  # Reload firewall (apply permanent rules)
+firewall-cmd --runtime-to-permanent  # Save runtime rules to permanent
+
+# ============================================================================
+# NETWORK NAMESPACES (ADVANCED)
+# ============================================================================
+ip netns list  # List network namespaces
+ip netns add myns  # Create namespace
+ip netns exec myns ip addr show  # Run command in namespace
+ip netns del myns  # Delete namespace
+
+# ============================================================================
+# VLAN CONFIGURATION
+# ============================================================================
+ip link add link eth0 name eth0.10 type vlan id 10  # Create VLAN interface
+ip addr add 192.168.10.1/24 dev eth0.10  # Add IP to VLAN
+ip link set eth0.10 up  # Bring VLAN up
+ip link delete eth0.10  # Delete VLAN interface
+
+# ============================================================================
+# BRIDGE CONFIGURATION
+# ============================================================================
+ip link add br0 type bridge  # Create bridge
+ip link set eth0 master br0  # Add interface to bridge
+ip link set br0 up  # Bring bridge up
+bridge link show  # Show bridge members
+ip link set eth0 nomaster  # Remove interface from bridge
+ip link delete br0  # Delete bridge
+
+# ============================================================================
+# BONDING/TEAMING
+# ============================================================================
+nmcli connection add type bond ifname bond0 mode active-backup  # Create bond (NetworkManager)
+nmcli connection add type ethernet ifname eth0 master bond0  # Add interface to bond
+nmcli connection up bond0  # Bring bond up
+cat /proc/net/bonding/bond0  # Show bond status
+
+# ============================================================================
+# BANDWIDTH & TRAFFIC
+# ============================================================================
+iftop -i eth0  # Real-time bandwidth monitor per connection
+iftop -n -i eth0  # Without DNS resolution
+nethogs eth0  # Show bandwidth per process
+vnstat -i eth0  # Show traffic statistics (requires daemon)
+tc qdisc show dev eth0  # Show traffic control queuing
+ethtool -S eth0  # Show interface statistics (counters)
+
+# ============================================================================
+# INTERFACE SPEED & DUPLEX
+# ============================================================================
+ethtool eth0  # Show interface settings
+ethtool -s eth0 speed 1000 duplex full autoneg off  # Set speed/duplex
+mii-tool eth0  # Check link status (legacy)
+
+# ============================================================================
+# TCP/UDP SESSIONS
+# ============================================================================
+ss -tan state established  # Show established TCP connections
+ss -tan state time-wait  # Show TIME_WAIT connections
+ss -o state established  # Show with timer information
+ss dst 192.168.1.100  # Show connections to specific destination
+
+# ============================================================================
+# PACKET CAPTURE
+# ============================================================================
+tcpdump -i eth0  # Capture on interface
+tcpdump -i eth0 -n  # Without DNS resolution
+tcpdump -i eth0 port 80  # Capture port 80 only
+tcpdump -i eth0 host 192.168.1.100  # Capture specific host
+tcpdump -i eth0 -w capture.pcap  # Write to file
+tcpdump -r capture.pcap  # Read from file
+tcpdump -i eth0 -c 100  # Capture 100 packets
+tcpdump -i eth0 'tcp[tcpflags] & (tcp-syn) != 0'  # Capture SYN packets
+
+# ============================================================================
+# NETWORK MANAGER (nmcli)
+# ============================================================================
+nmcli device status  # Show device status
+nmcli connection show  # Show all connections
+nmcli connection show "System eth0"  # Show specific connection
+nmcli connection up "System eth0"  # Activate connection
+nmcli connection down "System eth0"  # Deactivate connection
+nmcli connection modify "System eth0" ipv4.addresses 192.168.1.10/24  # Modify IP
+nmcli connection modify "System eth0" ipv4.gateway 192.168.1.1  # Modify gateway
+nmcli connection modify "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"  # Modify DNS
+nmcli connection reload  # Reload connections
+
+# ============================================================================
+# TROUBLESHOOTING PATTERNS
+# ============================================================================
+# No connectivity:
+ip addr show  # Check IP assigned
+ip route show  # Check default gateway
+ping 192.168.1.1  # Test gateway
+ping 8.8.8.8  # Test external connectivity
+ping google.com  # Test DNS resolution
+
+# Slow network:
+mtr google.com  # Check packet loss and latency
+ethtool eth0  # Check speed/duplex
+iftop -i eth0  # Check bandwidth usage
+
+# Port not accessible:
+ss -tulpn | grep :80  # Check if service listening
+iptables -L -n -v | grep 80  # Check firewall rules
+nc -zv localhost 80  # Test port locally
+
+# DNS issues:
+cat /etc/resolv.conf  # Check DNS servers
+dig google.com  # Test DNS resolution
+dig @8.8.8.8 google.com  # Test with public DNS
+
+# ============================================================================
+# SYNTAX REFERENCE
+# ============================================================================
+# ip addr <show|add|del> [address] dev <interface>
+# ip link <show|set> [interface] [up|down]
+# ip route <show|add|del> [destination] via [gateway]
+# ss [options] [-tulpn]
+# iptables <-L|-A|-D> <chain> [options]
+# tcpdump -i <interface> [filter]
+# nmcli <device|connection> <subcommand>
