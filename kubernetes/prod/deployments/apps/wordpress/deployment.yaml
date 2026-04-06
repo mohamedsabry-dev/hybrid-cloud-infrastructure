@@ -31,6 +31,7 @@ spec:
         vault.hashicorp.com/tls-secret: "vault-ca"
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
+      priorityClassName: app-standard
       serviceAccountName: wordpress-sa
       # Spread pods across different nodes
       affinity:

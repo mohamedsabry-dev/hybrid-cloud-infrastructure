@@ -33,6 +33,7 @@ spec:
         vault.hashicorp.com/tls-secret: "vault-ca"
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
+      priorityClassName: database-critical
       serviceAccountName: mariadb-sa
       securityContext:
         fsGroup: 999  # mysql group

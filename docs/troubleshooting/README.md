@@ -1,31 +1,37 @@
 # Troubleshooting Guide
 
-This directory contains documented troubleshooting cases from real incidents in the hybrid-cloud-infrastructure environment.
+All troubleshooting documentation has been moved to the main troubleshooting directory, organized by component.
 
-## Case Index
+## Location
 
-| ID | Title | Components | Date |
-|----|-------|------------|------|
-| [TS-001](ts-001-flux-kustomization-dependency.md) | Flux Kustomization CRD Dependency Failure | Flux, ServiceMonitor, kube-prometheus-stack | 2026-04-05 |
-| [TS-002](ts-002-k8s-master-resource-exhaustion.md) | Kubernetes Master Node Resource Exhaustion | kubelet, containerd, etcd, NFS | 2026-04-05 |
-| [TS-003](ts-003-vault-service-account-authorization.md) | Vault Kubernetes Auth - Service Account Not Authorized | Vault, Kubernetes Auth, Helm | 2026-04-05 |
+```
+/troubleshooting/
+├── kubernetes/    # Kubernetes, Flux, NFS, networking issues
+├── vault/         # Vault cluster, auth, certificates
+├── terraform/     # Terraform, Proxmox provider issues
+├── proxmox/       # Proxmox host, backup, LXC/VM issues
+├── identity/      # FreeIPA, Kerberos, LDAP issues
+├── github/        # Git, GitHub issues
+├── github-actions/# CI/CD pipeline issues
+├── network/       # Network, firewall, DNS issues
+├── linux/         # Linux OS issues
+├── macos/         # macOS issues
+├── aws/           # AWS cloud issues
+└── security/      # Security related issues
+```
 
-## Quick Reference
+## Recent Cases (Now Relocated)
 
-### Flux Issues
-- CRD not found errors → Check deployment order, use `dependsOn` ([TS-001](ts-001-flux-kustomization-dependency.md))
-
-### Node Issues
-- kubectl hangs → Check node memory with `free -h` ([TS-002](ts-002-k8s-master-resource-exhaustion.md))
-- Container runtime down → `systemctl restart containerd` ([TS-002](ts-002-k8s-master-resource-exhaustion.md))
-
-### Vault Issues
-- Pod stuck in Init → Check `vault-agent-init` logs ([TS-003](ts-003-vault-service-account-authorization.md))
-- "service account name not authorized" → Verify SA name matches Vault role ([TS-003](ts-003-vault-service-account-authorization.md))
+| Old ID | New Location | Title |
+|--------|--------------|-------|
+| TS-001 | [kubernetes/10](../../troubleshooting/kubernetes/10-flux-kustomization-crd-dependency-failure.md) | Flux Kustomization CRD Dependency Failure |
+| TS-002 | [kubernetes/11](../../troubleshooting/kubernetes/11-k8s-master-node-resource-exhaustion.md) | Kubernetes Master Node Resource Exhaustion |
+| TS-003 | [kubernetes/12](../../troubleshooting/kubernetes/12-vault-k8s-auth-service-account-not-authorized.md) | Vault Kubernetes Auth - Service Account Not Authorized |
 
 ## Contributing
+
 When documenting a new troubleshooting case:
-1. Use the next available TS-XXX number
-2. Include: Problem Summary, Symptoms, Root Cause, Investigation Steps, Solution, Verification, Prevention
-3. Add evidence from actual commands and outputs
-4. Update this README with the new case
+1. Add to the appropriate component folder under `/troubleshooting/`
+2. Use the next available number in that folder
+3. Naming format: `{number}-{short-description}.md`
+4. Include: Problem Summary, Symptoms, Root Cause, Investigation Steps, Solution, Verification, Prevention

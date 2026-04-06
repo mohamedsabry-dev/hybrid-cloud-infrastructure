@@ -17,8 +17,14 @@ spec:
   chart:
     spec:
       chart: csi-driver-nfs
-      version: ">=4.0.0"
+      version: "4.13.1"
       sourceRef:
         kind: HelmRepository
         name: csi-driver-nfs
         namespace: flux-system
+  values:
+    controller:
+      replicas: 2
+      priorityClassName: system-cluster-critical
+    node:
+      priorityClassName: system-node-critical
