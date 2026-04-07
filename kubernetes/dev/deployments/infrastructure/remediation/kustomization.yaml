@@ -4,4 +4,4 @@ resources:
   - configmap.yaml
   - deployment.yaml
   - remediation-auth-sa.yaml
-  - vault-ca-secret.yaml
+ # - vault-ca-secret.yaml
