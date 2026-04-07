@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remediation-script
+  namespace: kube-system
+data:
+  remediation.py: |
+    Hello, this is a remediation script.

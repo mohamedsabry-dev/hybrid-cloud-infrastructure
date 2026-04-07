@@ -5,7 +5,13 @@ metadata:
   namespace: kube-system
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: remediation-pod
   template:
+    metadata:
+      labels:
+        app: remediation-pod
     spec:
       nodeSelector:
         node-role.kubernetes.io/control-plane: ""
@@ -17,6 +23,12 @@ spec:
       priorityClassName: self-healing-critical
       containers:
         - name: remediation
+          image: ghcr.io/mohamedsabry-dev/remediation:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/scripts/remediation.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
           resources:
             requests:
               memory: "128Mi"
@@ -24,3 +36,7 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "100m"
+      volumes:
+        - name: script
+          configMap:
+            name: remediation-script
