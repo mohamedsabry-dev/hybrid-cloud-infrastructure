@@ -5,4 +5,4 @@ resources:
   - deployment.yaml
   - remediation-auth-sa.yaml
   - priorityclass.yaml
- # - vault-ca-secret.yaml
+  - vault-ca-secret.yaml
