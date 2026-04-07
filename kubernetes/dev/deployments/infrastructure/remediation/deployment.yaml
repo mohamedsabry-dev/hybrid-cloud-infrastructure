@@ -37,8 +37,8 @@ spec:
       containers:
         - name: remediation
           image: ghcr.io/mohamedsabry-dev/remediation:latest
-          imagePullPolicy: Always
-          command: ["python", "/scripts/remediation.py"]
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-u", "/scripts/remediation.py"]
           volumeMounts:
             - name: script
               mountPath: /scripts
