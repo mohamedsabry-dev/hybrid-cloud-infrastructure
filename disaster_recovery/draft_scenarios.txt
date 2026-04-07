@@ -68,7 +68,17 @@ Test 2: [Network & Ingress Level Failures]
 
 ## External NGINX (Rocky Linux LXC):
     - Stop nginx service on ex-nginx (10.0.65.10) and check if the app is working or not, then recover nginx and verify
-    - Kill nginx process vs graceful stop - different behavior?
+        # Expected behavior: existing connections may persist briefly, but new requests should fail until nginx is back up
+        # We already identified ex-nginx as SPOF for ingress traffic, so this test confirms the impact of that failure and recovery process
+
+    - Recovery Procedure >> 
+        Detection mechanism:
+            - 
+        Recovery Path 1:
+            - AWS + CloudWatch + Lambda to trigger Proxmox API to :
+                1. soft reboot
+                2. reset 
+                3. force stop the ex-nginx VM, restore from latest backup, and start it again
     - Test least_conn load balancing behavior when one backend worker is down
 
 ## Ingress NGINX Controller (In-Cluster):
@@ -76,6 +86,13 @@ Test 2: [Network & Ingress Level Failures]
     - Stop ingress nginx pod 2 of 3 and check if the app is working or not, then recover the pod and verify
     - Stop ingress nginx pod 3 of 3 and check if the app is working or not, then recover the pod and verify
     - Test ingress controller during worker node failures - does it reschedule correctly?
+        # Expected behaviour: even 1 pod of the 3 replica of nginx is up the service should still reach inside
+            Detection mechanism:
+                - 
+            Recovery Path: 
+                - Flux will watch and reconcile the deployment to get the remaining replicas up. 
+                - If the node hosting the nginx pod is down, Kubernetes will reschedule the pod to another node. We can monitor this process and verify that the ingress controller recovers and continues to route traffic correctly.
+                - The anti affinity + the priority class should ensure that nginx pods are rescheduled with high priority and not evicted under resource pressure, which helps maintain ingress availability during node failures.
 
 ## Network Connectivity:
     - Network connection drop with proxmox and router on svc0 level or storage level network, use email to notify urgency using the mgmt path
@@ -83,7 +100,7 @@ Test 2: [Network & Ingress Level Failures]
     - Test CoreDNS failure - stop coredns pods and verify service discovery impact
     - Test cross-node pod communication during network partition scenarios
 
-Test 3: [Storage Level Failures]
+Test 3: [Storage Level Failures] [[Critical Risk operation test need to finish the pod health monitoring as we might need the whole stack of recovery explained in test-1]]
     - We need to see the application wordpress stability while we do operations on the cluster led to:
         - Stop nfs server completely and check if the app is working or not, then recover the nfs server and verify
         - Break worker node connection with nfs while pod is running with no actions on web server, then recover the worker node and check if the pods are running or not
@@ -94,7 +111,16 @@ Test 3: [Storage Level Failures]
         - Test storage class dynamic provisioning during NFS outage
         - Complete down NAS and see how the cluster will react and recover, check if the app is working or not and etcd is working or not "and send email trigger from proxmox", then recover the NAS and verify
 
-Test 4: [Infrastructure Level Failures]
+Test 4: [Infrastructure Level Failures] 
+    - Critical note: when power up if the vms was running i.e. it out and back before the servers ups reach shutdown level trigger 
+        # we face different kind of issues because storage will take time to recover and start share + the time which already 
+            diffrentiate from the servers , vms , and cluster pods which will go into hang state of nfs failure to contact 
+            - Also the nfs down will breack the backup mount of proxmox + which will prevent proxmox from going into complete normal shutdown and will need force shutdown 
+                - we need either find a solution within the proxmox ups sctip or accept to use hard shutdown for proxmox host after make sure all vms and lxc soft shutdown. 
+                    - or we can make umount the backup storage before shutdown and remount it after power up to make sure proxmox can start normally without need to force shutdown and then remount the backup storage after power up to make sure the backup will work again without need to wait for the nfs to be up and then remount it
+                        # Need to send email with the info. + if we did that and auto start vms after next boot will fail on ipa because it has 1 external disk on the nfs 
+                            # + worker pods will all fail because of the dpeendancy on nfs if not restored on time 
+        
 
 ## Power & Environment:
     - Electricity down and network and storage drop scenario
@@ -112,6 +138,10 @@ Test 4: [Infrastructure Level Failures]
     - Proxmox API unavailable - test impact on monitoring and automation
 
 Test 5: [Backup and Restore Operations]
+        [[ This Need to be moved into task 1 scope as it's critical to have backup and restore tested before doing any of the above tests as we might need it to recover from the failure scenarios and also to make sure that the backup and restore process is working properly before we need to use it in a real failure scenario ]]
+        [[Also to be considered in TASK 4 if power down while backup operation mid way
+            - im thinking of depend on backup strategy to backup toward local storage first without dependancy on nfs 
+                and scdule task to copy the backup from local to nfs , keep only latest backup on local storage to make sure we can recover from backup even if the nfs is down and we can use the backup on local storage to recover the cluster and then copy it back to nfs after recovery to make sure the backup will work again without need to wait for the nfs to be up and then remount it]]
 
 ## ETCD Backup/Restore:
     - Backup etcd and restore in normal operation 
@@ -129,6 +159,7 @@ Test 5: [Backup and Restore Operations]
     - Test point-in-time recovery for MariaDB
 
 Test 6: [Automated Remediation Framework]
+        # Move into TASK 1 + Task 4 Scope not as seprate TASK
 
 ## Auto-Recovery Actions:
     If any node of specific type is down for long time like 1 hour (master, worker, or vault node):
@@ -140,6 +171,7 @@ Test 6: [Automated Remediation Framework]
         - Monitor recovery pattern for each node type (master vs worker vs vault)
 
 Test 7: [Observability & Monitoring]
+    # Move to TASK 1,2,3,4 Scope not as seprate task 
 
 ## Monitoring During Failures:
     - Monitor from Grafana during each failure scenario:
@@ -152,6 +184,9 @@ Test 7: [Observability & Monitoring]
     - Verify alerting pipeline end-to-end (Prometheus -> AlertManager -> Email/Slack)
 
 Test 8: [GitOps & Release Management]
+    # We depend on Flux on the reconcile , need to have a confirmed test for it before that 
+        - make sure flux can recover and act as expected during the failure scenarios and the recovery process to make sure that we can rely on it to recover the cluster and the app in case of failure and also to make sure that it can keep reconciling the state of the cluster and the app during the failure scenarios and the recovery process
+        [ This is part of TASK 1 scope, not seprate task but more like sub task]
 
 ## Flux Behavior:
     - Flux reconciliation during master node failures
@@ -164,6 +199,9 @@ Test 8: [GitOps & Release Management]
     - Verify helm secrets in etcd during master quorum loss
 
 Test 9: [Certificate & Secret Management]
+    # We dont have cert manager yet, skip this part 
+    # For secret injection its already part of the vault failure test but we can add more specific tests for it as well
+    # move certmanager to furutre improve and test, and move vault to task 1
 
 ## Certificate Lifecycle:
     - Test cert-manager behavior during API server instability
@@ -176,6 +214,8 @@ Test 9: [Certificate & Secret Management]
     - Verify sidecar injection when vault-injector pod is rescheduling
 
 Test 10: [NFS CSI Driver Failures]
+    # related to storage task , move to task 3 and task 1 scope, not seprate task but more like sub task
+
 
 ## CSI Controller Failure:
     - Kill nfs-csi-controller pod and try to create new PVC - does it succeed or fail?
@@ -199,6 +239,7 @@ Test 10: [NFS CSI Driver Failures]
     - CSI node pod restart on worker with active mounts using soft mount options (timeo=30, retrans=3)
 
 Test 11: [CSI Node Priority & Startup Order]
+    # related to srtorage task, move to task 3 + task 1 
 
 ## Priority Class Verification:
     - Verify nfs-csi-node pods have system-node-critical priority class
@@ -234,7 +275,27 @@ Test 11: [CSI Node Priority & Startup Order]
     - Retest node recovery scenarios
 ---
 
-# Future Improvements & Known Gaps:
+
+
+
+
+
+# Future topics to discuse and judge & Known Gaps:
+
+## We have SPOF on the following and accepted it so far: 
+
+Identify and accept: 
+
+FreeIPA
+Storage 
+VPN Tunnel 
+Nginx Ex 
+Storage 
+Router 
+switch
+AP
+MAriadb
+
 
 ## Not Yet Implemented:
     - We don't have replica of IPA domain yet
@@ -270,7 +331,7 @@ Test 11: [CSI Node Priority & Startup Order]
 
 ---
 
-## Execution Priority (Per AI Recommendation):
+## Execution Priority (Per AI Recommendation): // Old from Version 3 , will be updated later 
 
 ### Tier 1 - Foundational (Execute First - 2 weeks):
 Tests 1 (pod/worker/master/vault basics), Test 2 (networking), Test 3 (storage NFS), Test 5 (etcd/raft backup), Infrastructure IPA domain, Combined failures (2W+1M scenario), Video upload mid-transaction tests, Vault quorum loss
