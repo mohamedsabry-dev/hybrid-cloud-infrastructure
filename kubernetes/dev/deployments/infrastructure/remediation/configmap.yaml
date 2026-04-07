@@ -5,4 +5,10 @@ metadata:
   namespace: kube-system
 data:
   remediation.py: |
-    Hello, this is a remediation script.
+    # Remediation script — placeholder
+    print("Remediation pod started successfully")
+    
+    import time
+    while True:
+        print("Running — script not yet implemented")
+        time.sleep(120)
