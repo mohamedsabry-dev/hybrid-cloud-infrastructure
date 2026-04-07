@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: remediation-script
-  namespace: kube-system
+  namespace: remediation
 data:
   remediation.py: |
     import time
