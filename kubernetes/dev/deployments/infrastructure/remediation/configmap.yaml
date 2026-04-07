@@ -5,10 +5,30 @@ metadata:
   namespace: kube-system
 data:
   remediation.py: |
-    # Remediation script — placeholder
-    print("Remediation pod started successfully")
-    
     import time
-    while True:
-        print("Running — script not yet implemented")
-        time.sleep(120)
+    from proxmoxer import ProxmoxAPI
+
+    # Load creds from Vault
+    creds = {}
+    with open("/vault/secrets/proxmox-creds") as f:
+        for line in f:
+            if "=" in line:
+                k, v = line.strip().split("=", 1)
+                creds[k] = v
+
+    host = creds["PROXMOX_HOST"].replace("https://", "").replace(":8006", "")
+    proxmox = ProxmoxAPI(
+        host,
+        user=creds["PROXMOX_TOKEN_ID"].split("!")[0],
+        token_name=creds["PROXMOX_TOKEN_ID"].split("!")[1],
+        token_value=creds["PROXMOX_TOKEN_SECRET"],
+        verify_ssl=False
+    )
+
+    # Wait 2 minutes then restart VM 1022
+    print("Waiting 2 minutes...")
+    time.sleep(120)
+
+    print("Restarting VM 1022...")
+    proxmox.nodes("pve").qemu(1022).status.reboot.post()
+    print("Done!")
