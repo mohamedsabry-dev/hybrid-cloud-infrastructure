@@ -1,7 +1,7 @@
 Prepare Master subnet to mgmt of proxmox 
 
-/ip firewall filter add chain=forward src-address=10.0.61.0/24 dst-address=10.0.5.110 action=accept comment="Allow 10.0.61.x to Dev Proxmox" place-before=13
-/ip firewall filter add chain=forward src-address=10.0.51.0/24 dst-address=10.0.5.100 action=accept comment="Allow 10.0.51.x to Prod Proxmox" place-before=13 
+/ip firewall filter add chain=forward src-address=10.0.61.0/24 dst-address=10.0.5.110 protocol=tcp dst-port=8006 action=accept comment="Allow 10.0.61.x to Dev Proxmox API" place-before=13
+/ip firewall filter add chain=forward src-address=10.0.51.0/24 dst-address=10.0.5.100 protocol=tcp dst-port=8006 action=accept comment="Allow 10.0.51.x to Prod Proxmox API" place-before=13
 
 ## Create Token 
 pveum user add k8s-pve@pve --comment "Kubernetes remediation service account"                                                                                                                      

@@ -10,11 +10,12 @@ data:
     from proxmoxer import ProxmoxAPI
 
     # Configuration
-    CHECK_INTERVAL = 180        # 3 minutes between checks
-    REMEDIATION_WAIT = 300      # 5 minutes wait after remediation
+    CHECK_INTERVAL = 120        # 2 minutes between checks
+    REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
     PROXMOX_NODE = "pve-dev"
     NFS_STORAGE = "nas-dev-data"
     TARGET_STORAGE = "local-lvm"
+    POD_FAILURE_THRESHOLD = 0.8  # 80% pods failing triggers remediation
 
     # Node to VMID mapping
     NODE_MAP = {
@@ -52,7 +53,7 @@ data:
             verify_ssl=False
         )
 
-    def is_node_healthy(v1, node_name):
+    def is_node_ready(v1, node_name):
         """Check if node exists and is Ready."""
         try:
             node = v1.read_node(node_name)
@@ -62,9 +63,61 @@ data:
             return False
         except client.exceptions.ApiException as e:
             if e.status == 404:
-                print(f"Node {node_name} not found in cluster")
+                print(f"  Node {node_name} not found in cluster")
                 return False
             raise
+
+    def are_pods_healthy(v1, node_name):
+        """Check if pods on node are healthy (not in CrashLoopBackOff/Error)."""
+        try:
+            pods = v1.list_pod_for_all_namespaces(
+                field_selector=f"spec.nodeName={node_name}"
+            )
+
+            if not pods.items:
+                return True  # No pods = healthy
+
+            total_pods = len(pods.items)
+            failing_pods = 0
+
+            for pod in pods.items:
+                if pod.status.phase in ["Failed", "Unknown"]:
+                    failing_pods += 1
+                    continue
+
+                # Check container statuses for CrashLoopBackOff
+                if pod.status.container_statuses:
+                    for cs in pod.status.container_statuses:
+                        if cs.state.waiting:
+                            if cs.state.waiting.reason in ["CrashLoopBackOff", "Error", "ImagePullBackOff"]:
+                                failing_pods += 1
+                                break
+
+            failure_rate = failing_pods / total_pods
+
+            if failure_rate >= POD_FAILURE_THRESHOLD:
+                print(f"  Pod failure rate: {failing_pods}/{total_pods} ({failure_rate*100:.0f}%)")
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"  Error checking pods: {e}")
+            return True  # Assume healthy on error
+
+    def is_node_healthy(v1, node_name):
+        """Check node status AND pod health."""
+        node_ready = is_node_ready(v1, node_name)
+
+        if not node_ready:
+            return False, "Node NotReady"
+
+        pods_healthy = are_pods_healthy(v1, node_name)
+
+        if not pods_healthy:
+            return False, "Pods failing"
+
+        return True, "OK"
 
     def reboot_vm(proxmox, vmid):
         """Soft reboot via ACPI."""
@@ -172,12 +225,13 @@ data:
 
         print(f"Monitoring nodes: {list(NODE_MAP.keys())}")
         print(f"Check interval: {CHECK_INTERVAL}s")
+        print(f"Pod failure threshold: {POD_FAILURE_THRESHOLD*100:.0f}%")
 
         while True:
             print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 
             for node_name, vmid in NODE_MAP.items():
-                healthy = is_node_healthy(v1, node_name)
+                healthy, reason = is_node_healthy(v1, node_name)
 
                 if healthy:
                     if counters[node_name] > 0:
@@ -186,7 +240,7 @@ data:
                     else:
                         print(f"{node_name}: Healthy")
                 else:
-                    print(f"{node_name}: UNHEALTHY!")
+                    print(f"{node_name}: UNHEALTHY! ({reason})")
                     remediate(proxmox, node_name, vmid)
 
             time.sleep(CHECK_INTERVAL)
