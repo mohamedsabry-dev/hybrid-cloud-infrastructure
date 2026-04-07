@@ -11,7 +11,7 @@ metadata:
   name: remediation-role
 rules:
 - apiGroups: [""]
-  resources: ["nodes"]
+  resources: ["nodes", "pods"]
   verbs: ["get", "list", "watch"]
 
 ---
