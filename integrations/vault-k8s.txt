@@ -1,1 +1,0 @@
-# As first part, we have both vault cluster deployed via gh and init manually while secrets recorded on aws

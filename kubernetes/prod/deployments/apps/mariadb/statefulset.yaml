@@ -51,12 +51,23 @@ spec:
               if [ -f /vault/secrets/db-creds ]; then
                 export $(cat /vault/secrets/db-creds | xargs)
               fi
-              exec docker-entrypoint.sh mysqld --innodb-flush-method=fsync
+              exec docker-entrypoint.sh mysqld \
+                --innodb-flush-method=fsync \
+                --general-log=1 \
+                --general-log-file=/dev/stdout \
+                --log-error=/dev/stderr \
+                --slow-query-log=1 \
+                --slow-query-log-file=/dev/stdout \
+                --long-query-time=2
+
           env:
             - name: MYSQL_DATABASE
               value: wordpress
             - name: MYSQL_USER
               value: wordpress
+
+            - name: MYSQL_INITDB_SKIP_TZINFO
+              value: "1"
           resources:
             requests:
               memory: "512Mi"

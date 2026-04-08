@@ -1,0 +1,249 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remediation-script
+  namespace: remediation
+data:
+  remediation.py: |
+    import time
+    from kubernetes import client, config
+    from proxmoxer import ProxmoxAPI
+
+    # Configuration
+    CHECK_INTERVAL = 120        # 2 minutes between checks
+    REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
+    PROXMOX_NODE = "pve-dev"
+    NFS_STORAGE = "nas-dev-data"
+    TARGET_STORAGE = "local-lvm"
+    POD_FAILURE_THRESHOLD = 0.8  # 80% pods failing triggers remediation
+
+    # Node to VMID mapping
+    NODE_MAP = {
+        "k8s-worker1.lab.local": 1020,
+        "k8s-worker2.lab.local": 1021,
+        "k8s-worker3.lab.local": 1022,
+    }
+
+    # Dump VMID mapping (for cloning broken VMs before restore)
+    DUMP_MAP = {
+        "k8s-worker1.lab.local": 5020,
+        "k8s-worker2.lab.local": 5021,
+        "k8s-worker3.lab.local": 5022,
+    }
+
+    # Track remediation attempts per node
+    counters = {node: 0 for node in NODE_MAP}
+
+    def load_proxmox_creds():
+        creds = {}
+        with open("/vault/secrets/proxmox-creds") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    creds[k] = v
+        return creds
+
+    def get_proxmox_client(creds):
+        host = creds["PROXMOX_HOST"].replace("https://", "").replace(":8006", "")
+        return ProxmoxAPI(
+            host,
+            user=creds["PROXMOX_TOKEN_ID"].split("!")[0],
+            token_name=creds["PROXMOX_TOKEN_ID"].split("!")[1],
+            token_value=creds["PROXMOX_TOKEN_SECRET"],
+            verify_ssl=False
+        )
+
+    def is_node_ready(v1, node_name):
+        """Check if node exists and is Ready."""
+        try:
+            node = v1.read_node(node_name)
+            for condition in node.status.conditions:
+                if condition.type == "Ready":
+                    return condition.status == "True"
+            return False
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                print(f"  Node {node_name} not found in cluster")
+                return False
+            raise
+
+    def are_pods_healthy(v1, node_name):
+        """Check if pods on node are healthy (not in CrashLoopBackOff/Error)."""
+        try:
+            pods = v1.list_pod_for_all_namespaces(
+                field_selector=f"spec.nodeName={node_name}"
+            )
+
+            if not pods.items:
+                return True  # No pods = healthy
+
+            total_pods = len(pods.items)
+            failing_pods = 0
+
+            for pod in pods.items:
+                if pod.status.phase in ["Failed", "Unknown"]:
+                    failing_pods += 1
+                    continue
+
+                # Check container statuses for CrashLoopBackOff
+                if pod.status.container_statuses:
+                    for cs in pod.status.container_statuses:
+                        if cs.state.waiting:
+                            if cs.state.waiting.reason in ["CrashLoopBackOff", "Error", "ImagePullBackOff"]:
+                                failing_pods += 1
+                                break
+
+            failure_rate = failing_pods / total_pods
+
+            if failure_rate >= POD_FAILURE_THRESHOLD:
+                print(f"  Pod failure rate: {failing_pods}/{total_pods} ({failure_rate*100:.0f}%)")
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"  Error checking pods: {e}")
+            return True  # Assume healthy on error
+
+    def is_node_healthy(v1, node_name):
+        """Check node status AND pod health."""
+        node_ready = is_node_ready(v1, node_name)
+
+        if not node_ready:
+            return False, "Node NotReady"
+
+        pods_healthy = are_pods_healthy(v1, node_name)
+
+        if not pods_healthy:
+            return False, "Pods failing"
+
+        return True, "OK"
+
+    def reboot_vm(proxmox, vmid):
+        """Soft reboot via ACPI."""
+        print(f"  -> Rebooting VM {vmid}")
+        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reboot.post()
+
+    def reset_vm(proxmox, vmid):
+        """Hard reset."""
+        print(f"  -> Hard resetting VM {vmid}")
+        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reset.post()
+
+    def get_latest_backup(proxmox, vmid):
+        """Get the latest backup for a VMID."""
+        backups = proxmox.nodes(PROXMOX_NODE).storage(NFS_STORAGE).content.get(
+            content="backup", vmid=vmid
+        )
+        if not backups:
+            return None
+        # Sort by creation time, get latest
+        backups.sort(key=lambda x: x.get("ctime", 0), reverse=True)
+        return backups[0]["volid"]
+
+    def restore_vm(proxmox, node_name, vmid, dump_vmid):
+        """Stop VM, clone to dump, restore from latest backup."""
+        print(f"  -> Stopping VM {vmid}")
+        try:
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.stop.post()
+            time.sleep(30)  # Wait for VM to stop
+        except Exception as e:
+            print(f"  -> Stop failed (may already be stopped): {e}")
+
+        # Clone current state to dump VMID
+        print(f"  -> Cloning VM {vmid} to dump VMID {dump_vmid}")
+        try:
+            # Delete existing dump if exists
+            try:
+                proxmox.nodes(PROXMOX_NODE).qemu(dump_vmid).delete()
+                time.sleep(10)
+            except:
+                pass  # Dump VM doesn't exist
+
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).clone.post(
+                newid=dump_vmid,
+                name=f"dump-{node_name.split('.')[0]}",
+                full=1
+            )
+            time.sleep(60)  # Wait for clone
+        except Exception as e:
+            print(f"  -> Clone failed: {e}")
+
+        # Get latest backup
+        latest_backup = get_latest_backup(proxmox, vmid)
+        if not latest_backup:
+            print(f"  -> No backup found for VM {vmid}!")
+            return False
+
+        print(f"  -> Restoring from {latest_backup}")
+
+        # Delete broken VM
+        try:
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).delete()
+            time.sleep(10)
+        except Exception as e:
+            print(f"  -> Delete failed: {e}")
+
+        # Restore from backup
+        proxmox.nodes(PROXMOX_NODE).qemu.post(
+            vmid=vmid,
+            archive=latest_backup,
+            storage=TARGET_STORAGE,
+            start=1
+        )
+        print(f"  -> Restore initiated, VM {vmid} starting")
+        return True
+
+    def remediate(proxmox, node_name, vmid):
+        """Escalating remediation: reboot -> reset -> restore."""
+        counters[node_name] += 1
+        attempt = counters[node_name]
+        dump_vmid = DUMP_MAP[node_name]
+
+        print(f"[Attempt {attempt}] Remediating {node_name} (VM {vmid})")
+
+        if attempt == 1:
+            reboot_vm(proxmox, vmid)
+        elif attempt == 2:
+            reset_vm(proxmox, vmid)
+        elif attempt >= 3:
+            restore_vm(proxmox, node_name, vmid, dump_vmid)
+            counters[node_name] = 0  # Reset counter after restore
+
+        print(f"  -> Waiting {REMEDIATION_WAIT}s for recovery...")
+        time.sleep(REMEDIATION_WAIT)
+
+    def main():
+        print("Remediation service starting...")
+
+        # Load K8s config (in-cluster)
+        config.load_incluster_config()
+        v1 = client.CoreV1Api()
+
+        # Load Proxmox client
+        creds = load_proxmox_creds()
+        proxmox = get_proxmox_client(creds)
+
+        print(f"Monitoring nodes: {list(NODE_MAP.keys())}")
+        print(f"Check interval: {CHECK_INTERVAL}s")
+        print(f"Pod failure threshold: {POD_FAILURE_THRESHOLD*100:.0f}%")
+
+        while True:
+            print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
+
+            for node_name, vmid in NODE_MAP.items():
+                healthy, reason = is_node_healthy(v1, node_name)
+
+                if healthy:
+                    if counters[node_name] > 0:
+                        print(f"{node_name}: Recovered! Resetting counter.")
+                        counters[node_name] = 0
+                    else:
+                        print(f"{node_name}: Healthy")
+                else:
+                    print(f"{node_name}: UNHEALTHY! ({reason})")
+                    remediate(proxmox, node_name, vmid)
+
+            time.sleep(CHECK_INTERVAL)
+
+    if __name__ == "__main__":
+        main()

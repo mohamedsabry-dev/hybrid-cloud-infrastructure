@@ -1,284 +1,517 @@
-# Kubernetes & Vault Cluster Chaos Engineering Test Plan
-
-Test 1: [Pod Level Failures - Cover reaction of wordpress, mariadb, vault injector, ingress nginx, helm, flux, prometheus, exporters]
-
-## Pod Operations:
-    - We need to see the application wordpress stability while [Browsing + Uploading Videos] and we do operations on the cluster led to:
-        - pod down and up "restart"
-        - pod down and up "recreate"
-        - pod down and up "force delete"
-        - 2 pods down intentionally out of the scale of 3 
-        - 3 pods down intentionally out of the scale of 3
-        - Scale up and Scale down automation based on the load and status
-        - Customer upload video while checking from nginx which node/pod they're on and tear it down mid-way upload
-        - Check if mid-upload video data persists, can be resumed, or if DB transaction fails with duplicate name conflict
-        - Monitor pod restart patterns and CrashLoopBackOff scenarios
-        - Test pod eviction under memory/CPU pressure
-        - What pods have priority in scheduling? What happens to flux? helm? db? and app pods during resource contention?
-
-# Worker Node Level:
-    - We need to see the application wordpress stability while we do operations on the cluster led to:
-        - worker node down and up "restart"
-        - worker node down and up "force shutdown"
-        - 2 worker nodes down intentionally out of the scale of 3 
-        - 3 worker nodes down intentionally out of the scale of 3
-        - Disconnect worker node from nfs while pod is running with no actions on web server and then recover the connection and check if the pods are running or not
-        - Repeat with disconnect the nfs connection itself on all nodes and see if it can be recovered auto or will hang forever 
-        - Will the uploaded mid-way data exist or disappear, will it be able to upload same file or db will crash because of mid-way transaction fail with same name 
-        - Recover db after mid transaction fail if any
-        - Test Node NotReady vs actual node down - how long until pods are rescheduled?
-        - Customer upload video, check from nginx which worker node they're on, tear down that specific worker mid-upload and verify behavior
-        - Monitor node resource usage (CPU/mem) during adjacent node failures from Grafana
-
-# Master Node Level:
-    - We need to see the application wordpress stability while we do operations on the cluster led to:
-    - Test Cluster Stability and ETCD survival, restore its backup 
-        - master node down and up "restart"
-        - master node down and up "force shutdown"
-        - 2 master nodes down intentionally out of the scale of 3 
-        - 3 master nodes down intentionally out of the scale of 3
-        - Force stop 2 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
-        - Force stop 3 nodes and check if the app is working or not and then recover the nodes and check if the app is working or not and etcd
-        - Tear down 1 master node and monitor from Grafana if it puts load on the other masters in terms of mem and cpu
-        - Test API server availability during master failures - can kubectl commands execute?
-        - Test scheduler and controller-manager behavior with reduced master quorum
-
-# Combined Failure Scenarios (Multi-Component):
-    - Critical combined failure testing:
-        - 2 workers down + 1 master down - check app stability, pod rescheduling, what happens to flux? helm? db? app?
-        - 2 workers down + 2 masters down - verify minimum viable cluster state
-        - 2 workers down + 3 masters down - expect total control plane failure
-        - 3 workers down + 1 master down - all worker capacity gone, control plane partially available
-        - What is the pod priority order during these combined failures? Which workloads survive and which get evicted?
-
-# Vault Level:
-    - We need to see the application wordpress stability while we do operations on the cluster led to:
-        - vault down and up "restart"
-        - vault down and up "force shutdown"
-        - 2 vault nodes down intentionally out of the scale of 3 
-        - 3 vault nodes down intentionally out of the scale of 3
-        - Tear down 2 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not 
-        - Tear down 3 vault nodes led the cluster to lose quorum and see if current pods can hold secrets and new pods can fetch or not
-        - Test Vault seal/unseal cycles - manual seal and auto-unseal behavior
-        - Break the unseal auto with AWS for missing or changed secrets and show how to recover the vault and check if the app is working or not
-        - Test existing pods with cached secrets vs new pod deployments during Vault outage
-        - Verify vault-injector sidecar behavior when Vault cluster is degraded
-
-Test 2: [Network & Ingress Level Failures]
-
-## External NGINX (Rocky Linux LXC):
-    - Stop nginx service on ex-nginx (10.0.65.10) and check if the app is working or not, then recover nginx and verify
-    - Kill nginx process vs graceful stop - different behavior?
-    - Test least_conn load balancing behavior when one backend worker is down
-
-## Ingress NGINX Controller (In-Cluster):
-    - Stop ingress nginx pod 1 of 3 and check if the app is working or not, then recover the pod and verify
-    - Stop ingress nginx pod 2 of 3 and check if the app is working or not, then recover the pod and verify
-    - Stop ingress nginx pod 3 of 3 and check if the app is working or not, then recover the pod and verify
-    - Test ingress controller during worker node failures - does it reschedule correctly?
-
-## Network Connectivity:
-    - Network connection drop with proxmox and router on svc0 level or storage level network, use email to notify urgency using the mgmt path
-    - Test Calico CNI plugin failure - stop calico-node daemonset pods
-    - Test CoreDNS failure - stop coredns pods and verify service discovery impact
-    - Test cross-node pod communication during network partition scenarios
-
-Test 3: [Storage Level Failures]
-    - We need to see the application wordpress stability while we do operations on the cluster led to:
-        - Stop nfs server completely and check if the app is working or not, then recover the nfs server and verify
-        - Break worker node connection with nfs while pod is running with no actions on web server, then recover the worker node and check if the pods are running or not
-        - Tear down 2 workers connection with nfs while pods are running with no actions on web server, then recover the worker nodes and check if the pods are running or not
-        - Customer uploads video mid-way, disconnect NFS on that specific worker, verify if upload completes or fails
-        - Test PVC orphaning - delete PV while PVC exists, verify behavior
-        - Verify NFS soft mount options (timeo=30, retrans=3) prevent pod hang vs hard mount
-        - Test storage class dynamic provisioning during NFS outage
-        - Complete down NAS and see how the cluster will react and recover, check if the app is working or not and etcd is working or not "and send email trigger from proxmox", then recover the NAS and verify
-
-Test 4: [Infrastructure Level Failures]
-
-## Power & Environment:
-    - Electricity down and network and storage drop scenario
-        - Test the smooth action transition to shutdown sequence for the whole environment based on the monitor script 
-        - Same but with backup and restore of the whole environment in case of electricity down and network and storage drop
-        - UPS behavior and graceful shutdown order: apps -> k8s workers -> k8s masters -> vault -> proxmox
-
-## Authentication & Identity:
-    - IPA domain down and see how the cluster will react and recover, check if the app is working or not and etcd is working or not "and send email trigger from proxmox", then recover the IPA domain and verify
-    - Test kerberos ticket expiration during IPA outage
-    - Verify pods with keytab mounts during IPA unavailability
-
-## Proxmox Integration:
-    - Network connection drop between proxmox host and management network
-    - Proxmox API unavailable - test impact on monitoring and automation
-
-Test 5: [Backup and Restore Operations]
-
-## ETCD Backup/Restore:
-    - Backup etcd and restore in normal operation 
-    - Backup etcd during active workload, restore, verify data integrity
-    - Test etcd snapshot corruption scenarios
-
-## Vault Raft Backup/Restore:
-    - Backup raft and restore with normal operation
-    - Verify Vault backup integrity before restore
-    - Test restore with different quorum scenarios
-
-## Application Data:
-    - Backup WordPress data (uploads + DB) during active operations
-    - Restore and verify data consistency
-    - Test point-in-time recovery for MariaDB
-
-Test 6: [Automated Remediation Framework]
-
-## Auto-Recovery Actions:
-    If any node of specific type is down for long time like 1 hour (master, worker, or vault node):
-        - Trigger proxmox API to force stop the node 
-        - Copy the node to different vmid or ct id for further log analysis later
-        - Restore the latest backup of this node in the storage 
-        - Start the node 
-        - Check if the node will join its related cluster or not and verify app working and etcd working "and send email trigger from proxmox"
-        - Monitor recovery pattern for each node type (master vs worker vs vault)
-
-Test 7: [Observability & Monitoring]
-
-## Monitoring During Failures:
-    - Monitor from Grafana during each failure scenario:
-        - CPU/memory pressure on remaining nodes
-        - Network traffic patterns during rescheduling
-        - etcd leader election timing
-        - Pod restart counts and reasons
-        - Storage I/O during NFS failures
-    - Test Prometheus scraping during target failures
-    - Verify alerting pipeline end-to-end (Prometheus -> AlertManager -> Email/Slack)
-
-Test 8: [GitOps & Release Management]
-
-## Flux Behavior:
-    - Flux reconciliation during master node failures
-    - Flux behavior when Git repository is unreachable
-    - Test Flux rollback on failed deployments during chaos
-
-## Helm Operations:
-    - Helm release state during worker/master failures
-    - Test helm rollback during node failures
-    - Verify helm secrets in etcd during master quorum loss
-
-Test 9: [Certificate & Secret Management]
-
-## Certificate Lifecycle:
-    - Test cert-manager behavior during API server instability
-    - Simulate certificate expiration and rotation during failures
-    - Verify TLS certificate chain during partial cluster outage
-
-## Secret Injection:
-    - Vault secret injection to new pods during Vault degraded state
-    - Test secret rotation during node failures
-    - Verify sidecar injection when vault-injector pod is rescheduling
-
-Test 10: [NFS CSI Driver Failures]
-
-## CSI Controller Failure:
-    - Kill nfs-csi-controller pod and try to create new PVC - does it succeed or fail?
-    - Kill nfs-csi-controller mid-way during PVC creation - does the PVC get stuck in Pending?
-    - With 1 replica controller down, how long until new PVC requests succeed again?
-    - Test leader election if running 2 controller replicas
-
-## CSI Node DaemonSet Failure:
-    - Kill nfs-csi-node pod on worker-1 while existing pods have mounted volumes - do mounts survive?
-    - Kill nfs-csi-node pod on worker-2 and try to schedule NEW pod with PVC to that node - does mount succeed?
-    - Tear down worker node entirely - does CSI node pod reschedule prevent stuck mounts on other nodes?
-    - Delete nfs-csi-node daemonset entirely - what happens to existing mounted volumes? Can new pods mount?
-
-## Dynamic Provisioning During Failures:
-    - Create PVC while nfs-csi-controller is down - verify it succeeds after controller recovery
-    - Create PVC while NFS server itself is unreachable - does PVC stay Pending or fail?
-    - Test StorageClass provisioner behavior when CSI driver is degraded
-
-## Combined CSI + NFS Server Failure:
-    - NFS server down + CSI controller down - recovery order matters?
-    - CSI node pod restart on worker with active mounts using soft mount options (timeo=30, retrans=3)
-
-Test 11: [CSI Node Priority & Startup Order]
-
-## Priority Class Verification:
-    - Verify nfs-csi-node pods have system-node-critical priority class
-    - Verify app pods have default (0) or custom priority
-    - Check priority class values: kubectl get priorityclass
-
-## Node Recovery Startup Order:
-    - Force shutdown worker-1 (has both app pods and CSI node pod)
-    - Start worker-1 and monitor pod startup order with `kubectl get pods -A -w`
-    - Measure: time until CSI node pod is Ready vs time until app pods are Ready
-    - Expected: CSI pod starts first due to higher priority
-
-## App Pod Mount Failure & Retry:
-    - Manually delete nfs-csi-node pod on worker-2
-    - Immediately delete wordpress pod on worker-2 to trigger restart
-    - Watch app pod stuck in ContainerCreating with FailedMount events
-    - Count retry attempts and backoff timing
-    - CSI node pod restarts automatically (daemonset controller)
-    - Verify app pod succeeds on next mount retry
-    - Measure total delay from CSI recovery to app pod Running
-
-## Resource Pressure Eviction Order:
-    - Create memory pressure on worker node
-    - Verify CSI node pod is NOT evicted (system-node-critical protection)
-    - Verify app pods ARE evicted first
-    - This proves priority class is working
-
-## Manual Priority Class Testing:
-    - If CSI node doesn't have system-node-critical, add it:
-```yaml
-      priorityClassName: system-node-critical
-```
-    - Retest node recovery scenarios
----
-
-# Future Improvements & Known Gaps:
-
-## Not Yet Implemented:
-    - We don't have replica of IPA domain yet
-    - We don't have flow to update keytab automatically yet 
-    - We don't have flow to update vault unseal auto with AWS yet but can use GitHub Actions to trigger vault unseal auto with AWS update in case of missing or changed secrets
-    - We can make use of Lambda but don't know how yet
-    - We can make use of Proxmox API to trigger force stop and restore from backup and start the node again but don't know how to do it yet
-    - We can make use of email to notify the urgency of the issue and the recovery process but don't know how to do it yet
-    - We don't have multi-database MariaDB yet, need to test if the only 1 we have down will cause the app to be down or not and how to recover it and check if the app is working or not and etcd is working or not "and send email trigger from proxmox" - also how to make DB active backup and restore in case of failure and have standby DB in case of failure and how to switch between them
-    - Do we need backup of our config data to be saved on S3 as well as NAS? Not sure but not on the list for testing this month
-
-## Future Setup Tasks:
-    1. Deploy CloudWatch or Prometheus AlertManager to monitor the cluster and set up alerts for the following scenarios:
-        - Node down (pod, worker, master, vault)
-        - NFS connection drop
-        - Proxmox connection drop
-        - IPA domain down
-        - Certificate expiration warnings
-        - etcd backup failures
-        - Vault seal events
-    
-    2. IPA Domain replica and test the failover and recovery process
-    
-    3. Multi-database MariaDB with active-standby and test the failover and recovery process
-    
-    4. Automated keytab refresh mechanism integrated with FreeIPA
-    
-    5. Lambda-based automated remediation for node failures
-    
-    6. S3 backup strategy for critical configuration data
-    
-    7. Disaster recovery runbook automation
+# Kubernetes & Vault Cluster — Chaos Engineering Test Plan v5
 
 ---
 
-## Execution Priority (Per AI Recommendation):
+## How to Use This Plan
 
-### Tier 1 - Foundational (Execute First - 2 weeks):
-Tests 1 (pod/worker/master/vault basics), Test 2 (networking), Test 3 (storage NFS), Test 5 (etcd/raft backup), Infrastructure IPA domain, Combined failures (2W+1M scenario), Video upload mid-transaction tests, Vault quorum loss
+Each Task is a failure domain (Compute, Network, Storage, etc.).
+Each Task contains numbered **Scenarios** that escalate in severity.
+After every Scenario, run the **Observation Checklist** at the bottom of that Task.
+Execute Task 0 (Backup & Restore) FIRST — it's your safety net before any destructive testing.
 
-### Tier 2 - Advanced (After Job Offer):
-Test 4 (electricity/infrastructure), Test 6 (automated remediation), Lambda integration, Proxmox API automation
+---
 
-### Tier 3 - Architecture Improvements (Post-Employment):
-Multi-DB MariaDB, IPA replica, S3 config backup, automated keytab rotation
 
-The honest acknowledgment of these gaps demonstrates mature understanding of system boundaries rather than pretending complete coverage.
+## Task 0: Backup & Restore Validation
+
+**Priority:** Execute FIRST — before Tasks 1 through 5. This is your safety net.
+
+### Scenario 0.1 — ETCD Backup & Restore (Normal)
+Backup etcd snapshot under normal operation → restore → verify cluster state.
+→ Run checklist.
+
+### Scenario 0.2 — ETCD Backup & Restore (Under Load)
+Backup etcd during active workload (uploads, deployments running) → restore → verify data integrity.
+→ Run checklist.
+
+### Scenario 0.3 — ETCD Snapshot Corruption
+Simulate corrupted etcd snapshot → attempt restore → document failure behavior and recovery path.
+→ Run checklist.
+
+### Scenario 0.4 — Vault Raft Backup & Restore (Normal)
+Backup Vault raft → restore → verify all secrets accessible.
+→ Run checklist.
+
+### Scenario 0.5 — Vault Raft Backup Integrity
+Verify backup integrity before restore (checksum, validation).
+Restore with different quorum states (1, 2, 3 nodes).
+→ Run checklist.
+
+### Scenario 0.6 — WordPress Data Backup & Restore
+Backup WordPress uploads + MariaDB during active operations.
+Restore → verify: uploads intact, DB consistent, no missing/duplicate records.
+→ Run checklist.
+
+### Scenario 0.7 — MariaDB Point-in-Time Recovery
+Test point-in-time recovery for MariaDB.
+Verify: can you restore to a specific moment before a failure?
+→ Run checklist.
+
+### Scenario 0.8 — Local Backup Without NFS
+Backup to local storage (no NFS dependency).
+Then: simulate NFS down → restore from local backup → verify.
+Confirms you can recover even when NFS is unavailable.
+→ Run checklist.
+
+### Scenario 0.9 — Backup Copy Strategy
+Backup to local → scheduled copy to NFS.
+Verify: only latest backup kept on local, older copies on NFS.
+Test: NFS goes down → local backup still usable.
+→ Run checklist.
+
+### Task 0 — Observation Checklist (run after every scenario):
+- [ ] Backup completed successfully (under load if applicable)
+- [ ] Restore produced consistent state
+- [ ] DB integrity (no missing / duplicate records)
+- [ ] WordPress uploads intact
+- [ ] Vault secrets accessible after raft restore
+- [ ] etcd cluster healthy after restore
+- [ ] Local backup usable without NFS
+- [ ] Backup copy to NFS succeeded
+
+---
+
+
+## Task 1: Kill Compute
+
+**Baseline:** WordPress browsing + video upload running throughout all scenarios.
+
+### Scenario 1.1 — Single Pod Kill
+Kill 1 WordPress pod (restart, recreate, force delete). Repeat for: mariadb, vault-injector, ingress-nginx, flux, prometheus, exporters.
+→ Run checklist.
+
+### Scenario 1.2 — Partial Pod Scale Loss
+Kill 2 of 3 pods for each component.
+→ Run checklist.
+
+### Scenario 1.3 — Full Pod Scale Loss
+Kill 3 of 3 pods for each component.
+→ Run checklist.
+
+### Scenario 1.4 — Mid-Upload Pod Kill
+Start video upload → identify which pod is serving via nginx → kill that pod mid-upload.
+Check: does upload data persist? Can same file be re-uploaded or does DB hit duplicate name conflict?
+→ Run checklist.
+
+### Scenario 1.5 — Pod Eviction Under Pressure
+Create memory/CPU pressure on a worker node. Observe which pods get evicted and which survive.
+Document the priority order: CSI > ingress > flux > app > exporters (or whatever the actual order is).
+→ Run checklist.
+
+### Scenario 1.6 — Single Worker Node Down
+Restart 1 worker node. Then repeat with force shutdown.
+Measure: time from NotReady until pods reschedule to other workers.
+→ Run checklist.
+
+### Scenario 1.7 — Partial Worker Loss
+2 of 3 workers down (force shutdown).
+→ Run checklist.
+
+### Scenario 1.8 — Full Worker Loss
+3 of 3 workers down (force shutdown).
+→ Run checklist.
+
+### Scenario 1.9 — Mid-Upload Worker Kill
+Start video upload → identify which worker node via nginx → force shutdown that worker mid-upload.
+Check: upload data persistence, DB transaction state, can same file be re-uploaded.
+→ Run checklist.
+
+### Scenario 1.10 — Single Master Node Down
+Restart 1 master. Then repeat with force shutdown.
+Check: can kubectl commands still execute? Does etcd still have quorum?
+→ Run checklist.
+
+### Scenario 1.11 — Partial Master Loss
+2 of 3 masters down (force shutdown).
+Check: etcd quorum, API server, scheduler, controller-manager.
+→ Run checklist.
+
+### Scenario 1.12 — Full Master Loss
+3 of 3 masters down. Total control plane loss.
+Document: recovery sequence to bring cluster back.
+→ Run checklist.
+
+### Scenario 1.13 — Single Vault Node Down
+Restart 1 vault pod. Then repeat with force shutdown.
+→ Run checklist.
+
+### Scenario 1.14 — Vault Quorum Loss
+2 of 3 vault nodes down. Quorum lost.
+Check: existing pods still serving with cached secrets? New pods can fetch secrets?
+→ Run checklist.
+
+### Scenario 1.15 — Full Vault Outage
+3 of 3 vault nodes down. Full outage.
+Same checks as 1.14.
+→ Run checklist.
+
+### Scenario 1.16 — Vault Seal/Unseal Cycle
+Manually seal vault → verify auto-unseal triggers → verify app health after unseal.
+Then: break auto-unseal (change/remove secrets) → manual recovery → verify.
+→ Run checklist.
+
+### Scenario 1.17 — Combined: 2 Workers + 1 Master
+Force shutdown 2 workers + 1 master simultaneously.
+→ Run checklist.
+
+### Scenario 1.18 — Combined: 2 Workers + 2 Masters
+Force shutdown 2 workers + 2 masters.
+→ Run checklist.
+
+### Scenario 1.19 — Combined: 3 Workers + 1 Master
+All worker capacity gone, partial control plane.
+→ Run checklist.
+
+### Scenario 1.20 — Combined: 2 Workers + 3 Masters
+Full control plane loss + partial worker loss.
+→ Run checklist.
+
+### Scenario 1.21 — Auto-Recovery via Proxmox API
+Trigger after a node (master, worker, or vault) stays down for extended period:
+1. Proxmox API → force stop the node
+2. Copy node to different VMID/CTID (for log analysis later)
+3. Restore latest backup of that node
+4. Start the node
+5. Verify it rejoins its cluster (K8s or Vault)
+6. Verify app + etcd health
+7. Confirm email notification sent
+→ Run checklist.
+
+### Task 1 — Observation Checklist (run after every scenario):
+- [ ] WordPress accessible (browse + upload)
+- [ ] DB integrity (no duplicate conflicts, no orphaned transactions)
+- [ ] etcd health and leader election
+- [ ] Flux reconciliation status
+- [ ] Helm release state
+- [ ] Vault sealed/unsealed status
+- [ ] Pod scheduling and priority behavior
+- [ ] Grafana: CPU, mem, pod restarts on remaining nodes
+- [ ] Prometheus scraping targets reachable
+- [ ] CrashLoopBackOff count and recovery timing
+
+---
+
+## Task 2: Kill Network
+
+**Baseline:** WordPress browsing + video upload running throughout all scenarios.
+
+### Scenario 2.1 — External NGINX Down
+Stop nginx service on ex-nginx (10.0.65.10).
+Expected: app unreachable externally (confirmed SPOF).
+Recover nginx → verify app accessible again. Measure downtime.
+→ Run checklist.
+
+### Scenario 2.2 — External NGINX Recovery via Proxmox
+Test recovery path: Proxmox API → soft reboot → if fail → reset → if fail → force stop + restore from backup + start.
+→ Run checklist.
+
+### Scenario 2.3 — Kill 1 of 3 Ingress NGINX Pods
+Kill 1 ingress-nginx pod.
+Expected: app still reachable via remaining 2 pods.
+→ Run checklist.
+
+### Scenario 2.4 — Kill 2 of 3 Ingress NGINX Pods
+Expected: app still reachable via remaining 1 pod.
+→ Run checklist.
+
+### Scenario 2.5 — Kill 3 of 3 Ingress NGINX Pods
+Expected: app down. Recovery via Flux reconciliation.
+Measure: time until Flux restores all 3 pods.
+→ Run checklist.
+
+### Scenario 2.6 — Ingress During Worker Node Failure
+Kill a worker node hosting an ingress-nginx pod.
+Verify: pod reschedules to another node. Anti-affinity + priority class working.
+→ Run checklist.
+
+### Scenario 2.7 — Calico CNI Failure
+Stop calico-node daemonset pods.
+Check: pod-to-pod communication across nodes.
+→ Run checklist.
+
+### Scenario 2.8 — CoreDNS Failure
+Stop coredns pods.
+Check: service discovery inside cluster (can pods resolve service names?).
+→ Run checklist.
+
+### Scenario 2.9 — Cross-Node Network Partition
+Simulate network partition between 2 worker nodes.
+Check: pods on isolated node, scheduling behavior, split-brain risk.
+→ Run checklist.
+
+### Scenario 2.10 — VLAN / Proxmox Network Drop
+Drop network between Proxmox and router on SVC or storage level VLAN.
+Trigger email notification via mgmt path.
+→ Run checklist.
+
+### Scenario 2.11 — Load Balancer Backend Loss
+Kill 1 backend worker → check least_conn behavior on ex-nginx.
+Verify: traffic shifts to remaining workers without errors.
+→ Run checklist.
+
+### Task 2 — Observation Checklist (run after every scenario):
+- [ ] WordPress accessible externally
+- [ ] Pod-to-pod communication working
+- [ ] DNS resolution inside cluster (service names resolve)
+- [ ] Ingress routing to correct backends
+- [ ] Flux reconciliation of ingress controller
+- [ ] Grafana: network traffic patterns
+- [ ] Email notification received via mgmt path
+- [ ] ex-nginx upstream health status
+
+---
+
+## Task 3: Kill Storage
+
+**Baseline:** WordPress browsing + video upload running throughout all scenarios.
+**Prerequisite:** Task 6 (Backup & Restore) validated before running any scenario here.
+
+### Scenario 3.1 — Stop NFS Server
+Stop NFS service on the NAS. Do not power off NAS.
+Check: pod state (hang vs crash), can pods recover when NFS comes back?
+→ Run checklist.
+
+### Scenario 3.2 — Full NAS Power Off
+Power off entire NAS.
+Check cascade: pods, etcd, Proxmox backup mount, IPA external disk.
+Recover NAS → verify everything reconnects.
+→ Run checklist.
+
+### Scenario 3.3 — Disconnect 1 Worker from NFS
+Break NFS connectivity on 1 worker while pods are idle (no active uploads).
+Recover connection → check if pods resume or need restart.
+→ Run checklist.
+
+### Scenario 3.4 — Disconnect 2 Workers from NFS
+Same as 3.3 but 2 of 3 workers.
+→ Run checklist.
+
+### Scenario 3.5 — Disconnect All Workers from NFS
+All workers lose NFS. Check: automatic recovery or permanent hang?
+→ Run checklist.
+
+### Scenario 3.6 — Mid-Upload NFS Disconnect
+Start video upload → identify which worker handles it → disconnect NFS on that worker.
+Check: upload outcome, DB transaction state, can same file be re-uploaded.
+→ Run checklist.
+
+### Scenario 3.7 — NFS Mount Options Behavior
+Verify current mount options (soft vs hard, timeo, retrans values).
+With soft mount (timeo=30, retrans=3): does pod return error instead of hanging?
+Compare: if hard mount was used, does pod hang forever?
+→ Run checklist.
+
+### Scenario 3.8 — Kill CSI Controller
+Kill nfs-csi-controller pod → immediately try creating a new PVC.
+Expected: PVC stays Pending until controller recovers.
+→ Run checklist.
+
+### Scenario 3.9 — Kill CSI Controller Mid-PVC Creation
+Start PVC creation → kill nfs-csi-controller mid-way.
+Check: does PVC get stuck permanently or resolve after controller restarts?
+→ Run checklist.
+
+### Scenario 3.10 — Kill CSI Node Pod (Existing Mounts)
+Kill nfs-csi-node pod on a worker that has pods with active NFS mounts.
+Check: do existing mounts survive? (They should — kernel handles mounts, not CSI pod.)
+→ Run checklist.
+
+### Scenario 3.11 — Kill CSI Node Pod (New Mount)
+Kill nfs-csi-node pod on a worker → schedule a new pod with PVC to that same worker.
+Check: does the new pod mount succeed, or stuck in ContainerCreating?
+→ Run checklist.
+
+### Scenario 3.12 — Delete CSI Node DaemonSet Entirely
+Delete the whole nfs-csi-node daemonset.
+Check: existing mounted volumes survive? New pods can mount?
+→ Run checklist.
+
+### Scenario 3.13 — Combined: NFS Server Down + CSI Controller Down
+Both down at the same time. Recover one at a time.
+Test: does recovery order matter? (NFS first then CSI, or CSI first then NFS?)
+→ Run checklist.
+
+### Scenario 3.14 — Delete PV While PVC Exists
+Delete a PV that has a bound PVC.
+Check: PVC state (Lost?), pod behavior, data accessibility.
+→ Run checklist.
+
+### Scenario 3.15 — Create PVC While NFS Unreachable
+NFS server is down → try to create a new PVC via StorageClass.
+Check: does it stay Pending or fail outright?
+→ Run checklist.
+
+### Scenario 3.16 — CSI Priority Class Verification
+Verify nfs-csi-node pods have system-node-critical priority.
+Force shutdown a worker → start it → monitor startup order.
+Expected: CSI node pod starts before app pods.
+→ Run checklist.
+
+### Scenario 3.17 — CSI vs App Eviction Under Pressure
+Create memory pressure on a worker.
+Expected: app pods evicted, CSI node pod survives (system-node-critical).
+→ Run checklist.
+
+### Scenario 3.18 — CSI + App Pod Simultaneous Kill
+Delete nfs-csi-node pod + app pod on the same worker at the same time.
+Measure: time from CSI pod recovery → app pod mount retry → app pod Running.
+→ Run checklist.
+
+### Task 3 — Observation Checklist (run after every scenario):
+- [ ] WordPress accessible
+- [ ] Upload data persisted or lost
+- [ ] DB transaction state (duplicate conflicts?)
+- [ ] PVC/PV binding state
+- [ ] CSI controller pod status
+- [ ] CSI node pod status
+- [ ] Pod mount events (FailedMount, retry count, backoff timing)
+- [ ] NFS mount recovery (auto vs manual remount)
+- [ ] IPA external disk state (NFS-dependent)
+- [ ] Proxmox backup mount state (NFS-dependent)
+- [ ] Grafana: storage I/O metrics
+
+---
+
+## Task 4: Kill Vault
+
+**Baseline:** WordPress browsing + video upload running throughout all scenarios.
+
+### Scenario 4.1 — Single Vault Pod Restart
+Restart 1 vault pod gracefully.
+→ Run checklist.
+
+### Scenario 4.2 — Single Vault Pod Force Kill
+Force shutdown 1 vault pod.
+→ Run checklist.
+
+### Scenario 4.3 — Vault Quorum Loss (2 of 3 Down)
+Kill 2 vault nodes. Quorum lost.
+Check: existing pods with cached secrets still running? New pods can fetch secrets?
+→ Run checklist.
+
+### Scenario 4.4 — Full Vault Outage (3 of 3 Down)
+Kill all 3 vault nodes.
+Same checks as 4.3.
+→ Run checklist.
+
+### Scenario 4.5 — Manual Seal → Auto-Unseal
+Manually seal vault → verify auto-unseal triggers correctly → verify app health.
+→ Run checklist.
+
+### Scenario 4.6 — Break Auto-Unseal
+Remove or change the secrets used for auto-unseal.
+Vault stays sealed → manual recovery procedure → verify app recovers.
+→ Run checklist.
+
+### Scenario 4.7 — Vault-Injector Behavior During Degraded Vault
+Vault cluster degraded (1 or 2 nodes down).
+Check: vault-injector sidecar behavior, can it still inject to new pods?
+What if vault-injector itself is rescheduling?
+→ Run checklist.
+
+### Scenario 4.8 — Vault Raft Backup & Restore (Normal)
+Backup Vault raft under normal operation → restore → verify all secrets intact.
+→ Run checklist.
+
+### Scenario 4.9 — Vault Raft Backup & Restore (Under Load)
+Backup Vault raft during active workload → restore → verify integrity.
+→ Run checklist.
+
+### Scenario 4.10 — Vault Raft Restore with Partial Quorum
+Restore raft backup with only 1 node available. Then 2 nodes. Then 3 nodes.
+Document which quorum states allow successful restore.
+→ Run checklist.
+
+### Task 4 — Observation Checklist (run after every scenario):
+- [ ] Existing pods still serving with cached secrets
+- [ ] New pods can / cannot inject secrets
+- [ ] Vault UI accessible
+- [ ] Vault sealed / unsealed status
+- [ ] vault-injector pod healthy and scheduling correctly
+- [ ] App functionality (WordPress login, DB connections via Vault creds)
+- [ ] Raft backup integrity after restore
+
+---
+
+## Task 5: Kill Power / Infrastructure
+
+**Baseline:** Full environment running normally before each scenario.
+**Prerequisite:** Task 6 (Backup & Restore) validated first.
+
+### Scenario 5.1 — Graceful Power Down (UPS Triggered)
+Simulate electricity loss → UPS triggers shutdown script.
+Verify shutdown order executes correctly:
+1. App pods
+2. K8s workers
+3. K8s masters
+4. Vault
+5. Proxmox
+→ Run checklist.
+
+### Scenario 5.2 — Graceful Power Down with NFS Dependency
+Before Proxmox shutdown: umount NFS backup storage.
+Verify: Proxmox shuts down cleanly without hanging on NFS mount.
+After power up: remount NFS backup storage before starting VMs.
+→ Run checklist.
+
+### Scenario 5.3 — Full Recovery Boot Sequence
+Power everything back on after graceful shutdown.
+Verify boot order and all services come back:
+NAS/NFS → Proxmox → IPA → Vault → K8s masters → K8s workers → App pods.
+Check: IPA VM auto-start (will it fail due to NFS external disk not ready?).
+Check: worker pods (will they fail if NFS not restored before pod scheduling?).
+→ Run checklist.
+
+### Scenario 5.4 — Power Flicker (Short Outage, UPS Holds)
+Power out and back before UPS reaches shutdown threshold.
+VMs stay running but NFS/NAS may restart.
+Storage takes time to recover and start sharing.
+Check: pods hanging on NFS mount during recovery window.
+→ Run checklist.
+
+### Scenario 5.5 — IPA Domain Down
+Stop IPA server.
+Check: K8s worker-to-master communication (IP-based or DNS-dependent? Check /etc/hosts).
+Check: Vault cluster (certs signed by IPA — does Vault break?).
+Check: Ansible runner connectivity to all nodes (fallback to root + trusted key via inventory).
+Check: can you still SSH into nodes? (local accounts, emergency access).
+Document: IPA restore procedure.
+→ Run checklist.
+
+### Scenario 5.6 — Proxmox Management Network Drop
+Drop network between Proxmox host and management VLAN.
+Check: impact on monitoring, self-healing automation, Proxmox API availability.
+Can you still reach Proxmox via console?
+→ Run checklist.
+
+### Scenario 5.7 — Proxmox API Unavailable
+Stop Proxmox API service (pveproxy).
+Check: impact on auto-recovery scripts (Scenario 1.21), monitoring, VM management.
+→ Run checklist.
+
+### Task 5 — Observation Checklist (run after every scenario):
+- [ ] Shutdown sequence completed in correct order
+- [ ] All VMs and LXCs started after recovery
+- [ ] NFS shares available and mounted
+- [ ] Proxmox backup mount restored
+- [ ] IPA external disk remounted
+- [ ] IPA accessible (or: confirmed not needed for K8s comms)
+- [ ] K8s cluster healthy (masters, workers, pods)
+- [ ] Vault unsealed and serving
+- [ ] WordPress accessible
+- [ ] Ansible runner can reach all nodes
+- [ ] Email notification sent via mgmt path
+
+---
+
+
+## Known SPOFs (Accepted):
+
+- FreeIPA (single instance)
+- NAS / NFS storage (single instance)
+- External NGINX (single LXC)
+- MariaDB (single instance)
+- VPN Tunnel
+- Router
+- Switch
+- AP

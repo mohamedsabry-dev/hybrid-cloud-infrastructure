@@ -64,7 +64,7 @@ spec:
               cpu: "50m"
       containers:
         - name: wordpress
-          image: wordpress:6.7.1-php8.2-apache
+          image: wordpress:6.9.4-php8.2-apache
           ports:
             - containerPort: 80
               name: http
@@ -84,6 +84,13 @@ spec:
               value: wordpress
             - name: WORDPRESS_DB_USER
               value: wordpress
+
+            - name: WORDPRESS_DEBUG
+              value: "1"
+            - name: WORDPRESS_DEBUG_LOG
+              value: "0"
+            - name: WORDPRESS_DEBUG_DISPLAY
+              value: "0"
           resources:
             requests:
               memory: "256Mi"
