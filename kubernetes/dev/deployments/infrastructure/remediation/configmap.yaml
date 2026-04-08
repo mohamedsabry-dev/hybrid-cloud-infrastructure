@@ -15,7 +15,7 @@ data:
     PROXMOX_NODE = "pve-dev"
     NFS_STORAGE = "nas-dev-data"
     TARGET_STORAGE = "local-lvm"
-    POD_FAILURE_THRESHOLD = 0.8  # 80% pods failing triggers remediation
+    POD_FAILURE_THRESHOLD = 0.7  # 70% pods failing triggers remediation
 
     # Node to VMID mapping
     NODE_MAP = {
