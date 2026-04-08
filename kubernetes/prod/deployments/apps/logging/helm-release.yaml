@@ -36,6 +36,7 @@ spec:
 
       compactor:
         retention_enabled: true
+        delete_request_store: filesystem
 
       schemaConfig:
         configs:
