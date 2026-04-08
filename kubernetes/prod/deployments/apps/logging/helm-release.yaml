@@ -71,10 +71,18 @@ spec:
     test:
       enabled: false
 
+    # Disable caching (reduces memory requirements)
+    chunksCache:
+      enabled: false
+    resultsCache:
+      enabled: false
+
     # Disable monitoring for now (can enable later)
     monitoring:
       selfMonitoring:
         enabled: false
+        grafanaAgent:
+          installOperator: false
       lokiCanary:
         enabled: false
 
