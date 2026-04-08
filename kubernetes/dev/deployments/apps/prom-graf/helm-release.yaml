@@ -60,6 +60,13 @@ spec:
         ingressClassName: nginx
         hosts:
           - grafana-dev.lab.local
+      
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          url: http://loki:3100
+          access: proxy
+          isDefault: false
 
     # ---------------------------------------------------------------------------
     # Prometheus

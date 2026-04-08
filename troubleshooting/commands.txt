@@ -1,0 +1,328 @@
+# ═══════════════════════════════════════════════
+#  K8s + Flux
+# ═══════════════════════════════════════════════
+
+# get
+kubectl get -n <ns>
+                  - all                    # everything in namespace
+                  - pods                   # list pods
+                  - pods -o wide           # + node, IP columns
+                  - pods --show-labels     # see all labels on pods
+                  - deployments            # list deployments
+                  - replicasets            # revision history
+                  - statefulsets           # stateful apps (dbs etc)
+                  - daemonsets             # runs on every node
+                  - services               # list services
+                  - endpoints              # actual IPs behind a service
+                  - ingress                # ingress rules
+                  - configmaps             # config data
+                  - secrets                # sensitive data
+                  - pv                     # persistent volumes (no -n)
+                  - pvc                    # persistent volume claims
+                  - events --sort-by=.metadata.creationTimestamp  # timeline
+                  - nodes                  # cluster-wide (no -n)
+                  - namespaces             # cluster-wide (no -n)
+                  - serviceaccounts        # list SAs
+
+# output formats
+kubectl get -n <ns> <resource>
+                  - -o yaml               # full spec as yaml
+                  - -o json               # full spec as json
+                  - -o name               # just names, clean
+
+# describe
+kubectl describe -n <ns>
+                  - pod <n>                # events + status + mounts
+                  - deployment <n>         # strategy + conditions
+                  - service <n>            # endpoints + ports
+                  - node <n>               # capacity, taints
+                  - pvc <n>                # bound PV, access mode
+                  - ingress <n>            # rules + backend mapping
+                  - serviceaccount <n>     # secrets + tokens bound
+
+# logs
+kubectl logs -n <ns>
+                  - <pod>                  # current logs
+                  - <pod> -f               # follow live
+                  - <pod> --previous       # crashed container logs
+                  - <pod> --tail=50        # last 50 lines
+                  - <pod> -c <container>   # specific container
+                  - deployment/<n>         # one pod of deployment
+
+# rollout
+kubectl rollout -n <ns>
+                  - restart deployment/<n>   # recreate all pods
+                  - status deployment/<n>    # watch progress
+                  - history deployment/<n>   # list revisions
+                  - undo deployment/<n>      # rollback to previous
+
+# exec
+kubectl exec -n <ns>
+                  - -it <pod> -- /bin/sh          # shell in
+                  - -it <pod> -- /bin/bash         # bash if available
+                  - <pod> -- cat /etc/resolv.conf  # check dns config
+                  - <pod> -- nslookup <service>    # test dns
+                  - <pod> -- wget -qO- <url>       # test connectivity
+
+# delete
+kubectl delete -n <ns>
+                  - pod <n>                # restarts via deployment
+                  - deployment <n>         # remove deployment
+                  - service <n>            # remove service
+                  - pvc <n>                # remove volume claim
+
+# top
+kubectl top -n <ns>
+                  - pods                   # cpu + memory per pod
+                  - pods --sort-by=memory  # sorted by memory
+                  - nodes                  # cpu + memory per node
+
+# rbac
+kubectl get
+                  - roles -n <ns>              # namespace-scoped roles
+                  - rolebindings -n <ns>        # who has which role
+                  - clusterroles               # cluster-wide (no -n)
+                  - clusterrolebindings        # cluster-wide (no -n)
+
+# check permissions
+kubectl auth can-i <verb> <resource> -n <ns>
+kubectl auth can-i <verb> <resource> -n <ns> --as=system:serviceaccount:<ns>:<sa>
+
+# label selector (-l)
+# labels are key=value tags in your YAML metadata
+kubectl get -n <ns> <resource> -l
+                  - app=nginx              # match exact
+                  - app=nginx,env=prod     # AND
+                  - 'app in (nginx,redis)' # OR
+                  - app                    # label exists
+                  - '!app'                 # label not exists
+                  - 'env!=prod'            # not equal
+
+# grep
+kubectl get pods -n <ns> | grep Running       # only running
+kubectl get pods -n <ns> | grep -v Running    # not running
+kubectl get all  -n <ns> | grep nginx         # filter by name
+
+# flux get
+flux get
+                  - source git             # git repo status
+                  - kustomization          # kustomization status
+                  - helmrelease            # helm release status
+                  - all                    # everything
+
+# flux reconcile
+flux reconcile
+                  - kustomization <n>      # force sync
+                  - source git <n>         # force git pull
+                  - helmrelease <n>        # force helm redeploy
+
+# flux suspend
+flux suspend
+                  - kustomization <n>      # pause syncing
+                  - helmrelease <n>        # pause helm
+
+# flux resume
+flux resume
+                  - kustomization <n>      # resume syncing
+                  - helmrelease <n>        # resume helm
+
+# flux logs
+flux logs
+                  - --follow               # follow live
+                  - --kind=Kustomization   # filter by kind
+                  - --kind=HelmRelease     # filter by kind
+
+
+# ═══════════════════════════════════════════════
+#  Vault
+# ═══════════════════════════════════════════════
+
+# login
+vault login
+                  - -method=ldap username=<user>   # ldap login
+                  - <token>                        # token login
+
+# token
+vault token
+                  - lookup                         # who am I + TTL
+                  - renew                          # extend current token
+
+# kv (v2 secrets)
+vault kv -mount=secret
+                  - put <path> key=value           # create/update
+                  - get <path>                     # read latest
+                  - get -version=2 <path>          # read specific version
+                  - list <folder>                  # list keys in folder
+                  - delete <path>                  # soft delete latest
+                  - undelete -versions=2 <path>    # restore soft deleted
+                  - metadata get <path>            # versions + timestamps
+                  - metadata delete <path>         # permanent delete all
+
+# read (generic, works on any backend)
+vault read
+                  - secret/<path>                  # read secret
+                  - auth/ldap/users/<user>         # ldap user config
+                  - auth/ldap/groups/<group>       # ldap group mapping
+                  - sys/mounts                     # all secret engines
+
+# list
+vault list
+                  - secret/                        # top level secrets
+                  - secret/<folder>                # keys in folder
+                  - auth/ldap/users                # all ldap users
+                  - auth/ldap/groups               # all ldap groups
+                  - sys/policies/acl               # all policies
+
+# policy
+vault policy
+                  - list                           # list all policies
+                  - read <name>                    # show policy rules
+                  - write <name> <file.hcl>        # create/update policy
+
+# auth methods
+vault auth
+                  - list                           # enabled auth methods
+
+# secrets engines
+vault secrets
+                  - list                           # enabled engines
+                  - enable -path=<p> kv-v2         # enable new kv engine
+                  - disable <path>                 # remove engine
+
+
+# ═══════════════════════════════════════════════
+#  Helm
+# ═══════════════════════════════════════════════
+
+# repo
+helm repo
+                  - list                           # show added repos
+                  - add <name> <url>               # add a repo
+                  - update                         # refresh repo index
+                  - remove <name>                  # delete a repo
+
+# search
+helm search
+                  - repo <keyword>                 # search added repos
+                  - hub <keyword>                  # search artifact hub
+
+# install
+helm install <release> <chart> -n <ns>
+                  - --values values.yaml           # custom values file
+                  - --set key=value                # override single value
+                  - --create-namespace             # create ns if missing
+                  - --dry-run                      # preview without applying
+
+# upgrade
+helm upgrade <release> <chart> -n <ns>
+                  - --values values.yaml           # updated values
+                  - --set key=value                # override single value
+                  - --install                      # install if not exists
+                  - --dry-run                      # preview changes
+
+# info
+helm list -n <ns>                                  # installed releases
+helm list -A                                       # all namespaces
+helm status <release> -n <ns>                      # release status
+helm history <release> -n <ns>                     # revision history
+
+# get
+helm get
+                  - values <release> -n <ns>       # current values
+                  - manifest <release> -n <ns>     # rendered yaml
+                  - notes <release> -n <ns>        # install notes
+                  - all <release> -n <ns>          # everything
+
+# show (inspect chart before installing)
+helm show
+                  - values <chart>                 # default values
+                  - chart <chart>                  # chart metadata
+                  - readme <chart>                 # chart readme
+                  - all <chart>                    # everything
+
+# rollback
+helm rollback <release> <revision> -n <ns>         # rollback to revision
+
+# uninstall
+helm uninstall <release> -n <ns>                   # remove release
+
+# template (render locally, no cluster needed)
+helm template <release> <chart>
+                  - --values values.yaml           # with custom values
+                  - --set key=value                # with overrides
+
+
+# ═══════════════════════════════════════════════
+#  Ansible
+# ═══════════════════════════════════════════════
+
+# playbook
+ansible-playbook -i <inventory> <playbook.yml>
+                  - --limit <host/group>           # run on specific hosts
+                  - --tags <tag1,tag2>              # run only tagged tasks
+                  - --skip-tags <tag>               # skip tagged tasks
+                  - --check                        # dry run, no changes
+                  - --diff                         # show file changes
+                  - --check --diff                 # dry run + show diff
+                  - --start-at-task "task name"    # resume from task
+                  - --step                         # confirm each task
+                  - --list-tasks                   # show tasks without running
+                  - --list-tags                    # show available tags
+                  - --list-hosts                   # show matched hosts
+                  - -e "key=value"                 # extra variable
+                  - -e @vars.yml                   # extra vars from file
+                  - -v                             # verbose
+                  - -vvv                           # very verbose (debug)
+                  - --ask-become-pass              # prompt sudo password
+                  - --forks 10                     # parallel hosts (default 5)
+
+# ad-hoc
+ansible <host/group> -i <inventory>
+                  - -m ping                        # test connectivity
+                  - -m shell -a "command"          # run shell command
+                  - -m command -a "command"        # run command (no pipes)
+                  - -m copy -a "src=x dest=y"     # copy file
+                  - -m file -a "path=x state=directory"  # create dir
+                  - -m service -a "name=x state=restarted"  # restart svc
+                  - -m apt -a "name=x state=present"   # install pkg (debian)
+                  - -m yum -a "name=x state=present"   # install pkg (rhel)
+                  - -m setup                       # gather all facts
+                  - -m setup -a "filter=ansible_os_family"  # specific fact
+                  - -b                             # become root
+                  - --limit <host>                 # target specific host
+
+# inventory
+ansible-inventory -i <inventory>
+                  - --list                         # full inventory as json
+                  - --graph                        # tree view of groups
+                  - --host <hostname>              # vars for specific host
+
+# vault (ansible-vault, not hashicorp)
+ansible-vault
+                  - create <file>                  # create encrypted file
+                  - edit <file>                    # edit in place
+                  - view <file>                    # view without editing
+                  - encrypt <file>                 # encrypt existing file
+                  - decrypt <file>                 # decrypt file
+                  - encrypt_string 'val' --name 'key'  # encrypt single var
+                  - rekey <file>                   # change password
+
+# using vault with playbook
+ansible-playbook -i <inv> <playbook.yml>
+                  - --ask-vault-pass               # prompt vault password
+                  - --vault-password-file <file>   # password from file
+
+# galaxy (roles + collections)
+ansible-galaxy
+                  - role install <name>            # install role
+                  - role list                      # installed roles
+                  - role init <name>               # scaffold new role
+                  - collection install <name>      # install collection
+                  - collection list                # installed collections
+
+# doc
+ansible-doc
+                  - <module>                       # module docs
+                  - -l                             # list all modules
+                  - -l | grep <keyword>            # search modules
+                  - -t callback -l                 # list callback plugins

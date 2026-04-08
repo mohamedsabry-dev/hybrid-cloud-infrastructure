@@ -1,0 +1,64 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: loki-stack
+      version: "2.10.2"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: monitoring
+  values:
+
+    # ---------------------------------------------------------------------------
+    # Loki — log storage and indexing
+    # ---------------------------------------------------------------------------
+    loki:
+      enabled: true
+
+      persistence:
+        enabled: true
+        storageClassName: nfs-retain
+        size: 75Gi
+
+      config:
+        auth_enabled: false
+
+        limits_config:
+          retention_period: 168h        # 7 days
+          ingestion_rate_mb: 16
+          ingestion_burst_size_mb: 32
+
+        compactor:
+          working_directory: /data/loki/compactor
+          shared_store: filesystem
+          retention_enabled: true
+
+    # ---------------------------------------------------------------------------
+    # Promtail — log collector DaemonSet on every node
+    # ---------------------------------------------------------------------------
+    promtail:
+      enabled: true
+
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+      config:
+        clients:
+          - url: http://loki:3100/loki/api/v1/push
+
+    # ---------------------------------------------------------------------------
+    # Grafana — disabled, already deployed via kube-prometheus-stack
+    # ---------------------------------------------------------------------------
+    grafana:
+      enabled: false

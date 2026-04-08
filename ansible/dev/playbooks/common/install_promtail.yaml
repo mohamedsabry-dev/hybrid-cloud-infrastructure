@@ -1,0 +1,35 @@
+- name: Install & Setup Promtail
+  hosts: "all:!k8s"
+  become: yes
+  tasks:
+    - name: Download Promtail binary
+      ansible.builtin.get_url:
+        url: "https://github.com/grafana/loki/releases/download/v2.9.0/promtail-linux-amd64.zip"
+        dest: /tmp/promtail.zip
+
+    - name: Unzip Promtail
+      ansible.builtin.unarchive:
+        src: /tmp/promtail.zip
+        dest: /usr/local/bin/
+        remote_src: yes
+
+    - name: Make executable
+      ansible.builtin.file:
+        path: /usr/local/bin/promtail-linux-amd64
+        mode: '0755'
+
+    - name: Deploy Promtail config
+      ansible.builtin.template:
+        src: promtail-config.yaml.j2
+        dest: /etc/promtail/config.yaml
+
+    - name: Create systemd service
+      ansible.builtin.template:
+        src: promtail.service.j2
+        dest: /etc/systemd/system/promtail.service
+
+    - name: Enable Promtail
+      ansible.builtin.service:
+        name: promtail
+        state: started
+        enabled: yes

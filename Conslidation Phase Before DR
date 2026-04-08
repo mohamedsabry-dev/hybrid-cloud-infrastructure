@@ -1,0 +1,10 @@
+- Review and improve the content of all repo + Readme manual 
+- Own and edit kubernetes deployment yaml and match needs 
+- Create logging deployment via helm chart "Loki"
+- Mirror to prod
+- Understand how to use monitoring and logging tools
+- Configure alerting rules for monitoring and logging tools and email notification
+- Backup ETCD 
+- Backup RAFT
+- Check if the servers "proxmox" can shutdown if storage dropped first.
+- What deschduler is and how to use it.
