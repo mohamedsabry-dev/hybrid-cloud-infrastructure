@@ -24,7 +24,7 @@ spec:
       persistence:
         enabled: true
         storageClassName: nfs-retain
-        size: 75Gi
+        size: 50Gi
 
       config:
         auth_enabled: false

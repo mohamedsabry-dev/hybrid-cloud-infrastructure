@@ -9,6 +9,7 @@ parameters:
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:
+  - nfsvers=3
   - soft
   - timeo=30
   - retrans=3
@@ -25,6 +26,7 @@ parameters:
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
+  - nfsvers=3
   - soft
   - timeo=30
   - retrans=3
@@ -41,6 +43,7 @@ parameters:
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:
+  - nfsvers=3
   - hard
   - timeo=600
   - retrans=5
