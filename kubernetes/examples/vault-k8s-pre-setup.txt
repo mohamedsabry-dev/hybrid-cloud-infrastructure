@@ -1,5 +1,4 @@
-
-  kubectl cluster-info
+kubectl cluster-info
 Kubernetes control plane is running at https://10.0.61.100:16443
 
 kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d

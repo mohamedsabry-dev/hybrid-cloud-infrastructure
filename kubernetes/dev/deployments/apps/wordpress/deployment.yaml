@@ -84,6 +84,15 @@ spec:
               value: wordpress
             - name: WORDPRESS_DB_USER
               value: wordpress
+              
+            - name: WORDPRESS_DEBUG
+              value: "1"
+            - name: WORDPRESS_DEBUG_LOG
+              value: "0"
+            - name: WORDPRESS_DEBUG_DISPLAY
+              value: "0"
+            - name: APACHE_LOG_DIR
+              value: "/proc/self/fd"
           resources:
             requests:
               memory: "128Mi"
