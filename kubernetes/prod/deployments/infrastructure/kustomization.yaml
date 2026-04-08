@@ -6,4 +6,4 @@ resources:
   - storage
   - vault
   - ingress
-  - descheduler
+  - remediation
