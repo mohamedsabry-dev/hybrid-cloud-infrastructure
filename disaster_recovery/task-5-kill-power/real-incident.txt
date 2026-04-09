@@ -51,9 +51,23 @@ Update prod crontab to match dev:
 After power restored, servers + NAS started at the same time.
 Faced same issue documented in: `troubleshooting/proxmox/12-vm-autostart-timeout-nfs-disk-not-ready.md`
 
+### Root Cause
+
+The startup delay fix (180 seconds) was applied via Terraform to **dev** but **not prod**.
+
+**Why prod wasn't fixed:**
+- Forgot to unlock the FreeIPA infrastructure GitHub branch lock
+- Terraform couldn't apply the changes to prod
+- Dev worked fine with the delay, prod still had the old 60s delay
+
+### Status
+- **Dev:** Fixed (startup delay 180s applied via Terraform)
+- **Prod:** Pending - unlock GitHub branch lock and run `terraform apply`
+
 ### Action Required
-- Final fix with proper delay OR
-- Remove disk 2 of FreeIPA (not needed)
+- Unlock freeipa infra branch in GitHub
+- Run terraform apply for prod
+- OR remove disk 2 of FreeIPA (not needed anyway)
 
 ---
 
@@ -339,6 +353,149 @@ Now remediation deploys with apps, AFTER infrastructure (vault) is healthy.
 
 ---
 
+## Issue 5: Vault Authentication Failure - All Pods Stuck (Caused by Flux Changes)
+
+### Symptoms
+
+After pushing the Flux split changes (Issue 3 & 4 fixes), ALL pods with vault-agent injection stuck:
+
+```bash
+[root@k8s-master1 ~]# kubectl get pods -A | grep -E "Init|vault"
+apps         wordpress-6d5cdf8c64-rbk6q   0/2   Init:0/2   0   27m
+apps         wordpress-6d5cdf8c64-sprnp   0/2   Init:0/2   0   27m
+apps         wordpress-6d5cdf8c64-vjctl   0/2   Init:0/2   0   27m
+database     mariadb-0                    0/2   Init:0/1   0   27m
+monitoring   kube-prometheus-stack-grafana-*   0/4   Init:1/2   0   2m
+```
+
+**vault-agent-init logs showed:**
+```
+2026-04-09T14:09:53.975Z [ERROR] agent.auth.handler: error authenticating:
+  error=
+  | Error making API request.
+  | URL: PUT https://vault.lab.local:8200/v1/auth/kubernetes/login
+  | Code: 403. Errors:
+  | * permission denied
+```
+
+### Investigation
+
+**Check vault-auth secret:**
+```bash
+[root@k8s-master1 ~]# kubectl get secret -n vault vault-auth -o jsonpath='{.data.token}' | base64 -d
+Error from server (NotFound): secrets "vault-auth" not found
+
+[root@k8s-master1 ~]# kubectl get sa vault-auth -n kube-system
+NAME         AGE
+vault-auth   18m
+
+[root@k8s-master1 ~]# kubectl get secret -n kube-system | grep vault-auth
+# Empty - no token secret!
+```
+
+The ServiceAccount exists but has **no token secret** (Kubernetes 1.24+ doesn't auto-create secrets).
+
+### Root Cause
+
+Chain of events caused by Flux Kustomization rename:
+
+1. **Change made:** Renamed Flux Kustomization from `deployments` → `infrastructure` + `apps`
+2. **Flux prune behavior:** With `prune: true`, Flux deleted all resources from old `deployments` Kustomization
+3. **Resources deleted:** Including the vault-auth-token secret
+4. **K8s 1.24+ behavior:** When ServiceAccount was recreated, token secret was NOT auto-created
+5. **Vault broken:** No token = Vault can't validate any Kubernetes pod authentication
+6. **All pods stuck:** wordpress, mariadb, grafana, remediation - everything with vault injection failed
+
+**Why this happened:**
+
+```yaml
+# Before (kustomization.yaml)
+resources:
+  - deployments-sync.yaml  # Kustomization name: "deployments"
+
+# After
+resources:
+  - infrastructure-sync.yaml  # NEW name: "infrastructure"
+  - apps-sync.yaml            # NEW name: "apps"
+  # - deployments-sync.yaml   # REMOVED
+```
+
+When Kustomization name changes, Flux treats the new Kustomizations as completely new. The old `deployments` Kustomization was removed, so Flux pruned all its managed resources.
+
+### Fix Applied
+
+**Step 1: Create token secret manually**
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-auth-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: vault-auth
+type: kubernetes.io/service-account-token
+EOF
+```
+
+**Step 2: Run Ansible playbook to update Vault trust**
+
+```bash
+cd ansible/dev
+ansible-playbook playbooks/k8s/integration-vault-k8s-trust.yml
+```
+
+This playbook:
+- Gets fresh vault-auth token from K8s
+- Gets CA cert and issuer
+- Updates Vault kubernetes auth config
+
+**Step 3: Delete stuck pods to force re-authentication**
+
+```bash
+kubectl delete pod -n apps -l app=wordpress
+kubectl delete pod -n database mariadb-0
+kubectl delete pod -n monitoring -l app.kubernetes.io/name=grafana
+kubectl delete pod -n remediation -l app=remediation
+```
+
+### Permanent Fix
+
+Updated vault-auth-sa.yaml to include the token secret (K8s 1.24+ compatible):
+
+```yaml
+# kubernetes/dev/deployments/infrastructure/vault/vault-auth-sa.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-auth
+  namespace: kube-system
+---
+# Long-lived token secret for Kubernetes 1.24+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-auth-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: vault-auth
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+# ... rest of config
+```
+
+### Lessons Learned
+
+1. **Flux prune is dangerous when renaming Kustomizations** - resources get deleted
+2. **K8s 1.24+ doesn't auto-create SA token secrets** - must create explicitly
+3. **Always include token secrets in manifests** for ServiceAccounts that need long-lived tokens
+4. **Test Flux changes in dev first** before applying to prod
+
+---
+
 ## Summary
 
 | Issue | Root Cause | Fix |
@@ -347,3 +504,4 @@ Now remediation deploys with apps, AFTER infrastructure (vault) is healthy.
 | Issue 2 | NFS not ready at VM autostart | Increase delay or remove disk 2 |
 | Issue 3 | Flux no dependency ordering | Split into infrastructure-sync + apps-sync |
 | Issue 4 | Remediation in infrastructure folder | Move remediation to apps folder |
+| Issue 5 | Flux prune deleted vault-auth token on Kustomization rename | Add token secret to manifest, run integration playbook |
