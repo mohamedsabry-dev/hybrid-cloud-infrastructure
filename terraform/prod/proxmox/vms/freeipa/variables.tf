@@ -44,7 +44,7 @@ variable "freeipa" {
     stop_on_destroy = true
   }
 }
-
+#
 variable "template_vmid" {
   description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
