@@ -282,6 +282,63 @@ If secrets missing -> probe fails -> pod restarts -> eventually gets sidecar.
 
 ---
 
+## Issue 4: Remediation Service CrashLoopBackOff (Vault Injection)
+
+### Symptoms
+
+After applying Flux split (infrastructure-sync + apps-sync), remediation pod crashed:
+
+```bash
+[root@k8s-master1 ~]# kubectl get pods -n remediation
+NAME                           READY   STATUS             RESTARTS      AGE
+remediation-56bdddfcd7-4vjhx   0/1     CrashLoopBackOff   5 (2m36s ago) 7m47s
+```
+
+**Error logs:**
+```bash
+[root@k8s-master1 ~]# kubectl logs remediation-56bdddfcd7-4vjhx -n remediation
+Remediation service starting...
+Traceback (most recent call last):
+  File "/scripts/remediation.py", line 242, in <module>
+    main()
+  File "/scripts/remediation.py", line 216, in main
+    creds = load_proxmox_creds()
+  File "/scripts/remediation.py", line 32, in load_proxmox_creds
+    with open("/vault/secrets/proxmox-creds") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/vault/secrets/proxmox-creds'
+```
+
+### Root Cause
+
+Remediation was located in `infrastructure/` folder alongside `vault/`:
+
+```
+kubernetes/dev/deployments/infrastructure/
+  ├── vault/          # vault-agent-injector
+  ├── remediation/    # ALSO here - deploys SAME TIME as vault!
+  └── ...
+```
+
+Even with `infrastructure-sync.yaml` having a healthCheck on vault-agent-injector, all resources **within** the same Kustomization still deploy simultaneously. The healthCheck only affects when Flux marks the Kustomization as "ready" for dependent Kustomizations.
+
+### Fix
+
+Move remediation folder from `infrastructure/` to `apps/`:
+
+```bash
+git mv kubernetes/dev/deployments/infrastructure/remediation kubernetes/dev/deployments/apps/
+git mv kubernetes/prod/deployments/infrastructure/remediation kubernetes/prod/deployments/apps/
+```
+
+Updated kustomization files:
+- `kubernetes/dev/deployments/infrastructure/kustomization.yaml` - removed remediation
+- `kubernetes/dev/deployments/apps/kustomization.yaml` - added remediation
+- Same for prod
+
+Now remediation deploys with apps, AFTER infrastructure (vault) is healthy.
+
+---
+
 ## Summary
 
 | Issue | Root Cause | Fix |
@@ -289,3 +346,4 @@ If secrets missing -> probe fails -> pod restarts -> eventually gets sidecar.
 | Issue 1 | Wrong cronjob timing on prod | Update crontab to `*/5 * * * *` |
 | Issue 2 | NFS not ready at VM autostart | Increase delay or remove disk 2 |
 | Issue 3 | Flux no dependency ordering | Split into infrastructure-sync + apps-sync |
+| Issue 4 | Remediation in infrastructure folder | Move remediation to apps folder |
