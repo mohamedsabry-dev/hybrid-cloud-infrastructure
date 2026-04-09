@@ -7,4 +7,3 @@
 - Backup ETCD 
 - Backup RAFT
 - Check if the servers "proxmox" can shutdown if storage dropped first.
-- What deschduler is and how to use it.
