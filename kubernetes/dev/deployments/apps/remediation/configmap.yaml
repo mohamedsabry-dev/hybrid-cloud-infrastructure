@@ -12,8 +12,8 @@ data:
     # Configuration
     CHECK_INTERVAL = 120        # 2 minutes between checks
     REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
-    PROXMOX_NODE = "pve-dev"
-    NFS_STORAGE = "nas-dev-data"
+    PROXMOX_NODE = "pve-prod"
+    NFS_STORAGE = "nas-prod-data"
     TARGET_STORAGE = "local-lvm"
     POD_FAILURE_THRESHOLD = 0.7  # 70% pods failing triggers remediation
 
