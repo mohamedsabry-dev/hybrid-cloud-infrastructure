@@ -1,0 +1,291 @@
+# DR Task 5: Power Outage Recovery - Issues and Analysis
+## Date: 2026-04-09
+
+---
+
+## Background
+
+Before starting DR Test 1, a real electricity outage occurred causing force shutdown of storage and network.
+Laptops still had battery and UPS script simulation - at 55% it triggers smooth shutdown.
+
+The script ran automatically on dev server but didn't run on prod.
+Figured on prod by manual run - script triggered at 41% and started shutdown.
+Suspected wrong config in the cronjob since both servers have the same script.
+Electricity recovered after 3 hours.
+
+---
+
+## Issue 1: UPS Monitor Cronjob Misconfiguration
+
+### Observation
+
+**Dev server (correct):**
+```bash
+root@pve-dev:~# crontab -l
+*/5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
+0 21 * * 4,6 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log
+```
+
+**Prod server (incorrect):**
+```bash
+root@pve-prod:~# crontab -l
+0 21 * * 4,6 /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
+0 4 * * 0 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log
+root@pve-prod:~# ps | grep ups
+root@pve-prod:~#
+```
+
+### Root Cause
+Wrong cronjob timing on prod - UPS monitor runs only at 21:00 on Thu/Sat instead of every 5 minutes.
+
+### Fix
+Update prod crontab to match dev:
+```bash
+*/5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
+```
+
+---
+
+## Issue 2: FreeIPA VM Autostart Timeout (NFS Disk)
+
+After power restored, servers + NAS started at the same time.
+Faced same issue documented in: `troubleshooting/proxmox/12-vm-autostart-timeout-nfs-disk-not-ready.md`
+
+### Action Required
+- Final fix with proper delay OR
+- Remove disk 2 of FreeIPA (not needed)
+
+---
+
+## Issue 3: WordPress Database Connection Failure
+
+### Symptoms
+
+While Grafana and Prometheus survived, WordPress and DB did not work.
+
+**Error displayed:**
+```
+Warning: mysqli_real_connect(): (HY000/1045): Access denied for user 'wordpress'@'10.245.62.24' (using password: YES)
+Error establishing a database connection
+```
+
+### Initial Investigation
+
+**Check PVCs:**
+```bash
+[root@k8s-master1 ~]# kubectl get pvc -A
+NAMESPACE    NAME                                                   STATUS   VOLUME        CAPACITY   ACCESS MODES
+apps         wordpress-data                                         Bound    pvc-725345ea  30Gi       RWX
+database     mariadb-data-mariadb-0                                 Bound    pvc-ffbc1708  50Gi       RWO
+monitoring   alertmanager-kube-prometheus-stack-alertmanager-db-*   Bound    pvc-3d118aaf  10Gi       RWO
+monitoring   kube-prometheus-stack-grafana                          Bound    pvc-ee3f5248  10Gi       RWO
+monitoring   prometheus-kube-prometheus-stack-prometheus-db-*       Bound    pvc-81f03bec  50Gi       RWO
+monitoring   storage-loki-0                                         Bound    pvc-baa06fa4  100Gi      RWO
+```
+
+**Check pod status:**
+```bash
+[root@k8s-master1 ~]# kubectl get pods -n database
+NAME        READY   STATUS    RESTARTS   AGE
+mariadb-0   2/2     Running   0          12m
+
+[root@k8s-master1 ~]# kubectl get pods -n apps
+NAME                         READY   STATUS    RESTARTS   AGE
+wordpress-85b7f46448-k6qlw   1/1     Running   0          4h5m
+wordpress-85b7f46448-l4nl5   1/1     Running   0          4h4m
+wordpress-85b7f46448-rwxx9   1/1     Running   0          4h4m
+```
+
+**Key observation:** MariaDB shows 2/2 (has vault-agent sidecar), WordPress shows 1/1 (missing sidecar).
+
+**Check MariaDB logs:**
+```bash
+[root@k8s-master1 ~]# kubectl logs mariadb-0 -n database
+2026-04-09 12:52:56 0 [Note] mysqld: ready for connections.
+2026-04-09 12:53:01 3 [Warning] Aborted connection 3 to db: 'unconnected' user: 'unauthenticated' host: '10.0.54.11'
+2026-04-09 12:53:02 4 [Warning] Aborted connection 4 to db: 'unconnected' user: 'unauthenticated' host: '10.245.62.20'
+...
+```
+
+Connection drops due to failed authentication - WordPress can't get DB password from Vault.
+
+### Vault Secrets Investigation
+
+**Check WordPress secrets:**
+```bash
+[root@k8s-master1 ~]# kubectl exec -it deploy/wordpress -n apps -- bash
+root@wordpress-85b7f46448-rwxx9:/# ls -la /vault/secrets/
+ls: cannot access '/vault/secrets/': No such file or directory
+root@wordpress-85b7f46448-rwxx9:/# ps aux | grep vault-agent
+root  75  0.0  0.0  3500  1704 pts/0  S+  13:09  0:00 grep vault-agent
+```
+
+**Check MariaDB secrets (working):**
+```bash
+[root@k8s-master1 ~]# kubectl exec -it mariadb-0 -n database -- bash
+root@mariadb-0:/# cat /vault/secrets/db-creds
+MYSQL_ROOT_PASSWORD=#####
+MYSQL_PASSWORD=#####
+```
+
+Grafana/Prometheus also work normally with Vault secrets.
+
+### Compare Pod Annotations
+
+**MariaDB (working):**
+```bash
+[root@k8s-master1 ~]# kubectl get pod mariadb-0 -n database -o jsonpath='{.metadata.annotations}' | jq . | grep vault
+  "vault.hashicorp.com/agent-inject": "true",
+  "vault.hashicorp.com/agent-inject-secret-db-creds": "secret/data/mariadb/config",
+  "vault.hashicorp.com/agent-inject-status": "injected",   # <-- KEY DIFFERENCE
+  ...
+```
+
+**WordPress (not working):**
+```bash
+[root@k8s-master1 ~]# kubectl get pod -n apps -l app=wordpress -o jsonpath='{.items[0].metadata.annotations}' | jq . | grep vault
+  "vault.hashicorp.com/agent-inject": "true",
+  "vault.hashicorp.com/agent-inject-secret-db-creds": "secret/data/wordpress/config",
+  # MISSING: "vault.hashicorp.com/agent-inject-status": "injected"
+  ...
+```
+
+WordPress pods are MISSING the `agent-inject-status: injected` annotation - injection never happened.
+
+### Immediate Fix
+
+```bash
+[root@k8s-master1 tmp]# kubectl rollout restart deployment wordpress -n apps
+deployment.apps/wordpress restarted
+
+[root@k8s-master1 tmp]# kubectl get pods -o wide -n apps
+NAME                         READY   STATUS        RESTARTS   AGE
+wordpress-69dd8cd7b4-47dzg   2/2     Running       0          21s    # Now 2/2!
+wordpress-69dd8cd7b4-rcbcx   2/2     Running       0          36s    # Now 2/2!
+wordpress-69dd8cd7b4-z4lgv   2/2     Terminating   0          11s
+wordpress-85b7f46448-k6qlw   1/1     Running       0          4h49m  # Old pod
+wordpress-864d767547-clhhr   1/2     Running       0          9s
+```
+
+---
+
+## Issue 3 - ROOT CAUSE ANALYSIS
+
+### Symptoms
+- WordPress showing "Error establishing a database connection"
+- WordPress pods running as 1/1 instead of 2/2 (missing vault-agent sidecar)
+- MariaDB pods running correctly as 2/2 with vault-agent sidecar
+- /vault/secrets/ directory missing inside WordPress pods
+
+### Investigation Steps
+
+**1. Compared annotations between MariaDB (working) and WordPress (not working):**
+- MariaDB had: `vault.hashicorp.com/agent-inject-status: injected`
+- WordPress was MISSING this annotation (injection never happened)
+
+**2. Checked Vault Agent Injector status:**
+- Injector pod running and healthy
+- Webhook registered correctly
+- No errors in injector logs
+
+**3. Compared timestamps:**
+```bash
+kubectl get pod -n apps -l app=wordpress -o jsonpath='{.metadata.name}: Created={.metadata.creationTimestamp} Started={.status.containerStatuses[0].state.running.startedAt}'
+```
+- WordPress pods Created: 09:00:09Z - 09:00:27Z
+- WordPress containers Started: 12:54:09Z - 12:54:11Z
+- Vault Injector Started: 12:14:45Z, Ready: 12:14:51Z
+
+**4. Key Finding - Checked etcd backup from 10:40 AM (before outage):**
+```bash
+ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2399 get /registry/pods/apps --prefix --keys-only | grep wordpress
+/registry/pods/apps/wordpress-85b7f46448-cx2ct   # Different pods!
+/registry/pods/apps/wordpress-85b7f46448-dm82c
+/registry/pods/apps/wordpress-85b7f46448-nh7hl
+
+ETCDCTL_API=3 etcdctl ... | strings | grep -i "vault-agent"
+vault-agent        # OLD pods HAD the sidecar!
+vault-agent-init
+```
+
+**5. Confirmed:** Old pods (before outage) had vault-agent, current pods do not.
+This proves a deployment rollout happened during recovery.
+
+### Root Cause
+
+The Flux Kustomization (`deployments-sync.yaml`) applies BOTH infrastructure and apps in a SINGLE reconciliation with NO DEPENDENCY ordering:
+
+```yaml
+# kubernetes/dev/flux/deployments-sync.yaml
+path: ./kubernetes/dev/deployments    # Applies everything at once
+
+# kubernetes/dev/deployments/kustomization.yaml
+resources:
+  - infrastructure   # vault-agent-injector here
+  - apps             # wordpress here - NO DEPENDENCY!
+```
+
+**When Flux reconciles after cluster recovery:**
+1. Flux applies ALL manifests simultaneously
+2. Vault HelmRelease triggers -> Injector pod starts spinning up
+3. WordPress Deployment triggers -> NEW pods created IMMEDIATELY
+4. But Vault Injector isn't READY yet -> pods created WITHOUT sidecar
+5. WordPress pods come up as 1/1 (no vault-agent) -> can't get DB password
+
+### Why MariaDB Worked
+
+MariaDB was recreated LATER (64 minutes ago vs 4+ hours for WordPress).
+By the time MariaDB StatefulSet was reconciled, the Vault Injector was ready.
+
+| Time     | Event                                            |
+|----------|--------------------------------------------------|
+| 09:00 AM | WordPress pods created (injector NOT ready)      |
+| 11:00 AM | Power outage                                     |
+| 12:14 PM | Vault Injector starts and becomes ready          |
+| 12:52 PM | MariaDB pod recreated (injector now ready) 2/2   |
+| 12:54 PM | WordPress containers restart (same old pods) 1/1 |
+
+### Immediate Fix
+```bash
+kubectl rollout restart deployment wordpress -n apps
+# This forces new pods to go through the now-ready webhook
+```
+
+### Permanent Fix
+
+Split Flux Kustomizations with dependency ordering:
+
+1. `infrastructure-sync.yaml` - Deploys infra with healthCheck on vault-agent-injector
+2. `apps-sync.yaml` - dependsOn: infrastructure (waits for vault to be healthy)
+
+**Files created:**
+- `kubernetes/dev/flux/infrastructure-sync.yaml`
+- `kubernetes/dev/flux/apps-sync.yaml`
+- `kubernetes/prod/flux/infrastructure-sync.yaml`
+- `kubernetes/prod/flux/apps-sync.yaml`
+
+This ensures apps only deploy AFTER vault-agent-injector is healthy.
+
+### Alternative Self-Healing Fix
+
+Add liveness probe to WordPress that checks for vault secrets:
+
+```yaml
+livenessProbe:
+  exec:
+    command: ["test", "-f", "/vault/secrets/db-creds"]
+  initialDelaySeconds: 60
+  periodSeconds: 10
+```
+
+If secrets missing -> probe fails -> pod restarts -> eventually gets sidecar.
+
+---
+
+## Summary
+
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| Issue 1 | Wrong cronjob timing on prod | Update crontab to `*/5 * * * *` |
+| Issue 2 | NFS not ready at VM autostart | Increase delay or remove disk 2 |
+| Issue 3 | Flux no dependency ordering | Split into infrastructure-sync + apps-sync |

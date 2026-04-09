@@ -186,33 +186,62 @@ qm config 1001 | grep startup
 
 ---
 
-## 9. Commands Reference
+## 9. Commands Used During Investigation
 
-### Check VM Startup Config
+### Check Network Interfaces
 ```bash
-qm config 1001 | grep startup
+ip a
 ```
 
-### Manually Set Startup Delay
+### Check Proxmox Task Logs
 ```bash
-qm set 1001 --startup order=1,up=180,down=60
+cat /var/log/pve/tasks/active
+grep -r "1001" /var/log/pve/tasks/
+```
+
+### Check Journal Logs for VM 1001
+```bash
+journalctl -u pvedaemon --since "1 hour ago" | grep 1001
+journalctl | grep -i "qemu\|kvm\|1001" | tail -50
+grep "1001" /var/log/syslog | tail -30
+```
+
+### Check Kernel Logs for NFS/Mount Issues
+```bash
+journalctl -k --since "23:01" --until "23:03" | grep -i "nfs\|mount\|nas"
+```
+
+### Check All Logs for Storage/Mount Events
+```bash
+journalctl --since "23:01" --until "23:03" | grep -i "nas-dev-data\|nfs\|mount"
+journalctl --since "23:01" --until "23:05" | grep -iE "stor|nfs|mount|nas|timeout"
+```
+
+### Check NFS Mount Unit Logs
+```bash
+journalctl -u mnt-pve-nas\\x2ddev\\x2ddata.mount --since "23:00" --until "23:20"
+```
+
+### Check Disk File Access During Boot
+```bash
+journalctl --since "23:01" --until "23:03" | grep -i "vm-1001-disk-0.raw\|images/1001"
 ```
 
 ### Check NFS Mount Status
 ```bash
+stat /mnt/pve/nas-dev-data
 systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
-mount | grep nas-dev-data
 ```
 
-### Check VM Task Logs
+### Check Storage Configuration
 ```bash
-grep "1001" /var/log/pve/tasks/active
-journalctl | grep -i "1001" | tail -50
+cat /etc/pve/storage.cfg | grep -A10 nas-dev-data
 ```
 
-### View Failed Task Details
+### VM Startup Configuration
 ```bash
-cat /var/log/pve/tasks/active | grep "qmstart:1001"
+qm config 1001 | grep startup
+qm set 1001 --startup order=1,up=180,down=60
 ```
 
 ---

@@ -4,6 +4,35 @@
 
 ---
 
+### Scenario 0.0 — Full Environment Backup (Pre-requisite)
+Complete Proxmox backup of all VMs/LXCs before DR testing begins.
+This is your rollback point if anything goes wrong during scenarios 0.1-0.9.
+
+**VMs:**
+- [ ] 1001 (freeipa)
+- [ ] 1010 (k8s-master1)
+- [ ] 1011 (k8s-master2)
+- [ ] 1012 (k8s-master3)
+- [ ] 1020 (k8s-worker1)
+- [ ] 1021 (k8s-worker2)
+- [ ] 1022 (k8s-worker3)
+
+**LXCs:**
+- [ ] 2001 (ansible)
+- [ ] 2002 (local-runner)
+- [ ] 2003 (ex-nginx)
+- [ ] 2004 (vault1)
+- [ ] 2005 (vault2)
+- [ ] 2006 (vault3)
+
+**Backup Method:** Proxmox vzdump (snapshot mode)
+**Backup Destination:** NAS storage
+**Retention:** Keep until all DR scenarios complete successfully
+ 
+→ Verify all backups completed before proceeding to 0.1
+
+---
+
 ### Scenario 0.1 — ETCD Backup & Restore (Normal)
 Backup etcd snapshot under normal operation → restore → verify cluster state.
 → Run checklist.
