@@ -4,6 +4,17 @@ metadata:
   name: vault-auth
   namespace: kube-system
 ---
+# Long-lived token secret for Kubernetes 1.24+
+# Required for Vault kubernetes auth to validate tokens
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-auth-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: vault-auth
+type: kubernetes.io/service-account-token
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

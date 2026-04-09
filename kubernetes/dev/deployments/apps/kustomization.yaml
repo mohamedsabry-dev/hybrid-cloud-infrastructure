@@ -6,3 +6,5 @@ resources:
   - testing
   - mariadb
   - wordpress
+  # Moved from infrastructure/ - requires vault-agent injection
+  - remediation
