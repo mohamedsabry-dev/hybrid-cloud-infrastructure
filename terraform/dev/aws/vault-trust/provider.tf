@@ -10,7 +10,7 @@ terraform {
   
   backend "s3" {
     bucket         = "hybrid-cloud-infrastructure-tf-state-dev-v2"
-    key            = "dev/aws/secrets/terraform.tfstate"
+    key            = "dev/aws/vault-trust/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev-v2"
