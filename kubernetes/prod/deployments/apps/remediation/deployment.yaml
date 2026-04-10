@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remediation
+  namespace: remediation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: remediation
+  template:
+    metadata:
+      labels:
+        app: remediation
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "remediation"
+        vault.hashicorp.com/agent-inject-secret-proxmox-creds: "secret/data/remediation/config"
+        vault.hashicorp.com/agent-inject-template-proxmox-creds: |
+          {{- with secret "secret/data/remediation/config" -}}
+          PROXMOX_HOST={{ .Data.data.host }}
+          PROXMOX_TOKEN_ID={{ .Data.data.token_id }}
+          PROXMOX_TOKEN_SECRET={{ .Data.data.token_secret }}
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: remediation-sa
+      priorityClassName: self-healing-critical
+      containers:
+        - name: remediation
+          image: ghcr.io/mohamedsabry-dev/remediation:latest
+          imagePullPolicy: Always
+          command: ["python", "-u", "/scripts/remediation.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      volumes:
+        - name: script
+          configMap:
+            name: remediation-script

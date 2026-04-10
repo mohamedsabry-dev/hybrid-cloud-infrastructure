@@ -1,0 +1,28 @@
+[ansible]
+ansible.home.lab ansible_connection=local
+
+[ipa]
+ipa.home.lab
+
+[monitor]
+monitor.home.lab
+
+[k8s]
+k8s-master.home.lab
+k8s-worker1.home.lab
+k8s-worker2.home.lab
+k8s-worker3.home.lab
+
+[vault]
+vault-01.home.lab
+vault-02.home.lab
+vault-03.home.lab
+
+[cicd]
+jenkins-master.home.lab
+
+[all:vars]
+ansible_user=super_ansible
+
+# Command to run playbook with this inventory file:
+# ansible-playbook -i Codes/Ansible-Playbooks/inventory your_playbook

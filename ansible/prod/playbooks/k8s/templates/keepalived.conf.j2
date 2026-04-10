@@ -1,0 +1,31 @@
+vrrp_script check_haproxy {
+    script "killall -0 haproxy"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+{% for master in masters %}
+{% if master.ip == ansible_default_ipv4.address %}
+    state {{ 'MASTER' if loop.index == 1 else 'BACKUP' }}
+    priority {{ master.priority }}
+{% endif %}
+{% endfor %}
+
+    interface {{ interface }}
+    virtual_router_id 51
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ k8s_keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ vip }}/24
+    }
+
+    track_script {
+        check_haproxy
+    }
+}

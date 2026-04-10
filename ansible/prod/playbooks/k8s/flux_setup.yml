@@ -1,0 +1,57 @@
+---
+- name: Install Flux on K8s
+  hosts: k8s-master1.lab.local
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Check if Flux is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/flux
+      register: flux_binary
+
+    - name: Install Flux
+      ansible.builtin.shell:
+        cmd: curl -s https://fluxcd.io/install.sh | sudo bash
+      when: not flux_binary.stat.exists
+
+    - name: Check flux pre flight
+      ansible.builtin.shell:
+        cmd: /usr/local/bin/flux check --pre
+      register: flux_check
+      failed_when: flux_check.rc != 0
+
+    - name: Check if Flux already bootstrapped
+      ansible.builtin.shell: kubectl get namespace flux-system
+      register: flux_ns
+      failed_when: false
+      changed_when: false
+
+    - name: Bootstrap Flux
+      ansible.builtin.shell:
+        cmd: >-
+          /usr/local/bin/flux bootstrap github
+          --owner={{ gh_username }}
+          --repository=hybrid-cloud-infrastructure
+          --branch=prod
+          --path=./kubernetes/prod/flux
+          --personal
+          --token-auth=false
+      when: flux_ns.rc != 0
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+        GITHUB_TOKEN: "{{ gh_admin_pat_token_flux }}"
+
+
+    - name: Wait for Flux to be ready
+      ansible.builtin.pause:
+        prompt: "Waiting for Flux to be ready..."
+        minutes: 2
+
+    - name: Check flux status
+      ansible.builtin.shell: kubectl -n flux-system get all
+      register: flux_status
+
+    - name: Output flux status
+      ansible.builtin.debug:
+        var: flux_status.stdout

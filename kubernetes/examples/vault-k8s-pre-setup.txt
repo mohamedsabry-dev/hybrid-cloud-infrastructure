@@ -1,0 +1,36 @@
+kubectl cluster-info
+Kubernetes control plane is running at https://10.0.61.100:16443
+
+kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d
+
+  # Get its token
+kubectl create token vault-auth -n kube-system --duration=30000h 
+
+kubectl get --raw /.well-known/openid-configuration | python3 -m json.tool | grep issuer
+
+"issuer": "https://kubernetes.default.svc.cluster.local",
+
+
+  "" On VAUKT "" # Initiak :
+  1- Rnable secret 
+  2- trsut K8s 
+  3- Run script to create app policy,role,secret 
+vault login -method=ldap username=sabry
+vault secrets enable -path=secret kv-v2
+
+
+ vault auth enable kubernetes  
+
+cat > /tmp/k8s-ca.crt << 'EOF'
+-----BEGIN CERTIFICATE-----
+certificate_Value                                                           
+-----END CERTIFICATE-----
+EOF
+
+cat > /tmp/k8s.tk.jwt << 'EOF'
+token_value
+EOF
+
+
+  Then update Vault config:                                                  
+vault write auth/kubernetes/config kubernetes_host="https://10.0.61.100:16443" kubernetes_ca_cert=@/tmp/k8s-ca.crt token_reviewer_jwt=@/tmp/k8s.tk.jwt issuer="https://kubernetes.default.svc.cluster.local" disable_iss_validation=false

@@ -1,0 +1,53 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-retain
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: "10.0.40.120"
+  share: "/volume1/k8s-dev"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=3
+  - nolock
+  - soft
+  - timeo=30
+  - retrans=3
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-delete
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: "10.0.40.120"
+  share: "/volume1/k8s-dev"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=3
+  - nolock
+  - soft
+  - timeo=30
+  - retrans=3
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-database
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: "10.0.40.120"
+  share: "/volume1/k8s-dev"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=3
+  - nolock
+  - hard
+  - timeo=600
+  - retrans=5
+  - intr

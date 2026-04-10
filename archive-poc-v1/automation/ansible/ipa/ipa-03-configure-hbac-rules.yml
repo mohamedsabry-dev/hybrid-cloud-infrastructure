@@ -1,0 +1,125 @@
+---
+
+- name: Phase 2 b - Configuration HBAC Rules 
+  hosts: ipa
+  become: yes
+
+  vars_prompt:
+    - name: "ipaadmin_password"
+      prompt: "Enter IPA Admin Password"
+      private: yes
+
+  tasks:
+    # ========================================
+    # Rule 1: K8s Access
+    - name: HBAC Rule - K8s Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_k8s_ssh
+        description: "Allow Standard, Ops, and admin SSH to K8s"
+        group:
+          - operators
+          - k8s_admins
+        hostgroup:
+          - k8s
+        hbacsvc:
+          - sshd
+        state: present
+
+    # ========================================
+    # Rule 2: Controller Access
+    - name: HBAC Rule - Controller Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_controller_ssh
+        description: "Allow Ansible Admins to SSH into Controllers"
+        group:
+          - ansible_admins
+        hostgroup:
+          - controllers
+        hbacsvc:
+          - sshd
+        state: present
+
+    # ========================================
+    # Rule 3: Super Users Automation Access
+    - name: HBAC Rule - Automation Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_automation_ssh
+        description: "Allow Super Ansible to SSH everywhere"
+        group:
+          - super_users
+        hostgroup:
+          - k8s
+          - controllers
+          - management
+          - backup_servers
+          - vault_servers
+          - cicd_servers
+        hbacsvc:
+          - sshd
+        state: present
+
+    # ========================================
+    # Rule 4: Backup Users Access Control
+    - name: HBAC Rule - Backup Users Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_backup_ssh
+        description: "Allow Backup Users to SSH into Backup Servers"
+        group:
+          - backup_admins
+        hostgroup:
+          - backup_servers
+        hbacsvc:
+          - sshd
+        state: present
+    
+    # ========================================
+    # Rule 5: Vault Users Access Control
+    - name: HBAC Rule - Vault Users Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_vault_ssh
+        description: "Allow Vault Admins to SSH into Vault Servers"
+        group:
+          - vault_admins
+        hostgroup:
+          - vault_servers
+        hbacsvc:
+          - sshd
+        state: present
+
+# ========================================
+
+    # Rule 6: CI/CD Admins Access Control
+    - name: HBAC Rule - CI/CD Admins Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_cicd_ssh
+        description: "Allow CI/CD Admins to SSH into CI/CD Servers"
+        group:
+          - cicd_admins
+        hostgroup:
+          - cicd_servers
+        hbacsvc:
+          - sshd
+        state: present  
+
+    # ========================================
+    # Rule 7: Monitoring Admins Access Control
+    - name: HBAC Rule - Monitoring Admins Access
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: allow_monitoring_ssh
+        description: "Allow Monitoring Admins to SSH into Monitoring Servers"
+        group:
+          - monitor_admins
+        hostgroup:
+          - monitors
+        hbacsvc:
+          - sshd
+        state: present
+
+# End of Playbook

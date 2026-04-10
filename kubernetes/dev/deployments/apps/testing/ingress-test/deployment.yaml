@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-test
+  namespace: testing
+  labels:
+    app: ingress-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingress-test
+  template:
+    metadata:
+      labels:
+        app: ingress-test
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+      initContainers:
+      - name: setup-html
+        image: busybox
+        command: ['sh', '-c', 'echo "<h1>Ingress Test App Working!</h1><p>Host: $(hostname)</p><p>Served via NGINX Ingress Controller</p>" > /html/index.html']
+        volumeMounts:
+        - name: html
+          mountPath: /html
+      volumes:
+      - name: html
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-test
+  namespace: testing
+spec:
+  type: ClusterIP
+  selector:
+    app: ingress-test
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test
+  namespace: testing
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: nginx-test-dev.lab.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ingress-test
+            port:
+              number: 80

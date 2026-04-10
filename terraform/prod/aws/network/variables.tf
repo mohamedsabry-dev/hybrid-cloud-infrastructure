@@ -9,13 +9,13 @@ variable "environment" {
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "eu-west-2"
+  default     = "us-east-1"
 }
 
 variable "availability_zone" {
   description = "Availability zone for subnets"
   type        = string
-  default     = "eu-west-2a"
+  default     = "us-east-1a"
 }
 
 variable "vpc_cidr" {
@@ -34,4 +34,10 @@ variable "subnet_mgmt_cidr" {
   description = "CIDR block for management subnet"
   type        = string
   default     = "172.17.63.0/24"
+}
+
+variable "dns_ingress_ip" {
+  description = "IP address for Route53 DNS records (ingress/proxy server)"
+  type        = string
+  default     = "10.0.55.10"
 }

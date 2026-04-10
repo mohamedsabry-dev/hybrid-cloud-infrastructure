@@ -18,6 +18,7 @@ on:
     paths:
       - 'terraform/prod/proxmox/vms/k8s_masters/**'
       - 'terraform/prod/proxmox/vms/k8s_workers/**'
+      - 'ansible/prod/playbooks/k8s/**'
       - '.github/workflows/prod-k8s-full-setup.yml'
 
 # -----------------------------------------------------------------------------
@@ -32,6 +33,8 @@ permissions:
 # -----------------------------------------------------------------------------
 env:
   ENVIRONMENT: prod
+  ANSIBLE_HOST: 10.0.53.10
+  ANSIBLE_USER: root
 
 # =============================================================================
 # Jobs
@@ -182,3 +185,64 @@ jobs:
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Setup K8s Cluster
+  # Installs and configures Kubernetes cluster via Ansible
+  # Lock: PROD_SVC_K8S_CLUSTER_SETUP
+  # ---------------------------------------------------------------------------
+  deploy-k8s-cluster:
+    name: "3. Setup K8s Cluster"
+    runs-on: prod-local-runner
+    needs: deploy-workers
+    if: ${{ always() && needs.deploy-workers.result != 'failure' && needs.deploy-workers.result != 'cancelled' && vars.PROD_SVC_K8S_CLUSTER_SETUP != 'true' }}
+
+    steps:
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_PROD }}
+
+      - name: Fetch GH Admin PAT and assign to ansible variable
+        run: |
+          GH_TOKEN=${{ secrets.GH_ADMIN_PAT_FLUX }}
+          GH_USERNAME=${{ secrets.GH_USERNAME }}
+          echo "::add-mask::${GH_TOKEN}"
+          echo "::add-mask::${GH_USERNAME}"
+          echo "GH_TOKEN=${GH_TOKEN}" >> $GITHUB_ENV
+          echo "GH_USER=${GH_USERNAME}" >> $GITHUB_ENV
+
+      - name: Fetch Keytab and Initialize Kerberos
+        run: |
+          # Fetch keytab and pipe to Ansible host - kinit immediately, delete keytab
+          aws secretsmanager get-secret-value \
+            --secret-id prod/super_bot/keytab \
+            --query SecretString --output text | base64 -d > /tmp/super_bot.keytab
+
+          cat /tmp/super_bot.keytab | ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} \
+            "cat > /tmp/kt && kinit -kt /tmp/kt super_bot@LAB.LOCAL && rm -f /tmp/kt"
+          rm -f /tmp/super_bot.keytab
+
+      - name: Pull latest code
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "cd /srv/repo/ && git pull origin prod"
+
+      - name: Run K8s setup playbook
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
+            export GH_TOKEN='${{ env.GH_TOKEN }}' && \
+            export GH_USER='${{ env.GH_USER }}' && \
+            cd /srv/repo/ansible/prod/ && \
+            ansible-playbook -i inventory/inventory.ini playbooks/common/pre_setup.yml --limit k8s && \
+            ansible-playbook -i inventory/inventory.ini playbooks/common/ntp.yml --limit k8s && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_setup.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_init.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_important_tools.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/flux_setup.yml"
+
+      - name: Cleanup Kerberos ticket
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "kdestroy" || true

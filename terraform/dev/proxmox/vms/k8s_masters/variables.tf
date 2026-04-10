@@ -2,6 +2,12 @@
 # K8s Control Plane Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the VM [type, service, category, environment]"
+  type        = list(string)
+  default     = ["vm", "k8s-master", "kubernetes", "dev"]
+}
+
 #-------------------------------------------------------------------------------
 # K8s Master 1
 #-------------------------------------------------------------------------------
@@ -28,14 +34,14 @@ variable "k8s_master1" {
     vmid           = 1010
     name           = "k8s-master1"
     cores          = 2
-    memory         = 2048
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.10/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
     vlan_id        = 61
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 8
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -68,14 +74,14 @@ variable "k8s_master2" {
     vmid           = 1011
     name           = "k8s-master2"
     cores          = 2
-    memory         = 2048
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.11/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
     vlan_id        = 61
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 9
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -108,14 +114,14 @@ variable "k8s_master3" {
     vmid           = 1012
     name           = "k8s-master3"
     cores          = 2
-    memory         = 2048
+    memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.12/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
     vlan_id        = 61
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 10
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -126,9 +132,9 @@ variable "k8s_master3" {
 # Common Variables
 #-------------------------------------------------------------------------------
 variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+  description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {

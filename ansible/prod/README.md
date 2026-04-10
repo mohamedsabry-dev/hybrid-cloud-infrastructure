@@ -23,6 +23,9 @@ ansible/prod/
 │       ├── ansible.yml         # Ansible control node (reserved)
 │       ├── local_runner.yml    # CI/CD runners (reserved)
 │       └── nginx.yml           # Nginx proxy (reserved)
+├── examples/                   # Manual operations & usage examples
+│   └── vault/
+│       └── usage.md            # Vault CLI and API examples
 └── playbooks/
     ├── ansible/                # Ansible node setup
     │   ├── README.md
@@ -266,7 +269,7 @@ NTP is configured separately via `playbooks/common/ntp.yml` with different templ
 FreeIPA configured with custom UID range (60001-65500) to fit within LXC unprivileged container UID mapping:
 - Must be > UID_MAX (60000) from /etc/login.defs
 - Must be < 65536 for unprivileged LXC container compatibility
-- See /troubleshooting/linux/21-lxc-uid-mapping-initgroups-error.md for full explanation
+- See /troubleshooting/identity/6-freeipa-lxc-uid-range-investigation.md for full explanation
 
 ### Credential Approaches
 
@@ -305,6 +308,7 @@ Each playbook folder has its own README.md with specific documentation:
 
 - **operation_guide.txt** - Day-to-day operations, keytab setup, git workflow
 - **ansible.cfg** - Ansible configuration settings (with detailed comments)
+- **examples/** - Manual operations and usage examples (Vault, K8s, etc.)
 - **/troubleshooting/** - Troubleshooting cases (identity, linux, vault, etc.)
 - **.github/workflows/** - GitHub Actions workflows that run these playbooks
 

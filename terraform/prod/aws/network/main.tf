@@ -58,3 +58,26 @@ resource "aws_route_table_association" "rta_mgmt" {
   subnet_id      = aws_subnet.subnet_mgmt.id
   route_table_id = aws_route_table.rt_public.id
 }
+
+resource "aws_route53_zone" "private" {
+  name = "lab.local"
+
+  vpc {
+    vpc_id = aws_vpc.vpc_main.id
+    vpc_region = var.aws_region
+  }
+}
+
+locals {
+  dns_records = ["nginx-test", "nginx", "prometheus", "grafana", "loki", "wordpress"]
+}
+
+resource "aws_route53_record" "services" {
+  for_each = toset(local.dns_records)
+
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "${each.key}-prod"
+  type    = "A"
+  ttl     = 300
+  records = [var.dns_ingress_ip]
+}

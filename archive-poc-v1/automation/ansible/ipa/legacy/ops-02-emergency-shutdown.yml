@@ -1,0 +1,89 @@
+---
+# ---------------------------------------------------------
+# PHASE 1: K8S WORKERS (Stop the workload)
+# ---------------------------------------------------------
+- name: Emergency Shutdown - Phase 1 (K8s Workers)
+  # We use a wildcard pattern to target only workers
+  hosts: "k8s-worker*" 
+  become: yes
+  tasks:
+    # Manual equivalent:
+    #   ssh k8s-worker1 "sudo shutdown -h now"
+    #   ssh k8s-worker2 "sudo shutdown -h now"
+    # Note: async and poll allow SSH to exit gracefully before shutdown
+    - name: Power off Workers
+      ansible.builtin.shell: shutdown -h now
+      async: 1
+      poll: 0
+      ignore_errors: yes
+
+# ---------------------------------------------------------
+# PHASE 2: K8S MASTER (Stop the Control Plane)
+# ---------------------------------------------------------
+- name: Emergency Shutdown - Phase 2 (K8s Master)
+  # We target the master specifically
+  hosts: "k8s-master*"
+  become: yes
+  tasks:
+    # Manual equivalent:
+    #   sleep 30  # Wait for workers to shut down
+    - name: Wait for Workers to die (Safety Buffer)
+      ansible.builtin.pause:
+        seconds: 30
+
+    # Manual equivalent:
+    #   ssh k8s-master "sudo shutdown -h now"
+    - name: Power off Master
+      ansible.builtin.shell: shutdown -h now
+      async: 1
+      poll: 0
+      ignore_errors: yes
+
+# ---------------------------------------------------------
+# PHASE 3: IDENTITY (Stop the Database)
+# ---------------------------------------------------------
+- name: Emergency Shutdown - Phase 3 (IPA Server)
+  hosts: ipa
+  become: yes
+  tasks:
+    # Manual equivalent:
+    #   sleep 60  # Wait for master to shut down
+    - name: Wait for Master to die
+      ansible.builtin.pause:
+        seconds: 60
+
+    # Manual equivalent:
+    #   ssh ipa "sudo shutdown -h now"
+    - name: Power off IPA
+      ansible.builtin.shell: shutdown -h now
+      async: 1
+      poll: 0
+      ignore_errors: yes
+
+# ---------------------------------------------------------
+# PHASE 4: REPORT BACK (The Signal)
+# ---------------------------------------------------------
+- name: Emergency Shutdown - Phase 4 (Ansible Self-Destruct)
+  hosts: ansible # Targets the Ansible VM itself
+  become: yes
+  tasks:
+    # Manual equivalent:
+    #   echo "Internal Environment Secured. Scheduling Ansible shutdown in 1 minute."
+    - name: Report Status to Windows
+      ansible.builtin.debug:
+        msg: "Internal Environment Secured. Scheduling Ansible shutdown in 1 minute."
+
+    # Manual equivalent:
+    #   sleep 40  # Wait for IPA to shut down
+    - name: Wait for IPA to die
+      ansible.builtin.pause:
+        seconds: 40
+
+    # Manual equivalent (on the Ansible VM itself):
+    #   shutdown -h now
+    # This is the final shutdown - Ansible controller shuts itself down last
+    - name: Schedule Shutdown (1 min delay to allow SSH to exit cleanly)
+      ansible.builtin.shell: shutdown -h now
+      async: 1
+      poll: 0
+      ignore_errors: yes

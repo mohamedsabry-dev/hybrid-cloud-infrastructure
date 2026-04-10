@@ -1,0 +1,31 @@
+vrrp_script check_vault {
+    script "killall -0 vault"
+    interval 2
+    weight 2
+}
+
+vrrp_instance VI_1 {
+{% for node in cluster %}
+{% if node.ip == ansible_default_ipv4.address %}
+    state {{ 'MASTER' if loop.index == 1 else 'BACKUP' }}
+    priority {{ node.priority }}
+{% endif %}
+{% endfor %}
+
+    interface {{ interface }}
+    virtual_router_id 52
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ vault_keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ vip }}/24
+    }
+
+    track_script {
+        check_vault
+    }
+}

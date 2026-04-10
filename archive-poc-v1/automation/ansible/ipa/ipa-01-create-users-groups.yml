@@ -1,0 +1,96 @@
+---
+
+- name: Phase 1 - Identity Structure (Users & Groups)
+  hosts: ipa
+  become: yes
+  vars: 
+    default_pass: "Change_Me"
+
+    my_groups:
+      - { name: "operators", desc: "K8s Operators (Restricted Sudo)"}
+      - { name: "monitors", desc: "Monitoring Service Accounts" }
+      - { name: "k8s_admins", desc: "Full K8s Cluster Admins" }
+      - { name: "ansible_admins", desc: "Ansible Controller Admins" }
+      - { name: "super_users", desc: "Admins with super privilages" }
+      - { name: "backup_admins", desc: "Backup Administrators" }
+      - { name: "vault_admins", desc: "Vault Access admins" }
+      - { name: "cicd_admins", desc: "Standard Login admins" }
+      - { name: "monitor_admins", desc: "Monitoring Admins" }
+
+
+
+
+
+    my_users:
+      
+      # The Standasrd Users (Login Only)
+      - { uid: cicd_admin1, first: cicd, last: admin1, group: cicd_admins }
+      - { uid: cicd_admin2, first: cicd, last: admin2, group: cicd_admins }
+
+      # The Operators (Restricted Sudo)
+      - { uid: operator1, first: Op, last: One, group: operators }
+      - { uid: operator2, first: Op, last: Two, group: operators }
+
+      
+        # The Monitors (No Shell/API only later)
+      - { uid: monitor1, first: Mon, last: One, group: monitors }
+      - { uid: monitor2, first: Mon, last: Two, group: monitors }
+
+      # The Admins K8s & Ansible
+      - { uid: admin1, first: Admin, last: One, group: k8s_admins }
+      - { uid: admin2, first: Admin, last: Two, group: k8s_admins }
+      - { uid: ansible_admin, first: Ansible, last: Admin, group: ansible_admins }
+      
+      # Super User Automation
+      - { uid: super_ansible, first: super, last: ansible, group: super_users }
+
+      # Backup Users
+      - { uid: veeam, first: Backup, last: veeam, group: backup_admins }
+
+      # Vault Users
+      - { uid: vault_admin1, first: Vault, last: Admin1, group: vault_admins }
+      - { uid: vault_admin2, first: Vault, last: Admin2, group: vault_admins }
+      
+      # Monitoring Admins
+      - { uid: mon_admin1, first: Mon, last: Admin1, group: monitor_admins }
+      - { uid: mon_admin2, first: Mon, last: Admin2, group: monitor_admins }
+
+  vars_prompt:
+    - name: "ipaadmin_password"
+      prompt: "Enter IPA Admin Password"
+      private: yes
+
+
+  tasks:
+   - name: Ensure Groups Exist
+     freeipa.ansible_freeipa.ipagroup:
+       ipaadmin_password: "{{ ipaadmin_password }}"
+       name: "{{ item.name }}"
+       description: "{{ item.desc }}"
+       state: present
+     loop: "{{ my_groups }}"
+
+   - name: Ensure Users exist
+     freeipa.ansible_freeipa.ipauser:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.uid }}"
+        first: "{{ item.first }}"
+        last: "{{ item.last }}"
+        password: "{{ default_pass }}"
+        update_password: on_create
+        state: present
+     loop: "{{ my_users }}"
+
+   - name: Assign Users to Groups
+     freeipa.ansible_freeipa.ipagroup:
+       ipaadmin_password: "{{ ipaadmin_password }}"
+       name: "{{ item.group }}"
+       user:
+          - "{{ item.uid }}"
+       action: member
+     loop: "{{ my_users }}"
+
+  
+## run the playbook with:
+# ansible-playbook -i inventories/ipa_inventory Codes/Ansible-Playbooks/IPA/ipa-01-create-users-groups.yml
+

@@ -1,0 +1,31 @@
+---
+- name: Check NTP Status on All VMs
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check if chronyd is running
+      command: systemctl is-active chronyd
+      register: chrony_status
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Get current NTP sources
+      command: chronyc sources
+      register: chrony_sources
+      changed_when: false
+
+    - name: Read chrony configuration file
+      command: cat /etc/chrony.conf
+      register: chrony_config
+      changed_when: false
+
+    - name: Display Status and Sources of NTP
+      debug:
+        msg:
+          - "Chronyd Status: {{ chrony_status.stdout }}"
+          - "{{ chrony_sources.stdout_lines }}"
+
+    - name: Display Chrony Config File
+      debug:
+        msg: "{{ chrony_config.stdout_lines }}"

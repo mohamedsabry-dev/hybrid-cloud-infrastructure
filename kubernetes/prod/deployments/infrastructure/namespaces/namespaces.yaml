@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Prometheus and Grafana monitoring stack"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "ELK/Loki logging stack"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Application workloads"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testing
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Temporary testing workloads"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Vault Injector"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Database Workloads"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "NGINX Ingress Controller"

@@ -1,0 +1,23 @@
+---
+- name: Add DNS Records to FreeIPA
+  hosts: freeipa
+  become: yes
+  tasks:
+    - name: Add DNS records
+      freeipa.ansible_freeipa.ipadnsrecord:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        zone_name: lab.local
+        name: "{{ item.name }}"
+        record_type: A
+        record_value: "{{ item.ip }}"
+        state: present
+      loop:
+        - { name: "vault", ip: "10.0.62.100" }
+        - { name: "k8s", ip: "10.0.61.100" }
+        - { name: "nginx-test-dev", ip: "10.0.65.10" }
+        - { name: "nginx-dev", ip: "10.0.65.10" }
+        - { name: "grafana-dev", ip: "10.0.65.10" }
+        - { name: "prometheus-dev", ip: "10.0.65.10" }
+        - { name: "loki-dev", ip: "10.0.65.10" }
+        - { name: "wordpress-dev", ip: "10.0.65.10" }

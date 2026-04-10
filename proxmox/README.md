@@ -1,70 +1,55 @@
-# Proxmox Documentation
+# Proxmox Infrastructure
 
-## Backup Script
+Documentation and scripts for Proxmox VE servers.
 
-### File
-`backup-proxmox-config.sh`
+## Server Details
 
-### Deployed To
-| Host | Path |
-|------|------|
-| pve-prod | `/backup-proxmox-config.sh` |
-| pve-dev | `/backup-proxmox-config.sh` |
+| Environment | Hostname | Management IP | Storage IP | API URL |
+|-------------|----------|---------------|------------|---------|
+| PROD | pve-prod.lab.local | 10.0.5.100 | 10.0.40.100 | https://pve-prod.lab.local:8006 |
+| DEV | pve-dev.lab.local | 10.0.5.110 | 10.0.40.110 | https://pve-dev.lab.local:8006 |
 
-### Usage
+## Folder Structure
+
+| Folder | Purpose |
+|--------|---------|
+| [bootstrap_proxmox/](bootstrap_proxmox/) | Initial Proxmox host setup (bootstrap, network, mail) |
+| [golden_templates/](golden_templates/) | VM/LXC golden image preparation scripts |
+| [backup/](backup/) | Backup scripts and configuration |
+| [disaster_recovery/](disaster_recovery/) | DR guides (power outage, hardware failure, recovery) |
+| [storage/](storage/) | NAS storage configuration |
+| [network_monitoring/](network_monitoring/) | Network monitoring setup |
+
+## Quick Start
+
+### New Proxmox Installation
+
 ```bash
-ssh root@pve-prod   # or pve-dev
-chmod +x /backup-proxmox-config.sh
-/backup-proxmox-config.sh
-```
+# 1. Bootstrap (repos, users, NTP)
+./bootstrap_proxmox/bootstrap.sh dev   # or prod
 
-### What It Backs Up
-- `/etc/pve` - VM/LXC configs, storage, users, permissions
-- `/etc/network/interfaces` - Network/VLAN config
-- `/etc/fstab` - Mount points
-- `/etc/lvm` - LVM configuration
-- Cron jobs
-- Custom systemd services
-- System info snapshot
-
-### Output
-```
-/tmp/proxmox-config-<hostname>-<timestamp>.tar.gz
-```
-
-### Copy to NAS
-```bash
-scp /tmp/proxmox-config-*.tar.gz admin@10.0.5.120:/volume1/Backups/
-```
-
-### Restore Notes
-See end of script for full restoration procedure.
-
-**Prerequisites for fresh Proxmox:**
-1. Install Proxmox VE (same or newer version)
-2. Use SAME HOSTNAME as original
-3. Basic network connectivity
-4. Install: `apt install nfs-common cifs-utils`
-
-**Quick restore:**
-```bash
-# On new Proxmox
-cd /tmp && tar -xzf proxmox-config-*.tar.gz && cd proxmox-config-*
-systemctl stop pvedaemon pveproxy pvestatd
-cp -a pve/* /etc/pve/
-cp network/interfaces /etc/network/interfaces
-cp storage/fstab /etc/fstab
+# 2. Network (WiFi, VLANs, bridges)
+./bootstrap_proxmox/network-setup.sh dev   # or prod
 reboot
+
+# 3. Optional: Email notifications
+./bootstrap_proxmox/mail-config.sh
 ```
 
-> **Note:** VM/LXC DATA not included - restore from vzdump backups on NAS.
+### Create Golden Templates
 
----
+```bash
+# VM: Run inside fresh Rocky Linux VM
+./golden_templates/golden-vm-setup.sh
 
-## Related Files
+# LXC: Run inside fresh Rocky Linux container
+./golden_templates/golden-lxc-setup.sh
+```
 
-| File | Description |
-|------|-------------|
-| storage/nas-storage-config.md | NAS shares and NFS config |
-| vms/ | VM documentation |
-| lxc/ | LXC container documentation |
+### Backup Proxmox Config
+
+```bash
+# Run on Proxmox host
+/root/scripts/backup-proxmox-config.sh
+```
+

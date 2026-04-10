@@ -73,3 +73,7 @@ ipa_managed_hosts:
 # Used by: (reserved for future k8s playbooks)
 # ----------------------------------------------------------------------------
 k8s_api_vip: 10.0.61.100
+
+
+gh_admin_pat_token_flux: "{{ lookup('env', 'GH_TOKEN') }}"
+gh_username: "{{ lookup('env', 'GH_USER') }}"

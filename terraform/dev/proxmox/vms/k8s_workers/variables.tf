@@ -2,6 +2,12 @@
 # K8s Worker Nodes Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the VM [type, service, category, environment]"
+  type        = list(string)
+  default     = ["vm", "k8s-worker", "kubernetes", "dev"]
+}
+
 #-------------------------------------------------------------------------------
 # K8s Worker 1
 #-------------------------------------------------------------------------------
@@ -16,6 +22,9 @@ variable "k8s_worker1" {
     gateway        = string
     bridge         = string
     vlan_id        = number
+    ip2            = string
+    bridge2        = string
+    vlan_id2       = number
     startup_delay  = number
     shutdown_delay = number
     startup_order  = number
@@ -33,9 +42,12 @@ variable "k8s_worker1" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    ip2            = "10.0.40.201/24"
+    bridge2        = "vmbr1"
+    vlan_id2       = 40
+    startup_delay  = 60      # Wait 60s after masters boot to ensure control plane is ready
     shutdown_delay = 60
-    startup_order  = 11
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -56,6 +68,9 @@ variable "k8s_worker2" {
     gateway        = string
     bridge         = string
     vlan_id        = number
+    ip2            = string
+    bridge2        = string
+    vlan_id2       = number
     startup_delay  = number
     shutdown_delay = number
     startup_order  = number
@@ -73,9 +88,12 @@ variable "k8s_worker2" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    ip2            = "10.0.40.202/24"
+    bridge2        = "vmbr1"
+    vlan_id2       = 40
+    startup_delay  = 0       # All workers start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 12
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -96,6 +114,9 @@ variable "k8s_worker3" {
     gateway        = string
     bridge         = string
     vlan_id        = number
+    ip2            = string
+    bridge2        = string
+    vlan_id2       = number
     startup_delay  = number
     shutdown_delay = number
     startup_order  = number
@@ -113,9 +134,12 @@ variable "k8s_worker3" {
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
     vlan_id        = 64
-    startup_delay  = 60
+    ip2            = "10.0.40.203/24"
+    bridge2        = "vmbr1"
+    vlan_id2       = 40
+    startup_delay  = 0       # All workers start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 13
+    startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -126,9 +150,9 @@ variable "k8s_worker3" {
 # Common Variables
 #-------------------------------------------------------------------------------
 variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+  description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {
@@ -156,7 +180,7 @@ variable "node_name" {
 }
 
 variable "disks" {
-  description = "Disk configuration for K8s workers (OS + Data disk)"
+  description = "Disk configuration for K8s workers (OS disk only)"
   type = map(object({
     datastore_id = string
     interface    = string
@@ -171,14 +195,6 @@ variable "disks" {
       datastore_id = "local-lvm"
       interface    = "scsi0"
       size         = 25
-      ssd          = true
-      discard      = "on"
-      file_format  = "raw"
-    }
-    data_disk = {
-      datastore_id = "nas-dev-data"
-      interface    = "scsi1"
-      size         = 80
       ssd          = true
       discard      = "on"
       file_format  = "raw"

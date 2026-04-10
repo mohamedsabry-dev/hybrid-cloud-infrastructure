@@ -1,0 +1,25 @@
+global
+    log /dev/log local0
+    maxconn 2000
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode tcp
+    option tcplog
+    timeout connect 5s
+    timeout client 30s
+    timeout server 30s
+
+frontend k8s_api
+    bind *:{{ haproxy_port }}
+    default_backend k8s_masters
+
+backend k8s_masters
+    balance roundrobin
+    option tcp-check
+{% for master in masters %}
+    server k8s-master{{ loop.index }} {{ master.ip }}:{{ api_port }} check fall 3 rise 2
+{% endfor %}
