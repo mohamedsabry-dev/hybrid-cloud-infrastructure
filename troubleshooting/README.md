@@ -1,6 +1,6 @@
 # Troubleshooting Cases
 
-Documentation of issues encountered and resolved during infrastructure setup.
+Documentation of issues encountered and resolved during hybrid cloud infrastructure setup and operations.
 
 Each subfolder contains troubleshooting tickets numbered sequentially within that category.
 
@@ -8,24 +8,59 @@ Each subfolder contains troubleshooting tickets numbered sequentially within tha
 
 ## Categories
 
-| Folder | Tickets | Range | Description |
-|--------|---------|-------|-------------|
-| [aws/](aws/) | 1 | 1 | AWS CloudFormation, IAM issues |
-| [github/](github/) | 3 | 1-3 | GitHub runners, workflows, git operations |
-| [github-actions/](github-actions/) | 5 | 1-5 | CI/CD workflow issues, cleanup |
-| [identity/](identity/) | 8 | 1-8 | FreeIPA, Kerberos, authentication |
-| [kubernetes/](kubernetes/) | 5 | 1-5 | K8s cluster, pods, networking, storage |
-| [linux/](linux/) | 5 | 1-5 | OS-level issues (Rocky Linux, NTP, UID) |
-| [macos/](macos/) | 2 | 1-2 | macOS client configuration |
-| [network/](network/) | 9 | 1-9 | Routing, WireGuard, hardware issues |
-| [proxmox/](proxmox/) | 11 | 1-11 | Proxmox VE platform, VMs, LXC, NFS |
-| [security/](security/) | 1 | 1 | Secrets management, incidents |
-| [terraform/](terraform/) | 9 | 1-9 | Terraform IaC, Proxmox provider |
-| [vault/](vault/) | 11 | 1-11 | HashiCorp Vault, certificates, Ansible |
+| Folder | Cases | Description |
+|--------|-------|-------------|
+| [aws/](aws/) | 1 | AWS CloudFormation, IAM |
+| [github/](github/) | 8 | GitHub Actions, runners, workflows, git operations |
+| [identity/](identity/) | 8 | FreeIPA, Kerberos, SSSD, authentication |
+| [kubernetes/](kubernetes/) | 20 | K8s cluster, pods, networking, storage, GitOps |
+| [linux/](linux/) | 2 | OS-level issues (Rocky Linux, NTP) |
+| [macos/](macos/) | 2 | macOS client configuration |
+| [network/](network/) | 5 | Routing, WireGuard, network stability |
+| [proxmox/](proxmox/) | 13 | Proxmox VE, VMs, LXC, backups, NFS |
+| [terraform/](terraform/) | 11 | Terraform IaC, Proxmox provider, cloud-init |
+| [vault/](vault/) | 4 | HashiCorp Vault, certificates, K8s integration |
 
 ---
 
-**Total: 70 troubleshooting tickets across 12 categories**
+**Total: 74 troubleshooting cases across 10 categories**
+
+---
+
+## Template Structure
+
+All cases follow a standardized 9-point template:
+
+| Section | Description |
+|---------|-------------|
+| **1. Context** | System, environment, related components |
+| **2. Issue** | Symptom, error messages, impact |
+| **3. Analysis** | Investigation steps with commands/outputs |
+| **4. Root Cause** | Why the issue occurred |
+| **5. Solution** | Fix steps, files changed, prevention |
+| **6. Solution Risk** | Risk level, potential impact |
+| **7. Impact After Fix** | Observed results |
+| **8. Notes** | Lessons learned, commands reference |
+| **9. Workaround** | Temporary fixes if needed |
+
+**Header Format:** `# TS-XXX-NNN | YYYY-MM-DD | STATUS`
+
+---
+
+## Quick Stats by Category
+
+```
+kubernetes/  ████████████████████  20
+proxmox/     █████████████         13
+terraform/   ███████████           11
+github/      ████████               8
+identity/    ████████               8
+network/     █████                  5
+vault/       ████                   4
+linux/       ██                     2
+macos/       ██                     2
+aws/         █                      1
+```
 
 ---
 
@@ -33,13 +68,44 @@ Each subfolder contains troubleshooting tickets numbered sequentially within tha
 
 Files follow the format: `N-short-description.md`
 
-- `N` = sequential number within the subfolder (1, 2, 3...)
-- Each subfolder maintains its own numbering sequence
-- Numbers are assigned chronologically as tickets are added
+- `N` = sequential number within the subfolder
+- Numbers assigned chronologically by incident date
+- Each subfolder maintains its own sequence
 
-## Adding New Tickets
+---
+
+## Status Definitions
+
+| Status | Meaning |
+|--------|---------|
+| RESOLVED | Issue fixed, root cause identified |
+| IN PROGRESS | Investigation or fix ongoing |
+| MONITORING | Workaround applied, watching for recurrence |
+
+---
+
+## Adding New Cases
 
 1. Identify the appropriate category folder
 2. Find the next available number in that folder
 3. Create file: `N-short-description.md`
-4. Include: Symptom, Root Cause, Solution, Prevention
+4. Follow the 9-point template structure
+5. Update the category README if exists
+6. Update this README with new count
+
+---
+
+## Environment Overview
+
+| Component | Technology |
+|-----------|------------|
+| Virtualization | Proxmox VE |
+| IaC | Terraform |
+| GitOps | Flux CD |
+| Containers | Kubernetes (kubeadm) |
+| CNI | Calico |
+| Storage | NFS + CSI Driver |
+| Identity | FreeIPA |
+| Secrets | HashiCorp Vault |
+| CI/CD | GitHub Actions |
+| Monitoring | Prometheus + Grafana + Loki |

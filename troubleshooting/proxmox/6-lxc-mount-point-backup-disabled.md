@@ -1,22 +1,15 @@
-# Case 6: LXC Mount Point (mp0) Not Included in Backups
+# TS-PVE-006 | 2026-03-20 | RESOLVED
 
-## Status: RESOLVED
-## Date: 2026-03-20
-## Environment: Dev & Prod (pve-dev, pve-prod)
-## Related: Case 5 (Backup Missed)
+## 1. Context
+- System: Proxmox VE with Terraform (bpg/proxmox provider)
+- Environment: Dev & Prod (pve-dev, pve-prod)
+- Related components: LXC mount points, vzdump backups, Terraform
 
----
+## 2. Issue
+- Symptom: LXC mount points (mp0) showing as "No - Disabled" in backup inclusion list
+- Error: No errors - silent data loss risk. Backups complete successfully but miss critical data stored on mount points.
 
-## Problem Description
-
-While reviewing Proxmox backup job details, discovered that LXC mount points (mp0) were showing as "No - Disabled" in the backup inclusion list. This means additional storage volumes attached to LXC containers were NOT being backed up.
-
-### Symptoms
-- Backup Details showing mp0 disks with "No - Disabled" status
-- Only rootfs being included in backups
-- No errors in backup logs (silent data loss risk)
-
-### Affected Containers (Dev)
+**Affected Containers (Dev):**
 | CTID | Name | mp0 Path | Backup Status |
 |------|------|----------|---------------|
 | 2001 | ansible | /opt/ansible | No - Disabled |
@@ -24,25 +17,19 @@ While reviewing Proxmox backup job details, discovered that LXC mount points (mp
 | 2003 | ex-nginx | /opt/nginx | No - Disabled |
 | 2004-2006 | vault1-3 | /opt/vault | No - Disabled |
 
-### Affected Containers (Prod)
-Same pattern - all LXC mp0 volumes had backup disabled.
+## 3. Analysis
 
----
-
-## Investigation
-
-### Step 1: Discovered Issue in Backup Details UI
+**Step 1: Discovered Issue in Backup Details UI**
 
 Opened Datacenter → Backup → Selected backup job → "Job Detail" → "Included disks"
 
-Screenshot showed:
 ```
 2001 (ansible)        lxc
   mp0 - local-lvm:vm-2001-disk-1      No - Disabled
   rootfs - local-lvm:vm-2001-disk-0   Yes
 ```
 
-### Step 2: Verified via CLI
+**Step 2: Verified via CLI**
 
 ```bash
 # SSH to Proxmox host
@@ -52,13 +39,7 @@ pct config 2001 | grep mp0
 
 The `backup=0` setting confirms mp0 is excluded from backups.
 
-### Step 3: Attempted Manual Fix via Web UI
-
-Tried: Select LXC → Resources → mp0 → Edit → Check "Backup"
-
-Found the checkbox but decided against manual fix for reproducibility reasons.
-
-### Step 4: Checked Terraform Provider Documentation
+**Step 3: Checked Terraform Provider Documentation**
 
 Reviewed bpg/proxmox provider docs for `mount_point` block:
 
@@ -67,23 +48,13 @@ backup (Optional) Whether to include the mount point in backups
        (only used for volume mount points, defaults to false).
 ```
 
-**Root Cause Identified**: The Terraform provider defaults `backup` to `false` if not explicitly set.
+**Finding:** The Terraform provider defaults `backup` to `false` if not explicitly set.
 
----
+## 4. Root Cause
+> Terraform bpg/proxmox provider defaults `mount_point` backup attribute to `false`. Since this wasn't explicitly set to `true` in Terraform configurations, all mp0 volumes were created with `backup=0`, excluding them from backups.
 
-## Root Cause
-
-When creating LXC containers via Terraform with the bpg/proxmox provider, the `mount_point` block's `backup` attribute defaults to `false`. Since this wasn't explicitly set to `true` in our Terraform configurations, all mp0 volumes were created with `backup=0`.
-
-This is a silent failure - backups complete successfully but miss critical data stored on mount points.
-
----
-
-## Resolution
-
-### Approach: Update Terraform Configuration
-
-Rather than manually fixing via CLI/UI (not reproducible), updated all Terraform LXC configurations to explicitly set `backup = true`.
+## 5. Solution
+> Update Terraform configurations to explicitly set `backup = true` for all mount points.
 
 ### Changes Made
 
@@ -158,9 +129,18 @@ terraform apply  # In-place update, no container restart
 
 The change is applied in-place - containers keep running.
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: None - in-place update, containers keep running
 
-## Verification
+## 7. Impact After Fix
+- Observed: All mount points now included in backups
+- mp0 shows "Yes" in backup job details
+- Full data protection restored
+
+## 8. Notes
+
+**Verification:**
 
 After `terraform apply`:
 
@@ -174,13 +154,9 @@ pct config 2001 | grep mp0
 # mp0 should now show "Yes" instead of "No - Disabled"
 ```
 
----
+**Prevention:**
 
-## Prevention
-
-### For New LXC Modules
-
-Always explicitly set `backup = true` in mount_point configurations:
+For new LXC modules, always explicitly set `backup = true` in mount_point configurations:
 
 ```hcl
 mount_point {
@@ -191,26 +167,18 @@ mount_point {
 }
 ```
 
-### Periodic Audit
-
-Check backup job details periodically to ensure all disks show "Yes" for backup inclusion.
-
----
-
-## Lessons Learned
+**Lessons Learned:**
 
 1. **Don't trust defaults** - Always check provider documentation for default values, especially for backup-related settings
 2. **Silent failures are dangerous** - Backup jobs completed successfully but missed critical data
 3. **Infrastructure as Code benefits** - Rather than manual CLI fixes, updating Terraform ensures consistency and reproducibility
 4. **Review backup scope** - Regularly verify what's actually being backed up, not just that backups run
 
----
+**Related:** TS-PVE-005 (backup missed) - discovered during same backup audit
 
-## Related Issues
-
-- Case 5: `5-proxmox-backup-missed-not-retried.md` - Missing `repeat-missed` flag
+## 9. Workaround (if any)
+> Manual fix via CLI: `pct set <ctid> -mp0 <current-config>,backup=1` but this is not reproducible. Use Terraform fix instead.
 
 ## References
-
 - [bpg/proxmox Provider - mount_point](https://registry.terraform.io/providers/bpg/proxmox/latest/docs/resources/virtual_environment_container#mount_point)
 - [Proxmox VE - Container Backup](https://pve.proxmox.com/wiki/Backup_and_Restore)

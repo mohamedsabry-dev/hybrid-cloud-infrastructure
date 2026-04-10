@@ -3,7 +3,7 @@
 When a USB-Ethernet adapter fails, replace it and update the MAC address mapping.
 
 > **Background**: This DR preparation was created after experiencing an outage due to hardware issues.
-> See: [TS Case 43: Switch Port 4 Link Flapping](/troubleshooting/network/43-switch-port4-link-flapping-loose-connection.md)
+> See: [TS Case 3: SVC Network Instability](/troubleshooting/network/3-svc-network-instability-investigation.md)
 
 ---
 
@@ -57,7 +57,7 @@ Name=svc0
 > **WARNING: stor0 Replacement**
 >
 > If replacing stor0 (storage network), unmount NFS **before** unplugging to avoid shutdown hang.
-> See: [TS Case 55: NFS Shutdown Hang](/troubleshooting/proxmox/55-nfs-shutdown-hang-stor0-hotswap.md)
+> See: [TS Case 9: NFS Shutdown Hang](/troubleshooting/proxmox/9-nfs-shutdown-hang-stor0-hotswap.md)
 >
 > ```bash
 > umount -l /mnt/pve/nas-dev-data
@@ -183,4 +183,4 @@ systemctl restart pvedaemon pvestatd
 
 ## Related
 
-- [TS Case 55: NFS Shutdown Hang During stor0 Hot-Swap](/troubleshooting/proxmox/55-nfs-shutdown-hang-stor0-hotswap.md)
+- [TS Case 9: NFS Shutdown Hang During stor0 Hot-Swap](/troubleshooting/proxmox/9-nfs-shutdown-hang-stor0-hotswap.md)

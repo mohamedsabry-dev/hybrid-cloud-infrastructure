@@ -2,7 +2,7 @@
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
-Relevant folders: troubleshooting/network/ (cases 49-52)
+Relevant folders: troubleshooting/network/ (Cases 4-5: WireGuard CGNAT and stability)
 
 For more details, see: network/vpn/wireguard-setup.md
 
@@ -48,7 +48,7 @@ Home/Datacenter (10.0.x.x)
 | Prod        | 172.17.200.1      | 172.17.200.2    | 51831         | 51820    |
 
 IMPORTANT: Tunnel IPs are within AWS VPC CIDR to solve routing issues.
-See troubleshooting case 52 for why.
+See troubleshooting Case 5 for why (routing design).
 
 ---
 
@@ -252,7 +252,7 @@ Keepalive Targets:
 - MikroTik peers have persistent-keepalive=10s
 - Full Cone NAT recommended on ISP router (if configurable)
 
-See troubleshooting case 50 for NAT timeout details.
+See troubleshooting Case 5 for NAT timeout and tunnel stability details.
 
 ---
 
@@ -275,7 +275,7 @@ Change MikroTik Listen Port to a different value:
 - Original 51821 was blocked, changed to 51830/51831
 - AWS side doesn't need changes (responds to source port)
 
-See troubleshooting case 49 for detailed diagnosis steps.
+See troubleshooting Case 4 for CGNAT port blocking diagnosis steps.
 
 ---
 
@@ -303,12 +303,10 @@ See troubleshooting case 49 for detailed diagnosis steps.
 
 Key VPN troubleshooting cases in troubleshooting/network/:
 
-| Case | Issue                         | Resolution                              |
-|------|-------------------------------|-----------------------------------------|
-| 49   | CGNAT port blocking           | Change MikroTik listen port             |
-| 50   | NAT timeout drops             | Keepalive service + Full Cone NAT       |
-| 51   | VLAN gateway ping fail        | Use tunnel IP as keepalive target       |
-| 52   | Wrong tunnel routing          | Place tunnel IPs within VPC CIDR        |
+| Case | Issue                              | Resolution                              |
+|------|------------------------------------|-----------------------------------------|
+| 4    | CGNAT port blocking                | Change MikroTik listen port             |
+| 5    | Tunnel stability/ISP EIP blocking  | Recreate AWS EIP, keepalive service     |
 
 For all cases, see: troubleshooting/network/
 
@@ -328,7 +326,7 @@ One AllowedIPs entry covers both tunnel AND VPC traffic:
 - dev peer: 172.16.0.0/16 routes tunnel (172.16.200.x) + VPC (172.16.x.x)
 - prod peer: 172.17.0.0/16 routes tunnel (172.17.200.x) + VPC (172.17.x.x)
 
-See troubleshooting case 52 for the routing issue this solves.
+See troubleshooting Case 5 for the routing issue this solves.
 
 ---
 

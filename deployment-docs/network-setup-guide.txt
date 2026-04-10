@@ -72,7 +72,7 @@ gigabit auto-negotiation through the switch, the architecture was simplified:
 - Switch is only used for isolated storage network (VLAN 40)
 - Fewer failure points, easier troubleshooting
 
-See troubleshooting cases: 43, 48, 57 in troubleshooting/network/
+See troubleshooting Case 3 (SVC Network Instability) in troubleshooting/network/
 
 ---
 

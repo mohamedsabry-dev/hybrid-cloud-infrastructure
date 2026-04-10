@@ -1,30 +1,25 @@
-# Case 10: VM Restore Hang — Concurrent NFS Operations
+# TS-PVE-010 | 2026-03-26 | RESOLVED
 
-## Status: RESOLVED
-## Date: 2026-03-26
-## Duration: ~15 minutes
-## Environment: Dev environment - Multiple VM restores from NFS backup storage
+## 1. Context
+- System: Proxmox VE with NFS backup storage
+- Environment: Dev environment - Multiple VM restores from NFS backup storage
+- Related components: vzdump, qmrestore, NFS storage (stor0), LVM thin pool
 
----
-
-## Symptoms
-
-- VM restore operations stuck at 100% for 10+ minutes
-- Proxmox Web UI shows restore task "running" but no progress
-- Multiple restore operations started simultaneously (6 VMs)
-- User cancelled stuck tasks, leaving orphaned LVM volumes
-- Subsequent restore attempts failed with LVM errors
-
-**Error Message:**
+## 2. Issue
+- Symptom: VM restore operations stuck at 100% for 10+ minutes, multiple restore operations started simultaneously (6 VMs)
+- Error:
 ```
 Logical Volume "vm-1012-cloudinit" already exists in volume group "pve"
 ```
 
----
+**Additional symptoms:**
+- Proxmox Web UI shows restore task "running" but no progress
+- User cancelled stuck tasks, leaving orphaned LVM volumes
+- Subsequent restore attempts failed with LVM errors
 
-## Root Cause
+## 3. Analysis
 
-**Too many concurrent restore operations overwhelmed NFS storage.**
+### What Happened
 
 When 6 VM restore operations were started simultaneously:
 1. NFS storage (stor0) became I/O bottleneck
@@ -41,9 +36,11 @@ When 6 VM restore operations were started simultaneously:
 2 qmstart failed with "received interrupt"
 ```
 
----
+## 4. Root Cause
+> Too many concurrent restore operations overwhelmed NFS storage. Cancelling stuck tasks mid-operation left orphaned LVM volumes that blocked subsequent restore attempts.
 
-## Resolution
+## 5. Solution
+> Cancel stuck tasks, remove orphaned LVM volumes, retry restore sequentially.
 
 ### Step 1: Cancel Stuck Tasks
 
@@ -82,7 +79,7 @@ lvremove -f pve/vm-1012-cloudinit
 lvremove -f pve/vm-1012-disk-0
 ```
 
-**For multiple VMs (example with 4 stuck VMs):**
+**For multiple VMs:**
 ```bash
 # VM 1012
 lvremove -f pve/vm-1012-cloudinit
@@ -92,13 +89,7 @@ lvremove -f pve/vm-1012-disk-0
 lvremove -f pve/vm-1022-cloudinit
 lvremove -f pve/vm-1022-disk-0
 
-# VM 1032
-lvremove -f pve/vm-1032-cloudinit
-lvremove -f pve/vm-1032-disk-0
-
-# VM 1042
-lvremove -f pve/vm-1042-cloudinit
-lvremove -f pve/vm-1042-disk-0
+# Repeat for other affected VMs
 ```
 
 ### Step 4: Retry Restore Sequentially
@@ -111,49 +102,18 @@ qmrestore /mnt/pve/stor0/dump/vzdump-qemu-1012-*.vma.zst 1012
 qmrestore /mnt/pve/stor0/dump/vzdump-qemu-1022-*.vma.zst 1022
 ```
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: Data loss if wrong LVM volumes removed. Always verify VMID before `lvremove`.
 
-## Commands Reference
+## 7. Impact After Fix
+- Observed: VMs restored successfully with sequential approach
+- No more LVM conflicts
+- Restore time predictable (one at a time)
 
-### LVM Cleanup
-```bash
-# List volumes for specific VM
-lvs | grep vm-<VMID>
+## 8. Notes
 
-# Remove specific volume (force)
-lvremove -f pve/vm-<VMID>-cloudinit
-lvremove -f pve/vm-<VMID>-disk-0
-
-# List all thin volumes
-lvs -a | grep pve
-```
-
-### Task Management
-```bash
-# View active tasks
-cat /var/log/pve/tasks/active
-
-# Check task log
-cat /var/log/pve/tasks/<task-id>
-```
-
-### NFS Monitoring
-```bash
-# Check NFS mount status
-mount | grep nfs
-
-# Monitor NFS I/O
-nfsiostat 1
-
-# Check NFS server response
-showmount -e <nfs-server>
-```
-
----
-
-## Prevention
-
-### Limit Concurrent Operations
+### Recommended Concurrent Operations
 
 | Restore Type | Recommended Max Concurrent |
 |--------------|---------------------------|
@@ -181,14 +141,30 @@ If restore hangs:
 - [ ] Remove orphaned LVM: `lvremove -f pve/vm-<VMID>-*`
 - [ ] Retry restore individually
 
----
+### Commands Reference
 
-## Related Issues
+```bash
+# List volumes for specific VM
+lvs | grep vm-<VMID>
 
-- Case 9: `9-nfs-shutdown-hang-stor0-hotswap.md` - NFS storage hang during shutdown
+# Remove specific volume (force)
+lvremove -f pve/vm-<VMID>-cloudinit
+lvremove -f pve/vm-<VMID>-disk-0
 
----
+# List all thin volumes
+lvs -a | grep pve
 
-## Status
+# View active tasks
+cat /var/log/pve/tasks/active
 
-✅ **Resolved** - VMs restored successfully after sequential restore approach
+# Monitor NFS I/O
+nfsiostat 1
+
+# Check NFS mount status
+mount | grep nfs
+```
+
+**Related:** TS-PVE-009 (NFS shutdown hang) - NFS storage hang during shutdown
+
+## 9. Workaround (if any)
+> If NFS is slow: Restore to local storage first (`--storage local-lvm`), then migrate disks to NFS after restore completes.

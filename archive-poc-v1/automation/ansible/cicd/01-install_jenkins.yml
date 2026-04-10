@@ -1,0 +1,97 @@
+---
+- name: Install Jenkins and Docker (Using Java 21)
+  hosts: cicd
+  become: yes
+  vars:
+    # Tuned for 3GB RAM
+    jenkins_java_opts: "-Xmx1024m -Djava.awt.headless=true"
+    allowed_subnet: "10.0.20.0/24"
+
+  tasks:
+    - name: Install basic tools
+      dnf:
+        name: [wget, git, epel-release]
+        state: present
+        update_cache: yes
+
+    # --- UPDATED: USING JAVA 21 AS SEEN IN YOUR SCREENSHOT ---
+    - name: Install Java 21 OpenJDK
+      dnf:
+        name: java-21-openjdk
+        state: present
+
+    - name: Add Jenkins Repository
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+
+    - name: Import Jenkins GPG Key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+    - name: Install Jenkins
+      dnf:
+        name: jenkins
+        state: present
+
+    # --- MEMORY TUNING (Critical for 3GB RAM) ---
+    - name: Create systemd override directory
+      file:
+        path: /etc/systemd/system/jenkins.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Apply Memory Limit (1GB)
+      copy:
+        dest: /etc/systemd/system/jenkins.service.d/override.conf
+        content: |
+          [Service]
+          Environment="JAVA_OPTS={{ jenkins_java_opts }}"
+      notify: Restart Jenkins
+
+    # --- DOCKER SETUP ---
+    - name: Add Docker Repository
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+
+    - name: Install Docker
+      dnf:
+        name: [docker-ce, docker-ce-cli, containerd.io]
+        state: present
+
+    - name: Start and Enable Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add 'jenkins' user to 'docker' group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+      notify: Restart Jenkins
+
+    # --- FIREWALL SECURITY ---
+    - name: Ensure Firewalld is running
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Allow Jenkins (8080) ONLY from {{ allowed_subnet }}
+      firewalld:
+        rich_rule: 'rule family="ipv4" source address="{{ allowed_subnet }}" port port="8080" protocol="tcp" accept'
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+  handlers:
+    - name: Restart Jenkins
+      systemd:
+        name: jenkins
+        state: restarted
+        daemon_reload: yes
+        enabled: yes

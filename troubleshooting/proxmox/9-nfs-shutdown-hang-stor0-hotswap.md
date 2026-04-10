@@ -1,21 +1,15 @@
-# Case 9: NFS Shutdown Hang During stor0 Hot-Swap
+# TS-PVE-009 | 2026-03-23 | RESOLVED
 
-## Status: RESOLVED
-## Date: 2026-03-23
-## Environment: pve-dev (applicable to any Proxmox host with NFS storage over USB-Ethernet)
+## 1. Context
+- System: Proxmox VE with NFS storage over USB-Ethernet
+- Environment: pve-dev (applicable to any Proxmox host with NFS storage over USB-Ethernet)
+- Related components: stor0 adapter, NFS mounts, systemd shutdown
 
----
+## 2. Issue
+- Symptom: System hangs on shutdown/reboot during USB-Ethernet adapter hot-swap for stor0 (storage network)
+- Error: Console shows no activity for several minutes, forced to use power button for hard reboot
 
-## Symptoms
-
-During USB-Ethernet adapter hot-swap for stor0 (storage network):
-- System hangs on shutdown/reboot
-- Console shows no activity for several minutes
-- Forced to use power button for hard reboot
-
----
-
-## Root Cause Analysis
+## 3. Analysis
 
 ### Timeline from Logs
 
@@ -46,26 +40,11 @@ timeo=600         ← 60-second timeout per attempt
 retrans=2         ← 2 retries before timeout message
 ```
 
----
+## 4. Root Cause
+> USB-Ethernet adapter unplugged while NFS mounts were active. NFS hard mounts wait indefinitely for server response, causing shutdown to hang while waiting for graceful unmount.
 
-## Investigation Commands
-
-```bash
-# Check previous boot logs
-journalctl --list-boots
-journalctl -b -1 | grep -iE "nfs|mount|stor0|timeout|busy"
-
-# Check current NFS mount options
-mount | grep nfs
-
-# Check what's using NFS mount
-lsof +D /mnt/pve/nas-dev-data
-fuser -m /mnt/pve/nas-dev-data
-```
-
----
-
-## Prevention
+## 5. Solution
+> Lazy unmount NFS before unplugging adapter. Use proper hot-swap procedure.
 
 ### Before Unplugging stor0
 
@@ -113,11 +92,18 @@ mount | grep nfs
 ping 10.0.40.120
 ```
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: VMs/LXCs lose NAS access during unmount, but recover after reboot
 
-## Recovery
+## 7. Impact After Fix
+- Observed: Clean shutdown when proper procedure followed
+- No more forced power button reboots
+- NFS auto-remounts after reboot
 
-### If Already Stuck on Shutdown
+## 8. Notes
+
+### Recovery If Already Stuck on Shutdown
 
 **Option 1: Wait** (may take 5-10 minutes)
 - System will eventually timeout and proceed
@@ -136,8 +122,6 @@ echo b > /proc/sysrq-trigger
 - Hold power button for 5-10 seconds
 - Use if commands don't respond
 
-After any force reboot, system recovers normally. NFS will reconnect once stor0 is configured.
-
 ### After Force Reboot
 
 ```bash
@@ -153,9 +137,7 @@ pvesm status  # Shows storage status
 systemctl restart pvedaemon pvestatd
 ```
 
----
-
-## Alternative: Soft NFS Mounts
+### Alternative: Soft NFS Mounts
 
 To avoid future hangs, consider soft mounts (trade-off: may cause I/O errors):
 
@@ -174,15 +156,25 @@ To avoid future hangs, consider soft mounts (trade-off: may cause I/O errors):
 
 For hot-swap scenarios, lazy unmount is safer than changing to soft mounts.
 
----
+### Investigation Commands
 
-## Related
+```bash
+# Check previous boot logs
+journalctl --list-boots
+journalctl -b -1 | grep -iE "nfs|mount|stor0|timeout|busy"
 
-- [USB-Ethernet Adapter Replacement Guide](../../proxmox/disaster_recovery/hardware/usb-ethernet-adapter-replacement.md)
-- Case 3: `3-proxmox-lxc-snapshot-nfs-mount.md` - NFS mount limitations
+# Check current NFS mount options
+mount | grep nfs
 
----
+# Check what's using NFS mount
+lsof +D /mnt/pve/nas-dev-data
+fuser -m /mnt/pve/nas-dev-data
+```
 
-## Status
+**Related:** TS-PVE-004 (LXC snapshot NFS mount) - NFS mount limitations
 
-RESOLVED - Documented prevention procedure for future hot-swaps
+## 9. Workaround (if any)
+> If shutdown is stuck: Wait 5-10 minutes for timeout, or force reboot with `systemctl reboot --force --force`, or hold power button.
+
+## Related Files
+- USB-Ethernet Adapter Replacement Guide: `proxmox/disaster_recovery/hardware/usb-ethernet-adapter-replacement.md`

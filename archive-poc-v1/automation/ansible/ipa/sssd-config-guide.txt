@@ -1,0 +1,241 @@
+3. The Configuration (SSSD.conf)
+Apply these edits to /etc/sssd/sssd.conf on your Client VMs:
+
+Ini, TOML
+
+[domain/lab.local]
+# Mandatory for offline login
+cache_credentials = True
+
+# 1. THE SIGNAL: How often to refresh the cache while online (60 mins)
+refresh_expired_interval = 3600
+
+# 2. THE SAFETY: How long to keep the cache if IPA is down (1 day)
+# This prevents "Stale Passwords" from lasting forever.
+offline_credentials_expiration = 1
+
+# 3. THE TIMEOUT: Reduce the "4-second wait" you felt yesterday
+ldap_network_timeout = 2
+
+
+
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+4. The "Seeding" Service (The Boot Trigger)
+Instead of a Cron job, create this file on your VMs: /etc/systemd/system/seed-veeam.service
+
+Ini, TOML
+
+[Unit]
+Description=Seed Veeam Identity to SSSD Cache
+# Ensure it runs only after SSSD and Network are up
+After=sssd.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# The "Signal" that pulls the user info from IPA to local disk
+ExecStart=/usr/bin/getent passwd veeam
+# This ensures it doesn't keep running; it just fires once at boot
+RemainAfterExit=yes
+
+[Install]
+# This makes it run during the normal boot sequence
+WantedBy=multi-user.target
+To activate it:
+
+Bash
+
+sudo systemctl daemon-reload
+sudo systemctl enable seed-veeam.service
+
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+This is an important distinction in Linux security. Because you are using password: '!', you are disabling password authentication entirely for this user.
+
+In this configuration, there is no place to type a password. Even if you were sitting at the physical console, you could not log in with a password. The "key" is the only way in.
+
+However, if you want a Hybrid Approach (where you have a password stored in your vault just in case the SSH key is lost), you should modify the playbook.
+
+1. Updated Playbook (With Password & No-Expire)
+To set a password that never expires and doesn't require a change on first login, use this configuration:
+
+YAML
+
+---
+- name: Architect the Local Emergency Hatch with Password
+  hosts: all
+  become: yes
+  vars:
+    emergency_user: "veeam_emergency"
+    emergency_ssh_key: "ssh-rsa AAAAB3Nza..."
+    # Generate this using: python3 -c 'import crypt; print(crypt.crypt("YourSecretPassword", crypt.mksalt(crypt.METHOD_SHA512)))'
+    # For now, I will use a placeholder hash
+    emergency_password_hash: "$6$rounds=656000$YourSalt$YourHashedPassword"
+
+  tasks:
+    - name: Create local group
+      group:
+        name: "{{ emergency_user }}"
+        state: present
+
+    - name: Create local user with Permanent Password
+      user:
+        name: "{{ emergency_user }}"
+        group: "{{ emergency_user }}"
+        shell: /bin/bash
+        password: "{{ emergency_password_hash }}"
+        # This prevents the "Password must be changed" prompt
+        update_password: on_create
+        # This ensures the account never expires at the system level
+        expires: -1
+        state: present
+
+    - name: Ensure password never expires (CHAGE)
+      shell: "chage -I -1 -m 0 -M 99999 -E -1 {{ emergency_user }}"
+      changed_when: false
+
+    - name: Deploy SSH Public Key
+      authorized_key:
+        user: "{{ emergency_user }}"
+        state: present
+        key: "{{ emergency_ssh_key }}"
+
+    - name: Grant sudo access
+      copy:
+        content: "{{ emergency_user }} ALL=(ALL) NOPASSWD:ALL"
+        dest: "/etc/sudoers.d/{{ emergency_user }}"
+        mode: '0440'
+        validate: 'visudo -cf %s'
+2. How to handle the Password
+Where to type it: You would only type this password if you were logging in via the Physical Console / VNC in Proxmox, or if you were using SSH and the server had PasswordAuthentication yes enabled.
+
+The Hash: Ansible requires the password to be hashed (encrypted). You should never put plain text passwords in a playbook.
+
+The Command: Use this command on your terminal to create the hash for your vault password: ansible all -i localhost, -m debug -a "msg={{ 'YourSecretPassword' | password_hash('sha512') }}"
+
+3. Why chage?
+The chage command in the playbook is the "Architect's Hammer." It tells the Linux kernel:
+
+-m 0: No minimum days between changes.
+
+-M 99999: Maximum days (effectively forever).
+
+-I -1: No password inactivity lockout.
+
+-E -1: No account expiration date.
+
+
+
+
+To get the "Signal Flow" correct, you need to think about who is the "Initiator" (the client) and who is the "Receiver" (the server).
+
+In this case, Veeam is the Initiator. It needs to "reach out" and touch the VMs.
+
+The 3-Step Key Signal Flow
+1. Create the Key on the Veeam Server
+Since Veeam is the software that will be doing the logging in, the Private Key must stay on the Veeam Windows Server.
+
+On your Veeam Server: Open PowerShell or CMD.
+
+Run: ssh-keygen -t rsa -b 4096 -f C:\VeeamKeys\id_rsa_veeam
+
+Result: You will have two files:
+
+id_rsa_veeam (The Private Key — NEVER share this).
+
+id_rsa_veeam.pub (The Public Key — This is the one we share).
+
+2. Move the Public Key to Ansible
+Now, you need to tell Ansible what that Public Key looks like so it can "distribute" it to all the VMs.
+
+Open the id_rsa_veeam.pub file on Windows and copy the text (it starts with ssh-rsa...).
+
+Go to your Ansible VM and paste that text into your Playbook or your vars file as the emergency_ssh_key variable.
+
+3. Run the Playbook
+When you run the Ansible playbook:
+
+Ansible acts as the "Messenger." It carries the Public Key to every VM.
+
+The VMs place that key into /home/veeam_emergency/.ssh/authorized_keys.
+
+The Final Connection
+Once the playbook is finished, you go back to your Veeam Software and configure the "Linux Credentials":
+
+Username: veeam_emergency
+
+Auth Method: "Key-based"
+
+Private Key File: Point it to C:\VeeamKeys\id_rsa_veeam.
+
+Summary Checklist:
+Generate on Veeam (Windows).
+
+Copy the .pub content.
+
+Paste into the Ansible variable.
+
+Run Playbook to distribute.
+
+
+
+
+
+
+
+
+
+
+
+
+### 
+
+super_ansible@k8s-worker2:~$ sudo sssctl user-checks admin1
+user: admin1
+action: acct
+service: system-auth
+
+sss_getpwnam_r failed with [0].
+User name lookup with [admin1] failed.
+InfoPipe User lookup with [admin1] failed.
+testing pam_acct_mgmt
+
+pam_acct_mgmt: User not known to the underlying authentication module
+
+PAM Environment:
+ - no env -
+super_ansible@k8s-worker2:~$ sudo sssctl user-checks admin2
+user: admin2
+action: acct
+service: system-auth
+
+SSSD nss user lookup result:
+ - user name: admin2
+ - user id: 1220000023
+ - group id: 1220000023
+ - gecos: Admin Two
+ - home directory: /home/admin2
+ - shell: /bin/sh
+
+SSSD InfoPipe user lookup result:
+ - name: admin2
+ - uidNumber: 1220000023
+ - gidNumber: 1220000023
+ - gecos: Admin Two
+ - homeDirectory: /home/admin2
+ - loginShell: /bin/sh
+
+testing pam_acct_mgmt
+
+pam_acct_mgmt: Success
+
+PAM Environment:
+ - no env -
+super_ansible@k8s-worker2:~$ _
