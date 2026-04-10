@@ -6,57 +6,82 @@
 ---
 
 ### Scenario 2.1 — External NGINX Down
-Stop nginx service on ex-nginx (10.0.65.10).
-Expected: app unreachable externally (confirmed SPOF).
-Recover nginx → verify app accessible again. Measure downtime.
+Stop external nginx (SPOF for external traffic).
+
+- Action: Stop nginx service on ex-nginx (10.0.65.10)
+- Check: App unreachable externally (confirmed SPOF)
+- Check: ex-nginx upstream health status
+- Check: least_conn behavior when backend workers change
+- Recovery: Start nginx service
+- Measure: Downtime duration
+- Check: App accessible again
+
 → Run checklist.
 
 ### Scenario 2.2 — External NGINX Recovery via Proxmox
-Test recovery path: Proxmox API → soft reboot → if fail → reset → if fail → force stop + restore from backup + start.
+Test recovery escalation path.
+
+- Action: Soft reboot ex-nginx via Proxmox API
+- Check: If soft reboot fails → reset
+- Check: If reset fails → force stop + restore from backup + start
+- Check: nginx serving traffic after recovery
+- Check: Email notification sent
+
 → Run checklist.
 
 ### Scenario 2.3 — Kill 1 of 3 Ingress NGINX Pods
-Kill 1 ingress-nginx pod.
-Expected: app still reachable via remaining 2 pods.
+Partial ingress-nginx failure.
+
+- Action: `kubectl delete pod -n ingress-nginx <one-pod>`
+- Check: App still reachable via remaining 2 pods
+- Check: Traffic distribution shifts to surviving pods
+- Check: Killed pod restarts automatically
+
 → Run checklist.
 
-### Scenario 2.4 — Kill 2 of 3 Ingress NGINX Pods
-Expected: app still reachable via remaining 1 pod.
+### Scenario 2.4 — Kill 3 of 3 Ingress NGINX Pods
+Full ingress-nginx failure.
+
+- Action: `kubectl delete pod -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx`
+- Check: App down (expected)
+- Check: Flux reconciliation kicks in
+- Measure: Time until Flux restores all 3 pods
+- Check: App accessible after recovery
+
 → Run checklist.
 
-### Scenario 2.5 — Kill 3 of 3 Ingress NGINX Pods
-Expected: app down. Recovery via Flux reconciliation.
-Measure: time until Flux restores all 3 pods.
+### Scenario 2.5 — Calico CNI Failure
+Stop CNI daemonset pods.
+
+- Action: `kubectl delete pod -n calico-system -l k8s-app=calico-node`
+- Check: Pod-to-pod communication across nodes
+- Check: Existing connections survive? New connections fail?
+- Check: Calico pods restart automatically
+- Check: Network recovers after restart
+
 → Run checklist.
 
-### Scenario 2.6 — Ingress During Worker Node Failure
-Kill a worker node hosting an ingress-nginx pod.
-Verify: pod reschedules to another node. Anti-affinity + priority class working.
+### Scenario 2.6 — CoreDNS Failure
+Stop cluster DNS.
+
+- Action: `kubectl delete pod -n kube-system -l k8s-app=kube-dns`
+- Check: Service discovery inside cluster broken
+- Check: Pods cannot resolve service names
+- Check: Pods using IP directly still work?
+- Check: CoreDNS pods restart automatically
+- Check: DNS resolution recovers
+
 → Run checklist.
 
-### Scenario 2.7 — Calico CNI Failure
-Stop calico-node daemonset pods.
-Check: pod-to-pod communication across nodes.
-→ Run checklist.
+### Scenario 2.7 — VLAN / Proxmox Network Drop
+Drop network between Proxmox and router.
 
-### Scenario 2.8 — CoreDNS Failure
-Stop coredns pods.
-Check: service discovery inside cluster (can pods resolve service names?).
-→ Run checklist.
+- Action: Drop SVC or storage level VLAN
+- Check: Impact on VMs and LXCs
+- Check: Impact on NFS mounts
+- Check: Impact on external access
+- Check: Email notification sent via mgmt path (separate VLAN)
 
-### Scenario 2.9 — Cross-Node Network Partition
-Simulate network partition between 2 worker nodes.
-Check: pods on isolated node, scheduling behavior, split-brain risk.
-→ Run checklist.
-
-### Scenario 2.10 — VLAN / Proxmox Network Drop
-Drop network between Proxmox and router on SVC or storage level VLAN.
-Trigger email notification via mgmt path.
-→ Run checklist.
-
-### Scenario 2.11 — Load Balancer Backend Loss
-Kill 1 backend worker → check least_conn behavior on ex-nginx.
-Verify: traffic shifts to remaining workers without errors.
 → Run checklist.
 
 ---

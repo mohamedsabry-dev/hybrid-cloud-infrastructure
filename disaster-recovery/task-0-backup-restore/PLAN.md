@@ -6,7 +6,6 @@
 
 ### Scenario 0.0 — Full Environment Backup (Pre-requisite)
 Complete Proxmox backup of all VMs/LXCs before DR testing begins.
-This is your rollback point if anything goes wrong during scenarios 0.1-0.9.
 
 **VMs:**
 - [ ] 1001 (freeipa)
@@ -25,65 +24,62 @@ This is your rollback point if anything goes wrong during scenarios 0.1-0.9.
 - [ ] 2005 (vault2)
 - [ ] 2006 (vault3)
 
-**Backup Method:** Proxmox vzdump (snapshot mode)
-**Backup Destination:** NAS storage
-**Retention:** Keep until all DR scenarios complete successfully
- 
-→ Verify all backups completed before proceeding to 0.1
+- Action: Run `vzdump` (snapshot mode) for each VM/LXC
+- Destination: NAS storage
+- Retention: Keep until all DR scenarios complete successfully
+- Check: Verify all backups completed before proceeding to 0.1
+
+→ Run checklist.
 
 ---
 
-### Scenario 0.1 — ETCD Backup & Restore (Normal)
-Backup etcd snapshot under normal operation → restore → verify cluster state.
+### Scenario 0.1 — ETCD Backup & Restore
+Backup etcd snapshot under normal operation, then restore.
+
+- Action: Trigger manual backup job
+  ```
+  kubectl create job --from=cronjob/etcd-backup etcd-backup-test -n etcd-backup
+  ```
+- Check: Local backup exists on master node (`/var/lib/etcd-backup/`)
+- Check: S3 bucket contains uploaded snapshot
+- Action: Restore from local snapshot
+- Check: Cluster state matches pre-backup state
+- Check: All pods running and serving traffic
+
 → Run checklist.
 
-### Scenario 0.2 — ETCD Backup & Restore (Under Load)
-Backup etcd during active workload (uploads, deployments running) → restore → verify data integrity.
+### Scenario 0.2 — ETCD Restore from S3
+Download snapshot from S3 and restore (simulates local backups lost).
+
+- Action: Delete local backups on all masters
+- Action: Download latest snapshot from S3 bucket
+- Action: Restore etcd from downloaded snapshot
+- Check: etcd cluster healthy (all 3 members)
+- Check: Kubernetes API responding
+- Check: All workloads recovered
+
 → Run checklist.
 
-### Scenario 0.3 — ETCD Snapshot Corruption
-Simulate corrupted etcd snapshot → attempt restore → document failure behavior and recovery path.
-→ Run checklist.
+### Scenario 0.3 — WordPress Data Backup & Restore
+Backup and restore WordPress uploads (NFS PVC) + MariaDB.
 
-### Scenario 0.4 — Vault Raft Backup & Restore (Normal)
-Backup Vault raft → restore → verify all secrets accessible.
-→ Run checklist.
+- Action: Backup WordPress uploads directory (NFS)
+- Action: Backup MariaDB database (`mysqldump` or snapshot)
+- Action: Simulate data loss (delete some uploads, drop table)
+- Action: Restore uploads from backup
+- Action: Restore MariaDB from backup
+- Check: Uploads intact and accessible
+- Check: DB consistent — no missing/duplicate records
+- Check: WordPress functioning normally
 
-### Scenario 0.5 — Vault Raft Backup Integrity
-Verify backup integrity before restore (checksum, validation).
-Restore with different quorum states (1, 2, 3 nodes).
-→ Run checklist.
-
-### Scenario 0.6 — WordPress Data Backup & Restore
-Backup WordPress uploads + MariaDB during active operations.
-Restore → verify: uploads intact, DB consistent, no missing/duplicate records.
-→ Run checklist.
-
-### Scenario 0.7 — MariaDB Point-in-Time Recovery
-Test point-in-time recovery for MariaDB.
-Verify: can you restore to a specific moment before a failure?
-→ Run checklist.
-
-### Scenario 0.8 — Local Backup Without NFS
-Backup to local storage (no NFS dependency).
-Then: simulate NFS down → restore from local backup → verify.
-Confirms you can recover even when NFS is unavailable.
-→ Run checklist.
-
-### Scenario 0.9 — Backup Copy Strategy
-Backup to local → scheduled copy to NFS.
-Verify: only latest backup kept on local, older copies on NFS.
-Test: NFS goes down → local backup still usable.
 → Run checklist.
 
 ---
 
 ### Observation Checklist (run after every scenario):
-- [ ] Backup completed successfully (under load if applicable)
+- [ ] Backup completed successfully
 - [ ] Restore produced consistent state
 - [ ] DB integrity (no missing / duplicate records)
 - [ ] WordPress uploads intact
-- [ ] Vault secrets accessible after raft restore
 - [ ] etcd cluster healthy after restore
-- [ ] Local backup usable without NFS
-- [ ] Backup copy to NFS succeeded
+- [ ] Pods running and serving traffic

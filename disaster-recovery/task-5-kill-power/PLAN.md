@@ -7,54 +7,85 @@
 ---
 
 ### Scenario 5.1 — Graceful Power Down (UPS Triggered)
-Simulate electricity loss → UPS triggers shutdown script.
-Verify shutdown order executes correctly:
-1. App pods
-2. K8s workers
-3. K8s masters
-4. Vault
-5. Proxmox
+Simulate electricity loss triggering UPS shutdown script.
+
+- Action: Trigger UPS shutdown script (or simulate)
+- Check: Shutdown order executes correctly:
+  1. App pods
+  2. K8s workers
+  3. K8s masters
+  4. Vault
+  5. Proxmox
+- Check: Each component shuts down cleanly
+- Check: No data corruption
+
 → Run checklist.
 
 ### Scenario 5.2 — Graceful Power Down with NFS Dependency
-Before Proxmox shutdown: umount NFS backup storage.
-Verify: Proxmox shuts down cleanly without hanging on NFS mount.
-After power up: remount NFS backup storage before starting VMs.
+Handle NFS mount before Proxmox shutdown.
+
+- Action: Before Proxmox shutdown: `umount` NFS backup storage
+- Check: Proxmox shuts down cleanly (no hang on NFS mount)
+- Recovery: After power up: remount NFS before starting VMs
+- Check: NFS mount successful before VM start
+
 → Run checklist.
 
 ### Scenario 5.3 — Full Recovery Boot Sequence
 Power everything back on after graceful shutdown.
-Verify boot order and all services come back:
-NAS/NFS → Proxmox → IPA → Vault → K8s masters → K8s workers → App pods.
-Check: IPA VM auto-start (will it fail due to NFS external disk not ready?).
-Check: worker pods (will they fail if NFS not restored before pod scheduling?).
+
+- Action: Boot in order:
+  1. NAS/NFS
+  2. Proxmox
+  3. IPA
+  4. Vault
+  5. K8s masters
+  6. K8s workers
+  7. App pods
+- Check: IPA VM auto-start — does it fail if NFS external disk not ready?
+- Check: Worker pods — do they fail if NFS not restored before scheduling?
+- Check: All services healthy after boot sequence
+
 → Run checklist.
 
 ### Scenario 5.4 — Power Flicker (Short Outage, UPS Holds)
-Power out and back before UPS reaches shutdown threshold.
-VMs stay running but NFS/NAS may restart.
-Storage takes time to recover and start sharing.
-Check: pods hanging on NFS mount during recovery window.
+Power out and back before UPS triggers shutdown.
+
+- Action: Simulate brief power loss (UPS holds, no shutdown)
+- Check: VMs stay running
+- Check: NAS/NFS may restart (battery-backed or not?)
+- Check: Storage takes time to recover and start sharing
+- Check: Pods hanging on NFS mount during recovery window
+- Check: Auto-recovery once NFS available
+
 → Run checklist.
 
 ### Scenario 5.5 — IPA Domain Down
-Stop IPA server.
-Check: K8s worker-to-master communication (IP-based or DNS-dependent? Check /etc/hosts).
-Check: Vault cluster (certs signed by IPA — does Vault break?).
-Check: Ansible runner connectivity to all nodes (fallback to root + trusted key via inventory).
-Check: can you still SSH into nodes? (local accounts, emergency access).
-Document: IPA restore procedure.
+Stop FreeIPA server, test DNS/auth dependencies.
+
+- Action: Stop IPA server (VM shutdown or service stop)
+- Check: K8s worker-to-master communication
+  - IP-based or DNS-dependent?
+  - Check `/etc/hosts` on nodes
+- Check: Vault cluster — certs signed by IPA, does Vault break?
+- Check: Ansible runner connectivity
+  - Fallback to root + trusted key via inventory?
+- Check: SSH access to nodes — local accounts, emergency access?
+- Document: IPA restore procedure
+
 → Run checklist.
 
-### Scenario 5.6 — Proxmox Management Network Drop
-Drop network between Proxmox host and management VLAN.
-Check: impact on monitoring, self-healing automation, Proxmox API availability.
-Can you still reach Proxmox via console?
-→ Run checklist.
+### Scenario 5.6 — Proxmox API Unavailable
+Stop Proxmox API service.
 
-### Scenario 5.7 — Proxmox API Unavailable
-Stop Proxmox API service (pveproxy).
-Check: impact on auto-recovery scripts (Scenario 1.21), monitoring, VM management.
+- Action: Stop `pveproxy` service on Proxmox
+- Check: VMs/LXCs still running (expected: yes)
+- Check: Impact on auto-recovery scripts (remediation)
+- Check: Impact on monitoring dashboards
+- Check: Impact on VM management (no UI/API access)
+- Recovery: Start `pveproxy` service
+- Check: API access restored
+
 → Run checklist.
 
 ---
