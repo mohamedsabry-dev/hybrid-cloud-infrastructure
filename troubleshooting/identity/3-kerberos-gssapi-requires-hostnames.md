@@ -1,16 +1,13 @@
-# Case 3: Kerberos/GSSAPI Authentication Requires Hostnames
+# TS-IDN-003 | 2026-03-05 | RESOLVED
 
-**Date:** 2026-03-05
-**Environment:** DEV (lab.local)
-**Affected Systems:** All FreeIPA domain hosts
-**Status:** RESOLVED
+## 1. Context
+- System: Kerberos / GSSAPI / SSH
+- Environment: DEV (lab.local)
+- Related components: All FreeIPA domain hosts, Ansible inventory
 
----
-
-## Symptom
-
-SSH works with hostnames but fails with IP addresses.
-
+## 2. Issue
+- Symptom: SSH works with hostnames but fails with IP addresses
+- Error:
 ```bash
 # Using IP - FAILS
 ssh super_bot@10.0.64.11
@@ -22,7 +19,6 @@ ssh super_bot@k8s-worker1.lab.local
 ```
 
 Same with Ansible:
-
 ```bash
 # Inventory with IPs - FAILS
 ansible all -m ping
@@ -33,14 +29,9 @@ ansible all -m ping
 # All green
 ```
 
----
+## 3. Analysis
 
-## Root Cause
-
-Kerberos authentication validates **service principals** which are tied to hostnames, not IP addresses.
-
-### How Kerberos Authentication Works
-
+**Check 1: How does Kerberos authentication work?**
 ```
 1. Client requests ticket for: host/k8s-worker1.lab.local@LAB.LOCAL
 2. KDC checks: Does this principal exist? Yes.
@@ -49,8 +40,7 @@ Kerberos authentication validates **service principals** which are tied to hostn
 5. Authentication succeeds
 ```
 
-### What Happens with IP Addresses
-
+**Check 2: What happens with IP addresses?**
 ```
 1. Client requests ticket for: host/10.0.64.11@LAB.LOCAL
 2. KDC checks: Does this principal exist? NO!
@@ -59,14 +49,21 @@ Kerberos authentication validates **service principals** which are tied to hostn
 
 The service principal is `host/FQDN@REALM`, not `host/IP@REALM`.
 
----
+## 4. Root Cause
+> Kerberos service principals are tied to **hostnames**, not IP addresses. The principal format is `host/FQDN@REALM` (e.g., `host/k8s-worker1.lab.local@LAB.LOCAL`). There is no `host/10.0.64.11@LAB.LOCAL` principal registered.
 
-## Solution
+**Simple analogy:** Kerberos is like a VIP guest list - list says "Allow John Smith from Acme Corp", not "Allow person from 123 Main Street". Must identify by name, not address.
 
-Use FQDNs (Fully Qualified Domain Names) in your Ansible inventory.
+## 5. Solution
+> Use FQDNs (Fully Qualified Domain Names) in Ansible inventory instead of IPs.
 
-### Before (Broken)
+**Why this works:** When SSH connects to `k8s-worker1.lab.local`, Kerberos can find the matching principal. When connecting to an IP, there's no matching principal.
 
+**File:** `ansible/dev/inventory/inventory.ini`
+
+**Location:** Ansible control node inventory configuration
+
+**Before (broken):**
 ```ini
 [k8s_workers]
 k8s-worker1.lab.local ansible_host=10.0.64.10
@@ -74,8 +71,7 @@ k8s-worker2.lab.local ansible_host=10.0.64.11
 k8s-worker3.lab.local ansible_host=10.0.64.12
 ```
 
-### After (Working)
-
+**After (working):**
 ```ini
 [k8s_workers]
 k8s-worker1.lab.local
@@ -83,61 +79,13 @@ k8s-worker2.lab.local
 k8s-worker3.lab.local
 ```
 
-FreeIPA provides DNS resolution, so hostnames resolve correctly.
+FreeIPA provides DNS resolution, so hostnames resolve correctly without specifying `ansible_host`.
 
----
+**Prerequisites:**
+1. FreeIPA DNS must be working - clients should use FreeIPA as DNS server
+2. Kerberos ticket must exist - run `kinit username` before SSH/Ansible
 
-## Prerequisites
-
-1. **FreeIPA DNS must be working** - clients should use FreeIPA as DNS server
-2. **Kerberos ticket must exist** - run `kinit username` before SSH/Ansible
-
-```bash
-# Get Kerberos ticket
-kinit super_bot
-
-# Verify ticket
-klist
-
-# Now SSH/Ansible will use GSSAPI
-ssh super_bot@k8s-worker1.lab.local
-ansible managed_hosts -m ping
-```
-
----
-
-## Simple Explanation
-
-Kerberos is like a VIP guest list at a venue:
-
-- Guest list says: "Allow **John Smith** from **Acme Corp**"
-- You show up saying: "I'm the person from **123 Main Street**"
-- Bouncer: "Sorry, I don't have **123 Main Street** on my list"
-
-The list uses **names** (hostnames), not **addresses** (IPs). You must identify yourself by name.
-
----
-
-## When You Must Use IPs
-
-If you absolutely need to use IP addresses:
-
-1. **Disable GSSAPI** and use password auth:
-   ```bash
-   ssh -o GSSAPIAuthentication=no super_bot@10.0.64.11
-   ```
-
-2. **Add IP to /etc/hosts** on the client with the hostname:
-   ```
-   10.0.64.11 k8s-worker1.lab.local k8s-worker1
-   ```
-
-3. **Use password authentication** instead of Kerberos (less secure)
-
----
-
-## Verification
-
+**Verification:**
 ```bash
 # Check DNS resolution
 dig k8s-worker1.lab.local
@@ -149,9 +97,30 @@ klist
 ssh -v super_bot@k8s-worker1.lab.local 2>&1 | grep -i gssapi
 ```
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: None - just using proper hostnames instead of IPs
 
-## References
+## 7. Impact After Fix
+- Observed: All GSSAPI authentication works with FQDNs
+- No new issues caused
 
-- [Kerberos Service Principals](https://web.mit.edu/kerberos/krb5-latest/doc/admin/princ_dns.html)
-- [FreeIPA DNS Integration](https://freeipa.readthedocs.io/en/latest/designs/dns.html)
+## 8. Notes
+
+**If you MUST use IPs:**
+
+1. Disable GSSAPI and use password auth:
+   ```bash
+   ssh -o GSSAPIAuthentication=no super_bot@10.0.64.11
+   ```
+
+2. Add IP to /etc/hosts on the client with the hostname:
+   ```
+   10.0.64.11 k8s-worker1.lab.local k8s-worker1
+   ```
+
+3. Use password authentication instead of Kerberos (less secure)
+
+## 9. Workaround (if any)
+> 1. `ssh -o GSSAPIAuthentication=no user@IP` to bypass Kerberos and use password auth.
+> 2. `ssh root@IP` - all nodes have ansible public key trusted (injected during infra init phase via GitHub workflow), so root SSH with key works regardless of Kerberos.

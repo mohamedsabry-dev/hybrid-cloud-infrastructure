@@ -1,20 +1,28 @@
-# Case 2: Calico BGP Peering on Wrong Interface After Adding Secondary NIC
+# TS-K8S-002 | 2026-03-28 | RESOLVED
 
-## Status: RESOLVED
-## Date: 2026-03-28
-## Severity: Medium
-## Environment: k8s-dev cluster
-## Related: Case 5 (NFS Hard Mount), Case 3-4, Case 6 (NFS Storage Guide)
+## 1. Context
+- System: Calico CNI / BGP Peering / Multi-NIC Configuration
+- Environment: k8s-dev cluster (also applied to prod)
+- Related components: Calico DaemonSet, Worker nodes with dual NICs, NFS storage network
+- Discovered during: Testing nginx deployment with NFS persistent storage
+- Related: Case 3 (NFS Hard Mount), Case 4-5, Case 6 (NFS Storage Guide)
 
----
+**Network Topology:**
+```
+Masters: 10.0.61.x (K8s network only)
+         │
+         │ BGP works (same L3 reachability)
+         ↓
+Workers: eth0: 10.0.64.x (K8s network) <-- BGP should use this
+         eth1: 10.0.40.x (Storage network) <-- BGP was using this (WRONG)
+```
 
-## 1. Issue Summary
+## 2. Issue
+- Symptom: Master nodes could not reach pod network on worker nodes
+- Error: BGP peering via wrong interface (eth1/10.0.40.x storage network instead of eth0/10.0.64.x K8s network)
+- Impact: Pods unreachable from master nodes; ClusterIP services timeout
 
-Master nodes could not reach pod network on worker nodes. Calico BGP was peering via the wrong network interface (eth1/10.0.40.x storage network) instead of the correct interface (eth0/10.0.64.x K8s network).
-
----
-
-## 2. How Issue Was Discovered
+**How Issue Was Discovered:**
 
 While testing a new nginx deployment with NFS persistent storage:
 
@@ -42,9 +50,7 @@ ping 10.244.207.69
 # 3 packets transmitted, 0 received, 100% packet loss
 ```
 
----
-
-## 3. Initial Symptoms
+**Symptom Matrix:**
 
 | Test | Expected | Actual |
 |------|----------|--------|
@@ -54,11 +60,9 @@ ping 10.244.207.69
 | Master -> Pod IP | Work | TIMEOUT |
 | Master -> localhost:30080 | Work | TIMEOUT |
 
----
+## 3. Analysis
 
-## 4. Investigation Steps
-
-### Step 4.1: Check IP Routes on Master
+### Step 1: Check IP Routes on Master
 
 ```bash
 [root@k8s-master1 ~]# ip route | grep 10.244
@@ -75,7 +79,9 @@ Missing routes for:
 - 10.244.207.x (worker2 pods)
 - 10.244.29.x (worker3 pods)
 
-### Step 4.2: Check Calico IPPool Configuration
+---
+
+### Step 2: Check Calico IPPool Configuration
 
 ```bash
 [root@k8s-master1 ~]# kubectl get ippool -o yaml
@@ -87,14 +93,18 @@ spec:
 
 **Finding:** IPPool config is correct. Issue is not tunnel mode.
 
-### Step 4.3: Install Calicoctl for Deeper Investigation
+---
+
+### Step 3: Install Calicoctl for Deeper Investigation
 
 ```bash
 curl -L https://github.com/projectcalico/calico/releases/latest/download/calicoctl-linux-amd64 -o /usr/local/bin/calicoctl
 chmod +x /usr/local/bin/calicoctl
 ```
 
-### Step 4.4: Check BGP Peering Status (KEY DISCOVERY)
+---
+
+### Step 4: Check BGP Peering Status (KEY DISCOVERY)
 
 ```bash
 [root@k8s-master1 ~]# calicoctl node status
@@ -124,7 +134,9 @@ Should be:
 - 10.0.64.11 (worker2 eth0 - K8s network)
 - 10.0.64.12 (worker3 eth0 - K8s network)
 
-### Step 4.5: Verify Worker Network Interfaces
+---
+
+### Step 5: Verify Worker Network Interfaces
 
 ```bash
 [root@k8s-worker1 ~]# ip a
@@ -133,7 +145,9 @@ eth1: 10.0.40.201/24  <-- Storage/NFS network (wrong for BGP)
 tunl0: 10.244.62.0/32 <-- Pod network tunnel
 ```
 
-### Step 4.6: Check Current IP Autodetection Setting
+---
+
+### Step 6: Check Current IP Autodetection Setting
 
 ```bash
 [root@k8s-master1 ~]# kubectl get daemonset calico-node -n kube-system -o yaml | grep -A2 IP_AUTODETECTION
@@ -142,9 +156,7 @@ tunl0: 10.244.62.0/32 <-- Pod network tunnel
 
 **Finding:** No IP_AUTODETECTION_METHOD set. Calico using default `first-found` which picked eth1 (wrong interface).
 
----
-
-## 5. Root Cause Analysis
+## 4. Root Cause
 
 ### Why This Wasn't an Issue Initially
 
@@ -164,26 +176,13 @@ When the cluster was first built, worker nodes had **only one network interface*
    - Different subnets with no L3 route for BGP
    - Storage VLAN (10.0.40.x) not meant for K8s traffic
 
-### Network Topology:
-
-```
-Masters: 10.0.61.x (K8s network only)
-         │
-         │ BGP works (same L3 reachability)
-         ↓
-Workers: eth0: 10.0.64.x (K8s network) <-- BGP should use this
-         eth1: 10.0.40.x (Storage network) <-- BGP was using this (WRONG)
-```
-
 ### Why Calico Picked Wrong Interface:
 
 Calico's default `IP_AUTODETECTION_METHOD=first-found` iterates through interfaces and picks the first valid non-local IP. After adding eth1, interface enumeration order changed, causing eth1 (10.0.40.x) to be selected.
 
----
+## 5. Solution
 
-## 6. Solution Applied
-
-### Step 6.1: Configure IP Autodetection Method
+### Step 1: Configure IP Autodetection Method
 
 ```bash
 [root@k8s-master1 ~]# kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD="cidr=10.0.64.0/24,10.0.61.0/24"
@@ -192,7 +191,7 @@ daemonset.apps/calico-node env updated
 
 This tells Calico: "Only use IPs from 10.0.64.0/24 (workers) or 10.0.61.0/24 (masters)"
 
-### Step 6.2: Wait for Rollout
+### Step 2: Wait for Rollout
 
 ```bash
 [root@k8s-master1 ~]# kubectl rollout status daemonset/calico-node -n kube-system
@@ -205,7 +204,7 @@ Waiting for daemon set "calico-node" rollout to finish: 5 of 6 updated pods are 
 daemon set "calico-node" successfully rolled out
 ```
 
-### Step 6.3: Verify BGP Peering Fixed
+### Step 3: Verify BGP Peering Fixed
 
 ```bash
 [root@k8s-master1 ~]# calicoctl node status
@@ -232,12 +231,11 @@ Also Repeat for Prod
 | 10.0.54.11   | node-to-node mesh | up    | 18:32:40 | Established |
 | 10.0.54.12   | node-to-node mesh | up    | 18:32:40 | Established |
 +--------------+-------------------+-------+----------+-------------+
-
 ```
 
 All peers now on CORRECT interfaces (10.0.64.x for workers).
 
-### Step 6.4: Verify Pod Connectivity
+### Step 4: Verify Pod Connectivity
 
 ```bash
 [root@k8s-master1 ~]# curl http://10.244.207.69:80
@@ -246,11 +244,9 @@ Hello from NFS!
 
 Master can now reach pod network directly.
 
----
+### Prevention Measures Implemented
 
-## 7. Prevention Measures Implemented
-
-### 7.1: Updated Cluster Init Playbook
+**Updated Cluster Init Playbook:**
 
 File: `ansible/dev/playbooks/k8s/k8s_init.yml`
 
@@ -268,7 +264,7 @@ Added after Calico apply:
         mode: '0755'
 ```
 
-### 7.2: Created Quick-Fix Playbook
+**Created Quick-Fix Playbook:**
 
 File: `ansible/dev/playbooks/k8s/calicoctl.yml`
 
@@ -287,9 +283,19 @@ File: `ansible/dev/playbooks/k8s/calicoctl.yml`
 
 Same playbook mirrored to prod: `ansible/prod/playbooks/k8s/calicoctl.yml`
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: Calico DaemonSet restart causes brief pod network disruption (~30s per node during rolling update)
 
-## 8. Verification Commands
+## 7. Impact After Fix
+- Observed: All BGP peers established on correct interfaces
+- Master nodes can reach pod IPs directly
+- ClusterIP services working correctly
+- Fix applied to both dev and prod clusters
+
+## 8. Notes
+
+### Verification Commands
 
 Use these to verify Calico health after any network changes:
 
@@ -308,27 +314,24 @@ kubectl get pods -A -o wide | head -5
 curl http://<POD_IP>:<PORT>
 ```
 
----
-
-## 9. Lessons Learned
+### Lessons Learned
 
 1. **Always set IP_AUTODETECTION_METHOD** when nodes have multiple NICs
 2. **Test pod connectivity from masters** after infrastructure changes
 3. **Install calicoctl** on masters for BGP debugging
 4. **Document network topology** - which interface for which purpose
 
----
-
-## 10. Related Files
+### Related Files
 
 - `ansible/dev/playbooks/k8s/k8s_init.yml` - Cluster init with Calico config
 - `ansible/dev/playbooks/k8s/calicoctl.yml` - Calicoctl install playbook
 - `ansible/prod/playbooks/k8s/calicoctl.yml` - Prod mirror
 - `kubernetes/dev/deployments/apps/testing/nginx-test.yml` - Test deployment used to discover issue
 
----
-
-## 11. References
+### References
 
 - Calico IP Autodetection: https://docs.tigera.io/calico/latest/networking/ipam/ip-autodetection
 - Calico BGP: https://docs.tigera.io/calico/latest/networking/configuring/bgp
+
+## 9. Workaround (if any)
+> Temporarily use NodePort access instead of direct pod IP access. Not recommended - fix the IP autodetection instead.

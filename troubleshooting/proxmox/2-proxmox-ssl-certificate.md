@@ -1,32 +1,34 @@
-# Case 2: Proxmox SSL Certificate — Wrong IP in SAN
+# TS-PVE-002 | 2026-02-20 | RESOLVED
 
-## Status: RESOLVED
-## Date: 2026-02-20
-## Environment: Dev & Prod Proxmox servers
+## 1. Context
+- System: Proxmox VE
+- Environment: Dev & Prod Proxmox servers
+- Related components: SSL certificates, /etc/hosts, pveproxy
 
----
-
-## Symptoms
-
-After changing Proxmox management IP from `192.168.0.x` to `10.0.5.x`, the browser shows certificate warning. The certificate still contains the old IP in Subject Alternative Name (SAN).
-
-## Root Cause
-
-Proxmox reads the node IP from `/etc/hosts` when generating certificates. If `/etc/hosts` has the old IP, the certificate will have the wrong IP.
-
-## Diagnosis
-
-Check current certificate SAN:
-```bash
-openssl x509 -in /etc/pve/local/pve-ssl.pem -text | grep -A1 "Subject Alternative Name"
-```
-
-Wrong output (old IP):
+## 2. Issue
+- Symptom: After changing Proxmox management IP from `192.168.0.x` to `10.0.5.x`, browser shows certificate warning
+- Error: Certificate still contains old IP in Subject Alternative Name (SAN)
 ```
 IP Address:127.0.0.1, IP Address:192.168.0.58, DNS:pve-dev, DNS:pve-dev.lab.local
 ```
 
-## Solution
+## 3. Analysis
+
+**Check current certificate SAN:**
+```bash
+openssl x509 -in /etc/pve/local/pve-ssl.pem -text | grep -A1 "Subject Alternative Name"
+```
+
+**Finding:** Certificate shows old IP (192.168.0.58) instead of new IP (10.0.5.110)
+
+**Why this happens:**
+Proxmox reads the node IP from `/etc/hosts` when generating certificates. If `/etc/hosts` has the old IP, the certificate will have the wrong IP.
+
+## 4. Root Cause
+> Proxmox reads node IP from `/etc/hosts` when generating certificates. After IP change, `/etc/hosts` still had old IP, so regenerated certificate contained wrong SAN.
+
+## 5. Solution
+> Update /etc/hosts with new IP, then regenerate certificate.
 
 ### On Proxmox Server
 
@@ -76,16 +78,23 @@ sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keyc
 security find-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
 ```
 
-## Note
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: Brief pveproxy restart, web UI unavailable for a few seconds
 
+## 7. Impact After Fix
+- Observed: Certificate now contains correct IP in SAN
+- Browser no longer shows certificate warnings
+- macOS trusts the Proxmox CA
+
+## 8. Notes
+
+**Automation:**
 The `network-setup-dev.sh` and `network-setup-prod.sh` scripts now automatically update `/etc/hosts` and regenerate the certificate. This manual process is only needed if:
 - The network setup script wasn't used
 - Certificate needs regeneration for other reasons
 
----
-
-## Commands Reference
-
+**Commands Reference:**
 ```bash
 # Check current certificate SAN
 openssl x509 -in /etc/pve/local/pve-ssl.pem -text | grep -A1 "Subject Alternative Name"
@@ -105,3 +114,8 @@ sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keyc
 # Find trusted cert on macOS
 security find-certificate -c "Proxmox Virtual Environment" /Library/Keychains/System.keychain
 ```
+
+**Related:** TS-PVE-001 (node rename) - similar SSL certificate regeneration process
+
+## 9. Workaround (if any)
+> Temporarily bypass certificate warning in browser, but this is not recommended for production use.

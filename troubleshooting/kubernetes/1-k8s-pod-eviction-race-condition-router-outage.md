@@ -1,20 +1,19 @@
-# Troubleshooting: K8s Pod Eviction Race Condition During Router Outage
+# TS-K8S-001 | 2026-03-25 | RESOLVED
 
-**Date**: 2026-03-25
-**Duration**: ~2 hours troubleshooting
-**Affected**: Prod & Dev K8s clusters - bare pods (nginx, nginx2, nginx3)
-**Resolution**: Understood race condition behavior; recommend Deployments instead of bare pods
+## 1. Context
+- System: Kubernetes / Pod Scheduling / Taint-based Eviction
+- Environment: Prod & Dev K8s clusters
+- Related components: ER605 Router (Inter-VLAN routing), bare nginx pods, TaintManager
+- Discovered during: Routine check after router reboot
+- Duration: ~2 hours troubleshooting
 
----
+**Cluster Details:**
+- Kubernetes v1.31.14 (kubeadm)
+- CNI: Calico v3.27.0
+- Pod CIDR: 10.245.0.0/16
+- HA API: 10.0.51.100:16443 (HAProxy + Keepalived)
 
-## Summary
-
-Router reboot caused ~5-10 minute network outage between K8s masters (VLAN 51) and workers (VLAN 54). This triggered pod eviction due to the default 300-second (5 min) tolerance. Due to race condition timing, some pods were evicted while others survived - inconsistent behavior across identical nodes.
-
----
-
-## Environment
-
+**Network Topology:**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        ER605 Router                             │
@@ -41,15 +40,12 @@ Router reboot caused ~5-10 minute network outage between K8s masters (VLAN 51) a
 └─────────────────────────┴───────────────────────────────────────┘
 ```
 
-**Cluster Details:**
-- Kubernetes v1.31.14 (kubeadm)
-- CNI: Calico v3.27.0
-- Pod CIDR: 10.245.0.0/16
-- HA API: 10.0.51.100:16443 (HAProxy + Keepalived)
+## 2. Issue
+- Symptom: Bare pods inconsistently evicted after router outage - some survived, some deleted
+- Error: `TaintManagerEviction - Marking for deletion Pod default/nginx`
+- Impact: Unpredictable pod survival during network outages; race condition behavior
 
----
-
-## Symptoms
+Router reboot caused ~5-10 minute network outage between K8s masters (VLAN 51) and workers (VLAN 54). This triggered pod eviction due to the default 300-second (5 min) tolerance. Due to race condition timing, some pods were evicted while others survived - inconsistent behavior across identical nodes.
 
 **Initial observation:**
 - Yesterday: Created 3 bare nginx pods, one on each worker
@@ -72,9 +68,7 @@ nginx3   1/1     Running   1          k8s-worker3.lab.local
 # nginx - GONE (evicted and deleted)
 ```
 
----
-
-## Troubleshooting Sequence
+## 3. Analysis
 
 ### Step 1: Check Node Status
 
@@ -252,9 +246,7 @@ Mar 25 14:51:39 containerd: Releasing address using handleID ContainerID="fd4cd3
 | 14:23:35 | Container created, nginx pulled |
 | 14:51:39 | Pod DELETED - eviction finally processed |
 
----
-
-## Root Cause
+## 4. Root Cause
 
 ### Primary Cause: Race Condition at Eviction Threshold
 
@@ -300,55 +292,7 @@ The TaintManager processes evictions in a queue. When nodes started recovering:
           All nodes Ready
 ```
 
----
-
-## Evidence Files
-
-### Kubernetes Events
-```bash
-# NodeNotReady events (all nodes same time)
-kubectl get events -A --field-selector reason=NodeNotReady
-
-# TaintManagerEviction events (shows race condition outcome)
-kubectl get events -A | grep -i "nginx\|evict"
-
-# NodeReady events (recovery timeline)
-kubectl get events -A --field-selector reason=NodeReady
-```
-
-### Worker Node Logs
-```bash
-# Kubelet logs
-journalctl -u kubelet --since "2 hours ago" | grep -i "nginx\|evict\|kill"
-
-# Containerd logs
-journalctl -u containerd --since "2 hours ago" | grep -i nginx
-```
-
----
-
-## Key Findings
-
-1. **All nodes NotReady at same time** - Network outage affected all equally
-2. **All nodes Ready at ~same time** - Recovered within 1 minute of each other
-3. **TaintManagerEviction race** - Processing order determined pod survival
-4. **Bare pods don't auto-recover** - Once evicted, they're gone permanently
-5. **Default tolerance is 300s** - 5 minutes before eviction starts
-
----
-
-## Lessons Learned
-
-1. **Bare pods are fragile** - They don't survive node failures
-2. **5-minute tolerance is tight** - Router reboots often exceed this
-3. **Race conditions are unpredictable** - Same setup, different outcomes
-4. **Deployments auto-recover** - K8s recreates evicted pods on healthy nodes
-5. **Inter-VLAN dependency** - Router is single point of failure for K8s control plane
-6. **Containerd logs are valuable** - Show complete container lifecycle
-
----
-
-## Prevention / Recommendations
+## 5. Solution
 
 ### 1. Use Deployments Instead of Bare Pods
 
@@ -467,18 +411,67 @@ Will be developed with the new MikroTik router in shaa Allah:
 - VPN tunnel health checks
 - Automated alerting on router issues
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: Deployments add minimal overhead; tolerance increase delays eviction (acceptable tradeoff for stability)
 
-## Commands Reference
+## 7. Impact After Fix
+- Observed: Deployments automatically reschedule evicted pods to healthy nodes
+- No manual intervention needed during network outages
+- Race condition still occurs but impact eliminated (pods recreated automatically)
 
-### Check Pod Status
+## 8. Notes
+
+### Key Findings
+
+1. **All nodes NotReady at same time** - Network outage affected all equally
+2. **All nodes Ready at ~same time** - Recovered within 1 minute of each other
+3. **TaintManagerEviction race** - Processing order determined pod survival
+4. **Bare pods don't auto-recover** - Once evicted, they're gone permanently
+5. **Default tolerance is 300s** - 5 minutes before eviction starts
+
+### Lessons Learned
+
+1. **Bare pods are fragile** - They don't survive node failures
+2. **5-minute tolerance is tight** - Router reboots often exceed this
+3. **Race conditions are unpredictable** - Same setup, different outcomes
+4. **Deployments auto-recover** - K8s recreates evicted pods on healthy nodes
+5. **Inter-VLAN dependency** - Router is single point of failure for K8s control plane
+6. **Containerd logs are valuable** - Show complete container lifecycle
+
+### Evidence Files
+
+**Kubernetes Events:**
+```bash
+# NodeNotReady events (all nodes same time)
+kubectl get events -A --field-selector reason=NodeNotReady
+
+# TaintManagerEviction events (shows race condition outcome)
+kubectl get events -A | grep -i "nginx\|evict"
+
+# NodeReady events (recovery timeline)
+kubectl get events -A --field-selector reason=NodeReady
+```
+
+**Worker Node Logs:**
+```bash
+# Kubelet logs
+journalctl -u kubelet --since "2 hours ago" | grep -i "nginx\|evict\|kill"
+
+# Containerd logs
+journalctl -u containerd --since "2 hours ago" | grep -i nginx
+```
+
+### Commands Reference
+
+**Check Pod Status:**
 ```bash
 kubectl get pods -o wide
 kubectl describe pod <pod-name>
 kubectl get events --field-selector involvedObject.name=<pod-name>
 ```
 
-### Check Node Status
+**Check Node Status:**
 ```bash
 kubectl get nodes -o wide
 kubectl describe node <node-name> | grep -A 15 Conditions
@@ -486,17 +479,17 @@ kubectl get events -A --field-selector reason=NodeNotReady
 kubectl get events -A --field-selector reason=NodeReady
 ```
 
-### Check Eviction Events
+**Check Eviction Events:**
 ```bash
 kubectl get events -A | grep -i "evict\|taint\|kill"
 ```
 
-### Check Pod Tolerations
+**Check Pod Tolerations:**
 ```bash
 kubectl get pod <pod-name> -o jsonpath='{.spec.tolerations}'
 ```
 
-### Worker Node Investigation
+**Worker Node Investigation:**
 ```bash
 journalctl -u kubelet --since "2 hours ago" | grep -i "evict\|kill\|delete"
 journalctl -u containerd --since "2 hours ago" | grep -i <pod-name>
@@ -504,20 +497,8 @@ crictl ps -a | grep <pod-name>
 ls -la /var/log/pods/ | grep <pod-name>
 ```
 
----
+### Action Items
 
-## Related Issues
-
-- `troubleshooting/network/43-switch-port4-link-flapping-loose-connection.md` - Physical network issues
-- `troubleshooting/network/48-er605-port4-gigabit-negotiation.md` - Router port failure
-
----
-
-## Status
-
-**Resolved** - Root cause identified as race condition during router outage.
-
-**Action Items:**
 - [ ] Convert bare pods to Deployments for resilience (auto-recovery)
 - [ ] For critical workloads, add explicit tolerations (600s) in Deployment YAML
 - [x] Update Terraform: Change VM boot order so all masters start together, all workers start together
@@ -525,3 +506,12 @@ ls -la /var/log/pods/ | grep <pod-name>
 - [ ] (Future) Migrate from ER605 to MikroTik L009UiGS-RM for stable routing
 - [ ] (Future) Implement router health monitoring with new MikroTik
 - [ ] (Future) Consider Kyverno for cluster-wide policy enforcement
+
+### Related Issues
+
+- `troubleshooting/network/43-switch-port4-link-flapping-loose-connection.md` - Physical network issues
+- `troubleshooting/network/48-er605-port4-gigabit-negotiation.md` - Router port failure
+
+## 9. Workaround (if any)
+> Manually recreate evicted bare pods: `kubectl run nginx --image=nginx`
+> Not recommended - use Deployments for automatic recovery instead.

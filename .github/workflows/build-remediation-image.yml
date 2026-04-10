@@ -5,7 +5,7 @@ on:
     branches:
       - dev
     paths:
-      - 'docker/remediation/**'
+      - 'kubernetes/docker-images/remediation/**'
 
 jobs:
   build-and-push:
@@ -29,6 +29,6 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          context: docker/remediation/
+          context: kubernetes/docker-images/remediation/
           push: true
           tags: ghcr.io/mohamedsabry-dev/remediation:latest

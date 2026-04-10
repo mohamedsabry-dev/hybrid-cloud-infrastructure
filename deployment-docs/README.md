@@ -58,7 +58,6 @@ These documents provide reference information, not deployment steps:
 | Document | Purpose |
 |----------|---------|
 | [capacity-planning.md](capacity-planning.md) | Resource allocation for VMs/LXCs |
-| [architecture-improvement-notes.txt](architecture-improvement-notes.txt) | Future architecture ideas |
 
 ---
 

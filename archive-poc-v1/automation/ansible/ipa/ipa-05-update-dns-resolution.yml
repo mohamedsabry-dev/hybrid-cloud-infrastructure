@@ -1,0 +1,34 @@
+---
+- name: Onboard Rocky Linux VMs to Solid Land
+  hosts: all:!ipa
+  become: yes
+  vars:
+    ipa_primary: "10.0.20.184"
+    pfsense_gw: "10.0.20.170"
+    domain: "home.lab"
+
+  tasks:
+    - name: Configure DNS via nmcli (IPA Primary, pfSense Secondary)
+      community.general.nmcli:
+        conn_name: "ens33"
+        type: ethernet
+        dns4:                     # Use dns4 for IPv4
+          - "{{ ipa_primary }}"
+          - "{{ pfsense_gw }}"
+        dns4_search:              # Use dns4_search
+          - "{{ domain }}"
+        state: present
+        conn_reload: yes          # Tells NetworkManager to reload the config
+
+#   - name: Force connection up to apply DNS
+#     ansible.builtin.shell: nmcli connection up ens33
+
+
+    - name: Read /etc/resolv.conf for verification
+      ansible.builtin.command: cat /etc/resolv.conf
+      register: dns_output
+
+
+    - name: Display DNS Resolution on each Host
+      ansible.builtin.debug:
+        msg: "{{ dns_output.stdout_lines }}"

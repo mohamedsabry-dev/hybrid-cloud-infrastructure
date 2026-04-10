@@ -115,7 +115,7 @@ Port 4 on the ER605 has a hardware defect causing gigabit negotiation failures.
 - All router/switch config unchanged, just cable moved
 - Port 4 left unused
 
-**Troubleshooting case:** `/troubleshooting/network/48-er605-port4-gigabit-negotiation.md`
+**Note:** ER605 has been replaced with MikroTik router. This issue is no longer applicable.
 
 ---
 

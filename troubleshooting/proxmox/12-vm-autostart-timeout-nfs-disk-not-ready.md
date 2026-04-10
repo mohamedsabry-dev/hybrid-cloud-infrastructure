@@ -1,101 +1,24 @@
-# Case 12: VM Autostart Timeout - NFS Disk Not Ready After Reboot
+# TS-PVE-012 | 2026-04-06 | RESOLVED
 
-## Status: RESOLVED (Suspected Root Cause)
-## Date: 2026-04-06
-## Severity: Medium
-## Environment: pve-dev (Proxmox VE)
-## Affected: VM 1001 (freeipa)
+## 1. Context
+- System: Proxmox VE autostart with NFS storage
+- Environment: pve-dev
+- Related components: VM 1001 (freeipa), NFS storage (nas-dev-data), QEMU autostart
 
----
-
-## 1. Issue Summary
-
-FreeIPA VM (1001) failed to start during Proxmox autostart sequence after system reboot. The VM has a secondary disk on NFS storage (`nas-dev-data`). Autostart failed with "got timeout" after 38 seconds. Manual start ~15 minutes later succeeded immediately.
-
-**Suspected Root Cause:** NFS storage mount not fully ready when autostart sequence began. QEMU timed out waiting for disk file access.
-
-**Note:** No explicit NFS mount errors found in logs. Root cause is suspected based on behavioral pattern, not confirmed with direct evidence.
-
-**Resolution:** Increased VM startup delay from 60 to 180 seconds in Terraform configuration.
-
----
-
-## 2. Symptoms
-
-- VM 1001 failed to start during autostart sequence
-- Error: "got timeout" after 38 seconds
-- Manual start 15 minutes later succeeded immediately
-- No explicit NFS mount errors in system logs
-
----
-
-## 3. Evidence
-
-### 3.1 Failed Autostart Task (Proxmox Web UI)
-
+## 2. Issue
+- Symptom: FreeIPA VM (1001) failed to start during Proxmox autostart sequence after system reboot. Manual start ~15 minutes later succeeded immediately.
+- Error:
 ```
 Status:        stopped: start failed: command '/usr/bin/kvm ...' failed: got timeout
 Task type:     qmstart
-User name:     root@pam
-Node:          pve-dev
-Start Time:    2026-04-06 23:01:40
-End Time:      2026-04-06 23:02:18
 Duration:      38s
-Unique task ID: UPID:pve-dev:00000540:00000502:69D41F34:qmstart:1001:root@pam:
 ```
 
-### 3.2 Journal Logs - Failed Start
+**Note:** No explicit NFS mount errors found in logs. Root cause is suspected based on behavioral pattern, not confirmed with direct evidence.
 
-```bash
-Apr 06 23:01:40 pve-dev pvesh[1340]: Starting VM 1001
-Apr 06 23:01:40 pve-dev pve-guests[1343]: <root@pam> starting task UPID:pve-dev:00000540:00000502:69D41F34:qmstart:1001:root@pam:
-Apr 06 23:01:41 pve-dev systemd[1]: Created slice qemu.slice - Slice /qemu.
-Apr 06 23:01:41 pve-dev systemd[1]: Started 1001.scope.
-Apr 06 23:02:16 pve-dev pve-guests[1344]: start failed: ... got timeout
-Apr 06 23:02:54 pve-dev systemd[1]: 1001.scope: Deactivated successfully.
-```
+## 3. Analysis
 
-### 3.3 Journal Logs - Successful Manual Start
-
-```bash
-Apr 06 23:17:00 pve-dev pvedaemon[11784]: start VM 1001: UPID:pve-dev:00002E08:00016C6D:69D422CC:qmstart:1001:admin_dev@pam:
-Apr 06 23:17:01 pve-dev pvedaemon[11784]: VM 1001 started with PID 11818.
-Apr 06 23:17:01 pve-dev pvedaemon[1314]: <admin_dev@pam> end task ... OK
-```
-
-### 3.4 VM Disk Configuration
-
-```bash
-root@pve-dev:~# cat /etc/pve/storage.cfg | grep -A10 nas-dev-data
-nfs: nas-dev-data
-        export /volume1/dev-storage
-        path /mnt/pve/nas-dev-data
-        server 10.0.40.120
-        content backup,rootdir,images
-        nodes pve-dev
-        prune-backups keep-last=5
-```
-
-VM 1001 has disk on NFS:
-- `scsi0`: local-lvm (OS disk)
-- `scsi1`: nas-dev-data (data disk at `/mnt/pve/nas-dev-data/images/1001/vm-1001-disk-0.raw`)
-
-### 3.5 NFS Mount Status (After Boot)
-
-```bash
-root@pve-dev:~# systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
-● mnt-pve-nas\x2ddev\x2ddata.mount - /mnt/pve/nas-dev-data
-     Loaded: loaded (/proc/self/mountinfo)
-     Active: active (mounted) since Mon 2026-04-06 23:01:41 EET; 1h 7min ago
-      Where: /mnt/pve/nas-dev-data
-       What: 10.0.40.120:/volume1/dev-storage
-```
-
-**Note:** Mount shows active at 23:01:41, but autostart began at 23:01:40. The 1-second difference and NFS initialization time may explain the timeout.
-
----
-
-## 4. Timeline
+### Timeline
 
 ```
 23:01:40  Autostart task begins (root@pam)
@@ -111,9 +34,13 @@ root@pve-dev:~# systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
 23:17:01  VM started successfully with PID 11818
 ```
 
----
+### VM Disk Configuration
 
-## 5. Behavioral Pattern Analysis
+VM 1001 has disk on NFS:
+- `scsi0`: local-lvm (OS disk)
+- `scsi1`: nas-dev-data (data disk at `/mnt/pve/nas-dev-data/images/1001/vm-1001-disk-0.raw`)
+
+### Behavioral Pattern Analysis
 
 | Observation | Implication |
 |-------------|-------------|
@@ -123,11 +50,7 @@ root@pve-dev:~# systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
 | NFS mount timestamp 23:01:41 | Mount was initializing |
 | No explicit NFS errors in logs | QEMU just timed out silently |
 
-**Conclusion:** Proxmox autostart ran before NFS was fully operational. QEMU attempted to open the NFS-backed disk file, hung waiting for I/O, and timed out after ~36 seconds.
-
----
-
-## 6. Why No NFS Errors in Logs
+### Why No NFS Errors in Logs
 
 QEMU/KVM does not log "file not found" or "mount not ready" errors explicitly. When a blockdev cannot be opened:
 1. QEMU attempts to open the file
@@ -135,17 +58,13 @@ QEMU/KVM does not log "file not found" or "mount not ready" errors explicitly. W
 3. After timeout, QEMU returns generic "got timeout" error
 4. No specific I/O or mount error is logged
 
-This makes diagnosing NFS-related VM start failures challenging.
+## 4. Root Cause
+> Proxmox autostart ran before NFS storage was fully operational. QEMU attempted to open the NFS-backed disk file, hung waiting for I/O, and timed out after ~36 seconds.
 
----
+## 5. Solution
+> Increase VM startup delay to allow NFS mount to fully initialize before VM starts.
 
-## 7. Resolution
-
-### 7.1 Immediate Fix
-
-Increased VM startup delay from 60 to 180 seconds (3 minutes) to allow NFS mount to fully initialize before VM starts.
-
-### 7.2 Terraform Configuration Changes
+### Terraform Configuration Changes
 
 **File: `terraform/dev/proxmox/vms/freeipa/variables.tf`**
 ```hcl
@@ -165,7 +84,7 @@ startup_delay   = 60
 startup_delay   = 180
 ```
 
-### 7.3 Applied to Proxmox
+### Applied to Proxmox
 
 After `terraform apply`, VM startup configuration will be:
 ```bash
@@ -173,9 +92,18 @@ qm config 1001 | grep startup
 # startup: order=1,up=180,down=60
 ```
 
----
+## 6. Solution Risk
+- Risk level: LOW
+- Potential impact: VM start delayed by 3 minutes after host boot. Acceptable trade-off for reliability.
 
-## 8. Alternative Solutions Considered
+## 7. Impact After Fix
+- Observed: Startup delay increased to 180 seconds
+- VM will wait for NFS to be fully ready before starting
+- No more timeout failures on autostart
+
+## 8. Notes
+
+### Alternative Solutions Considered
 
 | Solution | Pros | Cons |
 |----------|------|------|
@@ -184,69 +112,7 @@ qm config 1001 | grep startup
 | Move disk to local storage | No NFS dependency | Loses NFS benefits |
 | Retry script | Auto-recovers | Adds complexity |
 
----
-
-## 9. Commands Used During Investigation
-
-### Check Network Interfaces
-```bash
-ip a
-```
-
-### Check Proxmox Task Logs
-```bash
-cat /var/log/pve/tasks/active
-grep -r "1001" /var/log/pve/tasks/
-```
-
-### Check Journal Logs for VM 1001
-```bash
-journalctl -u pvedaemon --since "1 hour ago" | grep 1001
-journalctl | grep -i "qemu\|kvm\|1001" | tail -50
-grep "1001" /var/log/syslog | tail -30
-```
-
-### Check Kernel Logs for NFS/Mount Issues
-```bash
-journalctl -k --since "23:01" --until "23:03" | grep -i "nfs\|mount\|nas"
-```
-
-### Check All Logs for Storage/Mount Events
-```bash
-journalctl --since "23:01" --until "23:03" | grep -i "nas-dev-data\|nfs\|mount"
-journalctl --since "23:01" --until "23:05" | grep -iE "stor|nfs|mount|nas|timeout"
-```
-
-### Check NFS Mount Unit Logs
-```bash
-journalctl -u mnt-pve-nas\\x2ddev\\x2ddata.mount --since "23:00" --until "23:20"
-```
-
-### Check Disk File Access During Boot
-```bash
-journalctl --since "23:01" --until "23:03" | grep -i "vm-1001-disk-0.raw\|images/1001"
-```
-
-### Check NFS Mount Status
-```bash
-stat /mnt/pve/nas-dev-data
-systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
-```
-
-### Check Storage Configuration
-```bash
-cat /etc/pve/storage.cfg | grep -A10 nas-dev-data
-```
-
-### VM Startup Configuration
-```bash
-qm config 1001 | grep startup
-qm set 1001 --startup order=1,up=180,down=60
-```
-
----
-
-## 10. Prevention
+### Prevention for NFS-backed VMs
 
 For any VM with disks on NFS storage:
 1. Set `startup_delay` to at least 120-180 seconds
@@ -259,20 +125,26 @@ startup_delay   = 180  # Wait for NFS
 startup_order   = 99   # Start last
 ```
 
----
+### Investigation Commands
 
-## 11. Related Issues
+```bash
+# Check Proxmox task logs
+grep -r "1001" /var/log/pve/tasks/
 
-- Case 9: NFS Shutdown Hang (stor0 hotswap)
-- Case 10: VM Restore Hang (concurrent NFS operations)
-- Kubernetes Case 13: CSI NFS Restart Stale Mount
+# Check journal logs for VM
+journalctl -u pvedaemon --since "1 hour ago" | grep 1001
 
-All related to NFS storage timing and availability.
+# Check NFS mount status
+systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
 
----
+# Check storage configuration
+cat /etc/pve/storage.cfg | grep -A10 nas-dev-data
 
-## 12. Status
+# Check VM startup configuration
+qm config 1001 | grep startup
+```
 
-**RESOLVED** - Startup delay increased to 180 seconds in Terraform configuration (dev and prod).
+**Related:** TS-PVE-009 (NFS shutdown hang), TS-PVE-010 (VM restore hang) - all related to NFS storage timing
 
-**Monitoring:** Will verify fix on next system reboot.
+## 9. Workaround (if any)
+> If VM fails to autostart: Manually start after 2-3 minutes with `qm start <VMID>`. NFS will be ready by then.

@@ -270,7 +270,7 @@ NTP is configured separately via `playbooks/common/ntp.yml` with different templ
 FreeIPA configured with custom UID range (60001-65500) to fit within LXC unprivileged container UID mapping:
 - Must be > UID_MAX (60000) from /etc/login.defs
 - Must be < 65536 for unprivileged LXC container compatibility
-- See /troubleshooting/linux/21-lxc-uid-mapping-initgroups-error.md for full explanation
+- See /troubleshooting/identity/6-freeipa-lxc-uid-range-investigation.md for full explanation
 
 ### Credential Approaches
 

@@ -1,0 +1,19 @@
+---
+
+- name: Cleanup -Delete Local User 'local_user'
+  hosts: k8s, ansible
+  become: yes
+
+  tasks:
+    # ========================================
+    # Remove local users that should no longer exist
+    # Manual equivalent:
+    #   userdel -r ansible  # -r removes home directory too
+    # To list local users first:
+    #   getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 {print $1}'
+    # ========================================
+    - name: Remove local user 'local_user'
+      ansible.builtin.user:
+        name: ansible
+        state: absent
+        remove: yes
