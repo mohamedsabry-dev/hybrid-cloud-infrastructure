@@ -60,3 +60,11 @@
           capabilities = ["read"]
         }
         EOF
+
+    - name: Bind K8s ServiceAccount to Vault role
+      ansible.builtin.shell: |
+        vault write auth/kubernetes/role/etcd-backup \
+          bound_service_account_names=etcd-backup-sa \
+          bound_service_account_namespaces=etcd-backup \
+          policies=etcd-backup-policy \
+          ttl=1h
