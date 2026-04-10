@@ -2,47 +2,53 @@
 # freeipa VM Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the VM [type, service, category, environment]"
+  type        = list(string)
+  default     = ["vm", "freeipa", "identity", "dev"]
+}
+
 variable "freeipa" {
   description = "Configuration for freeipa VM cloned from golden image"
   type = object({
-    vmid    = number
-    name    = string
-    cores   = number
-    memory  = number
-    ip      = string
-    gateway = string
-    bridge  = string
-    vlan_id = number
-    startup_delay = number
-    shutdown_delay = number
-    startup_order = number
-    started = bool
-    on_boot = bool
+    vmid            = number
+    name            = string
+    cores           = number
+    memory          = number
+    ip              = string
+    gateway         = string
+    bridge          = string
+    vlan_id         = number
+    startup_delay   = number
+    shutdown_delay  = number
+    startup_order   = number
+    started         = bool
+    on_boot         = bool
     stop_on_destroy = bool
   })
 
   default = {
-    vmid    = 1001
-    name    = "freeipa"
-    cores   = 2
-    memory  = 2048
-    ip      = "10.0.60.10/24"
-    gateway = "10.0.60.1"
-    bridge  = "vmbr0"
-    vlan_id = 60
-    startup_delay = 60
-    shutdown_delay = 60
-    startup_order = 1
-    started = true
-    on_boot = true
+    vmid            = 1001
+    name            = "freeipa"
+    cores           = 2
+    memory          = 2048
+    ip              = "10.0.60.10/24"
+    gateway         = "10.0.60.1"
+    bridge          = "vmbr0"
+    vlan_id         = 60
+    startup_delay   = 180
+    shutdown_delay  = 60
+    startup_order   = 1
+    started         = true
+    on_boot         = true
     stop_on_destroy = true
   }
 }
 
 variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+  description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {
@@ -80,7 +86,7 @@ variable "disks" {
     discard      = string
     file_format  = string
   }))
-  
+
   default = {
     os_disk = {
       datastore_id = "local-lvm"

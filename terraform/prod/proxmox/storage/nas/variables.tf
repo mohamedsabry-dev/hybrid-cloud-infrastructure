@@ -1,4 +1,9 @@
+#===============================================================================
+# NAS Storage Configuration
+#===============================================================================
+
 variable "nas_iso" {
+  description = "Shared ISO/template storage (contains ISOs and LXC templates)"
   type = object({
     id      = string
     server  = string
@@ -16,6 +21,7 @@ variable "nas_iso" {
 }
 
 variable "nas_data" {
+  description = "Environment-specific data storage (VM images, container rootfs)"
   type = object({
     id        = string
     server    = string
@@ -30,11 +36,12 @@ variable "nas_data" {
     export    = "/volume1/prod-storage"
     nodes     = ["pve-prod"]
     content   = ["images", "rootdir", "backup"]
-    keep_last = 2
+    keep_last = 5
   }
 }
 
 variable "backups" {
+  description = "Backup storage for vzdump (VM and LXC backups)"
   type = object({
     id        = string
     server    = string
@@ -53,6 +60,10 @@ variable "backups" {
   }
 }
 
+#===============================================================================
+# Proxmox Connection
+#===============================================================================
+
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint URL"
   type        = string
@@ -66,6 +77,7 @@ variable "proxmox_tls_insecure" {
 }
 
 variable "proxmox_api_token" {
-  type      = string
-  sensitive = true
+  description = "Proxmox API token (injected via CI/CD)"
+  type        = string
+  sensitive   = true
 }

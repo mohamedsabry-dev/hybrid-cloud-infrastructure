@@ -1,0 +1,100 @@
+---
+- name: Phase 2 - Create Host Groups and assign hosts into them
+  hosts: ipa
+  become: yes
+  vars_prompt:
+    - name: "ipaadmin_password"
+      prompt: "Enter IPA Admin Password"
+      private: yes
+
+  tasks:
+   - name: Ensure Host Groups Structure exist
+     freeipa.ansible_freeipa.ipahostgroup:
+       ipaadmin_password: "{{ ipaadmin_password }}"
+       name: "{{ item.name }}"
+       description: "{{item.desc }}"
+       state: present
+     loop:
+       - { name: "management", desc: "General Infrastructure (Legacy)" }
+       - { name: "k8s", desc: "Kubernetes Cluster Nodes" }
+       - { name: "controllers", desc: "Ansible Automation Controllers" }
+       - { name: 'backup_servers', desc: "Backup Servers Group" }
+       - { name: 'monitors', desc: "Monitoring Servers Group" }
+       - { name: 'vault_servers', desc: "Vault Servers Group" }
+       - { name: 'cicd_servers', desc: "CI/CD Servers Group" }
+
+   - name: Add Ansible VM to controllers
+     freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: controllers
+        host:
+          - ansible.home.lab
+        action: member
+
+   - name: Add Nodes to K8s Group
+     freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: k8s
+        host:
+          - k8s-master.home.lab
+          - k8s-worker1.home.lab
+          - k8s-worker2.home.lab
+          - k8s-worker3.home.lab
+        action: member
+
+    # ========================================
+   - name: Add Hosts to Management Group
+     freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: management
+        host:
+          - ipa.home.lab
+          - ansible.home.lab
+        action: member
+
+    # ========================================
+   - name: Add All Nodes to Backup Servers Group
+     freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: backup_servers
+        host: # set to all
+          - ipa.home.lab
+          - ansible.home.lab
+          - k8s-master.home.lab
+          - k8s-worker1.home.lab
+          - k8s-worker2.home.lab
+          - k8s-worker3.home.lab
+          - monitor.home.lab
+          - vault-01.home.lab
+          - vault-02.home.lab
+          - vault-03.home.lab
+          - jenkins-master.home.lab
+        action: member
+
+    # ========================================
+   - name: Add Monitor Server to Monitors Group
+     freeipa.ansible_freeipa.ipahostgroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: monitors
+        host:
+          - monitor.home.lab
+        action: member
+
+    # ========================================
+   - name: Add Vault Servers to Vault Servers Group
+     freeipa.ansible_freeipa.ipahostgroup:
+         ipaadmin_password: "{{ ipaadmin_password }}"
+         name: vault_servers
+         host:
+           - vault-01.home.lab
+           - vault-02.home.lab
+           - vault-03.home.lab
+         action: member
+    # ========================================
+   - name: Add CI/CD Servers to CI/CD Servers Group
+     freeipa.ansible_freeipa.ipahostgroup:
+          ipaadmin_password: "{{ ipaadmin_password }}"
+          name: cicd_servers
+          host:
+            - jenkins-master.home.lab
+          action: member

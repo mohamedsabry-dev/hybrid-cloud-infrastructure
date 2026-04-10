@@ -1,0 +1,25 @@
+---
+- name: Check FreeIPA DNS Configuration
+  hosts: ipa
+  become: yes
+  vars_prompt:
+    - name: ipa_admin_password
+      prompt: "Enter IPA admin password"
+      private: yes
+
+  tasks:
+    - name: Get Kerberos ticket and show DNS config
+      shell: |
+        echo "{{ ipa_admin_password }}" | kinit admin
+        ipa dnsconfig-show
+      register: dns_config
+      changed_when: false
+
+    - name: Display DNS configuration
+      debug:
+        var: dns_config.stdout_lines
+
+    - name: Destroy the Kerberos ticket
+      command: kdestroy
+      changed_when: false
+      ignore_errors: yes

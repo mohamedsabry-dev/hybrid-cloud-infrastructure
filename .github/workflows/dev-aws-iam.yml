@@ -67,15 +67,6 @@ jobs:
       - name: Terraform Init
         run: terraform init -upgrade
 
-      # One-time state migration (DELETE AFTER FIRST RUN)
-      - name: State Migration
-        run: |
-          terraform state mv aws_iam_role.dev_wireguard_ssm aws_iam_role.wireguard_ssm || true
-          terraform state mv aws_iam_role_policy_attachment.dev_wireguard_ssm_core aws_iam_role_policy_attachment.wireguard_ssm_core || true
-          terraform state mv aws_iam_instance_profile.dev_wireguard_ssm aws_iam_instance_profile.wireguard_ssm || true
-          terraform state mv aws_iam_policy.terraform_state_dev aws_iam_policy.terraform_state || true
-          terraform state mv aws_iam_policy.security_boundary_dev aws_iam_policy.security_boundary || true
-
       - name: Terraform Plan
         timeout-minutes: 3
         run: terraform plan -var="account_id=${{ secrets.AWS_ACCOUNT_ID_DEV }}" -out=tfplan

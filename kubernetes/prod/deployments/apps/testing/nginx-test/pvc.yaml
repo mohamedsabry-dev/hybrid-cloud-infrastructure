@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-test-data
+  namespace: testing
+  labels:
+    environment: prod
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    description: "Temporary storage for testing workloads"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-delete
+  resources:
+    requests:
+      storage: 1Gi

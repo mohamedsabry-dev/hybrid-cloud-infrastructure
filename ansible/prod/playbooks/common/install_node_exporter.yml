@@ -1,0 +1,20 @@
+---
+- name: Install & Setup Node exporter
+  hosts: "all:!k8s"
+  become: yes
+  tasks:
+    - name: Enable EPEL repo
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+
+    - name: Install node_exporter
+      ansible.builtin.dnf:
+        name: node_exporter
+        state: present
+
+    - name: Enable Node Exporter
+      ansible.builtin.service:
+        name: node_exporter
+        state: started
+        enabled: yes

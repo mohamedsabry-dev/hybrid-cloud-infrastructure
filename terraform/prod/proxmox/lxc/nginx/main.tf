@@ -8,9 +8,10 @@ resource "proxmox_virtual_environment_container" "nginx" {
 
   node_name = var.node_name
   vm_id     = var.nginx.ctid
-  tags      = ["lxc", "nginx", "reverse-proxy", "prod"]
+  tags      = var.tags
 
-  # Unprivileged container with nesting
+  # Unprivileged container (security best practice - runs without root on host)
+  # Nesting enabled for running containers inside (Docker/Podman support)
   unprivileged = true
 
   features {
@@ -58,7 +59,7 @@ resource "proxmox_virtual_environment_container" "nginx" {
     swap      = var.nginx.swap
   }
 
-  # Network Configuration
+  # Network Configuration (eth0 is standard Linux NIC name, firewall enables PVE firewall)
   network_interface {
     name     = "eth0"
     bridge   = var.nginx.bridge

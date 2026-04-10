@@ -2,14 +2,48 @@
 
 Network configuration for hybrid cloud infrastructure connecting on-premises lab to AWS.
 
+---
+
+## Directory Structure
+
+```
+network/
+├── ip-planning.txt           # Complete IP allocation and VLAN assignments
+├── topology.txt              # Physical topology and traffic flow
+├── README.md                 # This file
+├── documents/                # General references (official site links)
+├── router/
+│   ├── er605/                # Current primary router
+│   │   ├── config.txt        # Router configuration
+│   │   ├── backups/          # Configuration backups (.bin)
+│   │   └── docs/             # TP-Link manuals (PDFs)
+│   └── mikrotik/             # Upcoming router (L009UiGS-RM)
+├── switch/
+│   └── fs308gp/              # L2+ managed switch
+│       ├── config.txt        # Switch configuration
+│       ├── backups/          # Configuration backups
+│       ├── docs/             # Controller documentation
+│       └── logs/             # Troubleshooting issue logs
+├── ap/
+│   └── ac750/                # WiFi access point
+│       └── config.txt        # AP configuration
+└── vpn/
+    ├── wireguard-config.txt  # VPN summary
+    ├── wireguard-setup.md    # Detailed setup guide
+    └── setup-wireguard.sh    # Setup script
+```
+
+---
+
 ## Architecture Overview
 
 ```
 ISP ONT
     │
     ├── ER605 (Firewall/Router/VPN)
+    │   ├── Port 2 → FS308GP (Dev Services Trunk) *cable moved from Port 4
     │   ├── Port 3 → AC750 AP (WiFi Mgmt - VLAN 5)
-    │   ├── Port 4 → FS308GP (Dev Services Trunk)
+    │   ├── Port 4 → UNUSED (defective)
     │   └── Port 5 → FS308GP (Prod Services Trunk)
     │
     ├── FS308GP (L2 Switch)
@@ -21,6 +55,8 @@ ISP ONT
         ├── dev_tunnel → AWS Dev VPC (172.16.0.0/16)
         └── prod_tunnel → AWS Prod VPC (172.17.0.0/16)
 ```
+
+---
 
 ## VLAN Summary
 
@@ -41,6 +77,8 @@ ISP ONT
 | 64 | 10.0.64.0/24 | K8s Data Plane | Dev |
 | 65 | 10.0.65.0/24 | DMZ (NGINX) | Dev |
 
+---
+
 ## Key Infrastructure
 
 | Component | Prod IP | Dev IP | Notes |
@@ -52,24 +90,34 @@ ISP ONT
 | K8s Masters | 10.0.51.10-12 | 10.0.61.10-12 | 3-node control plane |
 | K8s Workers | 10.0.54.10-12 | 10.0.64.10-12 | 3-node data plane |
 
-## Documentation Files
+---
 
-| File | Description |
-|------|-------------|
-| [00-ip-planning.txt](00-ip-planning.txt) | Complete IP allocation and VLAN assignments |
-| [01-network-topology.txt](01-network-topology.txt) | Physical topology and traffic flow |
-| [02-er605-config.txt](02-er605-config.txt) | ER605 router/firewall configuration |
-| [03-ap-wifi-config.txt](03-ap-wifi-config.txt) | WiFi access point configuration |
-| [04-fs308gp-config.txt](04-fs308gp-config.txt) | FS308GP switch configuration |
-| [05-vpn-wireguard-config.txt](05-vpn-wireguard-config.txt) | WireGuard VPN summary |
+## Device Quick Reference
 
-## Subfolders
+| Device | Model | Management IP | Documentation |
+|--------|-------|---------------|---------------|
+| Router | ER605 v2 | 10.0.5.1 | [router/er605/](router/er605/) |
+| Switch | FS308GP | Via Controller | [switch/fs308gp/](switch/fs308gp/) |
+| AP | AC750 | 10.0.5.x (DHCP) | [ap/ac750/](ap/ac750/) |
+| VPN | WireGuard | N/A | [vpn/](vpn/) |
 
-| Folder | Contents |
-|--------|----------|
-| `backups/` | Device configuration backups |
-| `documents/` | Vendor documentation and references |
-| `vpn-setup/` | WireGuard setup scripts and detailed guide |
+---
+
+## Known Issues
+
+### ER605 Port 4 Defect
+
+Port 4 on the ER605 has a hardware defect causing gigabit negotiation failures.
+
+**Resolution:**
+- Enabled port mirroring on router: Port 4 config → Port 2
+- Physically moved cable from Port 4 to Port 2
+- All router/switch config unchanged, just cable moved
+- Port 4 left unused
+
+**Note:** ER605 has been replaced with MikroTik router. This issue is no longer applicable.
+
+---
 
 ## Quick Reference
 

@@ -1,0 +1,41 @@
+- name: Vault VIP - Keepalived HA
+  hosts: vault_cluster
+  become: yes
+  vars:
+    vip: "10.0.52.100"
+    interface: "eth0"
+    cluster:
+      - { ip: "10.0.52.10", priority: 101 }
+      - { ip: "10.0.52.11", priority: 100 }
+      - { ip: "10.0.52.12", priority: 99 }
+  tasks:
+    - name: Install Keepalived
+      ansible.builtin.dnf:
+        name: keepalived
+        state: present
+
+    - name: Allow Keepalived to bind to non-local IP
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: '1'
+        state: present
+        sysctl_file: /etc/sysctl.d/keepalived.conf
+        reload: true
+
+    - name: Configure Keepalived
+      ansible.builtin.template:
+        src: templates/vault-keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+      notify: Restart Keepalived
+
+    - name: Enable and start Keepalived
+      ansible.builtin.service:
+        name: keepalived
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Keepalived
+      ansible.builtin.systemd:
+        name: keepalived
+        state: restarted

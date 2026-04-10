@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: database
+  labels:
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: flux
+    environment: prod
+spec:
+  selector:
+    app: mariadb
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+  clusterIP: None  # Headless service for StatefulSet
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-svc
+  namespace: database
+  labels:
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: flux
+    environment: prod
+spec:
+  selector:
+    app: mariadb
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+  type: ClusterIP  # Internal only - no ingress for DBs
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb-sa
+  namespace: database
+  labels:
+    app.kubernetes.io/name: mariadb
+    app.kubernetes.io/managed-by: flux
+    environment: prod

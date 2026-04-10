@@ -2,6 +2,12 @@
 # Ansible LXC Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the LXC container [type, service, category, environment]"
+  type        = list(string)
+  default     = ["lxc", "ansible", "automation", "dev"]
+}
+
 variable "ansible" {
   description = "Configuration for Ansible LXC container from golden template"
   type = object({

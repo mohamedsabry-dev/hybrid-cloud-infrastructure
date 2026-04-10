@@ -1,0 +1,21 @@
+# Check date on remote hosts using timedatectl and get its output
+---
+- name: Check date on remote hosts
+  hosts: all
+  tasks:
+    - name: Get date and time information
+      ansible.builtin.command: timedatectl
+      register: timedatectl_output
+
+    # Example 1: Display the full output
+    - name: Display full date and time information
+      ansible.builtin.debug:
+        var: timedatectl_output.stdout_lines
+      when: timedatectl_output.stdout is defined  # Mean to avoid errors if command fails
+
+    # # Example 2: Filter output to show only Local time (using grep)
+    # - name: Display only Local time
+    #   ansible.builtin.debug:
+    #     msg: "{{ item }}"
+    #   loop: "{{ timedatectl_output.stdout_lines }}"
+    #   when: "'Local time' in item"

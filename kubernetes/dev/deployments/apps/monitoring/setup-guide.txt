@@ -1,0 +1,68 @@
+================================================================================
+MONITORING STACK - SETUP GUIDE (DEV)
+================================================================================
+
+PREREQUISITES BEFORE ACTIVATION
+================================================================================
+
+1. VAULT CONFIGURATION
+--------------------------------------------------------------------------------
+   Run on any Vault node (vault1/vault2/vault3):
+
+   /opt/vault/scripts/vault-pod-setup.sh grafana monitoring grafana-sa
+
+   This script will:
+   - Create secret at secret/grafana/config (prompts for admin_user/password)
+   - Create policy for grafana
+   - Create Kubernetes auth role binding SA and namespace
+
+2. NODE EXPORTER ON EXTERNAL HOSTS
+--------------------------------------------------------------------------------
+   Run from Ansible control node:
+
+   cd ~/hybrid-cloud-infrastructure/ansible/dev
+   ansible-playbook -i inventory/inventory.ini playbooks/common/install_node_exporter.yml
+
+   This installs node_exporter (port 9100) on:
+   - freeipa.lab.local      (10.0.60.10)
+   - vault1.lab.local       (10.0.62.10)
+   - vault2.lab.local       (10.0.62.11)
+   - vault3.lab.local       (10.0.62.12)
+   - ansible.lab.local      (10.0.63.10)
+   - local-runner.lab.local (10.0.63.20)
+   - ex-nginx.lab.local     (10.0.65.10)
+
+   Note: K8s nodes (masters/workers) are excluded - node-exporter DaemonSet
+         deployed by kube-prometheus-stack covers them automatically.
+
+ACTIVATION
+================================================================================
+
+Update kustomization.yaml resources:
+
+   resources:
+     - helm-repository.yaml
+     - helm-release.yaml
+     - service-account.yaml
+     - vault-ca-secret.yaml
+
+VERIFICATION
+================================================================================
+
+1. Check deployment status:
+
+   kubectl get helmrelease -n monitoring
+   kubectl get pods -n monitoring
+
+2. Access Grafana UI:
+
+   URL: http://grafana-dev.lab.local
+
+   Accessible from:
+   - AWS (via Route53 private hosted zone -> ex-nginx)
+   - Mac Mini / local devices (via /etc/hosts -> 10.0.65.10)
+
+   DNS resolves to ex-nginx (10.0.65.10) which proxies to ingress-nginx
+   NodePort on k8s workers. No additional configuration required.
+
+================================================================================

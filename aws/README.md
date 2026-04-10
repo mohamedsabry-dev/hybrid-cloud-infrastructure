@@ -215,7 +215,7 @@ See `/troubleshooting/aws/` for resolved issues:
 
 | Case | Issue |
 |------|-------|
-| [01](../troubleshooting/aws/01-cloudformation-iam-policy-replacement-failure.md) | IAM policy replacement failure during stack updates |
+| [01](../troubleshooting/aws/1-cloudformation-iam-policy-replacement-failure.md) | IAM policy replacement failure during stack updates |
 
 ---
 

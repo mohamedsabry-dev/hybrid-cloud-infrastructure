@@ -318,11 +318,7 @@ See `/troubleshooting/vault/` (repo root) for detailed issue resolutions:
 
 | Case | Issue |
 |------|-------|
-| [25](../../../../troubleshooting/vault/25-vault-gpg-signature-validation-failure.md) | GPG signature validation failure on install |
-| [26](../../../../troubleshooting/vault/26-certmonger-force-flag-not-recognized.md) | ipa-getcert --force flag not recognized |
-| [27](../../../../troubleshooting/vault/27-freeipa-ca-rejected-csr-hostname-mismatch.md) | FreeIPA CA rejected CSR (hostname mismatch) |
-| [28](../../../../troubleshooting/vault/28-ansible-cert-ownership-task-file-absent.md) | Cert ownership task file absent |
-| [29](../../../../troubleshooting/vault/29-vault-tls-ip-san-error.md) | vault status TLS IP SAN error |
-| [30](../../../../troubleshooting/vault/30-ansible-shell-expansion-wrong-node.md) | $(hostname -f) expanding on control node |
-| [31](../../../../troubleshooting/vault/31-ansible-cert-check-missing-file-fatal.md) | Cert issuer check failing on missing file |
-| [32](../../../../troubleshooting/vault/32-rpm-postinstall-task-ordering.md) | RPM post-install task ordering |
+| [1](../../../../troubleshooting/vault/1-vault-cluster-initial-setup-investigation.md) | Initial setup (8 sub-issues: GPG, certmonger, CSR, TLS, shell expansion, etc.) |
+| [2](../../../../troubleshooting/vault/2-freeipa-vip-certificate-san-managedby.md) | VIP SAN cert - missing managedby permissions |
+| [3](../../../../troubleshooting/vault/3-vault-kms-credentials-overwrite-empty-vars.md) | KMS credentials empty - manual playbook bypass |
+| [4](../../../../troubleshooting/vault/4-vault-agent-injector-k8s-tls-ca-setup.md) | Vault Agent TLS and template errors |

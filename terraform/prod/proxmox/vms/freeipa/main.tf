@@ -10,11 +10,12 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   node_name = var.node_name
   vm_id     = var.freeipa.vmid
   name      = var.freeipa.name
-  tags      = ["freeipa", "clone", "prod"]
+  tags      = var.tags
 
   description = "FreeIPA VM cloned from ${var.template_name} golden image"
 
   # Clone from template
+  # full=true creates independent copy (safer than linked clone which depends on source template)
   clone {
     vm_id = var.template_vmid
     full  = true
@@ -50,7 +51,7 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
     file_format  = var.disks.data_disk.file_format
   }
 
-  # CPU
+  # CPU (sockets=1 standard, type=host for CPU passthrough performance)
   cpu {
     cores   = var.freeipa.cores
     sockets = 1
@@ -103,6 +104,8 @@ resource "proxmox_virtual_environment_vm" "freeipa" {
   }
 
   lifecycle {
-    ignore_changes = []
+    # Ignore clone block changes - VMs are already created, changing template_vmid
+    # should not trigger recreation of existing VMs
+    ignore_changes = [clone]
   }
 }

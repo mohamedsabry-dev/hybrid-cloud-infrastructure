@@ -36,12 +36,17 @@ Key*
 # vault ansible
 .ansible_vault
 
-# Router backups
-backup-ER605*.bin
+# Network device backups (contain credentials)
 *.bin
-
-# Switch config backups (contains credentials)
-network/backups/*.cfg
+network/**/backups/*.cfg
+network/router/mikrotik/backups/**
 
 # Device diagnostic logs
-logs/**
+network/**/logs/**
+network/router/mikrotik/logs/**
+
+# Vendor documentation PDFs
+network/**/docs/*.pdf
+
+# Local guides (not tracked)
+git-workflow-guide.txt

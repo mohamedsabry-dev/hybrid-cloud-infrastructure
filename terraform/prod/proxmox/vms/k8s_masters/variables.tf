@@ -2,6 +2,12 @@
 # K8s Control Plane Configuration
 #===============================================================================
 
+variable "tags" {
+  description = "Tags for the VM [type, service, category, environment]"
+  type        = list(string)
+  default     = ["vm", "k8s-master", "kubernetes", "prod"]
+}
+
 #-------------------------------------------------------------------------------
 # K8s Master 1
 #-------------------------------------------------------------------------------
@@ -33,9 +39,9 @@ variable "k8s_master1" {
     gateway        = "10.0.51.1"
     bridge         = "vmbr0"
     vlan_id        = 51
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 8
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -73,9 +79,9 @@ variable "k8s_master2" {
     gateway        = "10.0.51.1"
     bridge         = "vmbr0"
     vlan_id        = 51
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 9
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -113,9 +119,9 @@ variable "k8s_master3" {
     gateway        = "10.0.51.1"
     bridge         = "vmbr0"
     vlan_id        = 51
-    startup_delay  = 60
+    startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 10
+    startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
     on_boot        = true
     stop_on_destroy = true
@@ -126,9 +132,9 @@ variable "k8s_master3" {
 # Common Variables
 #-------------------------------------------------------------------------------
 variable "template_vmid" {
-  description = "VM ID of the golden image template to clone from"
+  description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9000
+  default     = 9001
 }
 
 variable "template_name" {

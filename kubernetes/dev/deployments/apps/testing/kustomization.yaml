@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []
+# Untracked (kept for reference, not deployed):
+#   - ingress-test
+#   - nginx-test

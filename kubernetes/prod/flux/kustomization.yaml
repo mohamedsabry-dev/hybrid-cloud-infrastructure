@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-system
+  # Split into infrastructure and apps with dependency ordering
+  # This ensures vault-agent-injector is ready before apps deploy
+  - infrastructure-sync.yaml
+  - apps-sync.yaml
+  # Old single deployment (replaced by above):
+  # - deployments-sync.yaml

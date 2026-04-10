@@ -6,6 +6,24 @@
   become: yes
   tasks:
 
+    - name: Add Vault VIP host to FreeIPA
+      freeipa.ansible_freeipa.ipahost:
+        ipaadmin_principal: "{{ ipaadmin_principal }}"
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: vault.lab.local
+        ip_address: "10.0.62.100"
+        state: present
+
+    - name: Add managedby relationship for Vault VIP
+      ansible.builtin.shell: |
+        echo "{{ ipaadmin_password }}" | kinit admin
+        ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
+        ipa host-add-managedby vault.lab.local --hosts=vault2.lab.local
+        ipa host-add-managedby vault.lab.local --hosts=vault3.lab.local
+        kdestroy
+      failed_when: false
+      no_log: true
+
     - name: Create Vault service principals in FreeIPA
       freeipa.ansible_freeipa.ipaservice:
         ipaadmin_principal: "{{ ipaadmin_principal }}"
@@ -16,6 +34,17 @@
         - vault1.lab.local
         - vault2.lab.local
         - vault3.lab.local
+        - vault.lab.local
+
+    - name: Add service managedby for VIP service
+      ansible.builtin.shell: |
+        echo "{{ ipaadmin_password }}" | kinit admin
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+        kdestroy
+      failed_when: false
+      no_log: true
 
 - name:  Configure hashicorp vault user & group on freeipa
   hosts: freeipa
@@ -156,6 +185,7 @@
         -K vault/{{ inventory_hostname }}
         -N CN={{ inventory_hostname }}
         -D {{ inventory_hostname }}
+        -D vault.lab.local
         -C "systemctl reload vault"
       when: "'HashiCorp' in cert_issuer.stdout or cert_issuer.rc != 0"
 
@@ -176,6 +206,11 @@
         owner: vault
         group: vault
         mode: "0600"
+      when:
+        - vault_aws_access_key_id is defined
+        - vault_aws_access_key_id | length > 0
+        - vault_aws_secret_access_key is defined
+        - vault_aws_secret_access_key | length > 0
       no_log: true
 
     - name: Deploy Vault configuration

@@ -1,0 +1,154 @@
+===============================================================================
+VMBR1 VLAN 40 Bridge Setup - Documentation
+===============================================================================
+Date: 2026-03-27
+Purpose: Allow VMs to access VLAN 40 (storage network) while preserving
+         Proxmox host's NAS connectivity.
+
+===============================================================================
+WHAT WE CHANGED
+===============================================================================
+
+BEFORE (stor0.40 direct VLAN interface):
+-----------------------------------------
+auto stor0
+iface stor0 inet manual
+
+auto stor0.40
+iface stor0.40 inet static
+    address 10.0.40.110
+    netmask 255.255.255.0
+    vlan-raw-device stor0
+
+Problem: VMs cannot access VLAN 40 because there's no bridge for them.
+
+
+AFTER (vmbr1 bridge with VLAN 40):
+-----------------------------------------
+auto stor0
+iface stor0 inet manual
+
+auto vmbr1
+iface vmbr1 inet manual
+    bridge-ports stor0
+    bridge-stp off
+    bridge-fd 0
+    bridge-vlan-aware yes
+    bridge-vids 40
+
+auto vmbr1.40
+iface vmbr1.40 inet static
+    address 10.0.40.110
+    netmask 255.255.255.0
+
+Result:
+- Proxmox host keeps 10.0.40.110 via vmbr1.40 (NAS access preserved)
+- VMs can use vmbr1 with VLAN tag 40 to reach 10.0.40.x network
+
+===============================================================================
+WHY WEB GUI FAILED
+===============================================================================
+
+Attempt 1: Create vmbr1 with bridge-ports=stor0
+-----------------------------------------------
+Error: "iface stor0 - ip address can't be set on interface if bridged"
+
+Why: stor0.40 (VLAN subinterface) existed with an IP. Linux networking
+doesn't allow bridging a physical interface that has VLAN subinterfaces
+with IPs assigned. The web GUI cannot atomically remove stor0.40 and
+create vmbr1 in one operation.
+
+
+Attempt 2: Create vmbr1 with bridge-ports=stor0.40
+--------------------------------------------------
+Error: "iface stor0.40 - ip address can't be set on interface if bridged"
+
+Why: stor0.40 had IP 10.0.40.110 assigned. You cannot bridge an interface
+that has an IP address. The bridge itself (or a VLAN interface on it)
+should hold the IP, not the bridge port.
+
+
+WHY CLI/FILE EDIT WORKED
+------------------------
+By editing /etc/network/interfaces directly, we could:
+1. Remove stor0.40 completely
+2. Create vmbr1 bridged to stor0
+3. Create vmbr1.40 with the IP
+4. Apply all changes atomically with `ifreload -a`
+
+The web GUI cannot do atomic multi-interface restructuring - it validates
+each change individually against the current running state.
+
+===============================================================================
+COMMANDS REFERENCE
+===============================================================================
+
+Config File Location:
+  /etc/network/interfaces
+
+Edit Command:
+  nano /etc/network/interfaces
+  # or
+  vim /etc/network/interfaces
+
+Backup Before Edit:
+  cp /etc/network/interfaces /etc/network/interfaces.bak
+
+Apply Changes (Recommended - with failsafe restart):
+  ifreload -a; sleep 20; systemctl restart networking
+
+  NOTE: ifreload -a alone may cause network outage on bridge restructuring.
+  The sleep + restart acts as a failsafe to restore connectivity.
+  If SSH disconnects, wait 20 seconds and reconnect.
+
+Alternative Commands:
+  ifreload -a                      # Apply changes (may cause outage)
+  systemctl restart networking     # Full restart (fixes outage)
+
+Verify Changes:
+  ip addr show
+  bridge vlan show
+  ping 10.0.40.120  # Test NAS connectivity
+
+===============================================================================
+VLAN TAGGING VERIFICATION
+===============================================================================
+
+The setup uses 802.1Q VLAN tagging correctly:
+
+Physical Layer:
+  stor0 (physical NIC) <---> Switch port (trunk, VLAN 40 allowed)
+
+Bridge Layer:
+  vmbr1 (VLAN-aware bridge on stor0)
+    - bridge-vids 40 = allows VLAN 40 traffic
+
+Host Access:
+  vmbr1.40 = tagged VLAN 40 interface on bridge
+    - Proxmox host uses this for 10.0.40.110
+    - Traffic leaves tagged with VLAN 40
+
+VM Access:
+  VM NIC -> vmbr1 (tag=40)
+    - VM traffic tagged with VLAN 40 by Proxmox
+    - Reaches same network as Proxmox host (10.0.40.x)
+
+===============================================================================
+VM CONFIGURATION
+===============================================================================
+
+To add a VM to VLAN 40 network:
+
+Via GUI:
+  Hardware -> Add -> Network Device
+  Bridge: vmbr1
+  VLAN Tag: 40
+
+Via CLI:
+  qm set <vmid> -net1 virtio,bridge=vmbr1,tag=40
+
+Inside VM:
+  The second NIC (ens19/eth1) will be on 10.0.40.x network
+  Configure static IP: 10.0.40.201/24 (no gateway needed for local storage)
+
+===============================================================================

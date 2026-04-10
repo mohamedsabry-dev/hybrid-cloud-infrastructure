@@ -1,0 +1,127 @@
+================================================================================
+FLUX: ADD NEW FOLDER TO WATCH
+================================================================================
+
+SCENARIO: You want Flux to sync resources from a new folder (e.g., deployments/)
+
+--------------------------------------------------------------------------------
+STEP 1: Create your resources folder
+--------------------------------------------------------------------------------
+
+mkdir -p kubernetes/<env>/deployments
+
+Example file: kubernetes/dev/deployments/monitoring.yml
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+
+--------------------------------------------------------------------------------
+STEP 2: Create kustomization.yaml in your resources folder
+--------------------------------------------------------------------------------
+
+File: kubernetes/<env>/deployments/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - monitoring.yml
+  - another-resource.yml
+
+--------------------------------------------------------------------------------
+STEP 3: Create Flux Kustomization to watch the folder
+--------------------------------------------------------------------------------
+
+File: kubernetes/<env>/flux/deployments-sync.yaml
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: deployments
+  namespace: flux-system
+spec:
+  interval: 5m0s
+  path: ./kubernetes/<env>/deployments
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+--------------------------------------------------------------------------------
+STEP 4: Update flux folder kustomization to include new sync
+--------------------------------------------------------------------------------
+
+File: kubernetes/<env>/flux/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-system
+  - deployments-sync.yaml
+
+--------------------------------------------------------------------------------
+STEP 5: Commit and push
+--------------------------------------------------------------------------------
+
+git add -A
+git commit -m "Add Flux sync for deployments folder"
+git push
+
+--------------------------------------------------------------------------------
+STEP 6: Verify (optional - auto syncs within ~11 minutes)
+--------------------------------------------------------------------------------
+
+# Force immediate sync
+flux reconcile source git flux-system
+
+# Check status
+flux get sources git
+flux get kustomizations
+
+# Verify resources created
+kubectl get ns
+
+================================================================================
+FINAL STRUCTURE
+================================================================================
+
+kubernetes/<env>/
+├── flux/
+│   ├── kustomization.yaml          # Lists flux-system + all *-sync.yaml
+│   ├── deployments-sync.yaml       # Flux Kustomization for deployments/
+│   ├── apps-sync.yaml              # (example) Flux Kustomization for apps/
+│   └── flux-system/
+│       ├── gotk-components.yaml
+│       ├── gotk-sync.yaml
+│       └── kustomization.yaml
+├── deployments/
+│   ├── kustomization.yaml          # Lists all resources in this folder
+│   └── monitoring.yml
+└── apps/                           # (example) another watched folder
+    ├── kustomization.yaml
+    └── my-app.yml
+
+================================================================================
+SYNC INTERVALS (from gotk-sync.yaml)
+================================================================================
+
+GitRepository interval: 1m    -> checks git for changes every 1 minute
+Kustomization interval: 10m   -> applies changes every 10 minutes
+
+Max wait time: ~11 minutes for auto-sync
+Use "flux reconcile" for immediate sync
+
+================================================================================
+COMMON COMMANDS
+================================================================================
+
+flux get sources git              # Check git sync status
+flux get kustomizations           # Check all kustomizations
+flux reconcile source git <name>  # Force git pull
+flux reconcile ks <name>          # Force kustomization apply
+flux logs                         # View flux logs
+
+================================================================================

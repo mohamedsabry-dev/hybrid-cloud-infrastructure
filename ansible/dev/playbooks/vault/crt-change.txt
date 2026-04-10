@@ -1,0 +1,15 @@
+# 1. Stop tracking current certificate
+ ansible vault_cluster -i inventory/inventory.ini -m command -a "ipa-getcert stop-tracking -f /opt/vault/tls/tls.crt" -b
+                                                                                                                  
+# 2. Remove old certificate files
+ansible vault_cluster -i inventory/inventory.ini -m file -a "path=/opt/vault/tls/tls.crt state=absent" -b       
+ansible vault_cluster -i inventory/inventory.ini -m file -a "path=/opt/vault/tls/tls.key state=absent" -b
+
+Then run vault_setup.yml between step 2 and 3 to request new certs.
+
+# 3. Restart vault service (after running vault_setup.yml to get new certs)
+ansible vault_cluster -i inventory/inventory.ini -m systemd -a "name=vault state=restarted" -b
+
+## We changed after Need for vault.lab.local for vip 
+>> ansible-playbook -i inventory/inventory.ini playbooks/freeipa/add_dns_records.yml
+>> ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_vip.yml
