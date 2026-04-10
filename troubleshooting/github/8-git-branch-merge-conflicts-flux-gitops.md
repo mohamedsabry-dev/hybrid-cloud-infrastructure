@@ -117,6 +117,21 @@ mkdir -p kubernetes/dev/flux
 
 ## 8. Notes
 
+**⚠️ WARNING: Do NOT use Squash or Rebase Merge**
+
+Using "Squash and merge" or "Rebase and merge" for long-lived branches (dev/prod) will cause recurring conflicts. See **TS-GH-010** for details.
+
+| Merge Type | Effect | Use For |
+|------------|--------|---------|
+| Merge commit | Preserves hashes, Git tracks what's merged | ✅ Long-lived branches (dev/prod) |
+| Squash merge | Creates new hashes, Git loses merge tracking | ❌ Only short-lived feature branches |
+| Rebase merge | Rewrites hashes, same problem as squash | ❌ Only short-lived feature branches |
+
+**Repo Settings Required:**
+- ✅ Allow merge commits: ON
+- ❌ Allow squash merging: OFF (or don't use for dev→prod)
+- ❌ Allow rebase merging: OFF (or don't use for dev→prod)
+
 **Workflow Diagram:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
