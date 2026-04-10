@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup
+  namespace: etcd-backup
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: etcd-backup
+          annotations:
+            # Vault Agent Injection
+            vault.hashicorp.com/agent-inject: "true"
+            vault.hashicorp.com/agent-pre-populate-only: "true"  # No sidecar for CronJob
+            vault.hashicorp.com/role: "etcd-backup"
+            vault.hashicorp.com/agent-inject-secret-aws: "aws/creds/etcd-backup"
+            vault.hashicorp.com/agent-inject-template-aws: |
+              {{- with secret "aws/creds/etcd-backup" -}}
+              export AWS_ACCESS_KEY_ID="{{ .Data.access_key }}"
+              export AWS_SECRET_ACCESS_KEY="{{ .Data.secret_key }}"
+              export AWS_SESSION_TOKEN="{{ .Data.security_token }}"
+              export AWS_DEFAULT_REGION="eu-west-2"
+              {{- end }}
+            # Vault TLS
+            vault.hashicorp.com/tls-skip-verify: "false"
+            vault.hashicorp.com/tls-secret: "vault-ca"
+            vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+        spec:
+          # Run on control-plane nodes (where etcd runs)
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          # Required to connect to etcd on 127.0.0.1:2379
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          serviceAccountName: etcd-backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: etcd-backup
+              image: ghcr.io/mohamedsabry-dev/etcd-backup:latest
+              command: ["bash", "/scripts/backup.sh"]
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: backup-storage
+                  mountPath: /backup
+                - name: etcd-certs
+                  mountPath: /etc/etcd/pki
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "200m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+          volumes:
+            - name: script
+              configMap:
+                name: etcd-backup-script
+                defaultMode: 0755
+            - name: backup-storage
+              hostPath:
+                path: /var/lib/etcd-backup
+                type: DirectoryOrCreate
+            - name: etcd-certs
+              hostPath:
+                path: /etc/kubernetes/pki/etcd
+                type: Directory
