@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etcd-backup-script
+  namespace: etcd-backup
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    exec 1> >(exec cat) 2>&1  # Force unbuffered output
+
+    BACKUP_NAME="etcd-$(date +%Y%m%d-%H%M%S).snap"
+    LOCAL_PATH="/backup/${BACKUP_NAME}"
+    S3_BUCKET="hybrid-cloud-k8s-etcd-backup-prod"
+
+    echo "=== etcd Backup Started ==="
+    echo "Timestamp: $(date)"
+    echo "Backup name: ${BACKUP_NAME}"
+
+    # Step 1: Take etcd snapshot
+    echo "Taking etcd snapshot..."
+    ETCDCTL_API=3 etcdctl snapshot save ${LOCAL_PATH} \
+      --endpoints=https://127.0.0.1:2379 \
+      --cacert=/etc/etcd/pki/ca.crt \
+      --cert=/etc/etcd/pki/server.crt \
+      --key=/etc/etcd/pki/server.key
+
+    echo "Snapshot saved locally: ${LOCAL_PATH}"
+    ls -lh ${LOCAL_PATH}
+
+    # Step 2: Verify snapshot
+    echo "Verifying snapshot..."
+    ETCDCTL_API=3 etcdctl snapshot status ${LOCAL_PATH} --write-out=table
+
+    # Step 3: Load AWS credentials from Vault
+    echo "Loading AWS credentials..."
+    source /vault/secrets/aws
+
+    # Step 4: Upload to S3
+    echo "Uploading to S3..."
+    aws s3 cp ${LOCAL_PATH} s3://${S3_BUCKET}/${BACKUP_NAME}
+
+    echo "=== Backup Complete ==="
+    echo "Local: ${LOCAL_PATH}"
+    echo "S3: s3://${S3_BUCKET}/${BACKUP_NAME}"
+
+    # Step 5: Cleanup old local backups (keep last 7 days)
+    echo "Cleaning up old local backups..."
+    find /backup -name "etcd-*.snap" -mtime +7 -delete
+
+    echo "Remaining local backups:"
+    ls -lh /backup/
