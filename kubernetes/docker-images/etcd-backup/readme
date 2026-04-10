@@ -1,0 +1,20 @@
+# etcd-backup Docker Image
+
+Image for etcd backup CronJob with tools:
+- etcdctl (v3.5.12)
+- aws cli
+- kubectl
+- Common utilities (curl, jq, vim, etc.)
+
+## Build
+
+```bash
+docker build -t ghcr.io/mohamedsabry-dev/etcd-backup:latest .
+docker push ghcr.io/mohamedsabry-dev/etcd-backup:latest
+```
+
+## Usage
+
+Used by etcd-backup CronJob in:
+- kubernetes/dev/deployments/apps/etcd-backup/cronjob.yaml
+- kubernetes/prod/deployments/apps/etcd-backup/cronjob.yaml

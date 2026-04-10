@@ -8,3 +8,4 @@ resources:
   - wordpress
   # Moved from infrastructure/ - requires vault-agent injection
   - remediation
+  - etcd-backup

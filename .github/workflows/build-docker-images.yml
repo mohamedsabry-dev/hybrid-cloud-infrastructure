@@ -1,0 +1,82 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'kubernetes/docker-images/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      remediation: ${{ steps.filter.outputs.remediation }}
+      etcd-backup: ${{ steps.filter.outputs.etcd-backup }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed images
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            remediation:
+              - 'kubernetes/docker-images/remediation/**'
+            etcd-backup:
+              - 'kubernetes/docker-images/etcd-backup/**'
+
+  build-remediation:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.remediation == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Remediation
+        uses: docker/build-push-action@v5
+        with:
+          context: kubernetes/docker-images/remediation/
+          push: true
+          tags: ghcr.io/mohamedsabry-dev/remediation:latest
+
+  build-etcd-backup:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.etcd-backup == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push etcd-backup
+        uses: docker/build-push-action@v5
+        with:
+          context: kubernetes/docker-images/etcd-backup/
+          push: true
+          tags: ghcr.io/mohamedsabry-dev/etcd-backup:latest
