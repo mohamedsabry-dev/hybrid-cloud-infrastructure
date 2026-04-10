@@ -1,0 +1,299 @@
+# etcd Backup with Vault AWS Integration
+# ========================================
+
+## Architecture Overview
+
+```
+K8s CronJob Pod
+      │
+      ├──► 1. Backup etcd locally (NAS PVC)
+      │
+      ├──► 2. Get temp AWS creds from Vault (via Vault Agent Init)
+      │
+      └──► 3. Upload to S3
+
+Result: 2 backup sources (NAS + S3), pod dies, keys expire
+```
+
+## Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  K8s Cluster                                                        │
+│                                                                     │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │  etcd Backup CronJob                                        │    │
+│  │  - ServiceAccount: etcd-backup-sa                           │    │
+│  │  - Vault annotations (agent-inject)                         │    │
+│  │  - PVC mounted to NAS (retain policy)                       │    │
+│  └───────────────────────┬────────────────────────────────────┘    │
+│                          │                                          │
+└──────────────────────────┼──────────────────────────────────────────┘
+                           │ K8s Auth (ServiceAccount JWT)
+                           ▼
+                     ┌──────────┐
+                     │  Vault   │
+                     │          │
+                     │  AWS     │
+                     │  Secrets │
+                     │  Engine  │
+                     └────┬─────┘
+                          │ STS AssumeRole (temp credentials)
+                          ▼
+                     ┌──────────┐
+                     │   AWS    │
+                     │   S3     │
+                     └──────────┘
+```
+
+## Component Breakdown
+
+### LAYER 1: TERRAFORM (AWS Resources)
+─────────────────────────────────────
+
+1. IAM USER (for Vault to authenticate to AWS)
+   - Create user: "vault-aws-engine"
+   - Enable access keys
+   - Create AWS Secrets Manager secret
+   - Store keys in secret (for initial Vault setup)
+
+2. IAM ROLE (for etcd backup operations)
+   - Name: "etcd-backup-role"
+   - Trust policy: allow vault IAM user to assume this role
+
+3. IAM POLICY (S3 permissions)
+   - Actions: s3:GetObject, s3:PutObject, s3:ListBucket, s3:DeleteObject
+   - Resource: only etcd-backup bucket and its objects
+   - Attach to: etcd-backup-role
+
+4. S3 BUCKET
+   - Name: "etcd-backups-<env>"
+   - For disaster recovery storage
+
+### Trust Relationship (Two-Way Handshake)
+
+```
+IAM User Policy:                    IAM Role Trust Policy:
+"I can assume role X"      <──>     "User Y can assume me"
+
+aws_iam_user_policy:                aws_iam_role.assume_role_policy:
+  Action: sts:AssumeRole              Principal: vault-user-arn
+  Resource: role-arn                  Action: sts:AssumeRole
+```
+
+### LAYER 2: VAULT CONFIGURATION
+────────────────────────────────
+
+1. Enable AWS secrets engine
+   ```
+   vault secrets enable aws
+   ```
+
+2. Configure root credentials (from IAM user)
+   ```
+   vault write aws/config/root \
+     access_key=<from-secrets-manager> \
+     secret_key=<from-secrets-manager> \
+     region=<region>
+   ```
+
+3. Create AWS role in Vault (points to IAM role)
+   ```
+   vault write aws/roles/etcd-backup \
+     credential_type=assumed_role \
+     role_arns=arn:aws:iam::ACCOUNT:role/etcd-backup-role \
+     default_sts_ttl=1h \
+     max_sts_ttl=2h
+   ```
+
+4. Create Vault policy (allow reading AWS creds)
+   ```
+   vault policy write etcd-backup-policy - <<EOF
+   path "aws/creds/etcd-backup" {
+     capabilities = ["read"]
+   }
+   EOF
+   ```
+
+5. Bind K8s ServiceAccount to Vault policy
+   ```
+   vault write auth/kubernetes/role/etcd-backup \
+     bound_service_account_names=etcd-backup-sa \
+     bound_service_account_namespaces=kube-system \
+     policies=etcd-backup-policy \
+     ttl=1h
+   ```
+
+### LAYER 3: KUBERNETES RESOURCES
+─────────────────────────────────
+
+1. ServiceAccount
+   ```yaml
+   apiVersion: v1
+   kind: ServiceAccount
+   metadata:
+     name: etcd-backup-sa
+     namespace: kube-system
+   ```
+
+2. PVC (mounted to NAS, retain policy)
+   ```yaml
+   apiVersion: v1
+   kind: PersistentVolumeClaim
+   metadata:
+     name: etcd-backup-pvc
+     namespace: kube-system
+   spec:
+     accessModes:
+       - ReadWriteMany
+     storageClassName: nfs-retain
+     resources:
+       requests:
+         storage: 10Gi
+   ```
+
+3. CronJob with Vault annotations
+   ```yaml
+   apiVersion: batch/v1
+   kind: CronJob
+   metadata:
+     name: etcd-backup
+     namespace: kube-system
+   spec:
+     schedule: "0 */6 * * *"  # Every 6 hours
+     jobTemplate:
+       spec:
+         template:
+           metadata:
+             annotations:
+               vault.hashicorp.com/agent-inject: "true"
+               vault.hashicorp.com/agent-pre-populate-only: "true"  # No sidecar for CronJob
+               vault.hashicorp.com/role: "etcd-backup"
+               vault.hashicorp.com/agent-inject-secret-aws: "aws/creds/etcd-backup"
+               vault.hashicorp.com/agent-inject-template-aws: |
+                 {{- with secret "aws/creds/etcd-backup" -}}
+                 export AWS_ACCESS_KEY_ID="{{ .Data.access_key }}"
+                 export AWS_SECRET_ACCESS_KEY="{{ .Data.secret_key }}"
+                 export AWS_SESSION_TOKEN="{{ .Data.security_token }}"
+                 {{- end -}}
+           spec:
+             serviceAccountName: etcd-backup-sa
+             containers:
+               - name: backup
+                 image: <etcd-backup-image>
+                 command:
+                   - /bin/sh
+                   - -c
+                   - |
+                     # Step 1: Backup etcd locally (no AWS needed)
+                     etcdctl snapshot save /backup/etcd-$(date +%Y%m%d-%H%M%S).snap
+
+                     # Step 2: Load AWS creds from Vault Agent file
+                     source /vault/secrets/aws
+
+                     # Step 3: Upload to S3
+                     aws s3 cp /backup/etcd-*.snap s3://etcd-backups-<env>/
+
+                     # Step 4: Cleanup old local backups (keep last 7 days)
+                     find /backup -mtime +7 -delete
+                 volumeMounts:
+                   - name: backup-storage
+                     mountPath: /backup
+                   - name: etcd-certs
+                     mountPath: /etc/etcd/pki
+             volumes:
+               - name: backup-storage
+                 persistentVolumeClaim:
+                   claimName: etcd-backup-pvc
+               - name: etcd-certs
+                 secret:
+                   secretName: etcd-certs
+             restartPolicy: OnFailure
+   ```
+
+## How Vault Agent Injection Works (CronJob)
+
+```
+CronJob triggers
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  New Pod Created                                             │
+│                                                              │
+│  1. Init Container (vault-agent-init)                       │
+│     - Authenticates to Vault using K8s ServiceAccount JWT   │
+│     - Requests: aws/creds/etcd-backup                       │
+│     - Vault generates temp STS credentials                  │
+│     - Writes to: /vault/secrets/aws                         │
+│     - Exits                                                  │
+│                                                              │
+│  2. Main Container (backup script)                          │
+│     - Reads /vault/secrets/aws (file exists from init)      │
+│     - Has AWS credentials in environment                    │
+│     - Runs backup, uploads to S3                            │
+│     - Exits                                                  │
+│                                                              │
+│  3. Pod terminates                                           │
+│     - Keys expire (doesn't matter, pod is dead)             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Note: For CronJobs, use `agent-pre-populate-only: "true"` to skip sidecar.
+      Pod doesn't live long enough to need key renewal.
+
+## Dependencies (Normal, Not Spaghetti)
+
+```
+Linear dependency chain:
+
+Worker Node UP
+      ↓
+Vault UP + Reachable
+      ↓
+AWS Reachable
+      ↓
+etcd Backup Pod runs
+      ↓
+Backup saved to NAS (even if S3 fails)
+      ↓
+Upload to S3 (if AWS reachable)
+```
+
+If Vault is down:
+- CronJob fails to start (init container can't get creds)
+- Alert fires
+- You fix Vault
+- Next scheduled backup succeeds
+- Local NAS backups from previous runs still exist
+
+## Terraform File Structure
+
+```
+terraform/dev/aws/
+├── vault-trust/
+│   ├── main.tf          # IAM user, roles, policies
+│   ├── variables.tf
+│   └── outputs.tf
+│
+└── s3-buckets/
+    ├── main.tf          # S3 bucket for etcd backups
+    ├── variables.tf
+    └── outputs.tf
+```
+
+## Security Summary
+
+| Component              | Location                      | Security               |
+|------------------------|-------------------------------|------------------------|
+| Vault IAM User keys    | AWS Secrets Manager           | Initial setup only     |
+| AWS temp credentials   | /vault/secrets/aws (in pod)   | Short-lived, auto-expire |
+| etcd backup data       | NAS PVC + S3                  | Encrypted at rest      |
+| K8s ServiceAccount     | kube-system namespace         | RBAC controlled        |
+
+## Backup Result
+
+```
+Every 6 hours:
+├── NAS: /backup/etcd-20240115-060000.snap (fast local recovery)
+└── S3:  s3://etcd-backups-dev/etcd-20240115-060000.snap (disaster recovery)
+```
