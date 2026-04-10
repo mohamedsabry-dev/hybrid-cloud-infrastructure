@@ -1,0 +1,86 @@
+# =============================================================================
+# DEV AWS Vault Trust
+# =============================================================================
+# Deploys IAM user, roles, and S3 bucket for Vault AWS Secrets Engine
+# Used for etcd backup to S3 with temporary credentials
+# Triggers on dev-security branch (security-sensitive changes)
+# =============================================================================
+
+name: "[DEV] AWS - Vault Trust (etcd Backup)"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to dev-security branch
+# -----------------------------------------------------------------------------
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev-security
+    paths:
+      - 'terraform/dev/aws/vault-trust/**'
+      - '.github/workflows/dev-aws-vault-trust.yml'
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
+permissions:
+  id-token: write
+  contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR: terraform/dev/aws/vault-trust
+
+# =============================================================================
+# Jobs
+# =============================================================================
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Deploy Vault Trust Resources
+  # Creates: IAM user, roles, policies, S3 bucket, Secrets Manager
+  # Uses TerraformAdmin role (requires elevated permissions for IAM)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: "Deploy Vault Trust Resources"
+    runs-on: mac-mini
+    # runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_DEV }}
+
+      # - name: Install Terraform
+      #   uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      # 3-minute pause for manual review before applying
+      - name: Review Window
+        run: |
+          echo "3-minute review window started at $(date)"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Plan output is available above for auditor review"
+          sleep 180
+          echo "Review window ended at $(date)"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
