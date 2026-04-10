@@ -16,6 +16,8 @@ Documentation of issues encountered with GitHub Actions, self-hosted runners, wo
 | 6 | [mac-address-deep-inspection-cleanup](6-mac-address-deep-inspection-cleanup.md) | Hardware MAC addresses in git history | Raw command outputs committed before .gitignore |
 | 7 | [concurrent-terraform-workflow-lxc-reboot](7-concurrent-terraform-workflow-lxc-reboot.md) | Vault workflow fails with exit code 255 | Concurrent Terraform workflows rebooted LXCs |
 | 8 | [git-branch-merge-conflicts-flux-gitops](8-git-branch-merge-conflicts-flux-gitops.md) | Cascading merge conflicts between dev/prod branches | Two-way merging between environment branches |
+| 9 | [commit-attributed-to-wrong-user](9-commit-attributed-to-wrong-user.md) | Commits showing wrong GitHub user as author | Unconfigured git + email registered by another account |
+| 10 | [squash-merge-causes-recurring-conflicts](10-squash-merge-causes-recurring-conflicts.md) | Every second merge causes conflicts | Squash merge breaks Git's merge tracking |
 
 ---
 
@@ -31,6 +33,10 @@ Documentation of issues encountered with GitHub Actions, self-hosted runners, wo
 
 ### Git Branch Strategy
 - **Case 8:** Merge conflicts → ONE-WAY FLOW ONLY: dev → prod, never merge back
+- **Case 10:** Recurring conflicts after every merge → Disable squash/rebase, use merge commits only
+
+### Git Identity
+- **Case 9:** Commits show wrong user → Check `git config user.email` on all devices
 
 ### Security Cleanup Chain (Cases 3→4→6)
 Related cases covering full security audit and cleanup:
@@ -45,6 +51,7 @@ Related cases covering full security audit and cleanup:
 | Case | Folder | Topic |
 |------|--------|-------|
 | TS-TF-002 | terraform/ | AWS secrets deletion incident (led to workflow lock pattern) |
+| TS-GH-008 + TS-GH-010 | github/ | Combined branching rules: one-way flow + merge commits only |
 
 ---
 
