@@ -83,9 +83,9 @@ Finding: Squash merge creates entirely new commits. Git cannot track that the or
 > ```
 
 ## 5. Solution
-> Disable squash/rebase merge and use regular merge commits for long-lived branches.
+> Disable squash/rebase merge, use regular merge commits, and reset all branches to source of truth (dev).
 
-**Step 1: Update GitHub repo settings**
+### Part A: Update GitHub repo settings
 
 Go to: Repository → Settings → Pull Requests
 
@@ -95,28 +95,80 @@ Go to: Repository → Settings → Pull Requests
 | Allow squash merging | ❌ OFF |
 | Allow rebase merging | ❌ OFF |
 
-**Step 2: Use "Create a merge commit" for all PRs**
+### Part B: Nuclear Reset - Sync all branches to dev (Chosen Solution)
+
+Due to extensive divergence from past squash merges, manual conflict resolution was impractical (20+ files). Instead, all branches were reset to match `dev` (source of truth).
+
+**Step 1: Create backups of all branches**
+```bash
+git checkout prod-security && git branch prod-security-backup-$(date +%Y%m%d)
+git checkout prod && git branch prod-backup-$(date +%Y%m%d)
+git checkout dev-security && git branch dev-security-backup-$(date +%Y%m%d)
+git checkout main && git branch main-backup-$(date +%Y%m%d)
+```
+
+**Step 2: Temporarily disable branch protection**
+
+GitHub → Settings → Branches → Edit each protected branch → Disable or allow force push
+
+**Step 3: Reset each branch to dev**
+```bash
+# Reset prod-security
+git checkout prod-security
+git reset --hard origin/dev
+git push origin prod-security --force
+
+# Reset prod
+git checkout prod
+git reset --hard origin/dev
+git push origin prod --force
+
+# Reset dev-security
+git checkout dev-security
+git reset --hard origin/dev
+git push origin dev-security --force
+
+# Reset main
+git checkout main
+git reset --hard origin/dev
+git push origin main --force
+```
+
+**Step 4: Verify all branches synced**
+```bash
+git fetch origin
+git rev-list --left-right --count origin/dev...origin/dev-security  # Should be 0 0
+git rev-list --left-right --count origin/dev...origin/main          # Should be 0 0
+git rev-list --left-right --count origin/dev...origin/prod          # Should be 0 0
+git rev-list --left-right --count origin/dev...origin/prod-security # Should be 0 0
+```
+
+**Step 5: Re-enable branch protection**
+
+GitHub → Settings → Branches → Restore protection rules
+
+### Part C: Future workflow
 
 When merging PRs from dev → prod:
 - Click the merge button dropdown
-- Select "Create a merge commit" (not squash or rebase)
-
-**Step 3: Handle transition period**
-
-After switching from squash to merge commits, you may get ONE more conflict on previously-squashed files. This is because Git still doesn't know about the old squash commits.
-
-Options:
-- Resolve this final conflict manually, then future merges will be clean
-- Or reset prod to match dev and reapply prod-specific changes (nuclear option)
+- Select **"Create a merge commit"** (never squash or rebase)
 
 ## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: One final conflict resolution may be needed during transition
+- Risk level: MEDIUM (force push to multiple branches)
+- Potential impact:
+  - Any unique commits on target branches are lost (backed up first)
+  - Requires temporary disable of branch protection
+  - Team members need to `git fetch && git reset --hard origin/<branch>` to sync local copies
 
 ## 7. Impact After Fix
-- Observed: Subsequent merges complete without conflicts
-- Git properly tracks merged commits
-- PRs show only actual new changes
+- Observed: All branches now identical (0-0 commit difference)
+- All future merges using "Create a merge commit" work without conflicts
+- Clean git history going forward
+- Backups preserved:
+  - `prod-security-backup-20260410`
+  - `prod-backup-20260410`
+  - `dev-security-backup-20260410`
+  - `main-backup-20260410`
 
 ## 8. Notes
 
@@ -147,7 +199,20 @@ The original reason for enabling squash was to avoid "polluting" dev with prod's
 4. MANUAL COPY: If prod has something dev needs, manually recreate it
 
 ## 9. Workaround (if any)
-> If squash merge must be used (not recommended), sync branches after each squash:
+
+**Alternative to nuclear reset (if branches have unique changes you can't lose):**
+> Manually resolve all conflicts once. After this painful merge, future merges should be clean:
+> ```bash
+> git checkout prod
+> git merge dev
+> # Resolve each conflict, keeping the correct version
+> git add .
+> git commit
+> git push
+> ```
+
+**If squash merge must be used in future (not recommended):**
+> Sync branches after each squash:
 > ```bash
 > # After squash merging dev → prod
 > git checkout dev

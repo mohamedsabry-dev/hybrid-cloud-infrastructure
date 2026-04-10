@@ -5,50 +5,67 @@
 
 ---
 
-### Scenario 4.1 — Single Vault Pod Restart
-Restart 1 vault pod gracefully.
+### Scenario 4.1 — Single Vault Node Down
+Restart or force kill 1 vault pod.
+
+- Action: Graceful restart 1 vault pod
+- Check: Raft leader election (if leader was killed)
+- Check: Vault remains unsealed
+- Check: App pods still serving with cached secrets
+- Action: Repeat with force kill (`kubectl delete pod --force`)
+- Check: Same behavior, different timing?
+
 → Run checklist.
 
-### Scenario 4.2 — Single Vault Pod Force Kill
-Force shutdown 1 vault pod.
+### Scenario 4.2 — Vault Quorum Loss (2 of 3 Down)
+Kill 2 vault nodes, lose raft quorum.
+
+- Action: Kill 2 vault pods
+- Check: Vault cluster unavailable (no quorum)
+- Check: Existing pods still serving with cached secrets?
+- Check: New pods can fetch secrets? (expected: no)
+- Check: vault-injector behavior
+- Recovery: Start vault pods → quorum restored
+- Check: New pods can now fetch secrets
+
 → Run checklist.
 
-### Scenario 4.3 — Vault Quorum Loss (2 of 3 Down)
-Kill 2 vault nodes. Quorum lost.
-Check: existing pods with cached secrets still running? New pods can fetch secrets?
+### Scenario 4.3 — Manual Seal → Auto-Unseal
+Test AWS KMS auto-unseal.
+
+- Action: Manually seal vault (`vault operator seal`)
+- Check: Vault shows sealed status
+- Check: AWS KMS auto-unseal triggers automatically
+- Check: Vault becomes unsealed
+- Check: App health during seal/unseal window
+- Check: No secret fetch failures for existing pods
+
 → Run checklist.
 
-### Scenario 4.4 — Full Vault Outage (3 of 3 Down)
-Kill all 3 vault nodes.
-Same checks as 4.3.
+### Scenario 4.4 — Break Auto-Unseal
+Test recovery when auto-unseal fails.
+
+- Action: Remove or change AWS KMS secrets used for auto-unseal
+- Action: Seal vault (or restart vault pods)
+- Check: Vault stays sealed (auto-unseal broken)
+- Action: Manual recovery procedure:
+  1. Restore correct AWS KMS secrets
+  2. Restart vault pods (or manually unseal)
+- Check: Vault unsealed
+- Check: App recovers
+
 → Run checklist.
 
-### Scenario 4.5 — Manual Seal → Auto-Unseal
-Manually seal vault → verify auto-unseal triggers correctly → verify app health.
-→ Run checklist.
+### Scenario 4.5 — Vault-Injector Behavior During Degraded Vault
+Test sidecar injection when vault is degraded.
 
-### Scenario 4.6 — Break Auto-Unseal
-Remove or change the secrets used for auto-unseal.
-Vault stays sealed → manual recovery procedure → verify app recovers.
-→ Run checklist.
+- Action: Kill 1 or 2 vault nodes (degraded state)
+- Action: Deploy a new pod that requires secret injection
+- Check: vault-injector sidecar behavior
+- Check: Can new pods get secrets injected?
+- Check: What if vault-injector pod itself reschedules?
+- Check: Init container timeout behavior
 
-### Scenario 4.7 — Vault-Injector Behavior During Degraded Vault
-Vault cluster degraded (1 or 2 nodes down).
-Check: vault-injector sidecar behavior, can it still inject to new pods?
-What if vault-injector itself is rescheduling?
-→ Run checklist.
-
-### Scenario 4.8 — Vault Raft Backup & Restore (Normal)
-Backup Vault raft under normal operation → restore → verify all secrets intact.
-→ Run checklist.
-
-### Scenario 4.9 — Vault Raft Backup & Restore (Under Load)
-Backup Vault raft during active workload → restore → verify integrity.
-→ Run checklist.
-
-### Scenario 4.10 — Vault Raft Restore with Partial Quorum
-Restore raft backup with only 1 node available. Then 2 nodes. Then 3 nodes.
-Document which quorum states allow successful restore.
 → Run checklist.
 
 ---
@@ -60,4 +77,3 @@ Document which quorum states allow successful restore.
 - [ ] Vault sealed / unsealed status
 - [ ] vault-injector pod healthy and scheduling correctly
 - [ ] App functionality (WordPress login, DB connections via Vault creds)
-- [ ] Raft backup integrity after restore

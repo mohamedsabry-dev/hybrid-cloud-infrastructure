@@ -7,94 +7,92 @@
 ---
 
 ### Scenario 3.1 — Stop NFS Server
-Stop NFS service on the NAS. Do not power off NAS.
-Check: pod state (hang vs crash), can pods recover when NFS comes back?
+Stop NFS service on the NAS (do not power off NAS).
+- Action: Stop NFS daemon on NAS
+- Check: Pod state — do they hang (hard mount) or return error (soft mount)?
+- Check: Can pods recover automatically when NFS comes back?
+- Check: Do pods need manual restart after NFS recovery?
 → Run checklist.
 
 ### Scenario 3.2 — Full NAS Power Off
-Power off entire NAS.
-Check cascade: pods, etcd, Proxmox backup mount, IPA external disk.
-Recover NAS → verify everything reconnects.
+Power off entire NAS device.
+- Action: Shutdown NAS completely
+- Check: WordPress pods behavior
+- Check: Proxmox backup mount (NFS-based)
+- Check: IPA external disk (NFS-based)
+- Recovery: Power on NAS → verify all mounts reconnect
 → Run checklist.
 
 ### Scenario 3.3 — Disconnect 1 Worker from NFS
-Break NFS connectivity on 1 worker while pods are idle (no active uploads).
-Recover connection → check if pods resume or need restart.
+Break NFS connectivity on 1 worker node (no active uploads).
+- Action: Block NFS traffic on worker (iptables or unplug VLAN)
+- Check: Pods on that worker — hang or error?
+- Check: Pods on other workers — still serving?
+- Recovery: Restore connection → do pods resume or need restart?
 → Run checklist.
 
-### Scenario 3.4 — Disconnect 2 Workers from NFS
-Same as 3.3 but 2 of 3 workers.
+### Scenario 3.4 — Mid-Upload NFS Disconnect
+Disconnect NFS while upload is in progress.
+- Action: Start video upload to WordPress
+- Action: Identify which worker handles it (check nginx logs)
+- Action: Disconnect NFS on that worker mid-upload
+- Check: Upload outcome — success, fail, or hang?
+- Check: DB transaction state — committed or rolled back?
+- Check: Can same file be re-uploaded? (duplicate name conflict?)
 → Run checklist.
 
-### Scenario 3.5 — Disconnect All Workers from NFS
-All workers lose NFS. Check: automatic recovery or permanent hang?
+### Scenario 3.5 — NFS Mount Options Behavior
+Verify soft mount behavior vs hard mount.
+- Action: Check current mount options (`mount | grep nfs`)
+- Expected: `soft,timeo=30,retrans=3` (from previous fix)
+- Test: With soft mount — does pod return error instead of hanging?
+- Compare: What would happen with hard mount? (document, don't test)
 → Run checklist.
 
-### Scenario 3.6 — Mid-Upload NFS Disconnect
-Start video upload → identify which worker handles it → disconnect NFS on that worker.
-Check: upload outcome, DB transaction state, can same file be re-uploaded.
+### Scenario 3.6 — Kill CSI Controller
+Kill the CSI controller pod and test PVC provisioning.
+- Action: `kubectl delete pod -n kube-system -l app=csi-nfs-controller`
+- Action: Immediately create a new PVC
+- Check: PVC stays Pending until controller recovers
+- Check: Controller pod restarts automatically
+- Check: PVC becomes Bound after controller recovery
 → Run checklist.
 
-### Scenario 3.7 — NFS Mount Options Behavior
-Verify current mount options (soft vs hard, timeo, retrans values).
-With soft mount (timeo=30, retrans=3): does pod return error instead of hanging?
-Compare: if hard mount was used, does pod hang forever?
+### Scenario 3.7 — Kill CSI Node Pod (Existing Mounts)
+Kill CSI node pod on a worker with active NFS mounts.
+- Action: Identify worker with WordPress pods
+- Action: `kubectl delete pod -n kube-system -l app=csi-nfs-node` (on that node)
+- Check: Existing mounts survive (kernel handles mounts, not CSI pod)
+- Check: WordPress pods continue serving
+- Check: CSI node pod restarts automatically
 → Run checklist.
 
-### Scenario 3.8 — Kill CSI Controller
-Kill nfs-csi-controller pod → immediately try creating a new PVC.
-Expected: PVC stays Pending until controller recovers.
+### Scenario 3.8 — Combined: NFS Server Down + CSI Controller Down
+Both NFS and CSI controller down simultaneously.
+- Action: Stop NFS service on NAS
+- Action: Kill CSI controller pod
+- Recovery Option A: NFS first, then wait for CSI
+- Recovery Option B: CSI first, then NFS
+- Check: Does recovery order matter?
+- Check: Do pods recover automatically or need intervention?
 → Run checklist.
 
-### Scenario 3.9 — Kill CSI Controller Mid-PVC Creation
-Start PVC creation → kill nfs-csi-controller mid-way.
-Check: does PVC get stuck permanently or resolve after controller restarts?
+### Scenario 3.9 — Delete PV While PVC Exists
+Delete a PV that has a bound PVC (tests reclaim policy).
+- Action: `kubectl delete pv <wordpress-pv>`
+- Check: PVC state — does it show `Lost`?
+- Check: Pod behavior — can it still access data?
+- Check: What is the reclaim policy? (`Retain` vs `Delete`)
+- Recovery: Recreate PV → does PVC rebind?
 → Run checklist.
 
-### Scenario 3.10 — Kill CSI Node Pod (Existing Mounts)
-Kill nfs-csi-node pod on a worker that has pods with active NFS mounts.
-Check: do existing mounts survive? (They should — kernel handles mounts, not CSI pod.)
-→ Run checklist.
-
-### Scenario 3.11 — Kill CSI Node Pod (New Mount)
-Kill nfs-csi-node pod on a worker → schedule a new pod with PVC to that same worker.
-Check: does the new pod mount succeed, or stuck in ContainerCreating?
-→ Run checklist.
-
-### Scenario 3.12 — Delete CSI Node DaemonSet Entirely
-Delete the whole nfs-csi-node daemonset.
-Check: existing mounted volumes survive? New pods can mount?
-→ Run checklist.
-
-### Scenario 3.13 — Combined: NFS Server Down + CSI Controller Down
-Both down at the same time. Recover one at a time.
-Test: does recovery order matter? (NFS first then CSI, or CSI first then NFS?)
-→ Run checklist.
-
-### Scenario 3.14 — Delete PV While PVC Exists
-Delete a PV that has a bound PVC.
-Check: PVC state (Lost?), pod behavior, data accessibility.
-→ Run checklist.
-
-### Scenario 3.15 — Create PVC While NFS Unreachable
-NFS server is down → try to create a new PVC via StorageClass.
-Check: does it stay Pending or fail outright?
-→ Run checklist.
-
-### Scenario 3.16 — CSI Priority Class Verification
-Verify nfs-csi-node pods have system-node-critical priority.
-Force shutdown a worker → start it → monitor startup order.
-Expected: CSI node pod starts before app pods.
-→ Run checklist.
-
-### Scenario 3.17 — CSI vs App Eviction Under Pressure
-Create memory pressure on a worker.
-Expected: app pods evicted, CSI node pod survives (system-node-critical).
-→ Run checklist.
-
-### Scenario 3.18 — CSI + App Pod Simultaneous Kill
-Delete nfs-csi-node pod + app pod on the same worker at the same time.
-Measure: time from CSI pod recovery → app pod mount retry → app pod Running.
+### Scenario 3.10 — Create PVC While NFS Unreachable
+Try to provision new storage while NFS is down.
+- Action: Stop NFS service on NAS
+- Action: Create new PVC via StorageClass
+- Check: PVC state — Pending or Failed?
+- Check: CSI controller logs — what error?
+- Recovery: Start NFS → does PVC become Bound automatically?
 → Run checklist.
 
 ---
