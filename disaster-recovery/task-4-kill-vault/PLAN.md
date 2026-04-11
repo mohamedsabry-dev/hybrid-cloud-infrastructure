@@ -6,60 +6,54 @@
 ---
 
 ### Scenario 4.1 — Single Vault Node Down
-Restart or force kill 1 vault pod.
 
-- Action: Graceful restart 1 vault pod
+> **ALREADY VALIDATED** — No need to test. Faced as real incident on April 11, 2026.
+> See: [TS-VLT-005](../../troubleshooting/vault/5-vault-node-recovery-stale-raft-data.md), [TS-K8S-024](../../troubleshooting/kubernetes/24-vault-cluster-resilience-2-node-quorum.md)
+
+Restart or force kill 1 vault LXC.
+
+- Action: Graceful restart 1 vault LXC (e.g., vault1 / 2004)
 - Check: Raft leader election (if leader was killed)
 - Check: Vault remains unsealed
 - Check: App pods still serving with cached secrets
-- Action: Repeat with force kill (`kubectl delete pod --force`)
+- Action: Repeat with force stop (`pct stop <CTID>`)
 - Check: Same behavior, different timing?
 
-→ Run checklist.
+→ Skip (validated in real incident).
 
 ### Scenario 4.2 — Vault Quorum Loss (2 of 3 Down)
-Kill 2 vault nodes, lose raft quorum.
+Kill 2 vault LXCs, lose raft quorum.
 
-- Action: Kill 2 vault pods
+- Action: Stop 2 vault LXCs (`pct stop 2004 && pct stop 2005`)
 - Check: Vault cluster unavailable (no quorum)
 - Check: Existing pods still serving with cached secrets?
 - Check: New pods can fetch secrets? (expected: no)
 - Check: vault-injector behavior
-- Recovery: Start vault pods → quorum restored
+- Recovery: Start vault LXCs → quorum restored
 - Check: New pods can now fetch secrets
 
 → Run checklist.
 
-### Scenario 4.3 — Manual Seal → Auto-Unseal
-Test AWS KMS auto-unseal.
+### Scenario 4.3 — AWS KMS Auto-Unseal Dependency
+Test recovery when KMS credentials are broken.
 
-- Action: Manually seal vault (`vault operator seal`)
-- Check: Vault shows sealed status
-- Check: AWS KMS auto-unseal triggers automatically
-- Check: Vault becomes unsealed
-- Check: App health during seal/unseal window
-- Check: No secret fetch failures for existing pods
-
-→ Run checklist.
-
-### Scenario 4.4 — Break Auto-Unseal
-Test recovery when auto-unseal fails.
-
-- Action: Remove or change AWS KMS secrets used for auto-unseal
-- Action: Seal vault (or restart vault pods)
-- Check: Vault stays sealed (auto-unseal broken)
-- Action: Manual recovery procedure:
-  1. Restore correct AWS KMS secrets
-  2. Restart vault pods (or manually unseal)
-- Check: Vault unsealed
+- Action: Break AWS KMS credentials (rotate key or change secrets)
+- Action: Restart vault LXC (`pct restart 2004`)
+- Check: Vault stays sealed on startup (auto-unseal fails)
+- Check: App impact — existing pods with cached secrets?
+- Recovery:
+  1. Restore correct AWS KMS credentials
+  2. Restart vault service (`systemctl restart vault`)
+- Check: Auto-unseal succeeds on restart
+- Check: Vault cluster healthy
 - Check: App recovers
 
 → Run checklist.
 
-### Scenario 4.5 — Vault-Injector Behavior During Degraded Vault
+### Scenario 4.4 — Vault-Injector Behavior During Degraded Vault
 Test sidecar injection when vault is degraded.
 
-- Action: Kill 1 or 2 vault nodes (degraded state)
+- Action: Stop 1 or 2 vault LXCs (degraded state)
 - Action: Deploy a new pod that requires secret injection
 - Check: vault-injector sidecar behavior
 - Check: Can new pods get secrets injected?

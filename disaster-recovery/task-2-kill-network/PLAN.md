@@ -18,30 +18,16 @@ Stop external nginx (SPOF for external traffic).
 
 → Run checklist.
 
-### Scenario 2.2 — External NGINX Recovery via Proxmox
-Test recovery escalation path.
+### Scenario 2.2 — Kill Ingress NGINX Pods
+Test ingress-nginx resilience under partial and full failure.
 
-- Action: Soft reboot ex-nginx via Proxmox API
-- Check: If soft reboot fails → reset
-- Check: If reset fails → force stop + restore from backup + start
-- Check: nginx serving traffic after recovery
-- Check: Email notification sent
-
-→ Run checklist.
-
-### Scenario 2.3 — Kill 1 of 3 Ingress NGINX Pods
-Partial ingress-nginx failure.
-
+**A) Partial failure (1 of 3 pods):**
 - Action: `kubectl delete pod -n ingress-nginx <one-pod>`
 - Check: App still reachable via remaining 2 pods
 - Check: Traffic distribution shifts to surviving pods
 - Check: Killed pod restarts automatically
 
-→ Run checklist.
-
-### Scenario 2.4 — Kill 3 of 3 Ingress NGINX Pods
-Full ingress-nginx failure.
-
+**B) Full failure (3 of 3 pods):**
 - Action: `kubectl delete pod -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx`
 - Check: App down (expected)
 - Check: Flux reconciliation kicks in
@@ -50,7 +36,7 @@ Full ingress-nginx failure.
 
 → Run checklist.
 
-### Scenario 2.5 — Calico CNI Failure
+### Scenario 2.3 — Calico CNI Failure
 Stop CNI daemonset pods.
 
 - Action: `kubectl delete pod -n calico-system -l k8s-app=calico-node`
@@ -61,7 +47,7 @@ Stop CNI daemonset pods.
 
 → Run checklist.
 
-### Scenario 2.6 — CoreDNS Failure
+### Scenario 2.4 — CoreDNS Failure
 Stop cluster DNS.
 
 - Action: `kubectl delete pod -n kube-system -l k8s-app=kube-dns`
@@ -73,7 +59,7 @@ Stop cluster DNS.
 
 → Run checklist.
 
-### Scenario 2.7 — VLAN / Proxmox Network Drop
+### Scenario 2.5 — VLAN / Proxmox Network Drop
 Drop network between Proxmox and router.
 
 - Action: Drop SVC or storage level VLAN
@@ -81,6 +67,7 @@ Drop network between Proxmox and router.
 - Check: Impact on NFS mounts
 - Check: Impact on external access
 - Check: Email notification sent via mgmt path (separate VLAN)
+    # All worker will appear unhealthy from master presepective , we need to prevet remediation from act in this scenari with safety check . 
 
 → Run checklist.
 
