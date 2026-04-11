@@ -48,6 +48,10 @@ Each case document follows this format:
 | [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) | 2026-04-08 | RESOLVED | CSI NFS Controller Network Isolation | Storage / Networking |
 | [019](19-flux-kustomization-restructure-cascade-failure.md) | 2026-04-09 | RESOLVED | Flux Kustomization Restructure Cascade Failure | GitOps |
 | [020](20-grafana-loki-version-incompatibility.md) | 2026-04-10 | RESOLVED | Grafana + Loki Version Incompatibility | Monitoring |
+| [021](21-remediation-pod-stopped-vm-api-error.md) | 2026-04-11 | RESOLVED | Remediation Pod Cannot Reboot Stopped VM | Self-Healing |
+| [022](22-worker-node-failure-cascading-pod-failures.md) | 2026-04-11 | RESOLVED | Worker Node Failure Cascading Pod Failures | HA / Recovery |
+| [023](23-kustomization-resource-not-removed.md) | 2026-04-11 | RESOLVED | Kustomization Resource Not Removed | GitOps |
+| [024](24-vault-cluster-resilience-2-node-quorum.md) | 2026-04-11 | RESOLVED | Vault Cluster 2-Node Quorum Resilience | Security / HA |
 
 ---
 
@@ -90,6 +94,14 @@ Each case document follows this format:
 ### Database
 - [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB on NFS
 - [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) - MariaDB Crash from Stale Mount
+
+### Self-Healing / HA
+- [021](21-remediation-pod-stopped-vm-api-error.md) - Remediation Pod API Error (Stopped VM)
+- [022](22-worker-node-failure-cascading-pod-failures.md) - Worker Node Failure Cascade Recovery
+- [024](24-vault-cluster-resilience-2-node-quorum.md) - Vault Cluster 2-Node Quorum Resilience
+
+### GitOps (Flux) - Additional
+- [023](23-kustomization-resource-not-removed.md) - Kustomization Resource Not Removed
 
 ---
 
