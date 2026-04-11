@@ -4,82 +4,90 @@
 
 ---
 
-### Scenario 0.0 — Full Environment Backup (Pre-requisite)
+## Scenario 0.0 — Full Environment Backup (Pre-requisite)
+
 Complete Proxmox backup of all VMs/LXCs before DR testing begins.
 
 **VMs:**
-- [ ] 1001 (freeipa)
-- [ ] 1010 (k8s-master1)
-- [ ] 1011 (k8s-master2)
-- [ ] 1012 (k8s-master3)
-- [ ] 1020 (k8s-worker1)
-- [ ] 1021 (k8s-worker2)
-- [ ] 1022 (k8s-worker3)
+- [x] 1001 (freeipa)
+- [x] 1010 (k8s-master1)
+- [x] 1011 (k8s-master2)
+- [x] 1012 (k8s-master3)
+- [x] 1020 (k8s-worker1)
+- [x] 1021 (k8s-worker2)
+- [x] 1022 (k8s-worker3)
 
 **LXCs:**
-- [ ] 2001 (ansible)
-- [ ] 2002 (local-runner)
-- [ ] 2003 (ex-nginx)
-- [ ] 2004 (vault1)
-- [ ] 2005 (vault2)
-- [ ] 2006 (vault3)
+- [x] 2001 (ansible)
+- [x] 2002 (local-runner)
+- [x] 2003 (ex-nginx)
+- [x] 2004 (vault1)
+- [x] 2005 (vault2)
+- [x] 2006 (vault3)
 
 - Action: Run `vzdump` (snapshot mode) for each VM/LXC
-- Destination: NAS storage
-- Retention: Keep until all DR scenarios complete successfully
-- Check: Verify all backups completed before proceeding to 0.1
-
-→ Run checklist.
+- Destination: NAS storage (nas-dev-data, nas-prod-data)
+- Check: Verify all backups completed before proceeding
 
 ---
 
-### Scenario 0.1 — ETCD Backup & Restore
-Backup etcd snapshot under normal operation, then restore.
+## Scenario 0.1 — ETCD Backup to S3
 
-- Action: Trigger manual backup job
+Backup etcd snapshot under normal operation, verify S3 upload.
+
+- [x] Trigger manual backup job
+  ```bash
+  kubectl create job --from=cronjob/etcd-backup etcd-backup-dr-test -n etcd-backup
   ```
-  kubectl create job --from=cronjob/etcd-backup etcd-backup-test -n etcd-backup
-  ```
-- Check: Local backup exists on master node (`/var/lib/etcd-backup/`)
-- Check: S3 bucket contains uploaded snapshot
-- Action: Restore from local snapshot
-- Check: Cluster state matches pre-backup state
-- Check: All pods running and serving traffic
-
-→ Run checklist.
-
-### Scenario 0.2 — ETCD Restore from S3
-Download snapshot from S3 and restore (simulates local backups lost).
-
-- Action: Delete local backups on all masters
-- Action: Download latest snapshot from S3 bucket
-- Action: Restore etcd from downloaded snapshot
-- Check: etcd cluster healthy (all 3 members)
-- Check: Kubernetes API responding
-- Check: All workloads recovered
-
-→ Run checklist.
-
-### Scenario 0.3 — WordPress Data Backup & Restore
-Backup and restore WordPress uploads (NFS PVC) + MariaDB.
-
-- Action: Backup WordPress uploads directory (NFS)
-- Action: Backup MariaDB database (`mysqldump` or snapshot)
-- Action: Simulate data loss (delete some uploads, drop table)
-- Action: Restore uploads from backup
-- Action: Restore MariaDB from backup
-- Check: Uploads intact and accessible
-- Check: DB consistent — no missing/duplicate records
-- Check: WordPress functioning normally
-
-→ Run checklist.
+- [x] Verify local backup exists on master node
+- [x] Verify S3 bucket contains uploaded snapshot
+- [x] Confirm Vault agent injects AWS credentials
 
 ---
 
-### Observation Checklist (run after every scenario):
-- [ ] Backup completed successfully
-- [ ] Restore produced consistent state
-- [ ] DB integrity (no missing / duplicate records)
-- [ ] WordPress uploads intact
-- [ ] etcd cluster healthy after restore
-- [ ] Pods running and serving traffic
+## Scenario 0.2 — ETCD Single Node Failure & Recovery
+
+Test etcd cluster resilience and recovery procedures.
+
+### Test A: Stop etcd (Quorum Test)
+- [x] Stop etcd on one master (move manifest to /tmp)
+- [x] Verify cluster survives with 2/3 quorum
+- [x] Observe resource impact on surviving masters
+- [x] Restore etcd (move manifest back)
+
+### Test B: Delete etcd Data (Cluster Sync Recovery)
+- [x] Delete /var/lib/etcd on broken node
+- [x] Remove member from cluster
+- [x] Re-add member with `etcdctl member add`
+- [x] Verify `--initial-cluster-state=existing`
+- [x] Restore manifest and verify sync from leader
+- [x] Restart kubelet if node stays NotReady
+
+### Test C: S3 Backup Validation
+- [x] Download snapshot from S3
+- [x] Validate with `etcdutl snapshot status`
+- [x] Compare hash/revision with original backup
+
+---
+
+## Observation Checklist
+
+- [x] Proxmox backups completed (dev + prod)
+- [x] etcd backups uploaded to S3
+- [x] etcd cluster survives single node failure
+- [x] Node recovery via cluster sync works
+- [x] S3 backup is valid and restorable
+- [x] All pods running after recovery
+
+---
+
+## Additional Backup Systems (Not Tested — Already Validated)
+
+| System | Status | Notes |
+|--------|--------|-------|
+| Proxmox config | Validated | Used in TS-PVE-007 (crontab recovery) |
+| VM/Node restore | Validated | Used in TS-TF-010 (cloud-init SSH key) |
+| Vault Raft | Deferred | NAS mount blocks LXC snapshots; using 3-node cluster + vzdump |
+| Router (ER605) | Validated | Used in real scenario; backups in gitignore |
+| Router (MikroTik) | Backed up | Backups in gitignore |
+| NAS (Asustor) | Partial | RAID 1 only; USB backup planned |
