@@ -1,5 +1,7 @@
 # TS-PVE-013 | 2026-04-09 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (power outage), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Proxmox VE / UPS Monitoring / Cron
 - Environment: PROD (pve-prod)

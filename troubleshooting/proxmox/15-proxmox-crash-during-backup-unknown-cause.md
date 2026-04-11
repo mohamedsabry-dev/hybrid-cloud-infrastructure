@@ -1,5 +1,7 @@
 # TS-PVE-015 | 2026-04-11 | UNRESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (Proxmox host crash during backup), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Proxmox VE (pve-dev) - ASUS laptop used as server
 - Environment: pve-dev

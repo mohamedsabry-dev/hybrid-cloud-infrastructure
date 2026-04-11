@@ -1,5 +1,7 @@
 # TS-K8S-019 | 2026-04-09 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (power outage recovery + Flux restructuring cascade), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Flux CD / Kubernetes / Vault Agent Injector
 - Environment: DEV (k8s cluster)

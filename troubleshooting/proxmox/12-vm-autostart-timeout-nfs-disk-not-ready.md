@@ -1,5 +1,7 @@
 # TS-PVE-012 | 2026-04-06 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (power outage recovery), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Proxmox VE autostart with NFS storage
 - Environment: pve-dev

@@ -1,5 +1,7 @@
 # TS-VLT-005 | 2026-04-11 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (Proxmox crash during backup), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: HashiCorp Vault HA Cluster (3-node Raft)
 - Environment: pve-dev (vault1, vault2, vault3 on LXC containers)

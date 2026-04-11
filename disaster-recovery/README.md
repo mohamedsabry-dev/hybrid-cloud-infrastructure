@@ -2,6 +2,31 @@
 
 ---
 
+## Real Incidents Before DR Testing
+
+Before the planned DR test phase even began, real production incidents occurred that validated (and exposed gaps in) the architecture. These unplanned failures provided authentic disaster recovery experience:
+
+**Incident 1: Power Outage (April 9, 2026)**
+- Triggered 5+ troubleshooting cases
+- Exposed UPS monitor cron misconfiguration, VM autostart timing issues, Flux cascade failures
+- Related cases: TS-PVE-012, TS-PVE-013, TS-K8S-018, TS-K8S-019
+
+**Incident 2: Prod Worker VM Crash (April 11, 2026)**
+- Worker VM crashed ~1 minute after boot, unknown cause
+- Exposed remediation pod bug (can't reboot stopped VMs), vault-injector race condition
+- Led to architecture improvements: remediation status check, vault-injector moved to masters
+- Related cases: TS-PVE-014, TS-K8S-021, TS-K8S-022, TS-K8S-023
+
+**Incident 3: Dev Proxmox Crash During Backup (April 11, 2026)**
+- Proxmox host crashed silently during vzdump, unknown cause
+- Vault node (vault3) went down, validated 2-node quorum resilience
+- Exposed stale Raft data recovery procedure
+- Related cases: TS-PVE-015, TS-VLT-005, TS-K8S-024
+
+These real incidents proved more valuable than planned tests because they exposed gaps (like remediation not handling stopped VMs) that careful simulation might have missed.
+
+---
+
 ## How to Use This Plan
 
 Each Task is a failure domain (Compute, Network, Storage, etc.).
