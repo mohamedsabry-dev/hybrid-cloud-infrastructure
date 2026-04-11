@@ -20,6 +20,9 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 10 | [TS-PVE-010](10-vm-restore-hang-concurrent-nfs-operations.md) | 2026-03-26 | VM restore stuck at 100% | Too many concurrent NFS operations |
 | 11 | [TS-PVE-011](11-vmbr1-storage-network-for-k8s-workers.md) | 2026-03-27 | VMs can't reach storage VLAN | No bridge for VLAN 40, GUI can't do atomic changes |
 | 12 | [TS-PVE-012](12-vm-autostart-timeout-nfs-disk-not-ready.md) | 2026-04-06 | VM autostart timeout after reboot | NFS mount not ready when autostart begins |
+| 13 | [TS-PVE-013](13-ups-monitor-cronjob-misconfiguration.md) | 2026-04-07 | UPS monitor cronjob misconfiguration | Wrong cron syntax |
+| 14 | [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) | 2026-04-11 | Worker VM crash ~1 min after boot | **UNDETERMINED** - No logs available |
+| 15 | [TS-PVE-015](15-proxmox-crash-during-backup-unknown-cause.md) | 2026-04-11 | Proxmox crash during backup mid-write | **UNDETERMINED** - Silent crash, no logs |
 
 ---
 
