@@ -474,6 +474,61 @@ This ensures:
 
 Added `replicas: 2` with `podAntiAffinity` to spread across masters.
 
+**Fix Validation — 21:39:**
+
+**Pre-test: 2 injector replicas running on different masters:**
+```
+NAME                                    READY   STATUS    NODE
+vault-agent-injector-5877589b57-5r2jd   1/1     Running   k8s-master1.lab.local
+vault-agent-injector-5877589b57-svckt   1/1     Running   k8s-master3.lab.local
+```
+
+**Simultaneous delete test (same command as before):**
+```bash
+echo "=== START: $(date) ===" && \
+kubectl delete pod -n vault vault-agent-injector-5877589b57-5r2jd & \
+kubectl delete pod -n apps -l app=wordpress && \
+echo "=== DELETED: $(date) ==="
+# START: Sat Apr 11 09:39:48 PM EET 2026
+# DELETED: Sat Apr 11 09:39:51 PM EET 2026
+```
+
+**Timeline:**
+```
+21:39:49 - Both deleted simultaneously
+         - vault-agent-injector-5r2jd: Terminating (master1)
+         - vault-agent-injector-svckt: Running (master3) ← STILL SERVING WEBHOOK
+         - WordPress pods: Init:0/2 (vault-agent-init starting!)
+         - New injector qc47q: ContainerCreating (master1)
+
+21:39:51 - WordPress pods: PodInitializing (0/2 containers)
+         - vault-agent-injector-qc47q: Running (ready)
+         - vault-agent-injector-svckt: Running (never stopped)
+
+21:39:53 - WordPress pods: Running 1/2 (wordpress + vault-agent starting)
+
+21:39:55 - Both injectors: 1/1 Running
+         - WordPress pods: Running 1/2 (vault-agent becoming ready)
+
+21:39:59 - WordPress pods: Running 2/2 ✓ (ALL PODS HAVE SIDECAR!)
+```
+
+**RESULT: FIX CONFIRMED**
+- Pods show `2/2` Ready (vault-agent sidecar injected!)
+- Second injector replica (svckt on master3) served webhook during restart
+- Zero gap in webhook availability
+- All WordPress pods started WITH proper secret injection
+- Total recovery time: 10 seconds
+
+**Before vs After:**
+| Scenario | Before Fix (1 replica) | After Fix (2 replicas) |
+|----------|------------------------|------------------------|
+| Simultaneous restart | Pods start 1/1 (NO sidecar) | Pods start 2/2 (WITH sidecar) |
+| DB connection | FAILED - Access denied | SUCCESS - Secrets injected |
+| Webhook availability | ~3s gap | Zero gap |
+
+**Race condition: MITIGATED ✓**
+
 ### Test: ingress-nginx Pod
 
 **Action:**
