@@ -38,14 +38,18 @@ Execute Task 0 (Backup & Restore) FIRST — it's your safety net before any dest
 
 ## Tasks
 
-| Task | Failure Domain | Scenarios | Prerequisite |
-|------|---------------|-----------|--------------|
-| [Task 0](task-0-backup-restore/PLAN.md) | Backup & Restore Validation | 0.1 – 0.9 | None (execute first) |
-| [Task 1](task-1-kill-compute/PLAN.md) | Kill Compute | 1.1 – 1.21 | Task 0 |
-| [Task 2](task-2-kill-network/PLAN.md) | Kill Network | 2.1 – 2.11 | Task 0 |
-| [Task 3](task-3-kill-storage/PLAN.md) | Kill Storage | 3.1 – 3.18 | Task 0 |
-| [Task 4](task-4-kill-vault/PLAN.md) | Kill Vault | 4.1 – 4.10 | Task 0 |
-| [Task 5](task-5-kill-power/PLAN.md) | Kill Power / Infrastructure | 5.1 – 5.7 | Task 0 |
+| Task | Failure Domain | Scenarios | Status |
+|------|---------------|-----------|--------|
+| [Task 0](task-0-backup-restore/PLAN.md) | Backup & Restore Validation | 0.1 – 0.2 | DONE |
+| [Task 1](task-1-pod-kill/PLAN.md) | Single Pod Kill | 1.1 | DONE |
+| [Task 1a](task-1a-pod-scale/PLAN.md) | Pod Scale Failures | 1.2 – 1.4 | TODO |
+| [Task 1b](task-1b-worker-kill/PLAN.md) | Worker Node Failures | 1.5 – 1.8 | TODO |
+| [Task 1c](task-1c-master-kill/PLAN.md) | Master/Quorum Failures | 1.9 – 1.14 | TODO |
+| [Task 1d](task-1d-auto-recovery/PLAN.md) | Auto-Recovery (Proxmox) | 1.15 | TODO |
+| [Task 2](task-2-kill-network/PLAN.md) | Kill Network | 2.1 – 2.5 | TODO |
+| [Task 3](task-3-kill-storage/PLAN.md) | Kill Storage | 3.1 – 3.x | TODO |
+| [Task 4](task-4-kill-vault/PLAN.md) | Kill Vault | 4.1 – 4.4 | TODO |
+| [Task 5](task-5-kill-power/PLAN.md) | Kill Power / Infrastructure | 5.1 – 5.x | TODO |
 
 ---
 
