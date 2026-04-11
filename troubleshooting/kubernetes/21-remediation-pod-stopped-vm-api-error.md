@@ -1,5 +1,7 @@
 # TS-K8S-021 | 2026-04-11 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (worker VM crash exposed remediation bug), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Kubernetes remediation pod (custom self-healing)
 - Environment: Production cluster (prod)

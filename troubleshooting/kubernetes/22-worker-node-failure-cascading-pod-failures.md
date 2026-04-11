@@ -1,5 +1,7 @@
 # TS-K8S-022 | 2026-04-11 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (worker node crash cascading to pod failures), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Kubernetes cluster pod scheduling and recovery
 - Environment: Production cluster (prod)

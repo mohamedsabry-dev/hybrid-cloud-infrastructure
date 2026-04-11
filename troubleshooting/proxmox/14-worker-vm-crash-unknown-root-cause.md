@@ -1,5 +1,7 @@
 # TS-PVE-014 | 2026-04-11 | UNRESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (VM crash after autostart), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 - System: Proxmox VE VM autostart
 - Environment: pve-prod

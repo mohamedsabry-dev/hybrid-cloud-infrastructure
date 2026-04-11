@@ -1,5 +1,7 @@
 # TS-K8S-024 | 2026-04-11 | RESOLVED (Resilience Confirmed)
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (Proxmox crash took down vault3), not planned DR testing. Documents successful HA resilience before DR test phase began.
+
 ## 1. Context
 - System: HashiCorp Vault HA Cluster (3 nodes on Proxmox LXC)
 - Environment: pve-dev (vault1, vault2, vault3)

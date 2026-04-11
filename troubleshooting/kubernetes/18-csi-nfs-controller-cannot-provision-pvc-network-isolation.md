@@ -1,5 +1,7 @@
 # TS-K8S-018 | 2026-04-08 | RESOLVED
 
+> **REAL INCIDENT** — This case occurred during an unplanned production failure (Loki deployment blocked by network isolation), not planned DR testing. Documented before DR test phase began.
+
 ## 1. Context
 
 - **System:** CSI NFS Driver / PVC Provisioning / Network Architecture
