@@ -11,19 +11,19 @@ Each subfolder contains troubleshooting tickets numbered sequentially within tha
 | Folder | Cases | Description |
 |--------|-------|-------------|
 | [aws/](aws/) | 1 | AWS CloudFormation, IAM |
-| [github/](github/) | 8 | GitHub Actions, runners, workflows, git operations |
+| [github/](github/) | 10 | GitHub Actions, runners, workflows, git operations |
 | [identity/](identity/) | 8 | FreeIPA, Kerberos, SSSD, authentication |
-| [kubernetes/](kubernetes/) | 20 | K8s cluster, pods, networking, storage, GitOps |
+| [kubernetes/](kubernetes/) | 24 | K8s cluster, pods, networking, storage, GitOps |
 | [linux/](linux/) | 2 | OS-level issues (Rocky Linux, NTP) |
 | [macos/](macos/) | 2 | macOS client configuration |
 | [network/](network/) | 5 | Routing, WireGuard, network stability |
-| [proxmox/](proxmox/) | 13 | Proxmox VE, VMs, LXC, backups, NFS |
+| [proxmox/](proxmox/) | 16 | Proxmox VE, VMs, LXC, backups, NFS, metrics |
 | [terraform/](terraform/) | 11 | Terraform IaC, Proxmox provider, cloud-init |
-| [vault/](vault/) | 4 | HashiCorp Vault, certificates, K8s integration |
+| [vault/](vault/) | 5 | HashiCorp Vault, certificates, K8s integration |
 
 ---
 
-**Total: 74 troubleshooting cases across 10 categories**
+**Total: 84 troubleshooting cases across 10 categories**
 
 ---
 
@@ -50,16 +50,16 @@ All cases follow a standardized 9-point template:
 ## Quick Stats by Category
 
 ```
-kubernetes/  ████████████████████  20
-proxmox/     █████████████         13
-terraform/   ███████████           11
-github/      ████████               8
-identity/    ████████               8
-network/     █████                  5
-vault/       ████                   4
-linux/       ██                     2
-macos/       ██                     2
-aws/         █                      1
+kubernetes/  ████████████████████████  24
+proxmox/     ████████████████          16
+terraform/   ███████████               11
+github/      ██████████                10
+identity/    ████████                   8
+network/     █████                      5
+vault/       █████                      5
+linux/       ██                         2
+macos/       ██                         2
+aws/         █                          1
 ```
 
 ---

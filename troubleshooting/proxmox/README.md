@@ -23,6 +23,7 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 13 | [TS-PVE-013](13-ups-monitor-cronjob-misconfiguration.md) | 2026-04-07 | UPS monitor cronjob misconfiguration | Wrong cron syntax |
 | 14 | [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) | 2026-04-11 | Worker VM crash ~1 min after boot | **UNDETERMINED** - No logs available |
 | 15 | [TS-PVE-015](15-proxmox-crash-during-backup-unknown-cause.md) | 2026-04-11 | Proxmox crash during backup mid-write | **UNDETERMINED** - Silent crash, no logs |
+| 16 | [TS-PVE-016](16-proxmox-memory-metrics-misleading.md) | 2026-04-11 | Proxmox shows 97% memory but actual is 54% | Linux cache counted as "used" — normal behavior |
 
 ---
 
@@ -57,6 +58,9 @@ Related cases covering NFS timing issues:
 ### Networking
 - **Case 11:** VMs can't reach VLAN → Create VLAN-aware bridge, edit /etc/network/interfaces directly
 
+### Monitoring & Metrics
+- **Case 16:** Memory shows 97% → Linux cache counted as used — use Prometheus `MemAvailable`, NOT Proxmox metrics for CloudWatch integration
+
 ---
 
 ## Related Cases in Other Folders
@@ -90,3 +94,4 @@ Related cases covering NFS timing issues:
 8. **Restore VMs sequentially from NFS** - Max 2-3 concurrent operations
 9. **Use `crontab -e` or append syntax** - `crontab -` replaces entire file
 10. **Increase startup delay for NFS-backed VMs** - Allow mount to initialize
+11. **Use Prometheus for monitoring, NOT Proxmox API** - Proxmox memory metrics include cache as "used"

@@ -30,3 +30,7 @@ to mkae even the design roubst if internal storage broke which already have almo
 - Understand how to use monitoring and logging tools 
 
 - schedulre and de 
+
+issue to be recoreded in as mentioned in test 1 loki which can display vault agent logs 
+labels to be added to vault agent 
+install kubcetl metrics to use kubectl pod nodes 
