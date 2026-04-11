@@ -1,3 +1,41 @@
+## Need to 
+
+kubectl exec -n kube-system etcd-k8s-master1.lab.local -- etcd --version 
+
+# Download etcdctl 3.6.6                                                                       
+curl -LO https://github.com/etcd-io/etcd/releases/download/v3.6.6/etcd-v3.6.6-linux-amd64.tar.gz
+tar xzf etcd-v3.6.6-linux-amd64.tar.gz                                                           
+mv etcd-v3.6.6-linux-amd64/etcdctl /usr/local/bin/
+rm -rf etcd-v3.6.6-linux-amd64*                                                                  
+                                                                                                 
+# Create persistent env                                                                        
+cat > /etc/profile.d/etcdctl.sh << 'EOF'
+export ETCDCTL_API=3
+export ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
+export ETCDCTL_CACERT=/etc/kubernetes/pki/etcd/ca.crt
+export ETCDCTL_CERT=/etc/kubernetes/pki/etcd/server.crt
+export ETCDCTL_KEY=/etc/kubernetes/pki/etcd/server.key
+EOF
+
+chmod +x /etc/profile.d/etcdctl.sh
+source /etc/profile.d/etcdctl.sh
+
+  # Test
+etcdctl endpoint health --cluster
+etcdctl member list
+
+
+Convert to Ansible playbook 
+
+
+
+ETCD_VER=v3.6.6
+curl -L https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz | tar xz
+./etcd-${ETCD_VER}-linux-amd64/etcdutl snapshot status /tmp/etcd-20260411-141101.snap --write-out=table
+
+
+
+
 # Check Health
 kubectl exec -it etcd-k8s-master1.lab.local -n kube-system -- etcdctl \
 --endpoints=https://127.0.0.1:2379 \
