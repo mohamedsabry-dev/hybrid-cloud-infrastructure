@@ -21,16 +21,28 @@ Restart or force kill 1 vault LXC.
 
 → Skip (validated in real incident).
 
-### Scenario 4.2 — Vault Quorum Loss (2 of 3 Down)
-Kill 2 vault LXCs, lose raft quorum.
+### Scenario 4.2 — Vault Quorum Loss + Injector Behavior (Combined with 4.4)
+Kill 2 vault LXCs, lose raft quorum, and test vault-injector behavior.
 
+**Step A — Quorum Loss Impact**
 - Action: Stop 2 vault LXCs (`pct stop 2004 && pct stop 2005`)
 - Check: Vault cluster unavailable (no quorum)
 - Check: Existing pods still serving with cached secrets?
 - Check: New pods can fetch secrets? (expected: no)
-- Check: vault-injector behavior
-- Recovery: Start vault LXCs → quorum restored
-- Check: New pods can now fetch secrets
+- Check: Vault UI inaccessible
+
+**Step B — Vault-Injector Deep Dive (while vault down)**
+- Action: Deploy a new pod that requires secret injection
+- Check: vault-injector sidecar behavior (does it inject?)
+- Check: Init container timeout behavior (how long? what error?)
+- Check: What if vault-injector pod itself reschedules?
+- Check: Can new pods get secrets injected? (expected: no, pending/timeout)
+
+**Step C — Recovery**
+- Action: Start vault LXCs (`pct start 2004 && pct start 2005`)
+- Check: Quorum restored, vault unsealed
+- Check: Pending pods now get secrets injected
+- Check: New pods can fetch secrets normally
 
 → Run checklist.
 
@@ -47,18 +59,6 @@ Test recovery when KMS credentials are broken.
 - Check: Auto-unseal succeeds on restart
 - Check: Vault cluster healthy
 - Check: App recovers
-
-→ Run checklist.
-
-### Scenario 4.4 — Vault-Injector Behavior During Degraded Vault
-Test sidecar injection when vault is degraded.
-
-- Action: Stop 1 or 2 vault LXCs (degraded state)
-- Action: Deploy a new pod that requires secret injection
-- Check: vault-injector sidecar behavior
-- Check: Can new pods get secrets injected?
-- Check: What if vault-injector pod itself reschedules?
-- Check: Init container timeout behavior
 
 → Run checklist.
 
