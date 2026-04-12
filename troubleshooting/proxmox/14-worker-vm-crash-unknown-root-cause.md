@@ -1,4 +1,4 @@
-# TS-PVE-014 | 2026-04-11 | UNRESOLVED
+# TS-PVE-014 | 2026-04-11 | RESOLVED (2026-04-12)
 
 > **REAL INCIDENT** — This case occurred during an unplanned production failure (VM crash after autostart), not planned DR testing. Documented before DR test phase began.
 
@@ -152,3 +152,234 @@ ps aux | grep 1021
 
 ## 9. Workaround (if any)
 > Monitor for NotReady nodes and manually start VMs if remediation fails. Long-term: improve remediation to handle stopped VMs by using `start` instead of `reboot`.
+
+---
+
+## 10. Follow-up Investigation: 2026-04-12
+
+> **ROOT CAUSE IDENTIFIED** — After rebooting both prod and dev servers on April 12, observed identical pattern on dev environment. The "crash" was actually remediation pod triggering reboot during normal worker boot sequence.
+
+### 10.1 Evidence: Dev Environment Reboot (April 12)
+
+**Proxmox Task Log (pve-dev):**
+```
+Apr 12 19:45:52  pve-dev  root@pam  VM 1010 - Start  (master1)
+Apr 12 19:45:52  pve-dev  root@pam  VM 1011 - Start  (master2)
+Apr 12 19:45:52  pve-dev  root@pam  VM 1012 - Start  (master3)
+Apr 12 19:45:55  pve-dev  root@pam  VM 1020 - Start  (worker1)
+Apr 12 19:46:55  pve-dev  root@pam  VM 1021 - Start  (worker2)
+Apr 12 19:47:08  pve-dev  root@pam  VM 1022 - Start  (worker3)
+Apr 12 19:48:43  pve-dev  k8s-pve@pve  VM 1022 - Reboot  ← REMEDIATION TRIGGERED!
+Apr 12 19:48:52  pve-dev  root@pam  VM 1022 - Start
+```
+
+**Key Finding:** Reboot triggered by `k8s-pve@pve` (remediation service account), NOT Proxmox autostart or VM crash.
+
+**Prod Environment (April 12) - Same Pattern:**
+```
+Apr 12 19:44:03  pve-prod  root@pam  VM 1010, 1011, 1012 - Start  (masters)
+Apr 12 19:44:06  pve-prod  root@pam  VM 1020 - Start  (worker1)
+Apr 12 19:45:06  pve-prod  root@pam  VM 1021, 1022 - Start  (worker2/3)
+```
+
+### 10.2 Timeline Analysis
+
+```
+19:45:52-55  Masters start (order 8, delay=0)
+             Remediation pod starts on master
+             ↓
+19:45:55     Worker1 starts (order 9, has up_delay=60)
+             up_delay=60 delays NEXT vm, not this one!
+             ↓ 60s wait
+19:46:55     Worker2 starts (up_delay=0)
+19:47:08     Worker3 starts (up_delay=0)
+             ↓
+             Workers booting, kubelet starting
+             Node status: NotReady (normal during boot)
+             ↓
+~19:46:30    Remediation first check (immediate after pod starts)
+             Workers NotReady but just started, no action
+             ↓
+19:48:30     Remediation second check (CHECK_INTERVAL=120s)
+             Worker3 uptime: ~1.5 minutes
+             Still NotReady → TRIGGERS REBOOT!
+             ↓
+19:48:43     VM 1022 Reboot by k8s-pve@pve
+             Reboot during boot = potential crash/corruption
+```
+
+### 10.3 Root Cause Discovery
+
+**The "crash" was NOT a VM crash.** It was remediation triggering reboot on workers still in normal boot sequence.
+
+**Three contributing factors:**
+
+**1. Proxmox up_delay Misunderstanding:**
+
+From Terraform Proxmox provider documentation:
+```
+startup:
+  up_delay - Delay in seconds before the NEXT VM is started.
+```
+
+`up_delay` delays the **NEXT** VM, not the current one!
+
+**Old Config (broken):**
+```terraform
+# worker1: startup_delay=60, order=9  ← delays worker2, not itself!
+# worker2: startup_delay=0,  order=9
+# worker3: startup_delay=0,  order=9
+```
+
+**Vault containers work correctly because they use different orders:**
+```
+CT 2004 (order=5, delay=60) → 19:42:49
+CT 2005 (order=6, delay=60) → 19:43:50  (+1 min)
+CT 2006 (order=7, delay=60) → 19:44:51  (+1 min)
+```
+
+**2. Remediation CHECK_INTERVAL Too Short:**
+```python
+CHECK_INTERVAL = 120  # 2 minutes - catches workers during boot!
+```
+
+**3. No Boot Protection:**
+- No initial grace period after remediation pod starts
+- No VM uptime check before triggering reboot
+
+### 10.4 VM Startup Config Verification
+
+**Commands used:**
+```bash
+# Check VM startup config in Proxmox
+qm config 1020 | grep startup
+# startup: order=9,up=60,down=60  (worker1 - has delay)
+
+qm config 1021 | grep startup
+# startup: order=9,up=0,down=60   (worker2 - no delay)
+
+qm config 1022 | grep startup
+# startup: order=9,up=0,down=60   (worker3 - no delay)
+```
+
+### 10.5 Fix Applied
+
+**Terraform Changes (dev + prod):**
+
+| File | Change |
+|------|--------|
+| `terraform/*/proxmox/vms/k8s_masters/variables.tf` | master3: `startup_delay = 0` → `60` |
+| `terraform/*/proxmox/vms/k8s_workers/variables.tf` | worker1: `startup_delay = 60` → `0` |
+
+**New Boot Sequence:**
+```
+Masters start (order 8)
+  ↓ master3 up_delay=60
+60 seconds wait
+  ↓
+All workers start together (order 9, all delay=0)
+```
+
+**Remediation Changes (dev + prod):**
+
+| File | Change |
+|------|--------|
+| `kubernetes/*/deployments/apps/remediation/configmap.yaml` | `CHECK_INTERVAL = 120` → `300` |
+
+**Verification Commands:**
+```bash
+# Check configmap updated
+kubectl get cm remediation-script -n remediation -o yaml | grep "CHECK_INTERVAL ="
+# Expected: CHECK_INTERVAL = 300
+
+# Restart pod to pick up new config
+kubectl rollout restart deployment/remediation -n remediation
+
+# Verify new interval active
+kubectl logs -n remediation -l app=remediation -c remediation | grep "Check interval"
+# Expected: Check interval: 300s
+```
+
+### 10.6 New Expected Timeline
+
+```
+T+0:00   Masters start together (order 8)
+T+1:00   Workers start together (after master3's 60s delay)
+T+2:00   Workers registering with K8s
+T+3:00   Workers showing Ready
+T+5:00   Remediation first real check (5 min interval)
+         All workers healthy, no action needed ✓
+```
+
+### 10.7 Key Learnings
+
+1. **Proxmox `up_delay` semantics:** Delays NEXT VM, not current. Put delay on LAST item of order group to create gap before next group.
+
+2. **Remediation needs boot protection:** Self-healing systems must account for cluster boot. 2-minute check is too aggressive.
+
+3. **Initial "crash" assumption was wrong:** Without full investigation, assumed VM crashed internally. Reality: external system triggered reboot.
+
+4. **Same pattern on both envs:** Dev reboot on April 12 showed identical remediation trigger, confirming root cause.
+
+### 10.8 Files Changed
+
+```
+terraform/dev/proxmox/vms/k8s_masters/variables.tf   # master3 delay: 0→60
+terraform/dev/proxmox/vms/k8s_workers/variables.tf   # worker1 delay: 60→0
+terraform/prod/proxmox/vms/k8s_masters/variables.tf  # master3 delay: 0→60
+terraform/prod/proxmox/vms/k8s_workers/variables.tf  # worker1 delay: 60→0
+kubernetes/dev/.../remediation/configmap.yaml        # CHECK_INTERVAL: 120→300
+kubernetes/prod/.../remediation/configmap.yaml       # CHECK_INTERVAL: 120→300
+```
+
+### 10.9 Post-Fix Validation (April 13, 00:08)
+
+**Server rebooted after fix applied. New boot sequence:**
+
+```
+Apr 13 00:08:36  pve-dev  VM 1010 - Start  (master1)
+Apr 13 00:08:36  pve-dev  VM 1011 - Start  (master2)
+Apr 13 00:08:36  pve-dev  VM 1012 - Start  (master3)
+         ↓
+         60s wait (master3's up_delay=60) ← FIX WORKING!
+         ↓
+Apr 13 00:09:37  pve-dev  VM 1020 - Start  (worker1)
+Apr 13 00:09:37  pve-dev  VM 1021 - Start  (worker2)
+Apr 13 00:09:38  pve-dev  VM 1022 - Start  (worker3)
+```
+
+**Key observations:**
+- Masters start together at 00:08:36
+- **60 second gap** before workers (master3's delay working!)
+- All workers start together at 00:09:37-38
+- **NO remediation reboot triggered!** ← FIX CONFIRMED
+
+**Before vs After:**
+
+| Metric | Before Fix | After Fix |
+|--------|------------|-----------|
+| Gap between masters and workers | ~0s (same time) | 60s |
+| Workers start sequence | Staggered (worker1, then 60s, worker2/3) | Together |
+| Remediation reboot during boot | YES (caused "crash") | NO |
+
+### 10.10 Documentation Reference
+
+Terraform Proxmox Provider - VM Resource:
+https://registry.terraform.io/providers/bpg/proxmox/latest/docs/resources/virtual_environment_vm
+
+**Startup block documentation:**
+```
+startup - (Optional) Defines startup and shutdown behavior of the VM.
+  order    - (Required) A non-negative number defining the general startup order.
+  up_delay - (Optional) A non-negative number defining the delay in seconds
+             before the NEXT VM is started.
+  down_delay - (Optional) A non-negative number defining the delay in seconds
+               before the NEXT VM is shut down.
+```
+
+### 10.11 Status
+
+**RESOLVED + VALIDATED** — Root cause identified as remediation race condition during boot. Fixes applied and validated after server reboot on April 13:
+- Terraform: master3 `startup_delay=60` creates gap before workers
+- Kubernetes: `CHECK_INTERVAL=300` gives workers 5 min to register
+- No remediation reboot triggered during boot sequence
