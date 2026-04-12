@@ -1,125 +1,143 @@
-# TS-K8S-019 | 2026-04-09 | RESOLVED
+# TS-K8S-019 — Incident Review
+> Date: 2026-04-09 | Severity: CATASTROPHIC | Status: RESOLVED
+> Trigger: Power outage recovery + Flux restructuring done incorrectly
 
-> **REAL INCIDENT** — This case occurred during an unplanned production failure (power outage recovery + Flux restructuring cascade), not planned DR testing. Documented before DR test phase began.
+---
 
-## 1. Context
-- System: Flux CD / Kubernetes / Vault Agent Injector
-- Environment: DEV (k8s cluster)
-- Related components: Flux Kustomizations, HelmReleases, Vault, WordPress, MariaDB, Ingress-NGINX
-- Discovered during: Real power outage recovery (unplanned incident)
+## What We Were Trying To Do
 
-## 2. Issue
-- Symptom: Multiple cascading failures after power outage and subsequent Flux restructuring
-- Impact: Complete cluster outage - all applications down
-- Severity: **CATASTROPHIC**
+Split one Flux Kustomization (`deployments`) that watched everything into two:
+- `infrastructure` — vault, ingress, storage (deploys first)
+- `apps` — wordpress, monitoring, remediation (deploys after vault is ready)
 
-**Issue Chain:**
-1. WordPress DB connection failure (vault-agent sidecar missing)
-2. Remediation pod CrashLoopBackOff (same root cause)
-3. Flux prune deleted ALL HelmReleases causing complete outage
+The goal was correct. The execution was wrong.
 
-## 3. Analysis
+---
 
-### Phase 1: WordPress Database Connection Failure (12:54 PM)
+## What We Did Wrong — Step by Step
 
-**Check 1: Initial Symptoms**
+### ❌ Wrong Step 1: No dependency ordering existed before the outage
+
+```yaml
+# deployments-sync.yaml
+path: ./kubernetes/dev/deployments   # watched everything at once
+
+# deployments/kustomization.yaml
+resources:
+  - infrastructure   # vault here
+  - apps             # wordpress here — no dependency on vault!
 ```
-Warning: mysqli_real_connect(): (HY000/1045): Access denied for user 'wordpress'@'10.245.62.24' (using password: YES)
-Error establishing a database connection
-```
 
-**Check 2: Pod Status Comparison**
+Flux applied both simultaneously. During power outage recovery, wordpress pods
+were created BEFORE vault-agent-injector was ready → pods came up without vault
+sidecar → no DB password → wordpress down.
+
+**Evidence — pod comparison at 12:54 PM:**
 ```bash
 [root@k8s-master1 ~]# kubectl get pods -n database
 NAME        READY   STATUS    RESTARTS   AGE
-mariadb-0   2/2     Running   0          12m    # Has vault-agent sidecar
+mariadb-0   2/2     Running   0          12m    # vault-agent sidecar present
 
 [root@k8s-master1 ~]# kubectl get pods -n apps
 NAME                         READY   STATUS    RESTARTS   AGE
-wordpress-85b7f46448-k6qlw   1/1     Running   0          4h5m   # MISSING sidecar!
+wordpress-85b7f46448-k6qlw   1/1     Running   0          4h5m   # sidecar MISSING
 ```
-Finding: MariaDB has 2/2 (vault-agent present), WordPress has 1/1 (missing).
 
----
-
-**Check 3: Vault Secrets Directory**
+**Evidence — vault secrets directory missing inside wordpress pod:**
 ```bash
-[root@k8s-master1 ~]# kubectl exec -it deploy/wordpress -n apps -- bash
 root@wordpress-85b7f46448-rwxx9:/# ls -la /vault/secrets/
 ls: cannot access '/vault/secrets/': No such file or directory
 ```
-Finding: `/vault/secrets/` directory missing - injection never happened.
 
----
-
-**Check 4: Compare Annotations**
+**Evidence — annotation missing on wordpress pod:**
 ```bash
-# MariaDB (working)
-kubectl get pod mariadb-0 -n database -o jsonpath='{.metadata.annotations}' | jq . | grep vault
-  "vault.hashicorp.com/agent-inject-status": "injected",   # KEY!
+# MariaDB (working) had this annotation:
+"vault.hashicorp.com/agent-inject-status": "injected"
 
-# WordPress (not working)
-kubectl get pod -n apps -l app=wordpress -o jsonpath='{.items[0].metadata.annotations}' | jq . | grep vault
-  # MISSING: "vault.hashicorp.com/agent-inject-status": "injected"
+# WordPress pod had NO vault annotation at all
 ```
-Finding: WordPress pods missing `agent-inject-status: injected` annotation.
 
----
-
-**Check 5: etcd Backup Comparison (10:40 AM - before outage)**
+**Evidence — etcd backup confirmed old pods HAD the sidecar:**
 ```bash
-ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2399 get /registry/pods/apps --prefix --keys-only | grep wordpress
-/registry/pods/apps/wordpress-85b7f46448-cx2ct   # Different pods!
-
 ETCDCTL_API=3 etcdctl ... | strings | grep -i "vault-agent"
-vault-agent        # OLD pods HAD the sidecar!
+vault-agent        # old pods before outage HAD the sidecar
 vault-agent-init
 ```
-Finding: Old pods (before outage) had vault-agent. Current pods do not. Deployment rollout happened during recovery.
+
+**Evidence — timeline that caused it:**
+```
+09:00 AM — WordPress pods created (vault injector NOT ready yet)
+11:00 AM — Power outage
+12:14 PM — Vault Injector starts and becomes ready
+12:52 PM — MariaDB pod recreated AFTER injector ready → 2/2 ✅
+12:54 PM — WordPress pod restarts but same old pod → 1/1 ❌
+```
+
+**What should have been done:** `dependsOn` between infrastructure and apps
+from day one, before any restructuring.
 
 ---
 
-**Check 6: Timestamp Analysis**
+### ❌ Wrong Step 2: Renamed Kustomization with prune: true active
+
+Created new files with NEW names while `prune: true` was still enabled:
+
 ```
-| Time     | Event                                            |
-|----------|--------------------------------------------------|
-| 09:00 AM | WordPress pods created (injector NOT ready)      |
-| 11:00 AM | Power outage                                     |
-| 12:14 PM | Vault Injector starts and becomes ready          |
-| 12:52 PM | MariaDB pod recreated (injector now ready) 2/2   |
-| 12:54 PM | WordPress containers restart (same old pods) 1/1 |
+Old: deployments-sync.yaml   (name: "deployments")
+New: infrastructure-sync.yaml (name: "infrastructure")  ← NEW NAME
+New: apps-sync.yaml           (name: "apps")            ← NEW NAME
 ```
-Finding: WordPress pods created BEFORE Vault Injector was ready.
+
+Flux saw `deployments` disappear from Git → prune kicked in →
+deleted EVERYTHING owned by `deployments`:
+- vault HelmRelease deleted → Helm uninstall ran → vault-agent-injector gone
+- ingress-nginx HelmRelease deleted → no external access
+- csi-driver-nfs HelmRelease deleted
+
+**Evidence — Flux logs showing vault HelmRelease uninstalled:**
+```bash
+[root@k8s-master1 tmp]# flux logs --kind=HelmRelease --name=vault -n vault
+2026-04-09T15:00:37.206Z info HelmRelease/vault.vault - uninstalled Helm release for deleted resource
+```
+
+**Evidence — all HelmReleases gone:**
+```bash
+[root@k8s-master1 tmp]# kubectl get helmrelease -A
+No resources found
+
+[root@k8s-master1 tmp]# kubectl get pods -n vault
+No resources found in vault namespace.
+```
+
+**Evidence — timeline of the disaster (2 seconds to destroy everything):**
+```
+15:00:35 — Flux infrastructure kustomization starts reconciling
+15:00:37 — Flux UNINSTALLS vault HelmRelease
+15:00:37 — vault-agent-injector DELETED
+15:00:37 — All HelmReleases DELETED (vault, ingress-nginx, csi-driver-nfs)
+15:00:xx — infrastructure stuck: healthCheck waiting for deleted vault-agent-injector
+15:00:xx — apps stuck: waiting for infrastructure
+15:00:xx — ALL pods with vault injection stuck in Init:0/2
+15:00:xx — ingress-nginx down — no external access
+```
+
+**What should have been done:** Set `prune: false` on `deployments-sync.yaml`
+BEFORE introducing new Kustomization names.
 
 ---
 
-### Phase 1 Root Cause
+### ❌ Wrong Step 3: Remediation placed in infrastructure folder
 
-Flux Kustomization applies BOTH infrastructure and apps simultaneously with NO dependency ordering:
-
-```yaml
-# kubernetes/dev/flux/deployments-sync.yaml
-path: ./kubernetes/dev/deployments    # Applies everything at once
-
-# kubernetes/dev/deployments/kustomization.yaml
-resources:
-  - infrastructure   # vault-agent-injector here
-  - apps             # wordpress here - NO DEPENDENCY!
+```
+infrastructure/
+  ├── vault/          # vault-agent-injector lives here
+  └── remediation/    # needs vault injection — deployed SAME TIME as vault!
 ```
 
-**Sequence during cluster recovery:**
-1. Flux applies ALL manifests simultaneously
-2. Vault HelmRelease triggers -> Injector pod starts spinning up
-3. WordPress Deployment triggers -> NEW pods created IMMEDIATELY
-4. But Vault Injector isn't READY yet -> pods created WITHOUT sidecar
-5. WordPress pods come up as 1/1 (no vault-agent) -> can't get DB password
+Remediation deployed at the same time as vault. Vault injector not ready yet →
+remediation pod started without sidecar → CrashLoopBackOff.
 
----
-
-### Phase 2: Remediation Pod CrashLoopBackOff (14:00 PM)
-
-After splitting Flux into infrastructure-sync + apps-sync:
-
+**Evidence — remediation CrashLoopBackOff:**
 ```bash
 [root@k8s-master1 ~]# kubectl get pods -n remediation
 NAME                           READY   STATUS             RESTARTS      AGE
@@ -129,28 +147,19 @@ remediation-56bdddfcd7-4vjhx   0/1     CrashLoopBackOff   5 (2m36s ago) 7m47s
 FileNotFoundError: [Errno 2] No such file or directory: '/vault/secrets/proxmox-creds'
 ```
 
-**Root Cause:** Remediation was in `infrastructure/` folder alongside `vault/`:
-```
-kubernetes/dev/deployments/infrastructure/
-  ├── vault/          # vault-agent-injector
-  ├── remediation/    # ALSO here - deploys SAME TIME as vault!
-```
-
-**Fix:** Moved remediation from `infrastructure/` to `apps/` folder.
+**What should have been done:** Anything that needs vault injection goes in
+`apps/`, never in `infrastructure/`.
 
 ---
 
-### Phase 3: Vault Authentication Failure (14:09 PM)
+### ❌ Wrong Step 4: vault-auth token secret not in manifests
 
+After prune deleted everything, the `vault-auth-token` secret was gone.
+Kubernetes 1.24+ does not auto-create ServiceAccount token secrets.
+Vault could not authenticate any pod → all pods stuck in `Init:0/2`.
+
+**Evidence — vault-agent-init authentication error:**
 ```bash
-[root@k8s-master1 ~]# kubectl get pods -A | grep -E "Init|vault"
-apps         wordpress-6d5cdf8c64-rbk6q   0/2   Init:0/2   0   27m
-database     mariadb-0                    0/2   Init:0/1   0   27m
-monitoring   kube-prometheus-stack-grafana-*   0/4   Init:1/2   0   2m
-```
-
-**vault-agent-init logs:**
-```
 2026-04-09T14:09:53.975Z [ERROR] agent.auth.handler: error authenticating:
   error=
   | URL: PUT https://vault.lab.local:8200/v1/auth/kubernetes/login
@@ -158,131 +167,97 @@ monitoring   kube-prometheus-stack-grafana-*   0/4   Init:1/2   0   2m
   | * permission denied
 ```
 
-**Check: vault-auth secret**
+**Evidence — secret missing, SA exists but no token:**
 ```bash
 [root@k8s-master1 ~]# kubectl get secret -n vault vault-auth -o jsonpath='{.data.token}' | base64 -d
 Error from server (NotFound): secrets "vault-auth" not found
 
 [root@k8s-master1 ~]# kubectl get sa vault-auth -n kube-system
 NAME         AGE
-vault-auth   18m
+vault-auth   18m        # SA exists
 
 [root@k8s-master1 ~]# kubectl get secret -n kube-system | grep vault-auth
-# Empty - no token secret!
+# Empty — no token secret!
 ```
 
-**Root Cause:** Chain of events from Flux Kustomization rename:
-1. Renamed Flux Kustomization from `deployments` -> `infrastructure` + `apps`
-2. Flux `prune: true` deleted all resources from old `deployments` Kustomization
-3. vault-auth-token secret was deleted
-4. K8s 1.24+ doesn't auto-create SA token secrets
-5. Vault can't validate any pod authentication
-6. All pods with vault injection stuck
+**Evidence — all vault-injected pods stuck:**
+```bash
+[root@k8s-master1 ~]# kubectl get pods -A | grep -E "Init|vault"
+apps         wordpress-6d5cdf8c64-rbk6q        0/2   Init:0/2   0   27m
+database     mariadb-0                         0/2   Init:0/1   0   27m
+monitoring   kube-prometheus-stack-grafana-*   0/4   Init:1/2   0   2m
+```
+
+**What should have been done:** The token secret must be declared explicitly
+in the vault manifests so Flux can recreate it on any reconcile.
 
 ---
 
-### Phase 4: COMPLETE CLUSTER OUTAGE (15:00 PM)
+### ❌ Wrong Step 5: healthCheck created a deadlock
 
-**Timeline of Disaster:**
-```
-15:00:35 - Flux infrastructure kustomization starts reconciling
-15:00:37 - Flux UNINSTALLS vault HelmRelease ("uninstalled Helm release for deleted resource")
-15:00:37 - vault-agent-injector DELETED
-15:00:37 - All HelmReleases DELETED (vault, ingress-nginx, csi-driver-nfs)
-15:00:xx - infrastructure stuck in "Reconciliation in progress"
-           (healthCheck waiting for vault-agent-injector that no longer exists)
-15:00:xx - apps stuck waiting for infrastructure
-15:00:xx - ALL PODS with vault injection stuck in Init:0/2
-15:00:xx - ingress-nginx down - no external access
+```yaml
+# infrastructure-sync.yaml
+healthChecks:
+  - kind: Deployment
+    name: vault-agent-injector   # waiting for this
+    namespace: vault
 ```
 
-**Evidence:**
+But vault-agent-injector was deleted by prune in step 2.
+Infrastructure waited forever for something that no longer existed.
+Apps waited for infrastructure. Nothing moved. Complete deadlock.
+
+**Evidence — the deadlock explained:**
+```
+infrastructure-sync.yaml healthCheck → waiting for vault-agent-injector
+But vault-agent-injector was DELETED by prune in wrong step 2
+
+Result:
+1. infrastructure waits for vault-agent-injector → never comes → stuck
+2. apps dependsOn infrastructure → never starts → stuck
+3. Nothing in the cluster moves → complete outage
+```
+
+**Evidence — infrastructure stuck in reconciliation:**
+```
+15:00:xx — infrastructure stuck in "Reconciliation in progress"
+           healthCheck waiting for vault-agent-injector that no longer exists
+15:00:xx — apps stuck waiting for infrastructure
+15:00:xx — COMPLETE DEADLOCK
+```
+
+**What should have been done:** Never put a healthCheck on a resource
+that can be deleted by prune from the same Kustomization.
+
+---
+
+## The Correct Operation (What Should Have Happened)
+
+```
+1. Set prune: false on deployments-sync.yaml → push → verify
+2. Create infrastructure-sync.yaml (prune: false, same path as before)
+3. Remove deployments-sync.yaml from kustomization.yaml resources → push
+4. Flux creates infrastructure Kustomization, orphans become owned by infrastructure
+5. Create empty apps/ folder + apps-sync.yaml with dependsOn: infrastructure → push
+6. Move apps one by one from infrastructure/ to apps/
+7. Move remediation LAST (it needs vault injection to be fully stable)
+8. Verify everything healthy → enable prune: true on both → push
+```
+
+Zero downtime. No HelmRelease deletions. No deadlock possible.
+
+---
+
+## Recovery Steps That Were Actually Run
+
 ```bash
-[root@k8s-master1 tmp]# flux logs --kind=HelmRelease --name=vault -n vault
-2026-04-09T15:00:37.206Z info HelmRelease/vault.vault - uninstalled Helm release for deleted resource
-
-[root@k8s-master1 tmp]# kubectl get helmrelease -A
-No resources found
-
-[root@k8s-master1 tmp]# kubectl get pods -n vault
-No resources found in vault namespace.
-```
-
-**The Chicken-and-Egg Problem:**
-```
-infrastructure-sync.yaml has:
-  healthChecks:
-    - kind: Deployment
-      name: vault-agent-injector  <- Waiting for this
-      namespace: vault
-
-But vault-agent-injector was DELETED by prune!
-
-1. Infrastructure waits for vault-agent-injector to be healthy
-2. But vault-agent-injector doesn't exist (HelmRelease was pruned)
-3. Infrastructure never completes
-4. Apps waits for infrastructure
-5. Nothing deploys
-6. COMPLETE OUTAGE
-```
-
-## 4. Root Cause
-
-> Multiple compounding failures:
-> 1. **No Flux dependency ordering** - Apps deployed before Vault Injector ready
-> 2. **Flux prune behavior** - Renaming Kustomization triggered mass deletion
-> 3. **K8s 1.24+ SA tokens** - ServiceAccount tokens not auto-created
-> 4. **HealthCheck deadlock** - Waiting for deleted resource
-
-## 5. Solution
-
-### Immediate Recovery Steps
-
-**Step 1: Suspend infrastructure to break deadlock**
-```bash
+# 1. Break the deadlock
 flux suspend kustomization infrastructure
-```
 
-**Step 2: Manually bootstrap vault HelmRelease**
-```bash
-kubectl apply -f - <<EOF
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: hashicorp
-  namespace: vault
-spec:
-  interval: 5m
-  url: https://helm.releases.hashicorp.com
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: vault
-  namespace: vault
-spec:
-  interval: 5m
-  chart:
-    spec:
-      chart: vault
-      version: "0.32.0"
-      sourceRef:
-        kind: HelmRepository
-        name: hashicorp
-        namespace: vault
-  values:
-    global:
-      externalVaultAddr: "https://vault.lab.local:8200"
-    server:
-      enabled: false
-    injector:
-      enabled: true
-      priorityClassName: system-cluster-critical
-EOF
-```
+# 2. Manually bootstrap vault (HelmRelease was deleted by prune)
+kubectl apply -f vault-helmrelease.yaml
 
-**Step 3: Create vault-auth token secret**
-```bash
+# 3. Recreate vault-auth token secret (deleted by prune, K8s 1.24+ won't auto-create)
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
@@ -293,136 +268,129 @@ metadata:
     kubernetes.io/service-account.name: vault-auth
 type: kubernetes.io/service-account-token
 EOF
-```
 
-**Step 4: Update Vault trust**
-```bash
+# 4. Re-run vault trust configuration
 cd ansible/dev
 ansible-playbook playbooks/k8s/integration-vault-k8s-trust.yml
-```
 
-**Step 5: Resume and reconcile**
-```bash
+# 5. Resume Flux
 flux resume kustomization infrastructure
 flux reconcile kustomization infrastructure --with-source
 flux reconcile kustomization apps
-```
 
-**Step 6: Delete stuck pods**
-```bash
+# 6. Restart all stuck pods
 kubectl delete pod -n apps -l app=wordpress
 kubectl delete pod -n database mariadb-0
 kubectl delete pod -n monitoring -l app.kubernetes.io/name=grafana
 kubectl delete pod -n remediation -l app=remediation
 ```
 
-### Permanent Fixes Applied
-
-**1. Split Flux Kustomizations with dependencies:**
-- `kubernetes/dev/flux/infrastructure-sync.yaml` - healthCheck on vault-agent-injector
-- `kubernetes/dev/flux/apps-sync.yaml` - dependsOn: infrastructure
-
-**2. Move remediation to apps folder:**
-```bash
-git mv kubernetes/dev/deployments/infrastructure/remediation kubernetes/dev/deployments/apps/
-```
-
-**3. Add token secret to vault-auth manifest (K8s 1.24+ compatible):**
-```yaml
-# kubernetes/dev/deployments/infrastructure/vault/vault-auth-sa.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: vault-auth
-  namespace: kube-system
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: vault-auth-token
-  namespace: kube-system
-  annotations:
-    kubernetes.io/service-account.name: vault-auth
-type: kubernetes.io/service-account-token
-```
 
-## 6. Solution Risk
-- Risk level: HIGH (for the restructuring)
-- Potential impact: Already experienced - complete cluster outage
+## Permanent Fixes Applied After Recovery
 
-## 7. Impact After Fix
+| Fix | What Changed |
+|---|---|
+| Flux ordering | Created `infrastructure-sync.yaml` + `apps-sync.yaml` with `dependsOn` |
+| Remediation location | Moved from `infrastructure/` to `apps/` |
+| vault-auth token | Added explicit Secret manifest to vault folder |
+| K8s 1.24+ SA tokens | Now declared in Git, recreated by Flux on any reconcile |
+
+---
+
+## Failure Summary
+
+| Phase | What Went Wrong | Root Cause | Severity |
+|---|---|---|---|
+| Phase 1 | WordPress missing vault sidecar | No dependsOn ordering | Medium |
+| Phase 2 | Remediation CrashLoopBackOff | Placed in infrastructure folder | Medium |
+| Phase 3 | Vault auth 403 for all pods | vault-auth token deleted by prune | High |
+| Phase 4 | Complete cluster outage | Prune deleted all HelmReleases on rename | CATASTROPHIC |
+
+---
+
+## Key Lessons
+
+1. `prune: true` + Kustomization rename = mass deletion. Always disable prune before rename.
+2. HelmRelease deletion = Helm uninstall = all pods gone. Not just the CR — everything.
+3. healthCheck on a prunable resource = potential deadlock. Design healthChecks carefully.
+4. K8s 1.24+ does not auto-create SA token secrets. Declare them explicitly in Git.
+5. Anything needing vault injection belongs in `apps/`, never in `infrastructure/`.
+6. One structural change at a time. Never rename + restructure + split simultaneously.
+
+---
+
+## Important Distinction — What dependsOn Does NOT Protect Against
+
+`dependsOn` is a **Flux-level concept** — it only controls reconciliation order when
+Flux is applying manifests. It has zero effect on runtime pod restarts.
+
+| Scenario | dependsOn helps? |
+|---|---|
+| Fresh cluster start — Flux reconciling everything | ✅ Yes — apps waits for infrastructure READY |
+| Power outage recovery — Flux reapplying all manifests | ✅ Yes — same ordering enforced |
+| Running pod deleted manually or crashes | ❌ No — Kubernetes reschedules immediately |
+| Worker node dies, pods reschedule to other nodes | ❌ No — Kubernetes scheduler, Flux not involved |
+
+**Proven by TS-K8S-022 DR test (2026-04-11):**
+
+Simultaneous delete of vault-agent-injector + wordpress pods:
 ```bash
-[root@k8s-master1 tmp]# flux get kustomization
-NAME            REVISION                READY   MESSAGE
-apps            prod@sha1:23a0d468      True    Applied revision
-flux-system     prod@sha1:23a0d468      True    Applied revision
-infrastructure  prod@sha1:23a0d468      True    Applied revision
+kubectl delete pod -n vault -l app.kubernetes.io/name=vault-agent-injector &
+kubectl delete pod -n apps -l app=wordpress
 ```
 
-- All applications recovered
-- Dependency ordering now enforced
-- Future deployments will wait for Vault Injector
+Result:
+```
+WordPress pods: Running 1/1  ← sidecar NOT injected
+                              ← dependsOn completely bypassed
+                              ← Kubernetes scheduled directly, no Flux involved
+```
 
-## 8. Notes
+WordPress error:
+```
+mysqli_real_connect(): (HY000/1045): Access denied for user 'wordpress'
+Error establishing a database connection
+```
 
-### CRITICAL WARNINGS
+**What actually protects at runtime — vault-agent-injector HA:**
 
-**WARNING 1: NEVER RENAME FLUX KUSTOMIZATIONS WITH PRUNE ENABLED**
+`dependsOn` protects deploy order. Runtime protection requires the injector
+to never have a gap in availability. Fix applied in TS-K8S-022:
+
 ```yaml
-# DANGEROUS - This DELETES all resources!
-# Old
-resources:
-  - deployments-sync.yaml  # name: "deployments"
-
-# New (CAUSES MASS DELETION)
-resources:
-  - infrastructure-sync.yaml  # name: "infrastructure" <- NEW NAME
+# vault HelmRelease
+injector:
+  replicas: 2
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault-agent-injector
+          topologyKey: kubernetes.io/hostname
 ```
 
-**Safe approach:**
-```yaml
-# Option 1: Keep same name, change path
-spec:
-  name: deployments  # KEEP SAME NAME
-  path: ./new/path
-
-# Option 2: Disable prune first
-spec:
-  prune: false  # DISABLE PRUNE BEFORE RENAME
-
-# Option 3: Use flux diff to preview
-flux diff kustomization infrastructure --path ./kubernetes/prod/deployments/infrastructure
+With 2 replicas spread across masters:
+```
+Replica A → master1
+Replica B → master2
+       ↓
+master1 crashes or injector pod dies
+       ↓
+Replica B still serving webhook immediately
+       ↓
+WordPress pods always get sidecar injected ✅
 ```
 
-**WARNING 2: HEALTHCHECKS CAN CAUSE DEADLOCKS**
+**Summary — two different problems, two different fixes:**
 
-If healthCheck references a resource that gets pruned, the Kustomization will NEVER complete.
+| Problem | Fix |
+|---|---|
+| Apps deploy before vault ready on cluster start | `dependsOn` + `healthCheck` in Flux |
+| Apps restart without vault sidecar at runtime | `replicas: 2` + `podAntiAffinity` on injector |
 
-**WARNING 3: ALWAYS TEST IN DEV FIRST**
-```bash
-flux diff kustomization <name> --path ./path
-flux reconcile kustomization <name> --dry-run
-```
-
-### Lessons Learned
-
-1. Flux prune is EXTREMELY dangerous when renaming Kustomizations
-2. HelmRelease deletion triggers Helm uninstall - all resources removed
-3. HealthChecks can cause deadlocks if they reference pruned resources
-4. K8s 1.24+ doesn't auto-create SA token secrets - must create explicitly
-5. Always include token secrets in manifests for ServiceAccounts
-6. Test Flux changes with `flux diff` first
-7. Have a rollback plan - know how to manually bootstrap critical services
-
-### Summary Table
-
-| Issue | Root Cause | Fix | Severity |
-|-------|------------|-----|----------|
-| WordPress DB fail | No Flux dependency ordering | Split into infrastructure-sync + apps-sync | Medium |
-| Remediation crash | In infrastructure folder | Move to apps folder | Medium |
-| Vault auth fail | K8s 1.24+ no auto token | Add token secret to manifest | High |
-| Complete outage | Flux prune on rename | Manual bootstrap, suspend/resume | **CATASTROPHIC** |
-
-## 9. Workaround (if any)
-> For WordPress immediate fix: `kubectl rollout restart deployment wordpress -n apps`
-> For complete outage: Manual bootstrap of critical HelmReleases as documented above.
+Refrence to: 
+  1. troubleshooting/kubernetes/22-worker-node-failure-cascading-pod-failures.md 
+  2. disaster-recovery/task-1-pod-kill/RESULTS.md
+  3. kubernetes/docs/flux_restructuring_operation_guide.md
