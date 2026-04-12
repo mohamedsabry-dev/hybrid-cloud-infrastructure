@@ -259,6 +259,10 @@ data:
         print(f"Check interval: {CHECK_INTERVAL}s")
         print(f"Pod failure threshold: {POD_FAILURE_THRESHOLD*100:.0f}%")
 
+        # Startup delay: wait before first health check to avoid race during cluster boot
+        print(f"Waiting {CHECK_INTERVAL}s before first health check (cluster stabilization)...")
+        time.sleep(CHECK_INTERVAL)
+
         while True:
             print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 

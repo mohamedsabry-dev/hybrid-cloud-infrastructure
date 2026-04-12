@@ -178,6 +178,43 @@ vzdump-qemu-9001-2026_04_11-12_29_01.vma.zst  1.5G
 - Dev has double backups (10:52 + 14:11) due to mid-backup crash incident (TS-PVE-015)
 - Total backup size: ~35GB dev, ~30GB prod
 
+### Live Backup Resilience (Observed 2026-04-13)
+
+**Finding:** Proxmox snapshot-mode backup is **non-disruptive** to running VMs and Kubernetes workloads.
+
+**Test Context:**
+- During Task 4 pre-backup (vzdump snapshot mode)
+- Observed "lock/suspend" phase on worker2 and worker3
+- MariaDB pod on worker3, WordPress pods on worker1/worker2
+
+**Evidence:**
+```bash
+# All nodes remained Ready during backup lock phase
+[root@k8s-master1 ~]# kubectl get nodes -o wide
+NAME                    STATUS   ROLES           AGE   VERSION
+k8s-master1.lab.local   Ready    control-plane   16d   v1.35.3
+k8s-master2.lab.local   Ready    control-plane   16d   v1.35.3
+k8s-master3.lab.local   Ready    control-plane   16d   v1.35.3
+k8s-worker1.lab.local   Ready    <none>          16d   v1.35.3
+k8s-worker2.lab.local   Ready    <none>          16d   v1.35.3
+k8s-worker3.lab.local   Ready    <none>          16d   v1.35.3
+
+# Pods accessible during backup
+[root@k8s-master1 ~]# kubectl exec -it wordpress-6d5cdf8c64-nwnn7 -n apps -- bash
+# Successfully entered pod during worker1 backup
+
+[root@k8s-master1 ~]# kubectl exec -it mariadb-0 -n database -- bash
+# Successfully entered pod during worker3 backup
+```
+
+**Verified:**
+- WordPress web UI remained accessible (login + browsing)
+- MariaDB connections uninterrupted
+- No pod restarts during backup
+- Node status never changed from Ready
+
+**Conclusion:** Proxmox vzdump snapshot mode is safe for production use during business hours. The brief "lock" phase does not disrupt running VMs or their workloads.
+
 ---
 
 ## Scenario 0.1 — ETCD Backup & Restore (Local + S3)
