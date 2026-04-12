@@ -10,7 +10,7 @@ data:
     from proxmoxer import ProxmoxAPI
 
     # Configuration
-    CHECK_INTERVAL = 120        # 2 minutes between checks
+    CHECK_INTERVAL = 300        # 5 minutes between checks (prevents race during boot)
     REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
     PROXMOX_NODE = "pve-dev"
     NFS_STORAGE = "nas-dev-data"
