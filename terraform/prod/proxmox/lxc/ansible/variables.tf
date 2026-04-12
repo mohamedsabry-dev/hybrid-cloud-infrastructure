@@ -37,9 +37,9 @@ variable "ansible" {
     gateway         = "10.0.53.1"
     bridge          = "vmbr0"
     vlan_id         = 53
-    startup_delay   = 60
+    startup_delay   = 300     # 5 min delay for NAS to be ready before FreeIPA starts
     shutdown_delay  = 60
-    startup_order   = 2
+    startup_order   = 1       # Boots first, delays FreeIPA
     started = true
     on_boot = true
   }

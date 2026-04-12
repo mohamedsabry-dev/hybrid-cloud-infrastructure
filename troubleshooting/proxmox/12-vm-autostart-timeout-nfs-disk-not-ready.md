@@ -150,3 +150,108 @@ qm config 1001 | grep startup
 
 ## 9. Workaround (if any)
 > If VM fails to autostart: Manually start after 2-3 minutes with `qm start <VMID>`. NFS will be ready by then.
+
+---
+
+## 10. Follow-up Investigation: 2026-04-12
+
+> **CRITICAL DISCOVERY:** The April 6 fix was incorrect! The `startup_delay` (Proxmox `up_delay`) delays the NEXT VM, not the current one. FreeIPA was still starting immediately.
+
+### 10.1 Discovery Context
+
+While investigating [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) (worker VM crash during boot), discovered the `up_delay` semantics were misunderstood.
+
+**From Terraform Proxmox Provider Documentation:**
+> https://registry.terraform.io/providers/bpg/proxmox/latest/docs/resources/virtual_environment_vm
+>
+> ```
+> startup - (Optional) Defines startup and shutdown behavior of the VM.
+>   up_delay - (Optional) A non-negative number defining the delay in seconds
+>              before the NEXT VM is started.
+> ```
+
+**Key insight:** `up_delay` delays the **NEXT** VM, not the current one!
+
+### 10.2 Why April 6 Fix Was Ineffective
+
+**Old Configuration:**
+```terraform
+# VM 1001 (FreeIPA)
+startup_order = 1       # FIRST to boot
+startup_delay = 180     # This delays CT 2001, NOT FreeIPA!
+
+# CT 2001 (Ansible)
+startup_order = 2
+startup_delay = 60
+```
+
+**What Actually Happened:**
+```
+T+0:00   FreeIPA starts IMMEDIATELY (no delay - it's first!)
+         ↓ 180s wait (FreeIPA's up_delay delays Ansible)
+T+3:00   Ansible starts (delayed by FreeIPA's setting)
+```
+
+FreeIPA was still starting before NFS was ready! The 180s delay was being applied to the wrong thing.
+
+### 10.3 Evidence: Boot Sequence Log (April 12-13)
+
+**Before fix (April 12, 23:59):**
+```
+Apr 12 23:59:29  VM 1001 (FreeIPA) - Start  ← IMMEDIATE, no delay!
+         ↓ 180s wait
+Apr 13 00:02:30  CT 2001 (Ansible) - Start  ← 3 min later
+Apr 13 00:03:31  CT 2002 - Start
+Apr 13 00:04:32  CT 2003 - Start
+...
+```
+
+### 10.4 Correct Fix Applied (April 13)
+
+**Swap the order** - Ansible boots first and its delay holds FreeIPA:
+
+**New Configuration:**
+```terraform
+# CT 2001 (Ansible) - boots FIRST, delays FreeIPA
+startup_order = 1
+startup_delay = 300     # 5 min delay for NAS to be ready
+
+# VM 1001 (FreeIPA) - boots SECOND, after delay
+startup_order = 2
+startup_delay = 60      # Delay next containers
+```
+
+**New Boot Sequence:**
+```
+T+0:00   Ansible starts (order 1, local-lvm only - no NFS needed)
+         ↓ 300s wait (5 min for NAS to fully initialize)
+T+5:00   FreeIPA starts (order 2, NAS now ready for data disk)
+         ↓ 60s wait
+T+6:00   Next containers...
+```
+
+### 10.5 Files Changed
+
+| File | Change |
+|------|--------|
+| `terraform/dev/proxmox/lxc/ansible/variables.tf` | order: 2→1, delay: 60→300 |
+| `terraform/dev/proxmox/vms/freeipa/variables.tf` | order: 1→2, delay: 180→60 |
+| `terraform/prod/proxmox/lxc/ansible/variables.tf` | order: 2→1, delay: 60→300 |
+| `terraform/prod/proxmox/vms/freeipa/variables.tf` | order: 1→2, delay: 180→60 |
+
+### 10.6 Key Learnings
+
+1. **`up_delay` semantics:** Delays NEXT VM, not current. Put delay on item BEFORE the one that needs to wait.
+
+2. **First item cannot delay itself:** If a VM is order=1 (first), there's nothing before it to apply delay. Solution: put something else first.
+
+3. **Documentation matters:** The Terraform provider docs clearly state "delay before the NEXT VM" - read carefully!
+
+### 10.7 Related Cases
+
+- [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) — Where this `up_delay` behavior was discovered
+- Same pattern caused both FreeIPA NFS timeout (this case) and worker VM "crash" (TS-PVE-014)
+
+### 10.8 Status
+
+**RESOLVED (Correctly)** — April 6 fix was ineffective due to misunderstanding `up_delay` semantics. Correct fix applied April 13: Ansible boots first with 300s delay, FreeIPA boots second after NAS is ready.
