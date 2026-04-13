@@ -10,7 +10,7 @@ metadata:
     environment: dev
 spec:
   serviceName: mariadb
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: mariadb
@@ -98,7 +98,7 @@ spec:
         name: mariadb-data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: nfs-retain
+        storageClassName: nfs-database
         resources:
           requests:
             storage: 15Gi
