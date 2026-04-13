@@ -106,13 +106,15 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+          # Readiness checks NFS-mounted path to detect storage failures
+          # (DR Test finding: local path check masks NFS outages)
           readinessProbe:
             httpGet:
-              path: /wp-includes/images/blank.gif
+              path: /wp-content/index.php
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
-            timeoutSeconds: 3
+            timeoutSeconds: 5    # Longer timeout for NFS latency
             failureThreshold: 3
           volumeMounts:
             - name: wordpress-data
