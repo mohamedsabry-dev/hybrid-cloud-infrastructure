@@ -10,7 +10,7 @@ metadata:
     environment: dev
 spec:
   serviceName: mariadb
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: mariadb
