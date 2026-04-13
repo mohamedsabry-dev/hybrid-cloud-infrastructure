@@ -51,9 +51,5 @@ network/**/docs/*.pdf
 # Local guides (not tracked)
 git-workflow-guide.txt
 
-# Personal/Private files (not for public repo)
-RAW_TECHNICAL_ASSESSMENT.md
-PERSONAL_ASSESSMENT.md
-MY_HONEST_REFLECTION.md
-LEARNING_TOPICS_COVERED.txt
-readme-drafts/
+# Personal docs (not for public repo)
+personal-docs/
