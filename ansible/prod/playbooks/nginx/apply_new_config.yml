@@ -5,8 +5,8 @@
   tasks:
     - name: Copy Config template
       ansible.builtin.template:
-        src: templates/nginx-test.conf.j2
-        dest: /etc/nginx/conf.d/nginx-test.conf
+        src: templates/k8s-ingress.conf.j2
+        dest: /etc/nginx/conf.d/k8s-ingress.conf
 
     - name: Validate nginx config
       ansible.builtin.command: nginx -t

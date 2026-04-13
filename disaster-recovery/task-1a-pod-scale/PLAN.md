@@ -27,6 +27,20 @@ Kill the pod handling an active upload.
 
 → Run checklist.
 
+### Scenario 1.3b — Mid-Upload Full Scale to Zero [COMPLETED 2026-04-13]
+Scale WordPress to 0 while multiple large uploads are in progress.
+
+- Action: Start 2 large file uploads to WordPress simultaneously (30MB + 20MB)
+- Action: While uploads are in progress: `kubectl scale deployment wordpress -n apps --replicas=0`
+- [x] Upload HTTP connection — drops immediately (SIGTERM)
+- [x] Partial files on NFS — **CLEAN** (zero partial files)
+- [x] DB records — **CLEAN** (zero orphaned records, InnoDB rollback worked)
+- [x] Completed uploads before kill — **INTACT** (IDs 18-21 all present)
+
+**Result: PASS** — InnoDB ACID guarantees + WordPress write order = no corruption.
+
+→ See [RESULT-1.3b-mid-upload-scale-zero.md](RESULT-1.3b-mid-upload-scale-zero.md) for full details.
+
 ### Scenario 1.4 — Pod Eviction Under Pressure
 Observe eviction priority when node is under pressure.
 
