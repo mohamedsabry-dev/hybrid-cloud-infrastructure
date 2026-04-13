@@ -55,5 +55,7 @@ Kill the worker node handling an active upload.
 - [ ] WordPress accessible (browse + upload)
 - [ ] DB integrity (no duplicate conflicts, no orphaned transactions)
 - [ ] Pod scheduling and priority behavior
-- [ ] Grafana: CPU, mem, pod restarts on remaining nodes
 - [ ] Node recovery and rejoin cluster
+- [ ] **Grafana:** CPU, memory, pod restarts, node status changes
+- [ ] **Prometheus:** scraping targets healthy, node exporter gaps?
+- [ ] **Loki:** application logs for errors during node failure/recovery

@@ -95,6 +95,29 @@ Try to provision new storage while NFS is down.
 - Recovery: Start NFS → does PVC become Bound automatically?
 → Run checklist.
 
+### Scenario 3.11 — Kill ALL CSI Controller Replicas (Full Controller Outage)
+Kill all CSI controller replicas and verify existing workloads unaffected.
+- Action: Check controller replicas: `kubectl get deploy -n kube-system csi-nfs-controller`
+- Action: Scale to 0 OR delete all pods: `kubectl scale deploy csi-nfs-controller -n kube-system --replicas=0`
+- Check: Existing pods still serving (mounts handled by kernel, not CSI)
+- Check: WordPress browsing + uploads still work
+- Check: New PVC creation stays Pending (no controller to provision)
+- Check: PVC deletion waits (no controller to cleanup)
+- Recovery: Scale back up: `kubectl scale deploy csi-nfs-controller -n kube-system --replicas=2`
+- Check: Pending PVCs become Bound after controller recovery
+→ Run checklist.
+
+### Scenario 3.12 — Kill ALL CSI Node Pods (Full Node Driver Outage)
+Kill all CSI node pods and verify existing mounts survive.
+- Action: Check node pods: `kubectl get ds -n kube-system csi-nfs-node`
+- Action: Delete all node pods: `kubectl delete pod -n kube-system -l app=csi-nfs-node`
+- Check: Existing mounts survive (kernel NFS mounts independent of CSI)
+- Check: Existing pods continue serving
+- Check: New pod scheduling with PVC — can it mount? (expected: no, NodePublishVolume fails)
+- Check: CSI node pods restart automatically (DaemonSet)
+- Check: New pods can mount after node pods recover
+→ Run checklist.
+
 ---
 
 ### Observation Checklist (run after every scenario):
@@ -108,4 +131,6 @@ Try to provision new storage while NFS is down.
 - [ ] NFS mount recovery (auto vs manual remount)
 - [ ] IPA external disk state (NFS-dependent)
 - [ ] Proxmox backup mount state (NFS-dependent)
-- [ ] Grafana: storage I/O metrics
+- [ ] **Grafana:** storage I/O metrics, NFS latency, mount errors
+- [ ] **Prometheus:** node-exporter filesystem metrics, CSI metrics
+- [ ] **Loki:** CSI controller/node logs, kubelet mount errors, app I/O errors

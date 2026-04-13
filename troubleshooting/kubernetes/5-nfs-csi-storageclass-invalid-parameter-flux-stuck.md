@@ -8,8 +8,8 @@
 | **Environment** | k8s-dev cluster |
 | **Severity** | Medium |
 | **Related Components** | StorageClass, PVC, NFS CSI Driver, Flux Kustomization |
-| **Discovered During** | Migration from static NFS PV to dynamic NFS CSI provisioning (Case 4) |
-| **Related Cases** | Case 4 (NFS PV reclaimPolicy — CSI driver migration), Case 6 (Complete NFS Storage Guide — recommended) |
+| **Discovered During** | Migration from static NFS PV to dynamic NFS CSI provisioning (TS-K8S-004) |
+| **Related Cases** | TS-K8S-004 (NFS PV reclaimPolicy — CSI driver migration), TS-K8S-006 (Complete NFS Storage Guide) |
 
 ---
 
@@ -17,7 +17,7 @@
 
 ### Symptom
 
-After migrating `testing-storage` from a static NFS PV to dynamic NFS CSI provisioning (Case 4), the new `StorageClass/nfs-csi-testing` was created with an invalid parameter (`onDeletePolicy`). This caused a chain of three compounding failures:
+After migrating `testing-storage` from a static NFS PV to dynamic NFS CSI provisioning (TS-K8S-004), the new `StorageClass/nfs-csi-testing` was created with an invalid parameter (`onDeletePolicy`). This caused a chain of three compounding failures:
 
 1. PVC stuck in `Pending` — provisioner rejected the StorageClass parameter
 2. Flux stuck on old git revision — StorageClass `parameters` are immutable, dry-run kept failing
@@ -84,21 +84,19 @@ This is a Kubernetes immutability rule — same as `spec.persistentVolumeSource`
 
 ### Failure 3: PVC Infeasible Cache Not Cleared by StorageClass Fix
 
-After manually deleting the StorageClass (`kubectl delete storageclass nfs-csi-testing`) and forcing Flux to reconcile the new revision, the StorageClass was recreated correctly. However the PVC remained in `Pending`.
+After manually deleting the StorageClass and forcing Flux to reconcile the new revision, the StorageClass was recreated correctly. However the PVC remained in `Pending`.
 
 **Why:** The PVC object itself had the `infeasible` flag cached from the earlier failed provisioning attempt. Kubernetes marks provisioning attempts that fail with `infeasible` errors (like `InvalidArgument`) as permanently failed for that PVC — retries are blocked until the PVC object is recreated. Deleting and recreating the StorageClass does not clear this flag.
 
 ### Why Pods Were Not Blocking PVC Deletion
 
-The nginx-test pods were showing as `Used By` in PVC describe, but they were in a `Pending/FailedScheduling` state — they had never actually mounted the PVC (scheduling failed). Because the pods never mounted the volume, the `pvc-protection` finalizer did not block deletion. The PVC deleted cleanly.
+The nginx-test pods were in a `Pending/FailedScheduling` state — they had never actually mounted the PVC (scheduling failed). Because the pods never mounted the volume, the `pvc-protection` finalizer did not block deletion. The PVC deleted cleanly.
 
 Had the pods been `Running` with the volume mounted, deletion would have hung until pods were removed first.
 
 ---
 
 ## 4. Root Cause
-
-### Root Cause Chain
 
 | Failure | Cause | Detail |
 |---------|-------|--------|
@@ -127,20 +125,15 @@ parameters:
   share: "/volume1/k8s-dev/testing"
 ```
 
-Push to git. `reclaimPolicy: Delete` on the StorageClass is sufficient — the CSI driver deletes the provisioned subdirectory on the NFS share when the PVC is deleted.
-
 ### Step 2: Delete the existing StorageClass manually
 
 Flux cannot update immutable `parameters` — must delete the object so it can be recreated:
 
 ```bash
 kubectl delete storageclass nfs-csi-testing
-# storageclass.storage.k8s.io "nfs-csi-testing" deleted
 ```
 
 ### Step 3: Force Flux to pick up the new revision
-
-Even after the git fix and manual StorageClass deletion, Flux remained stuck on the old revision. The `--with-source` flag forces the GitRepository to re-fetch before reconciling:
 
 ```bash
 flux reconcile kustomization deployments --with-source
@@ -159,13 +152,8 @@ flux get kustomization
 
 ### Step 4: Delete the stale PVC to clear the infeasible cache
 
-StorageClass was now correct and present, but PVC remained `Pending` due to cached infeasible state. Pods must be deleted first to release the `pvc-protection` finalizer:
-
 ```bash
-# Delete pods to release pvc-protection finalizer
 kubectl delete pods -n testing --all
-
-# Delete the PVC to clear the infeasible provisioning cache
 kubectl delete pvc testing-storage -n testing
 ```
 
@@ -173,28 +161,15 @@ kubectl delete pvc testing-storage -n testing
 
 ```bash
 flux reconcile kustomization deployments
-# ✔ applied revision dev@sha1:9c9b2cb3...
 ```
 
 ### Step 6: Verify PVC bound and pods running
 
 ```bash
 kubectl get pvc testing-storage -n testing -w
-# NAME              STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS
-# testing-storage   Bound    pvc-3aa5ba61-09ff-41b8-816b-40589d5a9eff   100Gi      RWX            nfs-csi-testing
+# NAME              STATUS   VOLUME                                     CAPACITY
+# testing-storage   Bound    pvc-3aa5ba61-09ff-41b8-816b-40589d5a9eff   100Gi
 ```
-
-PVC is `Bound`. The CSI driver dynamically provisioned a PV (`pvc-3aa5ba61-...`) and created a subdirectory on the NFS share. Pods scheduled and running.
-
-### Files Changed
-
-- `storageclass.yaml` — removed invalid `onDeletePolicy` parameter from `parameters` section
-
-### Prevention Measures
-
-- Always validate StorageClass parameters against CSI driver documentation
-- Use `reclaimPolicy` field on StorageClass, not custom parameters
-- Test StorageClass changes in dev before prod
 
 ---
 
@@ -210,13 +185,11 @@ PVC is `Bound`. The CSI driver dynamically provisioned a PV (`pvc-3aa5ba61-...`)
 
 ## 7. Impact After Fix
 
-| Observation | Result |
-|-------------|--------|
-| PVC Status | Bound to dynamically provisioned PV (`pvc-3aa5ba61-...`) |
-| StorageClass | Recreated with valid parameters |
-| Flux Kustomization | Advanced to new revision, healthy |
-| Pods | Scheduled and running |
-| NFS Share | Subdirectory auto-created by CSI driver |
+- PVC bound to dynamically provisioned PV
+- StorageClass recreated with valid parameters
+- Flux Kustomization advanced to new revision
+- Pods scheduled and running
+- NFS subdirectory auto-created by CSI driver
 
 ---
 
@@ -240,123 +213,50 @@ PVC is `Bound`. The CSI driver dynamically provisioned a PV (`pvc-3aa5ba61-...`)
 | `flux reconcile kustomization deployments` | Re-applies current cached git revision — does NOT re-fetch from git |
 | `flux reconcile kustomization deployments --with-source` | Forces GitRepository to re-fetch from remote first, then reconciles with latest commit |
 
-When Flux is stuck on an old revision due to a failed dry-run, `--with-source` is required to advance to a newer commit. Without it, Flux keeps retrying the same failed revision.
+When Flux is stuck on an old revision due to a failed dry-run, `--with-source` is required to advance to a newer commit.
 
 ### Commands Reference
 
-#### StorageClass Operations
 ```bash
-# List StorageClasses
+# StorageClass Operations
 kubectl get sc
-
-# Describe StorageClass (see parameters, provisioner)
 kubectl describe sc <name>
-
-# Delete StorageClass (required for immutable field changes)
-kubectl delete sc <name>
-
-# Get StorageClass YAML
+kubectl delete sc <name>          # Required for immutable field changes
 kubectl get sc <name> -o yaml
-```
 
-#### PVC Operations
-```bash
-# List PVCs
+# PVC Operations
 kubectl get pvc -A
 kubectl get pvc -n <namespace>
-
-# Check PVC events (shows provisioning errors)
-kubectl describe pvc <name> -n <namespace>
-
-# Delete PVC (clears infeasible cache)
-kubectl delete pvc <name> -n <namespace>
-
-# Watch PVC status
+kubectl describe pvc <name> -n <namespace>   # Shows provisioning errors
+kubectl delete pvc <name> -n <namespace>     # Clears infeasible cache
 kubectl get pvc <name> -n <namespace> -w
-```
 
-#### PV Operations
-```bash
-# List PVs
-kubectl get pv
-
-# Describe PV
-kubectl describe pv <name>
-```
-
-#### Flux Operations
-```bash
-# Check kustomization status
+# Flux Operations
 flux get kustomizations
-
-# Reconcile with current cached revision
 flux reconcile kustomization <name>
-
-# Force re-fetch from git then reconcile
 flux reconcile kustomization <name> --with-source
-
-# Suspend/Resume kustomization
 flux suspend kustomization <name>
 flux resume kustomization <name>
-
-# Check Flux logs
 flux logs --kind=Kustomization --name=<name>
-```
 
-#### CSI Driver Operations
-```bash
-# Check CSI driver pods
-kubectl get pods -n kube-system | grep csi
-
-# Check CSI driver logs
-kubectl logs -n kube-system -l app.kubernetes.io/name=csi-driver-nfs --tail=50
-
-# Describe CSI driver
-kubectl describe daemonset csi-nfs-node -n kube-system
-```
-
-#### Cleanup Sequence (When Fixing Immutable Fields)
-```bash
-# 1. Delete pods using the PVC
+# Full cleanup sequence for immutable field changes
 kubectl delete pods -n <namespace> --all
-
-# 2. Delete PVC
 kubectl delete pvc <name> -n <namespace>
-
-# 3. Delete StorageClass
 kubectl delete sc <name>
-
-# 4. Push fixed YAML to git
-
-# 5. Force Flux reconcile
+# Push fixed YAML to git
 flux reconcile kustomization <name> --with-source
-
-# 6. Verify
-kubectl get sc
-kubectl get pvc -n <namespace>
-kubectl get pv
+kubectl get sc && kubectl get pvc -n <namespace> && kubectl get pv
 ```
-
-### Related Files
-
-- `storageclass.yaml` in infrastructure/storage/
-
-### References
-
-- Case 4: NFS PV reclaimPolicy — CSI driver migration
-- Case 6: Complete NFS Storage Guide
 
 ---
 
 ## 9. Workaround
 
-**Temporary Workaround (before proper fix):**
-
-If immediate provisioning is needed before fixing the StorageClass properly:
+**Temporary (if immediate provisioning needed before proper fix):**
 
 1. Suspend Flux: `flux suspend kustomization deployments`
 2. Manually create a corrected StorageClass with a different name
 3. Manually create PVC referencing the temporary StorageClass
 4. After proper fix in git, delete temporary resources and resume Flux
 
-**Not recommended** — proper fix is straightforward and should be applied.
+**Not recommended** — proper fix is straightforward.

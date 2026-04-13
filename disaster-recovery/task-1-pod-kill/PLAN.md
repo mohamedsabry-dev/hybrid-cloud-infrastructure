@@ -35,3 +35,15 @@ Kill 1 pod for each critical component.
 - [x] Pod scheduling and priority behavior
 - [ ] Grafana: CPU, mem, pod restarts on remaining nodes
 - [ ] Prometheus scraping targets reachable
+- [ ] Loki: check app logs for errors/warnings during incident
+
+### Monitoring Commands Reference
+```bash
+# Prometheus targets
+curl -s http://prometheus.lab.local/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+
+# Loki logs for specific app
+curl -G -s "http://loki.lab.local/loki/api/v1/query_range" --data-urlencode 'query={namespace="apps"}' | jq
+
+# Or via Grafana Explore UI for easier browsing
+```

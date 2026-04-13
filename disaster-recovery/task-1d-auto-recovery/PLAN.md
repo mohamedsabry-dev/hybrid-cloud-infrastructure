@@ -29,3 +29,6 @@ Test automated recovery procedure for downed nodes.
 - [ ] Email notification received
 - [ ] Backup restoration successful
 - [ ] Log analysis possible from copied node
+- [ ] **Grafana:** node metrics resume after recovery
+- [ ] **Prometheus:** scraping targets re-appear, no gaps in metrics
+- [ ] **Loki:** logs show recovery sequence, compare with pre-failure state

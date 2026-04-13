@@ -79,6 +79,8 @@ Drop network between Proxmox and router.
 - [ ] DNS resolution inside cluster (service names resolve)
 - [ ] Ingress routing to correct backends
 - [ ] Flux reconciliation of ingress controller
-- [ ] Grafana: network traffic patterns
 - [ ] Email notification received via mgmt path
 - [ ] ex-nginx upstream health status
+- [ ] **Grafana:** network traffic patterns, ingress request rates, error rates
+- [ ] **Prometheus:** scraping targets reachable (network-dependent!)
+- [ ] **Loki:** ingress-nginx logs, calico logs, coredns logs for failures

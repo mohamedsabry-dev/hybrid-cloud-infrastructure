@@ -45,4 +45,6 @@ Observe eviction priority when node is under pressure.
 - [ ] DB integrity (no duplicate conflicts, no orphaned transactions)
 - [ ] Flux reconciliation status
 - [ ] Pod scheduling and priority behavior
-- [ ] Grafana: CPU, mem, pod restarts on remaining nodes
+- [ ] **Grafana:** CPU, memory, pod restarts, eviction events
+- [ ] **Prometheus:** scraping targets healthy, alerts firing?
+- [ ] **Loki:** application logs for errors/warnings during incident
