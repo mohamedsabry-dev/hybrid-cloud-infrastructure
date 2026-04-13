@@ -7,6 +7,7 @@
 - Discovered during: DR testing preparation (large file upload test)
 - Related Cases:
   - TS-K8S-003 — NFS mount options (storage backend for uploads)
+  - TS-K8S-028 — External nginx proxy 413 error (discovered after fixing PHP limits)
 
 ---
 

@@ -52,8 +52,10 @@ Each case document follows this format:
 | [022](22-worker-node-failure-cascading-pod-failures.md) | 2026-04-11 | RESOLVED | Worker Node Failure Cascading Pod Failures | HA / Recovery |
 | [023](23-kustomization-resource-not-removed.md) | 2026-04-11 | RESOLVED | Kustomization Resource Not Removed | GitOps |
 | [024](24-vault-cluster-resilience-2-node-quorum.md) | 2026-04-11 | RESOLVED | Vault Cluster 2-Node Quorum Resilience | Security / HA |
+| [025](25-promtail-vault-namespace-logs.md) | 2026-04-11 | PLACEHOLDER | Promtail Vault Namespace Logs | Monitoring |
 | [026](26-released-pvs-cleanup.md) | 2026-04-13 | RESOLVED | Released PVs Cleanup (Orphaned Storage) | Storage |
 | [027](27-wordpress-php-upload-limits.md) | 2026-04-13 | RESOLVED | WordPress PHP Upload Limits | Application |
+| [028](28-nginx-proxy-body-size-413-error.md) | 2026-04-13 | RESOLVED | External Nginx Proxy 413 Body Size Error | Networking / Proxy |
 
 ---
 
@@ -85,15 +87,20 @@ Each case document follows this format:
 - [014](14-vault-k8s-auth-service-account-not-authorized.md) - Vault K8s Auth Not Authorized
 - [017](17-vault-injection-system-namespace-denied.md) - Vault Injection System Namespace Denied
 
-### Networking
+### Networking / Proxy
 - [002](2-calico-bgp-wrong-interface-multi-nic.md) - Calico BGP Wrong Interface
 - [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) - Network Isolation Issue
+- [028](28-nginx-proxy-body-size-413-error.md) - External Nginx Proxy 413 Body Size Error
 
 ### Applications
 - [010](10-wordpress-admin-password-hash-reset.md) - WordPress Password Reset
 - [011](11-wordpress-plugin-version-incompatibility-blank-page.md) - WordPress Plugin Incompatibility
 - [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility
 - [027](27-wordpress-php-upload-limits.md) - WordPress PHP Upload Limits
+
+### Monitoring
+- [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility
+- [025](25-promtail-vault-namespace-logs.md) - Promtail Vault Namespace Logs (PLACEHOLDER)
 
 ### Database
 - [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB on NFS
@@ -117,6 +124,7 @@ Each case document follows this format:
 | RESOLVED | Issue fixed, root cause identified, prevention in place |
 | IN PROGRESS | Investigation or fix ongoing |
 | MONITORING | Workaround applied, monitoring for recurrence |
+| PLACEHOLDER | Issue identified but not yet investigated |
 
 ### Common Commands
 
