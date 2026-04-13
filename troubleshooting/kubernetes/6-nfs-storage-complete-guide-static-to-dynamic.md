@@ -1,4 +1,5 @@
 # TS-K8S-006 | 2026-04-02 | RESOLVED
+> Last updated: 2026-04-13 — added nfs-database StorageClass (TS-K8S-015), controller placement clarification (TS-K8S-018), Released PV cleanup procedure (TS-K8S-026)
 
 ## 1. Context
 
@@ -6,104 +7,73 @@
 - **Environment:** k8s-dev / k8s-prod clusters
 - **Related Components:** NFS CSI driver, StorageClass, PV, PVC, Flux GitOps
 - **Discovered During:** NFS storage architecture design and troubleshooting
-- **Related:** Case 4 (PV Failed state), Case 5 (StorageClass immutability), Case 3 (NFS Hard Mount)
+- **Related Cases:**
+  - TS-K8S-003 — NFS hard mount causing pod hangs (mountOptions requirement)
+  - TS-K8S-004 — PV Failed state with reclaimPolicy:Delete without CSI
+  - TS-K8S-005 — StorageClass parameter immutability
+  - TS-K8S-007 — InnoDB O_DIRECT incompatibility with NFS
+  - TS-K8S-015 — Stale NFS mount on CSI restart (introduced nfs-database StorageClass)
+  - TS-K8S-018 — CSI controller network placement in segmented environments
+  - TS-K8S-026 — Released PV accumulation and cleanup procedure
 
 ---
 
-## 2. Issue
+## 2. Journey Summary
 
-**Summary:** This document consolidates the complete NFS storage journey from initial static PV/PVC setup through troubleshooting issues to production-ready dynamic provisioning architecture.
-
-**Journey:**
 ```
-Static PVs (manual) → Failed state issues → CSI Driver installation →
-Invalid parameters → Production refactoring → Behavior-based StorageClasses
+Static PVs (manual) → Failed state (TS-K8S-004) → CSI Driver installation →
+Invalid parameters (TS-K8S-005) → Production refactoring → Behavior-based StorageClasses →
+Network placement issue (TS-K8S-018) → Database mount options (TS-K8S-015) →
+Released PV cleanup (TS-K8S-026)
 ```
-
-**Issues Encountered:**
-
-### Issue 1: PV Stuck in Failed State (TS-64)
-
-**Symptom:**
-```bash
-kubectl get pv nfs-testing
-# STATUS: Failed
-```
-
-**Error:**
-```
-no deletable volume plugin matched
-```
-
-**Cause:** `reclaimPolicy: Delete` on static NFS PV without CSI driver installed.
-
-### Issue 2: StorageClass Invalid Parameter (TS-65)
-
-**Symptom:**
-```bash
-kubectl describe pvc testing-storage
-# invalid parameter "onDeletePolicy" in storage class
-```
-
-**Cause:** Used non-existent parameter `onDeletePolicy: delete` in StorageClass.
-
-### Issue 3: StorageClass Parameters Immutable
-
-**Symptom:**
-```
-Flux dry-run failed: parameters: Forbidden: updates to parameters are forbidden
-```
-
-**Cause:** Tried to update existing StorageClass parameters (immutable after creation).
-
-### Issue 4: PVC Infeasible Cache
-
-**Symptom:** PVC stuck in `Pending` even after StorageClass fixed.
-
-**Cause:** Provisioner caches `infeasible` errors on the PVC object itself.
-
-### Issue 5: Flux Recreates Deleted Resources
-
-**Symptom:** Deleted PV/PVC manually, Flux recreated them.
-
-**Cause:** GitOps — git is source of truth. If files exist in git, Flux recreates resources.
-
-**Impact:** Multiple storage architecture issues blocking application deployments.
 
 ---
 
-## 3. Analysis
+## 3. Concepts
 
-### Concepts Learned
+### StorageClass vs PV vs PVC
 
-#### StorageClass vs PV vs PVC
+| Component | What It Is | Who Creates It | Naming Convention |
+|-----------|------------|----------------|-------------------|
+| **StorageClass** | Template/blueprint for storage | Infra team (once) | By behavior: `nfs-retain`, `nfs-delete`, `nfs-database` |
+| **PersistentVolume (PV)** | Actual storage resource | CSI driver (auto) | Auto: `pvc-<uuid>` |
+| **PersistentVolumeClaim (PVC)** | App's request for storage | App team/deployment | By app: `prometheus-data`, `mariadb-data` |
 
-| Component | What It Is | Who Creates It | Naming |
-|-----------|------------|----------------|--------|
-| **StorageClass** | Template/blueprint for storage | Infra team (once) | By behavior: `nfs-retain`, `nfs-delete` |
-| **PersistentVolume (PV)** | Actual storage resource | CSI driver (auto) or admin (manual) | Auto: `pvc-xxx-xxx` |
-| **PersistentVolumeClaim (PVC)** | App's request for storage | App team/deployment | By app: `prometheus-data`, `nginx-test-data` |
-
-#### Static vs Dynamic Provisioning
+### Static vs Dynamic Provisioning
 
 | Approach | Flow | Production Use |
 |----------|------|----------------|
-| **Static** | Admin creates PV → PVC binds to it | 5% (legacy, special cases) |
-| **Dynamic** | PVC created → CSI auto-creates PV | 95% (standard) |
+| **Static** | Admin creates PV manually → PVC binds to it | Legacy only |
+| **Dynamic** | PVC created → CSI auto-creates PV | Standard — use this |
 
-#### Why NFS Needs CSI Driver
+### How CSI Creates NFS Subdirectories
+
+The StorageClass `share` parameter is the **base path** on the NAS. CSI does not use this path directly — it creates a subdirectory under it named `pvc-<uuid>` for each PVC.
+
+```
+StorageClass parameter: share: "/volume1/k8s-prod"
+PVC created: mariadb-data
+  └─► CSI creates: /volume1/k8s-prod/pvc-ffbc1708-252f-48f8-bd87-70ee37726bc8/
+        └─► PV created pointing to that subdirectory
+              └─► PVC bound to PV
+```
+
+NAS directory names are always `pvc-<uuid>` — never human-readable app names. This is why NAS inspection shows UUID-named directories.
+
+### Why NFS Needs CSI Driver
 
 Kubernetes has no built-in NFS provisioner. Without CSI driver:
-- `reclaimPolicy: Delete` causes PV to enter `Failed` state
+- `reclaimPolicy: Delete` causes PV to enter `Failed` state (TS-K8S-004)
 - No dynamic provisioning possible
-- Manual folder management on NFS server
+- Manual NAS folder management required
+- Deleting a static PV never touches the NAS directory
 
 With CSI driver (`nfs.csi.k8s.io`):
-- Auto-creates folders on NFS for each PVC
-- Auto-deletes folders when PVC deleted (if `Delete` policy)
-- Dynamic PV creation
+- Auto-creates subdirectory on NAS for each PVC
+- Auto-deletes subdirectory when PVC deleted (if `Delete` policy)
+- Dynamic PV creation — no manual PV management
 
-#### Immutability Rules
+### Immutability Rules
 
 **PersistentVolume (Immutable After Creation):**
 - `nfs.path` / `nfs.server`
@@ -112,8 +82,8 @@ With CSI driver (`nfs.csi.k8s.io`):
 - `volumeMode`
 
 **PersistentVolume (Mutable):**
-- `persistentVolumeReclaimPolicy`
-- `claimRef` (can patch to null to recover stuck PV)
+- `persistentVolumeReclaimPolicy` — patch in-place
+- `claimRef` — patch to null to recover stuck/Released PV
 
 **StorageClass (All Immutable After Creation):**
 - `parameters`
@@ -123,40 +93,23 @@ With CSI driver (`nfs.csi.k8s.io`):
 
 ---
 
-## 4. Root Cause
+## 4. Final Architecture
 
-Multiple interconnected issues:
+### Infrastructure Storage Folder
 
-| Issue | Root Cause |
-|-------|------------|
-| PV Failed state | `reclaimPolicy: Delete` requires CSI driver for NFS |
-| Invalid parameter | `onDeletePolicy` doesn't exist; use `reclaimPolicy` |
-| Immutable parameters | StorageClass parameters cannot be updated after creation |
-| PVC stuck pending | Provisioner caches infeasible errors on PVC object |
-| Flux recreation | GitOps requires git changes before cluster changes |
-
----
-
-## 5. Solution
-
-### Final Architecture
-
-**Infrastructure Storage Folder:**
 ```
 infrastructure/storage/
 ├── nfs-csi-driver.yaml      # HelmRepository + HelmRelease
-├── storageclass.yaml        # nfs-retain + nfs-delete
-└── kustomization.yaml       # References only above 2 files
+├── storageclass.yaml        # nfs-retain + nfs-delete + nfs-database
+└── kustomization.yaml
 ```
 
-**No PV files. No PVC files.**
+**No PV files. No PVC files in infrastructure.**
 
-### StorageClass Design
-
-**Named by behavior, not by application:**
+### StorageClass Design — Three Classes by Behavior
 
 ```yaml
-# nfs-retain — for critical/persistent data
+# nfs-retain — critical/persistent data (WordPress, MariaDB, Prometheus, Grafana, Loki)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -164,15 +117,17 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   server: "10.0.40.120"
-  share: "/volume1/k8s-prod"    # Base path
-reclaimPolicy: Retain            # Keep data on PVC delete
+  share: "/volume1/k8s-prod"    # base path — CSI creates pvc-<uuid> subdirs under here
+reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:
+  - nfsvers=3
+  - nolock
   - soft
   - timeo=30
   - retrans=3
 ---
-# nfs-delete — for temporary/test data
+# nfs-delete — temporary/test data (cleaned up automatically on PVC delete)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -181,28 +136,59 @@ provisioner: nfs.csi.k8s.io
 parameters:
   server: "10.0.40.120"
   share: "/volume1/k8s-prod"
-reclaimPolicy: Delete            # Auto-cleanup on PVC delete
+reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
+  - nfsvers=3
+  - nolock
   - soft
   - timeo=30
   - retrans=3
+---
+# nfs-database — databases requiring write integrity on NFS (MariaDB, PostgreSQL)
+# Added in TS-K8S-015 after soft mount caused MariaDB CrashLoopBackOff
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-database
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: "10.0.40.120"
+  share: "/volume1/k8s-prod"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=3
+  - nolock
+  - hard
+  - timeo=600
+  - retrans=5
+  - intr
 ```
+
+### Mount Options Decision Table
+
+| Workload | StorageClass | Mount Options | Reason |
+|---|---|---|---|
+| WordPress, Nginx, static apps | nfs-retain | soft, timeo=30, retrans=3 | Crash + restart better than silent hang |
+| Prometheus, Grafana, Loki | nfs-retain | soft, timeo=30, retrans=3 | Can rescrape, should not hang cluster |
+| MariaDB, PostgreSQL | nfs-database | hard, timeo=600, retrans=5, intr | Data integrity critical — see TS-K8S-007/015 |
+| Temp/test workloads | nfs-delete | soft, timeo=30, retrans=3 | Auto-cleanup on PVC delete |
 
 ### PVCs Live With Apps
 
 ```
-apps/
-├── nginx-test/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── pvc.yaml              # nginx-test-data
-│
-├── prometheus/
-│   └── pvc.yaml              # prometheus-data (uses nfs-retain)
-│
-└── temp-job/
-    └── pvc.yaml              # temp-job-data (uses nfs-delete)
+apps/wordpress/
+└── pvc.yaml              # storageClassName: nfs-retain
+
+apps/mariadb/
+└── statefulset.yaml      # volumeClaimTemplate → storageClassName: nfs-database
+
+monitoring/prometheus/
+└── values or pvc.yaml    # storageClassName: nfs-retain
+
+testing/nginx-test/
+└── pvc.yaml              # storageClassName: nfs-delete
 ```
 
 ### PVC Example
@@ -211,12 +197,12 @@ apps/
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nginx-test-data        # Named after the app
+  name: nginx-test-data
   namespace: testing
 spec:
-  storageClassName: nfs-delete # Choose policy
+  storageClassName: nfs-delete
   accessModes:
-    - ReadWriteMany            # Defined in PVC, not SC
+    - ReadWriteMany      # defined in PVC, not StorageClass
   resources:
     requests:
       storage: 1Gi
@@ -226,303 +212,196 @@ spec:
 
 Defined in PVC, NOT StorageClass. NFS supports all:
 
-| Mode | Meaning |
-|------|---------|
-| `ReadWriteOnce` (RWO) | One node read/write |
-| `ReadOnlyMany` (ROX) | Many nodes read-only |
-| `ReadWriteMany` (RWX) | Many nodes read/write |
+| Mode | Meaning | Use case |
+|------|---------|----------|
+| `ReadWriteOnce` (RWO) | One node read/write | Databases, single-instance apps |
+| `ReadOnlyMany` (ROX) | Many nodes read-only | Static content |
+| `ReadWriteMany` (RWX) | Many nodes read/write | Shared content, multi-replica apps |
 
-### Issue-Specific Fixes
+---
 
-**Issue 1 Fix:** Install NFS CSI driver OR use `reclaimPolicy: Retain` for static PVs.
+## 5. CSI Driver Architecture
 
-**Issue 2 Fix:** Remove `onDeletePolicy`. Use `reclaimPolicy: Delete` on StorageClass itself.
+### Two Components, Two Responsibilities
 
-**Issue 3 Fix:** Delete StorageClass manually, then let Flux recreate:
-```bash
-kubectl delete storageclass <name>
-flux reconcile kustomization flux-system --with-source
+```
+csi-nfs-controller (Deployment)
+  replicas: 2
+  runs on: worker nodes (NOT masters — see TS-K8S-018)
+  responsibility: CREATE and DELETE NFS subdirectories
+  called when: PVC is created or deleted
+  needs: network access to NFS server (10.0.40.x)
+
+csi-nfs-node (DaemonSet)
+  runs on: every node (or workers only if masters have no NFS access)
+  responsibility: MOUNT and UNMOUNT NFS paths on the node
+  called when: pod is scheduled to that node and needs NFS volume
+  communicates with: kubelet via unix socket on same node
 ```
 
-**Issue 4 Fix:** Delete and recreate the PVC:
-```bash
-kubectl delete pvc <name> -n <namespace>
-# Let Flux recreate it
-```
+### Controller Node Placement — Critical in Network-Segmented Environments
 
-**Issue 5 Fix:** Push git changes first, then Flux removes resources automatically. Or suspend Flux:
-```bash
-flux suspend kustomization flux-system
-# Clean up cluster
-# Push changes
-flux resume kustomization flux-system
-```
+**In this lab, masters (10.0.61.x) have no route to NFS storage (10.0.40.x). Workers (10.0.64.x) have dedicated storage NICs.**
 
-### Migration Procedure: Static to Dynamic
-
-#### Step 1: Install CSI Driver (if not already)
+CSI controller must run on workers — it temporarily mounts NFS during PVC provisioning to create subdirectories. If it runs on masters, provisioning fails with mount timeout (TS-K8S-018).
 
 ```yaml
-# nfs-csi-driver.yaml
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: csi-driver-nfs
-  namespace: flux-system
-spec:
-  interval: 1h
-  url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+# HelmRelease values — controller on workers only
+controller:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist  # DoesNotExist = workers only
+```
+
+**Note:** `DoesNotExist` targets workers (nodes WITHOUT control-plane label). `Exists` targets masters. Verify placement after applying:
+```bash
+kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+# Must show worker nodes, not masters
+```
+
+**Limitation:** If all workers are down, CSI controller cannot provision new PVCs — no failover to masters due to network isolation. Existing mounts on pods are unaffected.
+
+### CSI Node DaemonSet
+
+The csi-nfs-node DaemonSet runs one pod per node. If your design keeps NFS access on workers only, restrict the DaemonSet to workers:
+
+```yaml
+node:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
+```
+
+This reduces from 6 pods (3 masters + 3 workers) to 3 pods (workers only).
+
+### When CSI Controller Is Down
+
+- No new PVC provisioning
+- No PVC deletion (NAS subdirectory not removed)
+- Existing running pods with mounted volumes: **unaffected**
+- The mount was established at pod start by csi-nfs-node — controller not involved after that
+
 ---
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: csi-driver-nfs
-  namespace: kube-system
-spec:
-  interval: 1h
-  chart:
-    spec:
-      chart: csi-driver-nfs
-      version: ">=4.0.0"
-      sourceRef:
-        kind: HelmRepository
-        name: csi-driver-nfs
-        namespace: flux-system
+
+## 6. Released PV Accumulation
+
+Released PVs accumulate when PVCs are deleted with `reclaimPolicy: Retain`. The PV stays alive but cannot be automatically rebound to new PVCs — it still holds the old `claimRef`.
+
+```
+PVC deleted
+  └─► reclaimPolicy: Retain → PV goes Released
+        └─► claimRef still points to deleted PVC
+              └─► new PVC cannot auto-bind to Released PV
+                    └─► CSI creates new PV + new NAS directory
+                          └─► old PV and old NAS directory = orphaned
 ```
 
-#### Step 2: Create StorageClasses
-
-Create `nfs-retain` and `nfs-delete` as shown above.
-
-#### Step 3: Update Files
-
-1. Remove `pv.yaml` from infrastructure/storage
-2. Remove `pvc.yaml` from infrastructure/storage
-3. Update `kustomization.yaml` to only reference csi-driver and storageclass
-4. Create PVC in each app folder with `storageClassName`
-
-#### Step 4: Clean Cluster Before Push
-
+**Periodic check command:**
 ```bash
-# Delete old PVCs
-kubectl delete pvc monitoring-storage -n monitoring --ignore-not-found
-kubectl delete pvc logging-storage -n logging --ignore-not-found
-kubectl delete pvc apps-storage -n apps --ignore-not-found
-kubectl delete pvc testing-storage -n testing --ignore-not-found
-
-# Delete old PVs
-kubectl delete pv nfs-monitoring nfs-logging nfs-apps nfs-testing --ignore-not-found
-
-# Delete old StorageClass (if different name)
-kubectl delete sc nfs-csi-testing --ignore-not-found
+kubectl get pv | grep Released
+# Empty output = clean state
 ```
 
-#### Step 5: Push and Reconcile
-
+**Cleanup procedure:**
 ```bash
-git add -A && git commit -m "Refactor: SC-based dynamic provisioning" && git push
-flux reconcile kustomization flux-system --with-source
-```
+# 1. Identify Released PVs
+kubectl get pv -A | grep Released
 
-#### Step 6: Verify
-
-```bash
-kubectl get sc
-# NAME         PROVISIONER      RECLAIMPOLICY
-# nfs-delete   nfs.csi.k8s.io   Delete
-# nfs-retain   nfs.csi.k8s.io   Retain
-
+# 2. Cross-reference against active PVCs
 kubectl get pvc -A
-# NAMESPACE   NAME              STATUS   STORAGECLASS
-# testing     nginx-test-data   Bound    nfs-delete
+# Match VOLUME field of active PVCs against Released PV names
 
+# 3. Delete Released PV objects
+kubectl delete pv <pv-name>
+
+# 4. Delete orphaned NAS directories manually via NAS UI or SSH
+```
+
+**Recover a Released PV for reuse (if data still needed):**
+```bash
+kubectl patch pv <pv-name> -p '{"spec":{"claimRef": null}}'
+# Then create PVC with spec.volumeName: <pv-name> to bind explicitly
+```
+
+See TS-K8S-026 for the full cleanup case with real examples.
+
+---
+
+## 7. Migration: Static to Dynamic
+
+```bash
+# Step 1: Install CSI driver via Flux (nfs-csi-driver.yaml)
+
+# Step 2: Create StorageClasses (storageclass.yaml)
+
+# Step 3: Update app PVC files to use storageClassName
+
+# Step 4: Clean cluster before pushing git
+kubectl delete pvc <old-pvcs> --ignore-not-found
+kubectl delete pv <old-pvs> --ignore-not-found
+kubectl delete sc <old-sc> --ignore-not-found
+
+# Step 5: Push and reconcile
+git add -A && git commit -m "Refactor: dynamic NFS provisioning" && git push
+flux reconcile kustomization infrastructure --with-source
+
+# Step 6: Verify
+kubectl get sc
+kubectl get pvc -A
 kubectl get pv
-# NAME                    CAPACITY   RECLAIM POLICY   STATUS   CLAIM
-# pvc-xxx-xxx-xxx-xxx     1Gi        Delete           Bound    testing/nginx-test-data
-```
-
-### Files Changed
-
-- `infrastructure/storage/nfs-csi-driver.yaml`
-- `infrastructure/storage/storageclass.yaml`
-- `infrastructure/storage/kustomization.yaml`
-- App-specific PVC files in each app folder
-
-### Prevention Measures
-
-1. Always use CSI driver for dynamic NFS provisioning
-2. Name StorageClasses by behavior (`nfs-retain`, `nfs-delete`), not by app
-3. Keep PVCs with apps, not in infrastructure folder
-4. Remember StorageClass parameters are immutable
-5. Delete PVC to clear infeasible cache after fixing StorageClass
-6. Push git changes before manual cluster cleanup (GitOps)
-
----
-
-## 6. Solution Risk
-
-- **Risk Level:** Low
-- **Potential Impact:**
-  - Migration requires deleting existing PVs/PVCs (data loss if not backed up)
-  - StorageClass changes require delete + recreate
-  - Brief storage unavailability during migration
-
----
-
-## 7. Impact After Fix
-
-**Observed Results:**
-
-- Dynamic provisioning working for all workloads
-- No manual PV management needed
-- Clean separation: infrastructure (CSI + SC) vs apps (PVCs)
-- Behavior-based naming clarifies data lifecycle
-- `soft` mount options prevent pod hangs (Case 3)
-
-**Before vs After:**
-
-### Before (Learning/Static)
-```
-infrastructure/storage/
-├── pv.yaml              # 4 manual PVs
-├── pvc.yaml             # 4 manual PVCs
-├── nfs-csi-driver.yaml
-├── storageclass.yaml    # nfs-csi-testing
-└── kustomization.yaml
-```
-
-### After (Production/Dynamic)
-```
-infrastructure/storage/
-├── nfs-csi-driver.yaml  # CSI driver
-├── storageclass.yaml    # nfs-retain + nfs-delete
-└── kustomization.yaml
-
-apps/nginx-test/
-└── pvc.yaml             # nginx-test-data → nfs-delete
-
-apps/prometheus/
-└── pvc.yaml             # prometheus-data → nfs-retain
 ```
 
 ---
 
-## 8. Notes
-
-### Key Takeaways
+## 8. Lessons Learned
 
 | Rule | Detail |
 |------|--------|
-| Static NFS PVs → use `Retain` only | `Delete` requires CSI driver |
-| StorageClass naming → by behavior | `nfs-retain`, `nfs-delete` — NOT `nfs-prometheus` |
+| Static NFS PVs → use `Retain` only | `Delete` requires CSI driver — TS-K8S-004 |
+| StorageClass naming → by behavior | `nfs-retain`, `nfs-delete`, `nfs-database` — not by app |
 | PVCs → live with apps | Not in infrastructure folder |
-| One CSI driver → many StorageClasses | Different configs, same provisioner |
+| StorageClass `share` = base path | CSI creates `pvc-<uuid>` subdirs under it — not human-readable names |
 | `accessModes` → defined in PVC | Not in StorageClass |
-| StorageClass parameters → immutable | Must delete + recreate to change |
-| PVC infeasible cache → delete PVC | Fixing SC alone doesn't clear it |
-| Flux recreates deleted resources | Push git changes first |
-| `flux reconcile --with-source` | Required when stuck on old revision |
-
-### Commands Reference
-
-#### Check CSI driver pods
-```bash
-kubectl get pods -n kube-system | grep csi
-```
-
-#### Check PVC events (why pending)
-```bash
-kubectl describe pvc <name> -n <namespace> | tail -30
-```
-
-#### Check CSI driver logs
-```bash
-kubectl logs -n kube-system -l app.kubernetes.io/name=csi-driver-nfs --tail=50
-```
-
-#### Recover stuck PV (clear claimRef)
-```bash
-kubectl patch pv <name> -p '{"spec":{"claimRef": null}}'
-```
-
-#### Force delete stuck PV (remove finalizers)
-```bash
-kubectl patch pv <name> -p '{"metadata":{"finalizers":null}}'
-kubectl delete pv <name>
-```
-
-#### Force Flux reconcile with latest git
-```bash
-flux reconcile kustomization flux-system --with-source
-```
-
-### Related Files
-
-- Case 4: NFS PV Stuck in Failed State (reclaimPolicy without provisioner)
-- Case 5: StorageClass Invalid Parameter + Flux Stuck
-- Case 3: NFS Hard Mount Pod Unresponsiveness
-- This document (Case 6): Complete migration guide
-
-### Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLUSTER                                  │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                    kube-system namespace                    │ │
-│  │                                                             │ │
-│  │   ┌─────────────────────────────────────────────────────┐  │ │
-│  │   │            NFS CSI Driver Pods                       │  │ │
-│  │   │   (installed via HelmRelease, runs on each node)     │  │ │
-│  │   └─────────────────────────────────────────────────────┘  │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                              │                                   │
-│              ┌───────────────┴───────────────┐                  │
-│              ▼                               ▼                   │
-│     ┌─────────────────┐             ┌─────────────────┐         │
-│     │   nfs-retain    │             │   nfs-delete    │         │
-│     │  StorageClass   │             │  StorageClass   │         │
-│     │  (Retain)       │             │  (Delete)       │         │
-│     └────────┬────────┘             └────────┬────────┘         │
-│              │                               │                   │
-│     ┌────────┴────────┐             ┌────────┴────────┐         │
-│     │   PVC: app-data │             │ PVC: test-data  │         │
-│     │   (prometheus)  │             │ (nginx-test)    │         │
-│     └────────┬────────┘             └────────┬────────┘         │
-│              │                               │                   │
-│     ┌────────┴────────┐             ┌────────┴────────┐         │
-│     │ PV: pvc-xxx-xxx │             │ PV: pvc-yyy-yyy │         │
-│     │ (auto-created)  │             │ (auto-created)  │         │
-│     └────────┬────────┘             └────────┬────────┘         │
-│              │                               │                   │
-└──────────────┼───────────────────────────────┼───────────────────┘
-               │                               │
-               ▼                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       NFS SERVER (10.0.40.120)                   │
-│                                                                  │
-│  /volume1/k8s-prod/                                             │
-│  ├── pvc-xxx-xxx-prometheus-data/    ← Retained on delete       │
-│  └── pvc-yyy-yyy-nginx-test-data/    ← Deleted on delete        │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+| StorageClass parameters → immutable | Must delete + recreate — TS-K8S-005 |
+| PVC infeasible cache → delete PVC | Fixing SC alone doesn't clear it — TS-K8S-005 |
+| CSI controller needs NFS network access | Must run on workers if masters have no storage route — TS-K8S-018 |
+| soft mount for stateless apps | TS-K8S-003 |
+| hard mount for databases | TS-K8S-007, TS-K8S-015 |
+| Released PVs accumulate silently | Run `kubectl get pv | grep Released` periodically — TS-K8S-026 |
+| Deleting static PV never touches NAS | Must manually delete NAS directory — TS-K8S-004 |
 
 ---
 
-## 9. Workaround
+## 9. Commands Reference
 
-**If dynamic provisioning is not available:**
+```bash
+# Check CSI driver pods and location
+kubectl get pods -n kube-system -o wide | grep csi
 
-**Option A: Use static PVs with `reclaimPolicy: Retain`**
-- Create PV manually pointing to NFS path
-- Create PVC that binds to specific PV
-- Data preserved on PVC delete (manual cleanup required)
+# Check PVC events (why pending)
+kubectl describe pvc <n> -n <namespace> | tail -30
 
-**Option B: Install CSI driver**
-- Recommended for any production use
-- Enables dynamic provisioning
-- Supports both Retain and Delete policies
+# Check CSI driver logs
+kubectl logs -n kube-system -l app.kubernetes.io/name=csi-driver-nfs --tail=50
 
-**Note:** Static provisioning should only be used for legacy systems or special cases. Dynamic provisioning with CSI driver is the production standard.
+# Recover stuck PV (clear claimRef)
+kubectl patch pv <n> -p '{"spec":{"claimRef": null}}'
+
+# Force delete stuck PV (remove finalizers)
+kubectl patch pv <n> -p '{"metadata":{"finalizers":null}}'
+kubectl delete pv <n>
+
+# Force Flux reconcile with latest git
+flux reconcile kustomization infrastructure --with-source
+
+# Periodic Released PV check
+kubectl get pv | grep Released
+```

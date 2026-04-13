@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wordpress-php-config
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: wordpress
+    environment: prod
+data:
+  uploads.ini: |
+    ; PHP Upload Settings for WordPress
+    upload_max_filesize = 100M
+    post_max_size = 100M
+    memory_limit = 256M
+    max_execution_time = 300
+    max_input_time = 300

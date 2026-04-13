@@ -5,7 +5,12 @@
 - Environment: k8s-dev / k8s-prod clusters
 - Related components: Static NFS PV, Flux GitOps, NFS CSI Driver
 - Discovered during: Testing PVC deletion and recreation workflow
-- Related: Case 5 (StorageClass Immutability), Case 6 (Complete NFS Storage Guide)
+- Related Cases:
+  - TS-K8S-005 — StorageClass immutability (next failure in the migration chain)
+  - TS-K8S-006 — Complete NFS storage guide (final architecture from this journey)
+  - TS-K8S-026 — Released PV cleanup (orphaned PVs from Retain policy accumulate over time)
+
+---
 
 ## 2. Issue
 - Symptom: `nfs-testing` PersistentVolume stuck in `Failed` state after PVC deletion
@@ -32,6 +37,8 @@ kubectl get pv nfs-testing
 ```
 
 PV was stuck in `Failed` and still referenced the deleted PVC. NFS data on the NAS was **not** deleted.
+
+---
 
 ## 3. Analysis
 
@@ -70,7 +77,22 @@ K8s treats PVC deletion as the end-of-lifecycle signal for the storage. When `De
 
 ---
 
-### Check 3: PVC Binding Behavior (Background)
+### Check 3: What Happens to NAS When a Static PV Is Deleted
+
+When you manually delete a static PV (`kubectl delete pv <name>`), Kubernetes removes the PV object from the cluster. The NAS directory is **never touched** — no delete operation is sent to the storage backend for static PVs regardless of reclaimPolicy.
+
+```
+kubectl delete pv nfs-testing
+  └─► PV object removed from cluster
+        └─► NAS directory /volume1/k8s-prod/testing: UNTOUCHED
+              └─► must be deleted manually on the NAS
+```
+
+Only the NFS CSI driver with `reclaimPolicy: Delete` on a **dynamically provisioned** PV can actually delete the NAS subdirectory automatically. Static PVs never get automatic NAS cleanup — see TS-K8S-026 for how this causes orphaned directories to accumulate.
+
+---
+
+### Check 4: PVC Binding Behavior (Background)
 
 Before hitting the issue, the following was confirmed through CLI testing:
 
@@ -90,7 +112,7 @@ kubectl get storageclass
 
 ---
 
-### Check 4: PV Immutability Discovery
+### Check 5: PV Immutability Discovery
 
 While attempting to fix by editing the PV:
 ```bash
@@ -110,7 +132,7 @@ kubectl apply -f pv.yaml   # with modified nfs.path
 
 ---
 
-### Check 5: Recovering a Stuck PV
+### Check 6: Recovering a Stuck PV
 
 ```bash
 # Clear the claimRef to return PV to Available
@@ -122,16 +144,21 @@ kubectl get pv nfs-testing
 
 ---
 
-### Check 6: Pod ↔ Storage Relationship Clarification
+### Check 7: Pod ↔ Storage Relationship Clarification
 
 Confirmed through testing:
 - **Pod deleted → nothing happens to PVC, PV, or NFS data**
+- **Deployment deleted → nothing happens to PVC, PV, or NFS data**
 - Pod does not create a folder named after itself — any folder seen on NAS was created by the application running inside the pod
 - NFS mount is a **direct mount of the full path** — not per-pod subdirectory like Docker volumes
-- Data lifecycle is controlled entirely by PVC/PV, not pod lifecycle
+- Data lifecycle is controlled entirely by PVC/PV, not pod or deployment lifecycle
+
+---
 
 ## 4. Root Cause
 > `reclaimPolicy: Delete` was set on a static NFS PV without an NFS CSI provisioner installed. When PVC was deleted, Kubernetes attempted to call a delete plugin that did not exist, causing the PV to enter Failed state with `no deletable volume plugin matched`.
+
+---
 
 ## 5. Solution
 
@@ -144,10 +171,8 @@ Installing `nfs.csi.k8s.io` registers a volume plugin. With it present:
 
 **`nfs-csi-driver.yaml`** (both dev + prod) — installs the driver via Flux:
 
-> API versions were also corrected here — cluster runs Flux v2.8.3 which dropped `v1beta2`/`v2beta1`
-
 ```yaml
-apiVersion: source.toolkit.fluxcd.io/v1          # was v1beta2
+apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
   name: csi-driver-nfs
@@ -156,7 +181,7 @@ spec:
   interval: 1h
   url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
 ---
-apiVersion: helm.toolkit.fluxcd.io/v2            # was v2beta1
+apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: csi-driver-nfs
@@ -183,8 +208,7 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   server: "10.0.40.120"
-  share: "/volume1/k8s-prod/testing"    # dev: /volume1/k8s-dev/testing
-  onDeletePolicy: delete
+  share: "/volume1/k8s-prod/testing"
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 mountOptions:
@@ -205,9 +229,7 @@ spec:
   storageClassName: nfs-csi-testing
 ```
 
-**`pv.yaml`** — static `nfs-testing` PV removed (CSI driver creates PVs automatically per PVC, with real subdirectory cleanup on deletion).
-
-**`kustomization.yaml`** — `storageclass.yaml` added to resources in both envs.
+**`pv.yaml`** — static `nfs-testing` PV removed (CSI driver creates PVs automatically per PVC).
 
 ### Why Manual Steps Were Required With Flux
 
@@ -237,14 +259,20 @@ kubectl delete pv nfs-testing
 
 Skipping step 1 → PVC stuck in `Terminating` → PV stuck in `Terminating` → Flux reconciliation blocked entirely.
 
+---
+
 ## 6. Solution Risk
 - Risk level: MEDIUM
 - Potential impact: Static to dynamic migration requires manual cleanup before git push; brief storage unavailability during migration
+
+---
 
 ## 7. Impact After Fix
 - Observed: Dynamic provisioning working correctly
 - PVC deletion now properly deletes NFS subdirectory via CSI driver
 - No more `Failed` PV states
+
+---
 
 ## 8. Notes
 
@@ -254,15 +282,16 @@ Skipping step 1 → PVC stuck in `Terminating` → PV stuck in `Terminating` →
 |---|---|
 | Static NFS PVs → always use `Retain` | `Delete` requires a CSI provisioner, fails silently with `Failed` status |
 | `reclaimPolicy` fires on PVC deletion, not PV deletion | Common naming confusion |
+| Deleting a static PV never touches NAS | NAS directory must be deleted manually regardless of reclaimPolicy |
 | PV `spec.persistentVolumeSource` is immutable | Must delete + recreate to change `nfs.path`, `capacity`, `accessModes` |
-| Pod deletion never affects storage | Data lifecycle = PVC/PV only |
+| Pod/Deployment deletion never affects storage | Data lifecycle = PVC/PV only |
 | Flux `prune: true` + protection finalizers = manual cleanup needed | Always drain pods → delete PVC → delete PV before pushing static→dynamic migration |
 | Flux v2.8.3 API versions | `source.toolkit.fluxcd.io/v1` and `helm.toolkit.fluxcd.io/v2` — v1beta2/v2beta1 no longer served |
 
 ### Quick Recovery Commands
 
 ```bash
-# Clear claimRef to return Failed PV to Available
+# Clear claimRef to return Failed/Released PV to Available
 kubectl patch pv <pv-name> -p '{"spec":{"claimRef": null}}'
 
 # Check PV status
@@ -272,6 +301,8 @@ kubectl describe pv <pv-name>
 # Check protection finalizers
 kubectl get pvc -o yaml | grep -A5 finalizers
 ```
+
+---
 
 ## 9. Workaround (if any)
 > For static NFS PVs, change `reclaimPolicy` from `Delete` to `Retain`:

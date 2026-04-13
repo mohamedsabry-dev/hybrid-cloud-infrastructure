@@ -117,7 +117,13 @@ spec:
           volumeMounts:
             - name: wordpress-data
               mountPath: /var/www/html/wp-content
+            - name: php-config
+              mountPath: /usr/local/etc/php/conf.d/uploads.ini
+              subPath: uploads.ini
       volumes:
         - name: wordpress-data
           persistentVolumeClaim:
             claimName: wordpress-data
+        - name: php-config
+          configMap:
+            name: wordpress-php-config

@@ -102,3 +102,6 @@ Stop Proxmox API service.
 - [ ] WordPress accessible
 - [ ] Ansible runner can reach all nodes
 - [ ] Email notification sent via mgmt path
+- [ ] **Grafana:** all dashboards loading, no data gaps during outage
+- [ ] **Prometheus:** scraping resumed, check for metric gaps in time series
+- [ ] **Loki:** logs resume after boot, check startup sequence logs for errors

@@ -77,3 +77,6 @@ Severe combined failure — tests quorum loss and recovery.
 - [ ] Vault sealed/unsealed status
 - [ ] API server availability
 - [ ] Existing pods still running (kubelet independent)
+- [ ] **Grafana:** etcd metrics, API server latency, control plane health
+- [ ] **Prometheus:** scraping targets (may be unavailable during quorum loss)
+- [ ] **Loki:** control plane logs, kubelet logs for disconnection events

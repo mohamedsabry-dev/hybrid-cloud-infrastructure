@@ -52,6 +52,8 @@ Each case document follows this format:
 | [022](22-worker-node-failure-cascading-pod-failures.md) | 2026-04-11 | RESOLVED | Worker Node Failure Cascading Pod Failures | HA / Recovery |
 | [023](23-kustomization-resource-not-removed.md) | 2026-04-11 | RESOLVED | Kustomization Resource Not Removed | GitOps |
 | [024](24-vault-cluster-resilience-2-node-quorum.md) | 2026-04-11 | RESOLVED | Vault Cluster 2-Node Quorum Resilience | Security / HA |
+| [026](26-released-pvs-cleanup.md) | 2026-04-13 | RESOLVED | Released PVs Cleanup (Orphaned Storage) | Storage |
+| [027](27-wordpress-php-upload-limits.md) | 2026-04-13 | RESOLVED | WordPress PHP Upload Limits | Application |
 
 ---
 
@@ -65,6 +67,7 @@ Each case document follows this format:
 - [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB NFS Table Creation Failure
 - [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) - CSI NFS Restart Stale Mount
 - [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) - CSI NFS Controller Network Isolation
+- [026](26-released-pvs-cleanup.md) - Released PVs Cleanup (Orphaned Storage)
 
 ### GitOps (Flux)
 - [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) - Flux Stuck on Old Revision
@@ -90,6 +93,7 @@ Each case document follows this format:
 - [010](10-wordpress-admin-password-hash-reset.md) - WordPress Password Reset
 - [011](11-wordpress-plugin-version-incompatibility-blank-page.md) - WordPress Plugin Incompatibility
 - [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility
+- [027](27-wordpress-php-upload-limits.md) - WordPress PHP Upload Limits
 
 ### Database
 - [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB on NFS
