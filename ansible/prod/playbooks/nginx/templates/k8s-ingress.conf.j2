@@ -11,8 +11,15 @@ server {
 
     access_log /var/log/nginx/nginx-test-prod.log upstream;
 
+    # Allow large file uploads (WordPress media, etc.)
+    client_max_body_size 500m;
+
     location / {
         proxy_pass http://k8s_workers;
+
+        # Timeouts for large uploads
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
