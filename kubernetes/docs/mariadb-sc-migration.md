@@ -93,24 +93,17 @@ kubectl exec -it mariadb-0 -n database -c mariadb -- mariadb -u root -p
 # Check: Pending flushes = 0, Pending reads = 0, Pending writes = 0
 # Note: Modified dirty pages in buffer pool are normal — flushed on shutdown
 
-> EXIT;
-```
-
-### Step 5 — Flush MariaDB (belt and suspenders)
-
-```bash
-kubectl exec -it mariadb-0 -n database -c mariadb -- mariadb -u root -p
-
 > FLUSH TABLES WITH READ LOCK;
 # Forces all dirty pages to disk, blocks new writes
 
 > SHOW PROCESSLIST;
 # Confirm only your connection remains
 
+
 > EXIT;
 ```
 
-### Step 6 — Scale MariaDB to 0 (clean InnoDB shutdown)
+### Step 5 — Scale MariaDB to 0 (clean InnoDB shutdown)
 SIGTERM triggers InnoDB clean shutdown: flushes dirty pages, writes checkpoint,
 closes all files. Safe to copy NAS directory after this.
 
