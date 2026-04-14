@@ -197,6 +197,47 @@ terraform apply
 # Requires VM restart to take effect
 ```
 
+### ⚠️ CRITICAL: Apply Changes One VM/LXC at a Time
+
+**Incident during fix (2026-04-14 03:07):**
+
+Terraform applied memory changes to all 3 workers simultaneously, triggering parallel reboots:
+
+```
+Apr 14 03:07:06  VM 1020 - Reboot   (worker1)
+Apr 14 03:07:06  VM 1021 - Reboot   (worker2)
+Apr 14 03:07:11  VM 1022 - Reboot   (worker3)
+Apr 14 03:07:14  VM 1021 - Start
+Apr 14 03:07:21  VM 1020 - Start
+Apr 14 03:07:21  VM 1022 - Start
+```
+
+**Result:** ~30 seconds complete cluster downtime (all workers down simultaneously).
+
+**Correct approach for production-safe changes:**
+
+```bash
+# Option 1: Target specific resources one at a time
+terraform apply -target=proxmox_virtual_environment_vm.k8s_worker1
+# Wait for worker1 to be Ready
+kubectl wait --for=condition=Ready node/k8s-worker1.lab.local --timeout=120s
+
+terraform apply -target=proxmox_virtual_environment_vm.k8s_worker2
+# Wait for worker2 to be Ready
+kubectl wait --for=condition=Ready node/k8s-worker2.lab.local --timeout=120s
+
+terraform apply -target=proxmox_virtual_environment_vm.k8s_worker3
+# Wait for worker3 to be Ready
+
+# Option 2: Manual rolling restart via Proxmox
+# Apply Terraform without reboot, then manually restart one at a time
+```
+
+**Same applies to:**
+- Vault LXCs (2004, 2005, 2006) - must maintain quorum during changes
+- K8s Masters - must maintain etcd quorum
+- Any HA cluster components
+
 ### Future Considerations
 
 1. **Add swap** to worker VMs (1-2GB) as safety buffer
@@ -214,9 +255,13 @@ terraform apply
 
 ## 7. Impact After Fix
 
-- [ ] Pending: Terraform apply + VM restart
-- [ ] Verify: Worker3 stable after memory increase
+- [x] Terraform applied (2026-04-14 03:07)
+- [x] All workers now have 3.25GB memory
+- [x] All Vault LXCs now have 512MB memory
 - [ ] Monitor: Check memory usage over 24-48 hours
+
+**Unintended impact:** All 3 workers rebooted simultaneously → 30s downtime.
+**Lesson:** Use `terraform apply -target=<resource>` for rolling updates.
 
 ## 8. Notes
 
@@ -226,6 +271,9 @@ terraform apply
 2. **OOM logs don't appear** when VM crashes at hypervisor level
 3. **Remediation pod worked** - detected and recovered the node automatically
 4. **Prometheus is heavy** - 700MB for a small dev cluster is significant
+5. **⚠️ Terraform apply reboots ALL VMs at once** - causes cluster-wide downtime
+6. **Always use `-target` for rolling changes** - one VM/LXC at a time
+7. **Same rule for Vault/Masters** - maintain quorum during changes
 
 ### Related Commands
 
