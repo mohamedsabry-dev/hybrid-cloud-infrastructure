@@ -1,32 +1,21 @@
-# Task 1: Single Pod Kill — Results
-
-**Test Date:** 2026-04-11
-**Baseline:** WordPress browsing + video upload running throughout all scenarios.
+# Single Pod Kill Tests
+# Date: 2026-04-11
+# Result: PARTIAL (3 of 6 components tested)
 
 ---
 
 ## Contents
 
-```
-Task 1 Results
-├── Pre-Test Baseline
-├── Scenario 1.1 — Single Pod Kill
-│   ├── WordPress Pod (DONE)
-│   ├── MariaDB Pod (DONE)
-│   ├── vault-agent-injector Pod (DONE)
-│   ├── Race Condition Test (DONE + FIX APPLIED)
-│   ├── ingress-nginx Pod (TODO)
-│   ├── flux Pod (TODO)
-│   └── prometheus Pod (TODO)
-├── Post-Test Verification
-└── Summary
-```
+| Component | Status | Recovery Time | Key Finding |
+|-----------|--------|---------------|-------------|
+| WordPress | PASS | 9s | Zero downtime, sessions preserved |
+| MariaDB | PASS | 9s (5s app downtime) | InnoDB crash recovery worked |
+| vault-agent-injector | PASS + FIX | 22s | Race condition found → 2 replicas fix |
+| ingress-nginx | TODO | - | - |
+| flux | TODO | - | - |
+| prometheus | TODO | - | - |
 
-**Other scenarios moved to separate tasks:**
-- 1.2-1.4 → [task-1a-pod-scale](../task-1a-pod-scale/PLAN.md)
-- 1.5-1.8 → [task-1b-worker-kill](../task-1b-worker-kill/PLAN.md)
-- 1.9-1.14 → [task-1c-master-kill](../task-1c-master-kill/PLAN.md)
-- 1.15 → [task-1d-auto-recovery](../task-1d-auto-recovery/PLAN.md)
+**Baseline:** WordPress browsing + video upload running throughout all scenarios.
 
 ---
 
@@ -165,7 +154,7 @@ Loki/Grafana: Logs queried via Grafana web UI → Explore → Loki datasource
 
 **NOTE:** Discovered that Loki/promtail does NOT scrape `vault` namespace logs.
 - kubectl logs works, but Grafana/Loki returns "No logs found"
-- Will create troubleshooting doc: [TS-K8S-025](../../troubleshooting/kubernetes/25-promtail-vault-namespace-logs.md)
+- Will create troubleshooting doc: [TS-K8S-025](../troubleshooting/kubernetes/25-promtail-vault-namespace-logs.md)
 - TODO: Update promtail config to include vault namespace
 
 **Understanding Log Timestamps (Loki vs Application):**
@@ -372,7 +361,7 @@ If WordPress pods restart AT THE SAME TIME as vault-agent-injector is down:
   - Does it start WITHOUT sidecar and fail to authenticate to MariaDB?
 
 This is a potential cascading failure scenario. Related to:
-[TS-K8S-022 — Preventing Vault Injection Race Condition](../../troubleshooting/kubernetes/22-worker-node-failure-cascading-pod-failures.md#preventing-vault-injection-race-condition)
+[TS-K8S-022 — Preventing Vault Injection Race Condition](../troubleshooting/kubernetes/22-worker-node-failure-cascading-pod-failures.md#preventing-vault-injection-race-condition)
 
 **Mitigation already implemented:**
 - vault-agent-injector moved to master nodes (more stable)

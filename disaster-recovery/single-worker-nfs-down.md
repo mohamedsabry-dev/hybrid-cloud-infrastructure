@@ -1,8 +1,6 @@
-# DR Test Result: NAS Storage Outage
-# Test Date: 2026-04-13
-# Environment: DEV cluster
-# Tester: Sabry
-# Overall Result: IN PROGRESS
+# Single Worker NFS Interface Down
+# Date: 2026-04-13
+# Result: PASS
 
 ---
 
@@ -477,314 +475,96 @@ Request 10: HTTP 200 - 0.164s
 
 ---
 
-## Scenario 2 — Two Workers NFS Interface Down
+## Fixes Applied During Test
 
-**Workers affected:**
-**Time started:**
-**Time restored:**
-
-### During Outage
-
-**Pod behavior:**
+### Fix 1: Grafana HA (3 replicas)
+**File:** `kubernetes/dev/deployments/apps/monitoring/helm-release.yaml`
+```yaml
+grafana:
+  replicas: 3
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+          topologyKey: kubernetes.io/hostname
+  persistence:
+    accessModes:
+      - ReadWriteMany  # Changed from RWO to support multiple replicas
 ```
-PASTE kubectl get pods -A -o wide OUTPUT
+**Result:** 3 Grafana pods running on worker1, worker2, worker3 ✅
+
+### Fix 2: WordPress Readiness Probe (NFS check)
+**File:** `kubernetes/dev/deployments/apps/wordpress/deployment.yaml`
+```yaml
+# BEFORE (problematic):
+readinessProbe:
+  httpGet:
+    path: /wp-includes/images/blank.gif  # Local file - doesn't detect NFS failure
+
+# AFTER (fixed):
+readinessProbe:
+  httpGet:
+    path: /wp-content/index.php  # On NFS mount - detects storage failure
+  timeoutSeconds: 5  # Longer timeout for NFS
 ```
+**Result:** Pod will be removed from endpoints when NFS fails ✅
 
-**WordPress — still serving? (1 replica on worker3):**
+### Validation Results ✅
+
+**WordPress readiness probe fix - VALIDATED:**
 ```
-curl result:
-```
+# During NFS outage on worker1:
+wordpress-...-pxlpm   1/2   Running   worker1  ← NOT READY (correct!)
+wordpress-...-mb4ql   2/2   Running   worker2  ← Ready
+wordpress-...-484ht   2/2   Running   worker3  ← Ready
 
-**MariaDB behavior:**
-```
-Status:
-Node it was on:
-```
+# Endpoints (worker1 REMOVED):
+wordpress   10.244.207.88:80,10.244.29.139:80  ← Only worker2 + worker3!
 
-**CSI controller — both replicas affected?:**
-```
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-```
-
-**Ingress-nginx status:** UP / DOWN
-**Vault status:** UP / DOWN
-
-### After Restore
-
-**Automatic recovery:** YES / NO — which pods?
-**Manual intervention needed:** YES / NO — what?
-**Stale mounts found:** YES / NO
-
-**Result:** PASS / FAIL
-**Notes:**
-
----
-
-## Scenario 3 — All 3 Workers NFS Interface Down
-
-**Time started:**
-**Time restored:**
-
-### During Outage
-
-**Pod behavior:**
-```
-PASTE kubectl get pods -A -o wide OUTPUT
+# Traffic test (20 requests):
+ALL HTTP 200 - 100% success ✅ (vs 10% timeout before fix)
 ```
 
-**WordPress behavior:**
-```
-Time until CrashLoopBackOff:
-Error in logs:
-```
+**Before vs After:**
+| Metric | Before Fix | After Fix |
+|--------|------------|-----------|
+| Worker1 pod status | 2/2 Ready (wrong) | 1/2 Ready (correct) |
+| Endpoints | 3 pods (broken included) | 2 pods (healthy only) |
+| Traffic success | ~90% (timeouts) | 100% ✅ |
 
-**MariaDB behavior:**
-```
-Status (hanging?):
-Logs:
-```
+**Grafana HA fix - VALIDATED:**
+- 3 replicas running on worker1, worker2, worker3
+- Anti-affinity working correctly
+- If 1 worker fails, 2/3 replicas still serve traffic
 
-**CSI provisioning test — new PVC during outage:**
-```
-PVC status:
-Error message:
-```
-
-**Components confirmed UP (no NFS dependency):**
-- ingress-nginx: UP / DOWN
-- Vault: UP / DOWN
-- Flux: UP / DOWN
-- FreeIPA/DNS: UP / DOWN
-- CoreDNS: UP / DOWN
-
-**K8s rescheduling behavior:**
-```
-Did it try to move pods to masters? YES / NO
-```
-
-### After Restore
-
-**Automatic recovery:** YES / NO — which pods?
-**Manual intervention needed:** YES / NO — what?
-**Stale mounts found:** YES / NO — how fixed?
-**MariaDB data intact:** YES / NO
-**WordPress accessible:** YES / NO
-**Recovery time (NAS up → WordPress serving):**
-
-**Result:** PASS / FAIL
-**Notes:**
-
----
-
-## Scenario 4 — Full NAS Shutdown
-
-**Time NAS shutdown:**
-**Time NAS restored:**
-**Total outage duration:**
-
-### During Outage
-
-**Pod behavior (all namespaces):**
-```
-PASTE kubectl get pods -A OUTPUT (captured ~2 min after shutdown)
-```
-
-**WordPress:**
-```
-Time to first error:
-Time to CrashLoopBackOff:
-Logs:
-```
-
-**MariaDB:**
-```
-Status:
-Logs:
-Hard mount behavior (hanging?):
-```
-
-**Prometheus:**
-```
-Status:
-```
-
-**Grafana:**
-```
-Status:
-```
-
-**Loki:**
-```
-Status:
-```
-
-**Alertmanager:**
-```
-Status:
-```
-
-**Remediation pod behavior:**
-```
-Status:
-Did it try to auto-heal anything?
-Any unexpected side effects?
-```
-
-**FreeIPA during outage:**
-```
-DNS resolution working? YES / NO
-Identity services working? YES / NO
-```
-
-**Proxmox during outage:**
-```
-Any VM disk affected? YES / NO
-Config backup affected? YES / NO
-```
-
-**Components confirmed UP:**
-- ingress-nginx: UP / DOWN
-- Vault: UP / DOWN
-- Flux: UP / DOWN
-- etcd: UP / DOWN
-- K8s API server: UP / DOWN
-
-### After Restore
-
-**NAS export available:**
-```
-showmount -e 10.0.40.120 output:
-```
-
-**Stale mounts found on workers:**
-```
-Worker1: YES / NO
-Worker2: YES / NO
-Worker3: YES / NO
-Fix applied:
-```
-
-**Pod recovery:**
-```
-Auto-recovered:
-Required manual restart:
-Required manual intervention:
-```
-
-**MariaDB:**
-```
-Resumed automatically? YES / NO
-Data intact? YES / NO
-Tables verified:
-```
-
-**WordPress:**
-```
-Accessible? YES / NO
-Media loading? YES / NO
-Recovery time:
-```
-
-**PVC state after recovery:**
-```
-kubectl get pvc -A output:
-kubectl get pv | grep Released output:
-```
-
-**Total recovery time (NAS up → full service restored):**
-
-**Result:** PASS / FAIL
-**Notes:**
-
----
-
-## Scenario 5 — New Pod Creation During Full NAS Outage
-
-**Time tested:**
-
-**Action:**
-```
-kubectl apply -f test-pvc.yaml (during NAS outage)
-```
-
-**PVC behavior:**
-```
-Status:
-Error message from kubectl describe:
-```
-
-**Pod behavior:**
-```
-Status:
-Error message:
-```
-
-**Auto-recovery when NAS restored:** YES / NO
-**Time to PVC Bound after NAS restore:**
-
-**Result:** PASS / FAIL
-**Notes:**
-
----
-
-## Scenario 6 — etcd Backup During NAS Outage
-
-**Time tested:**
-
-**Action:**
+**After restore (eth1 up):**
 ```bash
-kubectl create job --from=cronjob/etcd-backup etcd-backup-dr-test -n etcd-backup
+kubectl get pods -o wide -n apps
+```
+```
+wordpress-...-484ht   2/2   Running   worker3 ✅
+wordpress-...-mb4ql   2/2   Running   worker2 ✅
+wordpress-...-pxlpm   2/2   Running   worker1 ✅  ← Recovered to 2/2
 ```
 
-**Job behavior:**
+```bash
+kubectl get endpoints wordpress -n apps
 ```
-kubectl get pods -n etcd-backup output:
 ```
-
-**Vault injection during outage (no NFS dependency):**
-```
-vault-agent-init succeeded? YES / NO
+wordpress   10.244.207.88:80,10.244.29.139:80,10.244.62.9:80  ← All 3 back in endpoints
 ```
 
-**Backup failure point:**
+**Traffic test after restore:**
 ```
-Failed at: NFS write / earlier step
-Logs:
+Request 1:  HTTP 000 - 3.002s  ← Brief window during NFS reconnect
+Request 2:  HTTP 000 - 3.002s  ← Brief window during NFS reconnect
+Request 3:  HTTP 200 - 0.606s  ✅
+Request 4:  HTTP 200 - 0.870s  ✅
+Request 5-10: HTTP 200         ✅
 ```
-
-**Job cleanup:** Clean / Stuck
-
-**Result:** PASS / FAIL
-**Notes:**
-
----
-
-## Overall Summary
-
-| Scenario | Result | Recovery | Manual Intervention |
-|---|---|---|---|
-| 1 — Single worker NFS down | PASS/FAIL | Auto/Manual | YES/NO |
-| 2 — Two workers NFS down | PASS/FAIL | Auto/Manual | YES/NO |
-| 3 — All workers NFS down | PASS/FAIL | Auto/Manual | YES/NO |
-| 4 — Full NAS shutdown | PASS/FAIL | Auto/Manual | YES/NO |
-| 5 — New pod during outage | PASS/FAIL | Auto/Manual | YES/NO |
-| 6 — etcd backup during outage | PASS/FAIL | Auto/Manual | YES/NO |
-
----
-
-## Key Findings
-
-(Fill after completing all scenarios)
-
-**What recovered automatically:**
-
-**What required manual intervention:**
-
-**Unexpected behaviors:**
-
-**Action items / improvements:**
-- [ ] **Grafana HA:** Add 2 replicas with pod anti-affinity to survive single worker failure
-- [ ] **WordPress readiness probe:** Consider checking NFS-mounted path to detect stale mounts
+Note: First 2 requests hit worker1 during NFS mount recovery. After ~6s, fully recovered.
 
 ---
 

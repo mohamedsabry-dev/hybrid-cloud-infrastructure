@@ -1,7 +1,5 @@
-# DR Test Result: Mid-Transaction WordPress Kill
-# Test Date: 2026-04-13
-# Environment: DEV cluster
-# Tester: Sabry
+# Mid-Upload Scale to Zero
+# Date: 2026-04-13
 # Result: PASS
 
 ---

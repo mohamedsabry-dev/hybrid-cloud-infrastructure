@@ -1,0 +1,16 @@
+12 Sessions — Revised Topic Plan and Conslidation Phase and extrcat the signal flow patterns
+
+Vault Injector ↔ Kubernetes (done today — signal flow complete)     # Completed 12 April
+Flux — (done today — signal flow complete)                          # Completed 12 April
+Storage ↔ NFS — PV, PVC, StorageClass, CSI driver, dynamic provisioning ## Completed 13 April 
+
+
+WordPress ↔ Deployments — stateless app, replicas, sessions, rolling update
+MariaDB ↔ StatefulSet — ordered deployment, stable identity, PVC binding
+Ingress — ingress-nginx, routing, TLS termination, your setup // Endpoints and service and cluster ip 
+Grafana ↔ Prometheus ↔ Loki — full observability stack as one session
+etcd ↔ Vault ↔ AWS — backup operation, dynamic credentials, KMS unseal
+Remediation ↔ Vault ↔ Proxmox — how remediation works, Vault injection, Proxmox API
+Priority Classes — what they are, why you have them, how they protect critical workloads
+FreeIPA — identity, CA, DNS, Kerberos, how everything depends on it
+Ansible — playbook structure, inventory, roles, how it ties your whole infrastructure together

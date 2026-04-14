@@ -1,0 +1,45 @@
+git push
+  └─► GitHub stores commit (new SHA assigned)
+        └─► source-controller polls (1m) via SSH deploy key
+              ├── same SHA → skip, wait next interval
+              └── new SHA → pulls repo → verifies → creates Artifact (SHA + checksum + local path)
+                    └─► kustomize-controller sees new Artifact
+                          └─► dependency check (dependsOn):
+                                ├── apps blocked until infrastructure READY: true
+                                └── infrastructure proceeds first
+                                      └─► for each Kustomization in order:
+                                            ├── STEP 1: fetch Artifact → extract configured path only
+                                            ├── STEP 2: kustomize build → resolve resources → apply patches → produce final manifests
+                                            ├── STEP 3: calculate diff → compare manifests against current cluster state
+                                            ├── STEP 4: apply to API server → write to etcd → stamp ownership labels:
+                                            │           kustomize.toolkit.fluxcd.io/name: infrastructure
+                                            ├── STEP 5: prune (if true) → delete any resource stamped with this name but not in latest apply
+                                            │           WARNING: rename Kustomization + prune:true = mass deletion (TS-K8S-019)
+                                            ├── STEP 6: healthCheck (if defined) → wait until resource healthy → timeout → mark not READY
+                                            │           WARNING: healthCheck on deleted resource = deadlock forever
+                                            └── STEP 7: update status
+                                                  ├── READY: true  → unblocks dependsOn children
+                                                  └── READY: false → children remain blocked
+                                                        └─► helm-controller (parallel, watches HelmRelease objects):
+                                                              ├── source-controller polls HelmRepository (1h) → downloads chart → Artifact
+                                                              ├── helm-controller fetches chart Artifact → renders with values block
+                                                              ├── no release exists → helm install
+                                                              ├── release exists + changed → helm upgrade
+                                                              ├── nothing changed → no-op
+                                                              └── HelmRelease deleted (by prune) → helm uninstall → ALL resources gone (TS-K8S-019)
+                                                                    └─► notification-controller:
+                                                                          ├── watches all Flux objects for status changes
+                                                                          ├── Alert + Provider configured → sends to Slack/Teams/GitHub
+                                                                          └── receives GitHub webhook → triggers immediate reconcile (bypasses poll interval)
+
+every 5m (interval) — even with no git change:
+  └─► kustomize-controller re-runs full cycle → drift correction
+        ├── manual kubectl edit → Flux reverts on next reconcile
+        ├── manual kubectl delete → Flux recreates on next reconcile
+        └── manual kubectl apply (no ownership label) → Flux ignores, resource stays unmanaged
+
+flux manages itself:
+  └─► gotk-sync.yaml (root) → flux-system Kustomization watches ./kubernetes/dev/flux
+        └─► finds infrastructure-sync.yaml + apps-sync.yaml → creates those Kustomization objects
+              └─► patches in kustomization.yaml merge onto gotk-components.yaml
+                    └─► Flux configures its own controllers (replicas, anti-affinity) via GitOps

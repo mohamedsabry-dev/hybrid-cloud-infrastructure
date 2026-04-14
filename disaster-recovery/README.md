@@ -1,10 +1,10 @@
-# Kubernetes & Vault Cluster — Chaos Engineering Test Plan v5
+# Disaster Recovery Test Results
 
 ---
 
 ## Real Incidents Before DR Testing
 
-Before the planned DR test phase even began, real production incidents occurred that validated (and exposed gaps in) the architecture. These unplanned failures provided authentic disaster recovery experience:
+Before the planned DR test phase even began, real production incidents occurred that validated (and exposed gaps in) the architecture:
 
 **Incident 1: Power Outage (April 9, 2026)**
 - Triggered 5+ troubleshooting cases
@@ -14,7 +14,7 @@ Before the planned DR test phase even began, real production incidents occurred 
 **Incident 2: Prod Worker VM Crash (April 11, 2026)**
 - Worker VM crashed ~1 minute after boot, unknown cause
 - Exposed remediation pod bug (can't reboot stopped VMs), vault-injector race condition
-- Led to architecture improvements: remediation status check, vault-injector moved to masters
+- Led to architecture improvements: remediation status check, vault-injector 2 replicas
 - Related cases: TS-PVE-014, TS-K8S-021, TS-K8S-022, TS-K8S-023
 
 **Incident 3: Dev Proxmox Crash During Backup (April 11, 2026)**
@@ -23,43 +23,58 @@ Before the planned DR test phase even began, real production incidents occurred 
 - Exposed stale Raft data recovery procedure
 - Related cases: TS-PVE-015, TS-VLT-005, TS-K8S-024
 
-These real incidents proved more valuable than planned tests because they exposed gaps (like remediation not handling stopped VMs) that careful simulation might have missed.
+---
+
+## Completed Tests
+
+| Test | Domain | Result | Key Finding |
+|------|--------|--------|-------------|
+| [proxmox-vzdump-backup](proxmox-vzdump-backup.md) | Backup | PASS | Live backups non-disruptive to pods |
+| [etcd-backup-s3](etcd-backup-s3.md) | Backup | PASS | Manual + automated S3 backup working |
+| [etcd-s3-backup-validation](etcd-s3-backup-validation.md) | Backup | PASS | Snapshot integrity verified |
+| [etcd-single-node-failure](etcd-single-node-failure.md) | etcd | PASS | Quorum maintained, auto-recovery works |
+| [pod-kill-tests](pod-kill-tests.md) | Compute | PARTIAL | Race condition found → 2 replicas fix |
+| [mid-upload-scale-zero](mid-upload-scale-zero.md) | Compute | PASS | InnoDB rollback works, no corruption |
+| [single-worker-nfs-down](single-worker-nfs-down.md) | Storage | PASS | NFS readiness probe fix applied |
+| [vault-single-node-down](vault-single-node-down.md) | Vault | Reference | Real incident validated HA |
+| [vault-quorum-loss](vault-quorum-loss.md) | Vault | PASS | 2/3 down recovery documented |
+| [vault-aws-kms-dependency](vault-aws-kms-dependency.md) | Vault | PASS | Auto-unseal failure handling verified |
 
 ---
 
-## How to Use This Plan
+## Pending Tests
 
-Each Task is a failure domain (Compute, Network, Storage, etc.).
-Each Task contains numbered **Scenarios** that escalate in severity.
-After every Scenario, run the **Observation Checklist** at the bottom of that Task.
-Execute Task 0 (Backup & Restore) FIRST — it's your safety net before any destructive testing.
-
----
-
-## Tasks
-
-| Task | Failure Domain | Scenarios | Status |
-|------|---------------|-----------|--------|
-| [Task 0](task-0-backup-restore/PLAN.md) | Backup & Restore Validation | 0.1 – 0.2 | DONE |
-| [Task 1](task-1-pod-kill/PLAN.md) | Single Pod Kill | 1.1 | DONE |
-| [Task 1a](task-1a-pod-scale/PLAN.md) | Pod Scale Failures | 1.2 – 1.4 | TODO |
-| [Task 1b](task-1b-worker-kill/PLAN.md) | Worker Node Failures | 1.5 – 1.8 | TODO |
-| [Task 1c](task-1c-master-kill/PLAN.md) | Master/Quorum Failures | 1.9 – 1.14 | TODO |
-| [Task 1d](task-1d-auto-recovery/PLAN.md) | Auto-Recovery (Proxmox) | 1.15 | TODO |
-| [Task 2](task-2-kill-network/PLAN.md) | Kill Network | 2.1 – 2.5 | TODO |
-| [Task 3](task-3-kill-storage/PLAN.md) | Kill Storage | 3.1 – 3.x | TODO |
-| [Task 4](task-4-kill-vault/PLAN.md) | Kill Vault | 4.1 – 4.4 | TODO |
-| [Task 5](task-5-kill-power/PLAN.md) | Kill Power / Infrastructure | 5.1 – 5.x | TODO |
+| Test | Domain | Priority | Notes |
+|------|--------|----------|-------|
+| [tmp-full-nas-shutdown](tmp-full-nas-shutdown.md) | Storage | CRITICAL | Most realistic disaster scenario |
+| [tmp-etcd-full-cluster-restore](tmp-etcd-full-cluster-restore.md) | etcd | CRITICAL | Validate S3 backup restore path |
+| [tmp-external-nginx-down](tmp-external-nginx-down.md) | Network | CRITICAL | SPOF confirmation |
+| [tmp-ingress-nginx-kill](tmp-ingress-nginx-kill.md) | Network | HIGH | Combine with external nginx test |
+| [tmp-partial-worker-loss](tmp-partial-worker-loss.md) | Compute | HIGH | 2/3 workers down + remediation |
+| [tmp-partial-master-loss](tmp-partial-master-loss.md) | Control Plane | HIGH | 2/3 masters, API server behavior |
+| [tmp-ipa-domain-down](tmp-ipa-domain-down.md) | Identity | HIGH | Trace DNS/auth dependencies |
+| [tmp-pod-creation-during-nfs-outage](tmp-pod-creation-during-nfs-outage.md) | Storage | MEDIUM | Run during NAS shutdown test |
+| [tmp-graceful-power-down](tmp-graceful-power-down.md) | Power | MEDIUM | Document shutdown order |
+| [tmp-recovery-boot-sequence](tmp-recovery-boot-sequence.md) | Power | MEDIUM | Document startup order |
 
 ---
 
-## Known SPOFs (Accepted):
+## Key Fixes Applied During Testing
+
+| Fix | File | Issue |
+|-----|------|-------|
+| vault-agent-injector 2 replicas | helm-release.yaml | Race condition on simultaneous restart |
+| WordPress NFS readiness probe | deployment.yaml | Traffic routed to broken NFS pod |
+| Grafana 3 replicas + RWX | helm-release.yaml | Single replica SPOF |
+| Remediation VM status check | configmap.yaml | Couldn't handle stopped VMs |
+
+---
+
+## Known SPOFs (Accepted)
 
 - FreeIPA (single instance)
 - NAS / NFS storage (single instance)
 - External NGINX (single LXC)
 - MariaDB (single instance)
 - VPN Tunnel
-- Router
-- Switch
-- AP
+- Router / Switch / AP
