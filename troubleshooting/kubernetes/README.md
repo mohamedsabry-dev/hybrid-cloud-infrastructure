@@ -56,6 +56,8 @@ Each case document follows this format:
 | [026](26-released-pvs-cleanup.md) | 2026-04-13 | RESOLVED | Released PVs Cleanup (Orphaned Storage) | Storage |
 | [027](27-wordpress-php-upload-limits.md) | 2026-04-13 | RESOLVED | WordPress PHP Upload Limits | Application |
 | [028](28-nginx-proxy-body-size-413-error.md) | 2026-04-13 | RESOLVED | External Nginx Proxy 413 Body Size Error | Networking / Proxy |
+| [029](29-wordpress-readiness-probe-nfs-detection.md) | 2026-04-13 | RESOLVED | WordPress Readiness Probe NFS Detection | Storage / Application |
+| [030](30-worker3-memory-exhaustion-vm-crash.md) | 2026-04-14 | RESOLVED | Worker3 Memory Exhaustion VM Crash | Resources / HA |
 
 ---
 
@@ -70,6 +72,7 @@ Each case document follows this format:
 - [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) - CSI NFS Restart Stale Mount
 - [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) - CSI NFS Controller Network Isolation
 - [026](26-released-pvs-cleanup.md) - Released PVs Cleanup (Orphaned Storage)
+- [029](29-wordpress-readiness-probe-nfs-detection.md) - WordPress Readiness Probe NFS Detection
 
 ### GitOps (Flux)
 - [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) - Flux Stuck on Old Revision
@@ -82,6 +85,7 @@ Each case document follows this format:
 - [009](9-k8s-scheduler-limitations-and-advanced-scheduling.md) - Scheduler Limitations
 - [013](13-k8s-master-node-resource-exhaustion.md) - Master Node Resource Exhaustion
 - [016](16-pod-priority-classes-dr-readiness.md) - Pod Priority Classes
+- [030](30-worker3-memory-exhaustion-vm-crash.md) - Worker3 Memory Exhaustion VM Crash
 
 ### Security (Vault)
 - [014](14-vault-k8s-auth-service-account-not-authorized.md) - Vault K8s Auth Not Authorized
@@ -97,6 +101,7 @@ Each case document follows this format:
 - [011](11-wordpress-plugin-version-incompatibility-blank-page.md) - WordPress Plugin Incompatibility
 - [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility
 - [027](27-wordpress-php-upload-limits.md) - WordPress PHP Upload Limits
+- [029](29-wordpress-readiness-probe-nfs-detection.md) - WordPress Readiness Probe NFS Detection
 
 ### Monitoring
 - [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility

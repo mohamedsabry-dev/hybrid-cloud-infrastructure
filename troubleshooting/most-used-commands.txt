@@ -1,0 +1,746 @@
+# Most Used Troubleshooting Commands
+# Extracted from 89 troubleshooting cases across hybrid cloud infrastructure
+# Organized by technology stack
+
+################################################################################
+# KUBERNETES (kubectl, helm, flux)
+################################################################################
+
+# --- Pod and Deployment Management ---
+
+kubectl get pods -A -o wide
+# List all pods across namespaces with node placement
+
+kubectl get pods -n <namespace> -o wide -w
+# Watch pods scheduling and status changes in real-time
+
+kubectl describe node <node-name> | grep -A 15 Conditions
+# Show node conditions (memory pressure, disk pressure, network status)
+
+kubectl get events -A --field-selector reason=NodeNotReady
+# Find all nodes that went offline
+
+kubectl get events -A --field-selector reason=NodeReady
+# Track node recovery timeline
+
+kubectl get events -A | grep <pod-name>
+# Find events for specific pod
+
+kubectl get pods <pod-name> -o jsonpath='{.spec.tolerations}'
+# Check pod's eviction tolerances
+
+kubectl rollout restart -n <namespace> deploy/<deployment-name>
+# Rolling restart of deployment (zero-downtime)
+
+kubectl rollout status -n <namespace> deploy/<deployment-name>
+# Wait for rollout to complete
+
+kubectl delete pod <pod-name> -n <namespace> --grace-period=0 --force
+# Force immediate pod termination (use with caution)
+
+kubectl get pods -A -o wide --field-selector spec.nodeName=<node-name>
+# List all pods on specific node
+
+# --- Network and Service Connectivity ---
+
+curl http://<POD_IP>:<PORT>
+# Test pod directly (bypass kube-proxy/Calico)
+
+curl http://<CLUSTER_IP>:<PORT>
+# Test ClusterIP service
+
+curl http://<NODE_IP>:<NODE_PORT>
+# Test NodePort service
+
+kubectl get endpoints -n <namespace>
+# Check service endpoints
+
+# --- Calico CNI Diagnostics ---
+
+calicoctl node status
+# Show BGP peer status and health
+
+ip route | grep 10.244
+# Verify pod network routes exist
+
+kubectl get daemonset calico-node -n kube-system -o yaml | grep -A2 IP_AUTODETECTION
+# Check Calico IP autodetection method
+
+kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD="cidr=10.0.64.0/24,10.0.61.0/24"
+# Configure Calico to use specific NICs (multi-NIC fix)
+
+kubectl rollout status daemonset/calico-node -n kube-system
+# Wait for Calico DaemonSet rollout
+
+# --- Storage and PersistentVolumes ---
+
+kubectl get pvc -A
+# List all PersistentVolumeClaims
+
+kubectl get pvc -n <namespace> -w
+# Watch PVC binding progress
+
+kubectl get pv
+# List all PersistentVolumes
+
+kubectl get pv | grep Released
+# Find orphaned Released PVs
+
+kubectl describe pvc <name> -n <namespace> | tail -30
+# Check PVC provisioning errors
+
+kubectl patch pv <pv-name> -p '{"spec":{"claimRef": null}}'
+# Clear claimRef to return PV to Available state
+
+kubectl exec <pod-name> -n <namespace> -- ls /path/to/nfs/mount
+# Test NFS mount inside pod
+
+kubectl exec <pod-name> -n <namespace> -- cat /proc/mounts | grep nfs
+# Check NFS mount options
+
+kubectl get pods -n kube-system | grep csi
+# Check CSI driver pods status
+
+# --- Flux and GitOps ---
+
+flux get kustomizations
+# Show Flux Kustomization sync status
+
+flux get helmreleases -A
+# List all HelmReleases across namespaces
+
+flux reconcile kustomization <name> --with-source
+# Force Flux to fetch latest from git
+
+flux logs --kind=Kustomization --name=<name>
+# View Flux kustomization logs
+
+flux suspend kustomization <name>
+# Pause Flux reconciliation
+
+flux resume kustomization <name>
+# Resume Flux reconciliation
+
+flux get sources git
+# Check git source sync status
+
+# --- Database (MariaDB/MySQL) ---
+
+kubectl exec -it <pod-name> -n <namespace> -c <container> -- mysql -u root -p -e "SHOW VARIABLES LIKE 'innodb_flush_method';"
+# Check InnoDB flush method (NFS compatibility)
+
+kubectl exec -it <pod-name> -n <namespace> -c <container> -- mysql -u root -p -e "SHOW ENGINE INNODB STATUS\G"
+# Detailed InnoDB status
+
+kubectl exec -it <pod-name> -n <namespace> -c <container> -- mariadb -u root -p -e "SELECT user_login, LEFT(user_pass, 10) as hash_prefix FROM wordpress.wp_users WHERE ID = 1;"
+# Check WordPress password hash
+
+kubectl exec -it <pod-name> -n <namespace> -c <container> -- mariadb -u root -p -e "UPDATE wordpress.wp_users SET user_pass = MD5('YourNewPassword') WHERE user_login = 'admin';"
+# Reset WordPress admin password
+
+# --- Resource Management ---
+
+kubectl describe nodes | grep -E "(Name:|memory)"
+# Quick memory overview per node
+
+kubectl describe node <node-name> | grep -A 10 "Allocated resources"
+# Detailed resource allocation
+
+kubectl top nodes
+# Show actual memory/CPU usage (requires metrics-server)
+
+kubectl top pods -A --sort-by=memory
+# Find most memory-hungry pods
+
+kubectl get events -A --sort-by='.lastTimestamp' | grep -i oom
+# Find OOM kill events
+
+kubectl get events -A --sort-by='.lastTimestamp' | grep -i schedule | tail -20
+# Recent scheduling events
+
+kubectl get deployment -n <namespace> <name> -o yaml | grep -A 20 "affinity"
+# Check pod anti-affinity rules
+
+# --- Vault and Secrets ---
+
+kubectl logs <pod-name> -n <namespace> -c vault-agent-init
+# Check Vault agent init logs
+
+kubectl get sa -n <namespace>
+# List service accounts
+
+kubectl get pod <pod> -o jsonpath='{.spec.serviceAccountName}'
+# Get pod's service account
+
+kubectl describe pod <pod-name> -n <namespace> | grep -A5 "vault.hashicorp.com"
+# Check Vault injection annotations
+
+# --- Monitoring and Health ---
+
+kubectl get helmrelease -n <namespace>
+# Check Helm releases
+
+kubectl get crd servicemonitors.monitoring.coreos.com
+# Verify ServiceMonitor CRD exists
+
+kubectl get servicemonitor -A
+# List all ServiceMonitors
+
+kubectl logs -n monitoring prometheus-0 --tail=50 | grep -i error
+# Check Prometheus errors
+
+################################################################################
+# PROXMOX (qm, pct, pvesm, vzdump)
+################################################################################
+
+# --- VM/CT Operations ---
+
+qm list
+# List all VMs
+
+pct list
+# List all LXC containers
+
+qm start <vmid>
+# Start VM
+
+qm shutdown <vmid>
+# Graceful shutdown VM
+
+qm stop <vmid>
+# Force stop VM
+
+qm status <vmid>
+# Check VM status
+
+pct start <ctid>
+# Start container
+
+pct shutdown <ctid>
+# Graceful shutdown container
+
+qm list | awk 'NR>1 {print $1}' | xargs -I {} qm shutdown {}
+# Graceful shutdown all VMs
+
+pct list | awk 'NR>1 {print $1}' | xargs -I {} pct shutdown {}
+# Graceful shutdown all containers
+
+watch -n 5 'qm list; echo "---"; pct list'
+# Monitor VM/CT status during shutdown
+
+# --- Backup Operations ---
+
+vzdump --all --storage nas-dev-data --mode stop --compress zstd
+# Full backup of all VMs/CTs
+
+vzdump <vmid> --storage <storage> --mode snapshot --compress zstd
+# Snapshot backup single VM
+
+# --- LVM Thin Provisioning ---
+
+lvs -o lv_name,lv_size,data_percent pve/data
+# Check thin pool actual usage
+
+vgs pve -o vg_name,vg_size,vg_free
+# Check volume group free space
+
+lvremove pve/data
+# Delete thin pool (DANGEROUS - backup first!)
+
+lvcreate -L 250G -T /dev/pve/data
+# Create thin pool at specific size
+
+lvs -a -o +devices > /tmp/lvs-backup.txt
+# Backup LVM configuration
+
+vgs -o +devices > /tmp/vgs-backup.txt
+# Backup volume group configuration
+
+# --- SSL Certificates ---
+
+rm /etc/pve/local/pve-ssl.pem /etc/pve/local/pve-ssl.key
+# Delete old SSL certificates
+
+pvecm updatecerts --force
+# Regenerate SSL certificates
+
+systemctl restart pveproxy
+# Restart Proxmox web UI service
+
+openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -text | grep -A1 "Subject Alternative Name"
+# Verify certificate SANs
+
+# --- Cron Job Management ---
+
+crontab -l
+# List current cron jobs
+
+crontab -l > ~/crontab-backup.txt
+# Backup crontab before changes
+
+(crontab -l 2>/dev/null; echo "0 4 * * 0 /root/scripts/backup.sh") | crontab -
+# Append cron job safely (preserves existing jobs)
+
+# WARNING: Never use 'echo "job" | crontab -' - it REPLACES entire crontab!
+
+################################################################################
+# VAULT (vault CLI)
+################################################################################
+
+# --- Cluster Operations ---
+
+vault status
+# Check Vault cluster status (sealed/unsealed, HA mode)
+
+source /etc/profile.d/vault.sh && vault status
+# Set VAULT_ADDR and check status
+
+vault operator raft list-peers
+# List Raft cluster members
+
+vault operator step-down
+# Force leader step-down (HA failover test)
+
+# --- Authentication ---
+
+vault login
+# Login interactively
+
+vault login -method=token token=<token>
+# Login with token
+
+vault read auth/kubernetes/role/<role>
+# Read K8s auth role configuration
+
+vault write auth/kubernetes/role/<role> \
+    bound_service_account_names=<sa> \
+    bound_service_account_namespaces=<ns> \
+    policies=<policy> \
+    ttl=1h
+# Configure K8s auth role
+
+vault auth list
+# List enabled auth methods
+
+# --- Secrets ---
+
+vault kv list secret/
+# List secrets at path
+
+vault kv get secret/<path>
+# Read secret
+
+################################################################################
+# IDENTITY (FreeIPA, Kerberos, SSSD)
+################################################################################
+
+# --- Kerberos Ticket Management ---
+
+kinit <username>
+# Obtain Kerberos ticket
+
+klist
+# List active Kerberos tickets
+
+kdestroy
+# Destroy all Kerberos tickets
+
+# --- SSSD Configuration ---
+
+journalctl -u sssd -f
+# Follow SSSD logs
+
+sss_cache -E
+# Clear SSSD cache completely
+
+systemctl restart sssd
+# Restart SSSD service
+
+getent passwd <username>
+# Test user lookup via SSSD
+
+id <username>
+# Check user groups via SSSD
+
+# --- Certificate Management (Certmonger) ---
+
+getcert list
+# List all tracked certificates
+
+getcert list -f /path/to/cert.crt
+# Show specific certificate tracking status
+
+getcert stop-tracking -f /path/to/cert.crt
+# Stop certificate tracking request
+
+ipa-getcert request \
+    -f /path/to/cert.crt \
+    -k /path/to/key.pem \
+    -N CN=<fqdn> \
+    -D <fqdn> \
+    -K service/<fqdn>@REALM
+# Request FreeIPA certificate
+
+# --- IPA Commands ---
+
+ipa user-find <username>
+# Search for user
+
+ipa host-find <hostname>
+# Search for host
+
+ipa service-find
+# List services
+
+################################################################################
+# NETWORKING (ip, wireguard, firewall)
+################################################################################
+
+# --- Static Routes ---
+
+ip route
+# Show routing table
+
+ip route | grep <subnet>
+# Check specific route
+
+sudo route add -net 10.0.0.0/8 <gateway>
+# Add static route (Linux)
+
+sudo route add -net 10.0.0.0/8 192.168.0.175
+# Add static route (macOS)
+
+netstat -rn | grep "^10"
+# Verify route installed
+
+# --- Network Diagnostics ---
+
+ip addr show
+# Show all interfaces and IPs
+
+ip link show
+# Show interface status
+
+ping -c 3 <host>
+# Test connectivity
+
+traceroute <host>
+# Trace network path
+
+nc -zv <host> <port>
+# Test TCP port connectivity
+
+curl -v telnet://<host>:<port>
+# Test TCP connection with verbose output
+
+ss -tlnp
+# Show listening TCP ports
+
+ss -ulnp
+# Show listening UDP ports
+
+# --- Firewall (firewalld) ---
+
+firewall-cmd --list-all
+# Show current firewall rules
+
+firewall-cmd --add-port=<port>/tcp --permanent
+# Add port permanently
+
+firewall-cmd --reload
+# Reload firewall rules
+
+################################################################################
+# GIT/GITHUB (git, gh)
+################################################################################
+
+# --- History Inspection (Security Audit) ---
+
+git log -p --all | grep -iE "(aws_account|account_id|AKIA[A-Z0-9]{16})"
+# Search for AWS credentials in history
+
+git log -p --all | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u | grep -v "^10\.\|^192\.168\.\|^172\.1[6-9]\."
+# Search for public IPs in history
+
+git log -p --all | grep -iE "(password|secret|token|key)"
+# Quick scan for common secret patterns
+
+git log -p --all | grep -E "<SENSITIVE_VALUE>" | head -5
+# Verify secrets removed after cleanup
+
+# --- History Cleanup (git-filter-repo) ---
+
+git filter-repo --replace-text cleanup-secrets.txt --force
+# Rewrite git history with secret replacement
+
+git remote add origin git@github.com:USERNAME/REPO.git
+# Re-add remote after filter-repo (it removes remotes)
+
+git push origin --force --all
+# Force push all branches after cleanup
+
+git push origin --force --tags
+# Force push all tags after cleanup
+
+# --- GitHub CLI (gh) ---
+
+gh pr list
+# List open pull requests
+
+gh pr view <number>
+# View PR details
+
+gh issue list
+# List open issues
+
+gh workflow list
+# List GitHub Actions workflows
+
+gh run list
+# List recent workflow runs
+
+gh run view <run-id> --log-failed
+# View failed run logs
+
+################################################################################
+# LINUX/SYSTEM (systemctl, journalctl)
+################################################################################
+
+# --- Service Management ---
+
+systemctl status <service>
+# Check service status
+
+systemctl start <service>
+# Start service
+
+systemctl stop <service>
+# Stop service
+
+systemctl restart <service>
+# Restart service
+
+systemctl enable <service>
+# Enable service at boot
+
+systemctl disable <service>
+# Disable service at boot
+
+systemctl list-units --failed
+# List failed services
+
+# --- Log Inspection ---
+
+journalctl -u <service> -f
+# Follow service logs in real-time
+
+journalctl -u <service> --since "2 hours ago"
+# Logs from last 2 hours
+
+journalctl -u <service> --since "2 hours ago" | grep -i error
+# Search logs in time range
+
+journalctl -xe
+# Recent logs with explanations
+
+journalctl --disk-usage
+# Check journal disk usage
+
+# --- System Resources ---
+
+free -h
+# Check memory usage
+
+df -h
+# Check disk usage
+
+ps aux --sort=-%mem | head -20
+# Find most memory-hungry processes
+
+ps aux --sort=-%cpu | head -20
+# Find most CPU-hungry processes
+
+top -b -n 1 | head -20
+# Snapshot of top processes
+
+htop
+# Interactive process viewer
+
+dmesg | tail -50
+# Recent kernel messages
+
+dmesg | grep -i nfs
+# Check kernel messages for NFS issues
+
+dmesg | grep -i error
+# Check kernel messages for errors
+
+uptime
+# System uptime and load average
+
+# --- Certificate Inspection ---
+
+openssl x509 -in /path/to/cert.pem -noout -text
+# Full certificate details
+
+openssl x509 -in /path/to/cert.pem -noout -dates
+# Certificate validity dates
+
+openssl x509 -in /path/to/cert.pem -noout -subject
+# Certificate subject
+
+openssl x509 -in /path/to/cert.pem -noout -issuer
+# Certificate issuer
+
+openssl x509 -in /path/to/cert.pem -noout -text | grep -A1 "Subject Alternative Name"
+# Certificate SANs
+
+openssl s_client -connect <host>:443 -servername <host> </dev/null 2>/dev/null | openssl x509 -noout -dates
+# Check remote certificate expiry
+
+# --- Package Management (DNF/YUM) ---
+
+rpm -q <package>
+# Check if package installed
+
+rpm -qa | grep <pattern>
+# Search installed packages
+
+dnf list installed | grep <pattern>
+# List installed packages matching pattern
+
+dnf clean all
+# Clear DNF cache
+
+dnf makecache
+# Rebuild DNF cache
+
+dnf config-manager --set-disabled <repo>
+# Disable repository
+
+rpm -q gpg-pubkey --qf '%{NAME}-%{VERSION}-%{RELEASE}\t%{SUMMARY}\n'
+# List imported GPG keys
+
+rpm --import <url>
+# Import GPG key from URL
+
+################################################################################
+# AWS (aws CLI)
+################################################################################
+
+# --- EC2 ---
+
+aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0]]' --output table
+# List instances with names and status
+
+aws ec2 describe-security-groups --filters "Name=vpc-id,Values=<vpc-id>" "Name=group-name,Values=default" --query 'SecurityGroups[0].GroupId' --output text
+# Get default security group for VPC
+
+aws ec2 modify-instance-attribute --instance-id <id> --groups <sg-id>
+# Change instance security groups
+
+# --- S3 ---
+
+aws s3 ls s3://<bucket>/
+# List bucket contents
+
+aws s3 cp <local-file> s3://<bucket>/<path>
+# Upload file to S3
+
+aws s3 sync <local-dir> s3://<bucket>/<path>
+# Sync directory to S3
+
+# --- IAM ---
+
+aws sts get-caller-identity
+# Check current AWS identity
+
+################################################################################
+# NFS/STORAGE
+################################################################################
+
+# --- NFS Mount Operations ---
+
+mount | grep nfs
+# Show current NFS mounts
+
+showmount -e <nfs-server-ip>
+# List exported shares on NFS server
+
+df -h /path/to/nfs/mount
+# Check NFS mount disk usage
+
+mount -t nfs <server>:<export> /mnt/test
+# Test mount manually
+
+umount /mnt/test
+# Unmount
+
+# --- NFS Troubleshooting ---
+
+nfsstat -c
+# NFS client statistics
+
+nfsstat -s
+# NFS server statistics
+
+rpcinfo -p <nfs-server>
+# Check RPC services on NFS server
+
+# --- Stale Mount Recovery ---
+
+umount -f /path/to/stale/mount
+# Force unmount (may not work if processes using)
+
+umount -l /path/to/stale/mount
+# Lazy unmount (detach immediately, cleanup later)
+
+fuser -m /path/to/mount
+# Find processes using mount
+
+lsof +D /path/to/mount
+# List open files on mount
+
+################################################################################
+# TERRAFORM
+################################################################################
+
+terraform init
+# Initialize working directory
+
+terraform plan
+# Preview changes
+
+terraform apply
+# Apply changes
+
+terraform apply -auto-approve
+# Apply without confirmation (use with caution)
+
+terraform destroy
+# Destroy all resources
+
+terraform state list
+# List resources in state
+
+terraform state show <resource>
+# Show resource details
+
+terraform import <resource> <id>
+# Import existing resource into state
+
+terraform refresh
+# Update state with real infrastructure
+
+terraform output
+# Show outputs
+
+terraform fmt -recursive
+# Format all .tf files
+
+terraform validate
+# Validate configuration syntax
+
+################################################################################
+# END OF FILE
+################################################################################
