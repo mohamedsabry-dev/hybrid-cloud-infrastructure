@@ -13,7 +13,7 @@ Each subfolder contains troubleshooting tickets numbered sequentially within tha
 | [aws/](aws/) | 1 | AWS CloudFormation, IAM |
 | [github/](github/) | 10 | GitHub Actions, runners, workflows, git operations |
 | [identity/](identity/) | 8 | FreeIPA, Kerberos, SSSD, authentication |
-| [kubernetes/](kubernetes/) | 24 | K8s cluster, pods, networking, storage, GitOps |
+| [kubernetes/](kubernetes/) | 30 | K8s cluster, pods, networking, storage, GitOps |
 | [linux/](linux/) | 2 | OS-level issues (Rocky Linux, NTP) |
 | [macos/](macos/) | 2 | macOS client configuration |
 | [network/](network/) | 5 | Routing, WireGuard, network stability |
@@ -23,7 +23,7 @@ Each subfolder contains troubleshooting tickets numbered sequentially within tha
 
 ---
 
-**Total: 84 troubleshooting cases across 10 categories**
+**Total: 90 troubleshooting cases across 10 categories**
 
 ---
 
@@ -50,16 +50,16 @@ All cases follow a standardized 9-point template:
 ## Quick Stats by Category
 
 ```
-kubernetes/  ████████████████████████  24
-proxmox/     ████████████████          16
-terraform/   ███████████               11
-github/      ██████████                10
-identity/    ████████                   8
-network/     █████                      5
-vault/       █████                      5
-linux/       ██                         2
-macos/       ██                         2
-aws/         █                          1
+kubernetes/  ██████████████████████████████  30
+proxmox/     ████████████████               16
+terraform/   ███████████                    11
+github/      ██████████                     10
+identity/    ████████                        8
+network/     █████                           5
+vault/       █████                           5
+linux/       ██                              2
+macos/       ██                              2
+aws/         █                               1
 ```
 
 ---

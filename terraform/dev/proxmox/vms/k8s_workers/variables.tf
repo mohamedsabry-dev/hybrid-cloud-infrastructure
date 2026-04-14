@@ -37,7 +37,7 @@ variable "k8s_worker1" {
     vmid           = 1020
     name           = "k8s-worker1"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.10/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -83,7 +83,7 @@ variable "k8s_worker2" {
     vmid           = 1021
     name           = "k8s-worker2"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.11/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -129,7 +129,7 @@ variable "k8s_worker3" {
     vmid           = 1022
     name           = "k8s-worker3"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.12/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
