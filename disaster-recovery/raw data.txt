@@ -1,0 +1,1459 @@
+Before Test :: Noted that antiaffinty let worked set beside each other in same node 
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS        AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     0               3m13s   10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     0               3m      10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     0               2m50s   10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     7 (64m ago)     45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0               2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0               25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0               80m     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     helm-controller-844f6958dc-vmdsf                            1/1     Running     16 (125m ago)   6d10h   10.244.62.55     k8s-worker1.lab.local   <none>           <none>
+flux-system     kustomize-controller-67486f5bfd-xjt7t                       1/1     Running     16 (125m ago)   6d10h   10.244.62.49     k8s-worker1.lab.local   <none>           <none>
+flux-system     notification-controller-7f5d7cb966-nnq6g                    1/1     Running     12 (125m ago)   4d6h    10.244.207.84    k8s-worker2.lab.local   <none>           <none>
+flux-system     source-controller-6d8d58659f-nf97c                          1/1     Running     17 (125m ago)   6d10h   10.244.62.44     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-4mjnt                   1/1     Running     10 (125m ago)   6d5h    10.244.207.90    k8s-worker2.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-pfpjh                   1/1     Running     12 (125m ago)   6d5h    10.244.62.34     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-wx4cv                   1/1     Running     7 (125m ago)    4d6h    10.244.207.98    k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-kube-controllers-9dff488b-jl2qq                      1/1     Running     36 (127m ago)   19d     10.244.43.187    k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-756lw                                           1/1     Running     31 (125m ago)   18d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     calico-node-7nzcf                                           1/1     Running     31 (125m ago)   18d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-node-dpvkz                                           1/1     Running     29 (127m ago)   18d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     calico-node-g6prh                                           1/1     Running     29 (127m ago)   18d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-hrpcf                                           1/1     Running     39 (125m ago)   18d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     calico-node-jp9m7                                           1/1     Running     29 (127m ago)   18d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-cb6cw                                    1/1     Running     2 (127m ago)    45h     10.244.25.229    k8s-master3.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-xclvs                                    1/1     Running     12 (127m ago)   7d21h   10.244.14.171    k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-99nbm                         5/5     Running     56 (125m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-snggk                         5/5     Running     42 (64m ago)    4d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-dgfgf                                          3/3     Running     30 (125m ago)   6d5h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-g6cng                                          3/3     Running     28 (125m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-gkdlg                                          3/3     Running     39 (125m ago)   6d5h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     csi-nfs-node-nzmnx                                          3/3     Running     24 (127m ago)   6d5h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-pgxkw                                          3/3     Running     24 (127m ago)   6d5h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-q96fb                                          3/3     Running     25 (127m ago)   6d5h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     etcd-k8s-master1.lab.local                                  1/1     Running     32 (127m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     etcd-k8s-master2.lab.local                                  1/1     Running     32 (127m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     etcd-k8s-master3.lab.local                                  1/1     Running     5 (127m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master1.lab.local                        1/1     Running     37 (127m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master2.lab.local                        1/1     Running     37 (127m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master3.lab.local                        1/1     Running     45 (127m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master1.lab.local               1/1     Running     36 (127m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master2.lab.local               1/1     Running     38 (64m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master3.lab.local               1/1     Running     34 (127m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-6c4z6                                            1/1     Running     32 (127m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-proxy-7sx59                                            1/1     Running     36 (125m ago)   19d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     kube-proxy-8cgvz                                            1/1     Running     32 (127m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-proxy-bq4vp                                            1/1     Running     44 (125m ago)   19d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     kube-proxy-hqnmt                                            1/1     Running     32 (127m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-pmm4p                                            1/1     Running     38 (125m ago)   19d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master1.lab.local                        1/1     Running     35 (127m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master2.lab.local                        1/1     Running     37 (127m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master3.lab.local                        1/1     Running     35 (127m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running     20 (125m ago)   6d5h    10.244.62.48     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-lrvqq              4/4     Running     15 (65m ago)    46h     10.244.207.93    k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-mqbk5              4/4     Running     18 (64m ago)    46h     10.244.62.46     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-pbbn6              4/4     Running     17 (64m ago)    45h     10.244.29.151    k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-kube-state-metrics-567d49447b-tq8sg   1/1     Running     18 (125m ago)   6d5h    10.244.62.63     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-operator-7479866ff6-2dsq8             1/1     Running     13 (125m ago)   6d5h    10.244.62.54     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dffc        1/1     Running     13 (125m ago)   6d5h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dj6h        1/1     Running     10 (125m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-kk2ml        1/1     Running     11 (125m ago)   6d5h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-mkwcn        1/1     Running     8 (127m ago)    6d5h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-th2qz        1/1     Running     8 (127m ago)    6d5h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-xcdmk        1/1     Running     8 (127m ago)    6d5h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      loki-0                                                      2/2     Running     20 (125m ago)   6d5h    10.244.207.114   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-56rnc                                           1/1     Running     9 (125m ago)    6d5h    10.244.207.109   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-fdm8f                                           1/1     Running     10 (125m ago)   6d5h    10.244.62.29     k8s-worker1.lab.local   <none>           <none>
+monitoring      loki-canary-kgp8g                                           1/1     Running     13 (125m ago)   6d5h    10.244.29.148    k8s-worker3.lab.local   <none>           <none>
+monitoring      prometheus-kube-prometheus-stack-prometheus-0               2/2     Running     6 (125m ago)    45h     10.244.29.163    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-54nsf                                              1/1     Running     10 (125m ago)   6d5h    10.244.62.26     k8s-worker1.lab.local   <none>           <none>
+monitoring      promtail-9s5d9                                              1/1     Running     9 (125m ago)    6d5h    10.244.207.120   k8s-worker2.lab.local   <none>           <none>
+monitoring      promtail-9vfn7                                              1/1     Running     13 (125m ago)   6d5h    10.244.29.161    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-bhbmn                                              1/1     Running     8 (127m ago)    6d5h    10.244.14.170    k8s-master2.lab.local   <none>           <none>
+monitoring      promtail-nwmxd                                              1/1     Running     8 (127m ago)    6d5h    10.244.25.230    k8s-master3.lab.local   <none>           <none>
+monitoring      promtail-vm2k5                                              1/1     Running     8 (127m ago)    6d5h    10.244.43.188    k8s-master1.lab.local   <none>           <none>
+remediation     remediation-56bdddfcd7-t8fvv                                2/2     Running     8 (65m ago)     2d19h   10.244.14.172    k8s-master2.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-4h2ts                       1/1     Running     7 (127m ago)    4d      10.244.43.189    k8s-master1.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-cwh5f                       1/1     Running     5 (125m ago)    45h     10.244.14.169    k8s-master2.lab.local   <none>           <none>
+[root@k8s-master1 k8s_admin]# 
+
+[root@ansible dev]#  ssh root@freeipa 'ipactl stop'  
+ipa: INFO: The ipactl command was successful
+Stopping ipa-dnskeysyncd Service
+Stopping ipa-otpd Service
+Stopping pki-tomcatd Service
+Stopping ipa-custodia Service
+Stopping httpd Service
+Stopping named Service
+Stopping kadmin Service
+Stopping krb5kdc Service
+Stopping Directory Service
+[root@ansible dev]# date
+Wed Apr 15 10:00:49 PM EET 2026
+[root@ansible dev]# 
+
+Vault Agent start to fail auth 
+[root@k8s-master1 k8s_admin]# kubectl logs -l app=wordpress -n apps -c vault-agent
+2026-04-15T19:47:07.403Z [INFO]  agent.auth.handler: renewed auth token
+2026-04-15T20:01:33.700Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:01:33.700Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:01:33.700Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 1 after "250ms")
+2026-04-15T20:01:58.328Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 2 after "500ms")
+2026-04-15T20:01:58.328Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:01:58.328Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:02:20.006Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 3 after "1s")
+2026-04-15T20:02:20.006Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:02:20.006Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T19:47:17.276Z [INFO]  agent: (runner) creating watcher
+2026-04-15T19:47:17.338Z [INFO]  agent.auth.handler: authentication successful, sending token to sinks
+2026-04-15T19:47:17.338Z [INFO]  agent.auth.handler: starting renewal process
+2026-04-15T19:47:17.338Z [INFO]  agent.sink.file: token written: path=/home/vault/.vault-token
+2026-04-15T19:47:17.339Z [INFO]  agent.template.server: template server received new token
+2026-04-15T19:47:17.339Z [INFO]  agent: (runner) stopping
+2026-04-15T19:47:17.339Z [INFO]  agent: (runner) creating new runner (dry: false, once: false)
+2026-04-15T19:47:17.339Z [INFO]  agent: (runner) creating watcher
+2026-04-15T19:47:17.340Z [INFO]  agent: (runner) starting
+2026-04-15T19:47:17.347Z [INFO]  agent.auth.handler: renewed auth token
+2026-04-15T19:47:30.428Z [INFO]  agent: (runner) creating watcher
+2026-04-15T19:47:30.455Z [INFO]  agent.auth.handler: authentication successful, sending token to sinks
+2026-04-15T19:47:30.455Z [INFO]  agent.auth.handler: starting renewal process
+2026-04-15T19:47:30.455Z [INFO]  agent.sink.file: token written: path=/home/vault/.vault-token
+2026-04-15T19:47:30.455Z [INFO]  agent.template.server: template server received new token
+2026-04-15T19:47:30.455Z [INFO]  agent: (runner) stopping
+2026-04-15T19:47:30.455Z [INFO]  agent: (runner) creating new runner (dry: false, once: false)
+2026-04-15T19:47:30.455Z [INFO]  agent: (runner) creating watcher
+2026-04-15T19:47:30.456Z [INFO]  agent: (runner) starting
+2026-04-15T19:47:30.463Z [INFO]  agent.auth.handler: renewed auth token
+[root@k8s-master1 k8s_admin]# 
+
+Nothing restarted yet 
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide 
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS        AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     0               15m     10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     0               15m     10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     0               15m     10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     7 (77m ago)     45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0               2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0               25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0               92m     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     helm-controller-844f6958dc-vmdsf                            1/1     Running     16 (138m ago)   6d11h   10.244.62.55     k8s-worker1.lab.local   <none>           <none>
+flux-system     kustomize-controller-67486f5bfd-xjt7t                       1/1     Running     16 (138m ago)   6d11h   10.244.62.49     k8s-worker1.lab.local   <none>           <none>
+flux-system     notification-controller-7f5d7cb966-nnq6g                    1/1     Running     12 (138m ago)   4d6h    10.244.207.84    k8s-worker2.lab.local   <none>           <none>
+flux-system     source-controller-6d8d58659f-nf97c                          1/1     Running     17 (138m ago)   6d11h   10.244.62.44     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-4mjnt                   1/1     Running     10 (138m ago)   6d5h    10.244.207.90    k8s-worker2.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-pfpjh                   1/1     Running     12 (138m ago)   6d5h    10.244.62.34     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-wx4cv                   1/1     Running     7 (138m ago)    4d6h    10.244.207.98    k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-kube-controllers-9dff488b-jl2qq                      1/1     Running     36 (139m ago)   19d     10.244.43.187    k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-756lw                                           1/1     Running     31 (138m ago)   18d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     calico-node-7nzcf                                           1/1     Running     31 (138m ago)   18d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-node-dpvkz                                           1/1     Running     29 (140m ago)   18d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     calico-node-g6prh                                           1/1     Running     29 (139m ago)   18d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-hrpcf                                           1/1     Running     39 (138m ago)   18d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     calico-node-jp9m7                                           1/1     Running     29 (140m ago)   18d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-cb6cw                                    1/1     Running     2 (140m ago)    45h     10.244.25.229    k8s-master3.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-xclvs                                    1/1     Running     12 (140m ago)   7d22h   10.244.14.171    k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-99nbm                         5/5     Running     56 (138m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-snggk                         5/5     Running     42 (77m ago)    4d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-dgfgf                                          3/3     Running     30 (138m ago)   6d5h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-g6cng                                          3/3     Running     28 (138m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-gkdlg                                          3/3     Running     39 (138m ago)   6d5h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     csi-nfs-node-nzmnx                                          3/3     Running     24 (140m ago)   6d5h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-pgxkw                                          3/3     Running     24 (139m ago)   6d5h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-q96fb                                          3/3     Running     25 (140m ago)   6d5h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     etcd-k8s-master1.lab.local                                  1/1     Running     32 (139m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     etcd-k8s-master2.lab.local                                  1/1     Running     32 (140m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     etcd-k8s-master3.lab.local                                  1/1     Running     5 (140m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master1.lab.local                        1/1     Running     37 (139m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master2.lab.local                        1/1     Running     37 (140m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master3.lab.local                        1/1     Running     45 (140m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master1.lab.local               1/1     Running     36 (139m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master2.lab.local               1/1     Running     38 (77m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master3.lab.local               1/1     Running     34 (140m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-6c4z6                                            1/1     Running     32 (139m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-proxy-7sx59                                            1/1     Running     36 (138m ago)   19d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     kube-proxy-8cgvz                                            1/1     Running     32 (140m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-proxy-bq4vp                                            1/1     Running     44 (138m ago)   19d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     kube-proxy-hqnmt                                            1/1     Running     32 (140m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-pmm4p                                            1/1     Running     38 (138m ago)   19d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master1.lab.local                        1/1     Running     35 (139m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master2.lab.local                        1/1     Running     37 (140m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master3.lab.local                        1/1     Running     35 (140m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running     20 (138m ago)   6d5h    10.244.62.48     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-lrvqq              4/4     Running     15 (78m ago)    47h     10.244.207.93    k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-mqbk5              4/4     Running     18 (76m ago)    47h     10.244.62.46     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-pbbn6              4/4     Running     17 (77m ago)    45h     10.244.29.151    k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-kube-state-metrics-567d49447b-tq8sg   1/1     Running     18 (138m ago)   6d5h    10.244.62.63     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-operator-7479866ff6-2dsq8             1/1     Running     13 (138m ago)   6d5h    10.244.62.54     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dffc        1/1     Running     13 (138m ago)   6d5h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dj6h        1/1     Running     10 (138m ago)   6d5h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-kk2ml        1/1     Running     11 (138m ago)   6d5h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-mkwcn        1/1     Running     8 (139m ago)    6d5h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-th2qz        1/1     Running     8 (140m ago)    6d5h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-xcdmk        1/1     Running     8 (140m ago)    6d5h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      loki-0                                                      2/2     Running     20 (138m ago)   6d5h    10.244.207.114   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-56rnc                                           1/1     Running     9 (138m ago)    6d5h    10.244.207.109   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-fdm8f                                           1/1     Running     10 (138m ago)   6d5h    10.244.62.29     k8s-worker1.lab.local   <none>           <none>
+monitoring      loki-canary-kgp8g                                           1/1     Running     13 (138m ago)   6d5h    10.244.29.148    k8s-worker3.lab.local   <none>           <none>
+monitoring      prometheus-kube-prometheus-stack-prometheus-0               2/2     Running     6 (138m ago)    45h     10.244.29.163    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-54nsf                                              1/1     Running     10 (138m ago)   6d5h    10.244.62.26     k8s-worker1.lab.local   <none>           <none>
+monitoring      promtail-9s5d9                                              1/1     Running     9 (138m ago)    6d5h    10.244.207.120   k8s-worker2.lab.local   <none>           <none>
+monitoring      promtail-9vfn7                                              1/1     Running     13 (138m ago)   6d5h    10.244.29.161    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-bhbmn                                              1/1     Running     8 (140m ago)    6d5h    10.244.14.170    k8s-master2.lab.local   <none>           <none>
+monitoring      promtail-nwmxd                                              1/1     Running     8 (140m ago)    6d5h    10.244.25.230    k8s-master3.lab.local   <none>           <none>
+monitoring      promtail-vm2k5                                              1/1     Running     8 (139m ago)    6d5h    10.244.43.188    k8s-master1.lab.local   <none>           <none>
+remediation     remediation-56bdddfcd7-t8fvv                                2/2     Running     8 (78m ago)     2d20h   10.244.14.172    k8s-master2.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-4h2ts                       1/1     Running     7 (139m ago)    4d      10.244.43.189    k8s-master1.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-cwh5f                       1/1     Running     5 (137m ago)    45h     10.244.14.169    k8s-master2.lab.local   <none>           <none>
+[root@k8s-master1 k8s_admin]# 
+
+
+Full back to etc hosts work on node level 
+[root@k8s-master1 k8s_admin]# ping vault.lab.local
+PING vault.lab.local (10.0.62.100) 56(84) bytes of data.
+64 bytes from vault.lab.local (10.0.62.100): icmp_seq=1 ttl=63 time=2.87 ms
+^C
+--- vault.lab.local ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 2.873/2.873/2.873/0.000 ms
+[root@k8s-master1 k8s_admin]# 
+
+sabry@Mohameds-Mac-mini ~ % time curl -I http://wordpress-dev.lab.local 
+HTTP/1.1 200 OK
+Server: nginx/1.26.3
+Date: Wed, 15 Apr 2026 20:04:44 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: keep-alive
+Set-Cookie: wordpress-sticky=1776283480.908.22.767968|f2bd2b074a2457a1ef9b065ade9d78ef; Expires=Fri, 17-Apr-26 20:04:39 GMT; Max-Age=172800; Path=/; HttpOnly
+X-Powered-By: PHP/8.2.30
+Link: <http://wordpress-dev.lab.local/wp-json/>; rel="https://api.w.org/"
+
+curl -I http://wordpress-dev.lab.local  0.01s user 0.01s system 0% cpu 4.909 total
+sabry@Mohameds-Mac-mini ~ % time curl -I http://wordpress-dev.lab.local 
+HTTP/1.1 200 OK
+Server: nginx/1.26.3
+Date: Wed, 15 Apr 2026 20:04:51 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: keep-alive
+Set-Cookie: wordpress-sticky=1776283488.563.23.180359|f2bd2b074a2457a1ef9b065ade9d78ef; Expires=Fri, 17-Apr-26 20:04:47 GMT; Max-Age=172800; Path=/; HttpOnly
+X-Powered-By: PHP/8.2.30
+Link: <http://wordpress-dev.lab.local/wp-json/>; rel="https://api.w.org/"
+
+curl -I http://wordpress-dev.lab.local  0.01s user 0.01s system 0% cpu 4.094 total
+sabry@Mohameds-Mac-mini ~ % 
+
+From web , wordpress delay open like 5-10 seconds but when page open , video content play is smooth 
+the delay only on open step , 
+
+wordpress-dev.lab.local	200	document	Other	15.3 kB	4.19 s
+dashicons.min.css?ver=6.9.4	200	stylesheet	(index):14	(memory cache)	0 ms
+admin-bar.min.css?ver=6.9.4	200	stylesheet	(index):15	(memory cache)	0 ms
+index.min.js?ver=66c613f68580994bb00a	200	script	(index):159	(memory cache)	0 ms
+ImagefYWQfzzc_400x400.jpg	200	jpeg	(index):265	(memory cache)	0 ms
+view.min.js?ver=b0f909c3ec791c383210	200	script	(index):331	(memory cache)	0 ms
+hoverintent-js.min.js?ver=2.2.1	200	script	(index):854	(memory cache)	0 ms
+admin-bar.min.js?ver=6.9.4	200	script	(index):855	(memory cache)	0 ms
+Imagedd10eaca49214cba39083e9011942451bd2e479eae2b5fc5c69d47e905e4ebd4?s=52&d=mm&r=g	304	jpeg	(index):169	0.4 kB	153 ms
+Imagedd10eaca49214cba39083e9011942451bd2e479eae2b5fc5c69d47e905e4ebd4?s=128&d=mm&r=g	304	jpeg	(index):169	0.4 kB	153 ms
+9240272-hd_1080_1920_30fps-1.mp4	206	media	(index):387	(disk cache)	267 ms
+
+wp-emoji-release.min.js?ver=6.9.4	200	script	wp-emoji-loader.min.js:3	(memory cache)	0 ms
+data:application/x-…	200	font	/wp-admin/load-styles.php?c=0&dir=ltr&load%5Bchunk_0%5D=dashicons,buttons,forms,l10n,login&ver=6.9.4	(memory cache)	0 ms
+Manrope-VariableFont_wght.woff2	200	font	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+Imagedata:image/svg+xml;…	200	svg+xml	(index):387	(memory cache)	0 ms
+favicon.ico	302	text/html / Redirect	Other	0.5 kB	4.06 s
+Otherw-logo-blue-white-bg.png	200	png	favicon.ico	(disk cache)	1 ms
+
+Delay 5 second as per devbeloper logs, faviiscpon is jsut the wordpress small icon 
+connection from my lap resolve the http://wordpress-dev.lab.local/ via etc/hosts so no dependancy on ipa on this 
+Al;so nginx external configured to forward to workers as 10.0.64.10-12 , no dependancy on ipa for this 
+so the delay expected to be internally in k8s 
+upstream k8s_workers {
+    least_conn;
+    server 10.0.64.10:30080;
+    server 10.0.64.11:30080;
+    server 10.0.64.12:30080;
+}
+this is part of external nginx config confirm the pointg 
+
+
+----
+Over 10 m in the test and nothing restarted random , suspect old restart of pods because nothing related to the test 
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide 
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS        AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     0               22m     10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     0               22m     10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     0               22m     10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     7 (83m ago)     45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0               2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0               25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0               99m     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     helm-controller-844f6958dc-vmdsf                            1/1     Running     16 (145m ago)   6d11h   10.244.62.55     k8s-worker1.lab.local   <none>           <none>
+flux-system     kustomize-controller-67486f5bfd-xjt7t                       1/1     Running     16 (145m ago)   6d11h   10.244.62.49     k8s-worker1.lab.local   <none>           <none>
+flux-system     notification-controller-7f5d7cb966-nnq6g                    1/1     Running     12 (144m ago)   4d7h    10.244.207.84    k8s-worker2.lab.local   <none>           <none>
+flux-system     source-controller-6d8d58659f-nf97c                          1/1     Running     17 (145m ago)   6d11h   10.244.62.44     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-4mjnt                   1/1     Running     10 (144m ago)   6d6h    10.244.207.90    k8s-worker2.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-pfpjh                   1/1     Running     12 (145m ago)   6d6h    10.244.62.34     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-wx4cv                   1/1     Running     7 (144m ago)    4d7h    10.244.207.98    k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-kube-controllers-9dff488b-jl2qq                      1/1     Running     36 (146m ago)   19d     10.244.43.187    k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-756lw                                           1/1     Running     31 (145m ago)   18d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     calico-node-7nzcf                                           1/1     Running     31 (144m ago)   18d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-node-dpvkz                                           1/1     Running     29 (146m ago)   18d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     calico-node-g6prh                                           1/1     Running     29 (146m ago)   18d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-hrpcf                                           1/1     Running     39 (144m ago)   18d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     calico-node-jp9m7                                           1/1     Running     29 (146m ago)   18d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-cb6cw                                    1/1     Running     2 (146m ago)    45h     10.244.25.229    k8s-master3.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-xclvs                                    1/1     Running     12 (146m ago)   7d22h   10.244.14.171    k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-99nbm                         5/5     Running     56 (144m ago)   6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-snggk                         5/5     Running     42 (83m ago)    4d7h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-dgfgf                                          3/3     Running     30 (145m ago)   6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-g6cng                                          3/3     Running     28 (144m ago)   6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-gkdlg                                          3/3     Running     39 (144m ago)   6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     csi-nfs-node-nzmnx                                          3/3     Running     24 (146m ago)   6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-pgxkw                                          3/3     Running     24 (146m ago)   6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-q96fb                                          3/3     Running     25 (146m ago)   6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     etcd-k8s-master1.lab.local                                  1/1     Running     32 (146m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     etcd-k8s-master2.lab.local                                  1/1     Running     32 (146m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     etcd-k8s-master3.lab.local                                  1/1     Running     5 (146m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master1.lab.local                        1/1     Running     37 (146m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master2.lab.local                        1/1     Running     37 (146m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master3.lab.local                        1/1     Running     45 (146m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master1.lab.local               1/1     Running     36 (146m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master2.lab.local               1/1     Running     38 (83m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master3.lab.local               1/1     Running     34 (146m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-6c4z6                                            1/1     Running     32 (146m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-proxy-7sx59                                            1/1     Running     36 (144m ago)   19d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     kube-proxy-8cgvz                                            1/1     Running     32 (146m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-proxy-bq4vp                                            1/1     Running     44 (144m ago)   19d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     kube-proxy-hqnmt                                            1/1     Running     32 (146m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-pmm4p                                            1/1     Running     38 (145m ago)   19d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master1.lab.local                        1/1     Running     35 (146m ago)   19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master2.lab.local                        1/1     Running     37 (146m ago)   19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master3.lab.local                        1/1     Running     35 (146m ago)   19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running     20 (145m ago)   6d6h    10.244.62.48     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-lrvqq              4/4     Running     15 (84m ago)    47h     10.244.207.93    k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-mqbk5              4/4     Running     18 (83m ago)    47h     10.244.62.46     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-pbbn6              4/4     Running     17 (83m ago)    45h     10.244.29.151    k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-kube-state-metrics-567d49447b-tq8sg   1/1     Running     18 (145m ago)   6d6h    10.244.62.63     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-operator-7479866ff6-2dsq8             1/1     Running     13 (145m ago)   6d6h    10.244.62.54     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dffc        1/1     Running     13 (144m ago)   6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dj6h        1/1     Running     10 (144m ago)   6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-kk2ml        1/1     Running     11 (145m ago)   6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-mkwcn        1/1     Running     8 (146m ago)    6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-th2qz        1/1     Running     8 (146m ago)    6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-xcdmk        1/1     Running     8 (146m ago)    6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      loki-0                                                      2/2     Running     20 (144m ago)   6d6h    10.244.207.114   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-56rnc                                           1/1     Running     9 (144m ago)    6d6h    10.244.207.109   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-fdm8f                                           1/1     Running     10 (145m ago)   6d6h    10.244.62.29     k8s-worker1.lab.local   <none>           <none>
+monitoring      loki-canary-kgp8g                                           1/1     Running     13 (144m ago)   6d6h    10.244.29.148    k8s-worker3.lab.local   <none>           <none>
+monitoring      prometheus-kube-prometheus-stack-prometheus-0               2/2     Running     6 (144m ago)    45h     10.244.29.163    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-54nsf                                              1/1     Running     10 (145m ago)   6d6h    10.244.62.26     k8s-worker1.lab.local   <none>           <none>
+monitoring      promtail-9s5d9                                              1/1     Running     9 (144m ago)    6d6h    10.244.207.120   k8s-worker2.lab.local   <none>           <none>
+monitoring      promtail-9vfn7                                              1/1     Running     13 (144m ago)   6d6h    10.244.29.161    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-bhbmn                                              1/1     Running     8 (146m ago)    6d6h    10.244.14.170    k8s-master2.lab.local   <none>           <none>
+monitoring      promtail-nwmxd                                              1/1     Running     8 (146m ago)    6d6h    10.244.25.230    k8s-master3.lab.local   <none>           <none>
+monitoring      promtail-vm2k5                                              1/1     Running     8 (146m ago)    6d6h    10.244.43.188    k8s-master1.lab.local   <none>           <none>
+remediation     remediation-56bdddfcd7-t8fvv                                2/2     Running     8 (84m ago)     2d20h   10.244.14.172    k8s-master2.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-4h2ts                       1/1     Running     7 (146m ago)    4d      10.244.43.189    k8s-master1.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-cwh5f                       1/1     Running     5 (144m ago)    45h     10.244.14.169    k8s-master2.lab.local   <none>           <none>
+
+
+-- 
+[root@k8s-master1 k8s_admin]# kubectl logs -l app=wordpress -n apps -c vault-agent
+2026-04-15T20:05:35.159Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:07:00.639Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 10 after "1m0s")
+2026-04-15T20:07:00.639Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:07:00.639Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:08:18.875Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 11 after "1m0s")
+2026-04-15T20:08:18.875Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:08:18.875Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:09:43.342Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 12 after "1m0s")
+2026-04-15T20:09:43.342Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:09:43.342Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:07:20.615Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:07:57.182Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:07:57.182Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:07:57.182Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 7 after "16s")
+2026-04-15T20:08:37.181Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 8 after "32s")
+2026-04-15T20:08:37.182Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:08:37.182Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:09:30.685Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 9 after "1m0s")
+2026-04-15T20:09:30.685Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:09:30.685Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:07:45.205Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:08:16.959Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 6 after "8s")
+2026-04-15T20:08:16.959Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:08:16.959Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:08:50.947Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 7 after "16s")
+2026-04-15T20:08:50.947Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:08:50.947Z [ERROR] agent.template.server: template server: could not extract error response
+2026-04-15T20:09:24.805Z [WARN]  agent: (view) vault.read(secret/data/wordpress/config): vault.read(secret/data/wordpress/config): Get "https://vault.lab.local:8200/v1/secret/data/wordpress/config": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving (retry attempt 8 after "32s")
+2026-04-15T20:09:24.805Z [ERROR] agent: (runner) sending server error back to caller
+2026-04-15T20:09:24.805Z [ERROR] agent.template.server: template server: could not extract error response
+[root@k8s-master1 k8s_admin]# 
+Vault agent complete error , pod dont affected because it have cached credential injected whed wordpress contianer started already injected by vault agent init and kept update with vault agent before we stop thew ipa 
+
+Expect exception if pod restart now to not be able to start . because vault agent init will not be able to finish his mission because it relay on internal coredns for resolution whioch relay on ipa
+lets test 
+
+before we do , [root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide 
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS        AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     1 (99s ago)     25m     10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     0               25m     10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     0               25m     10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     8 (42s ago)     45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0               2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0               25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0               102m    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     hel 
+catch live restart with no reason even for DB 
+
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide 
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS         AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     1 (3m30s ago)    27m     10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     0                27m     10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     0                27m     10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     8 (2m33s ago)    45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0                2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0                25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0                104m    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     helm-controller-844f6958dc-vmdsf                            1/1     Running     16 (150m ago)    6d11h   10.244.62.55     k8s-worker1.lab.local   <none>           <none>
+flux-system     kustomize-controller-67486f5bfd-xjt7t                       1/1     Running     16 (150m ago)    6d11h   10.244.62.49     k8s-worker1.lab.local   <none>           <none>
+flux-system     notification-controller-7f5d7cb966-nnq6g                    1/1     Running     12 (150m ago)    4d7h    10.244.207.84    k8s-worker2.lab.local   <none>           <none>
+flux-system     source-controller-6d8d58659f-nf97c                          1/1     Running     17 (150m ago)    6d11h   10.244.62.44     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-4mjnt                   1/1     Running     10 (150m ago)    6d6h    10.244.207.90    k8s-worker2.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-pfpjh                   1/1     Running     12 (150m ago)    6d6h    10.244.62.34     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-wx4cv                   1/1     Running     7 (150m ago)     4d7h    10.244.207.98    k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-kube-controllers-9dff488b-jl2qq                      1/1     Running     36 (151m ago)    19d     10.244.43.187    k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-756lw                                           1/1     Running     31 (150m ago)    18d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     calico-node-7nzcf                                           1/1     Running     31 (150m ago)    18d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-node-dpvkz                                           1/1     Running     29 (151m ago)    18d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     calico-node-g6prh                                           1/1     Running     29 (151m ago)    18d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-hrpcf                                           1/1     Running     39 (150m ago)    18d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     calico-node-jp9m7                                           1/1     Running     29 (151m ago)    18d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-cb6cw                                    1/1     Running     2 (151m ago)     45h     10.244.25.229    k8s-master3.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-xclvs                                    1/1     Running     12 (151m ago)    7d22h   10.244.14.171    k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-99nbm                         5/5     Running     56 (150m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-snggk                         5/5     Running     42 (89m ago)     4d7h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-dgfgf                                          3/3     Running     30 (150m ago)    6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-g6cng                                          3/3     Running     28 (150m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-gkdlg                                          3/3     Running     39 (150m ago)    6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     csi-nfs-node-nzmnx                                          3/3     Running     24 (151m ago)    6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-pgxkw                                          3/3     Running     24 (151m ago)    6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-q96fb                                          3/3     Running     25 (151m ago)    6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     etcd-k8s-master1.lab.local                                  1/1     Running     32 (151m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     etcd-k8s-master2.lab.local                                  1/1     Running     32 (151m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     etcd-k8s-master3.lab.local                                  1/1     Running     5 (151m ago)     19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master1.lab.local                        1/1     Running     37 (151m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master2.lab.local                        1/1     Running     37 (151m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master3.lab.local                        1/1     Running     45 (151m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master1.lab.local               1/1     Running     36 (151m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master2.lab.local               1/1     Running     38 (89m ago)     19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master3.lab.local               1/1     Running     34 (151m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-6c4z6                                            1/1     Running     32 (151m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-proxy-7sx59                                            1/1     Running     36 (150m ago)    19d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     kube-proxy-8cgvz                                            1/1     Running     32 (151m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-proxy-bq4vp                                            1/1     Running     44 (150m ago)    19d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     kube-proxy-hqnmt                                            1/1     Running     32 (151m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-pmm4p                                            1/1     Running     38 (150m ago)    19d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master1.lab.local                        1/1     Running     35 (151m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master2.lab.local                        1/1     Running     37 (151m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master3.lab.local                        1/1     Running     35 (151m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running     20 (150m ago)    6d6h    10.244.62.48     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-lrvqq              4/4     Running     16 (2m21s ago)   47h     10.244.207.93    k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-mqbk5              4/4     Running     19 (94s ago)     47h     10.244.62.46     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-pbbn6              4/4     Running     17 (89m ago)     45h     10.244.29.151    k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-kube-state-metrics-567d49447b-tq8sg   1/1     Running     18 (150m ago)    6d6h    10.244.62.63     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-operator-7479866ff6-2dsq8             1/1     Running     13 (150m ago)    6d6h    10.244.62.54     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dffc        1/1     Running     13 (150m ago)    6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dj6h        1/1     Running     10 (150m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-kk2ml        1/1     Running     11 (150m ago)    6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-mkwcn        1/1     Running     8 (151m ago)     6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-th2qz        1/1     Running     8 (151m ago)     6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-xcdmk        1/1     Running     8 (151m ago)     6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      loki-0                                                      2/2     Running     20 (150m ago)    6d6h    10.244.207.114   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-56rnc                                           1/1     Running     9 (150m ago)     6d6h    10.244.207.109   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-fdm8f                                           1/1     Running     10 (150m ago)    6d6h    10.244.62.29     k8s-worker1.lab.local   <none>           <none>
+monitoring      loki-canary-kgp8g                                           1/1     Running     13 (150m ago)    6d6h    10.244.29.148    k8s-worker3.lab.local   <none>           <none>
+monitoring      prometheus-kube-prometheus-stack-prometheus-0               2/2     Running     6 (150m ago)     45h     10.244.29.163    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-54nsf                                              1/1     Running     10 (150m ago)    6d6h    10.244.62.26     k8s-worker1.lab.local   <none>           <none>
+monitoring      promtail-9s5d9                                              1/1     Running     9 (150m ago)     6d6h    10.244.207.120   k8s-worker2.lab.local   <none>           <none>
+monitoring      promtail-9vfn7                                              1/1     Running     13 (150m ago)    6d6h    10.244.29.161    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-bhbmn                                              1/1     Running     8 (151m ago)     6d6h    10.244.14.170    k8s-master2.lab.local   <none>           <none>
+monitoring      promtail-nwmxd                                              1/1     Running     8 (151m ago)     6d6h    10.244.25.230    k8s-master3.lab.local   <none>           <none>
+monitoring      promtail-vm2k5                                              1/1     Running     8 (151m ago)     6d6h    10.244.43.188    k8s-master1.lab.local   <none>           <none>
+remediation     remediation-56bdddfcd7-t8fvv                                2/2     Running     9 (12s ago)      2d20h   10.244.14.172    k8s-master2.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-4h2ts                       1/1     Running     7 (151m ago)     4d      10.244.43.189    k8s-master1.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-cwh5f                       1/1     Running     5 (149m ago)     46h     10.244.14.169    k8s-master2.lab.local   <none>           <none>
+nothing else restart rather than those 2 , they were on same worker nodes and not changed after the unexpetced restart 
+
+Investigate Pod Restarts:                                                                                                                                                  
+                                                                                                                                                                             
+  # 1. See restart count and last state                                                                                                                                      
+  kubectl describe pod mariadb-0 -n database | grep -A10 "Last State\|Restart Count"                                                                                     
+                                                                                                                                                                             
+  # 2. Get previous container logs (before crash)
+  kubectl logs <pod-name> -n <namespace> --previous                                                                                                                          
+  kubectl logs <pod-name> -n <namespace> -c <container-name> --previous
+                                                                                                                                                                             
+  # 3. Check events for the pod              
+  kubectl get events -n <namespace> --field-selector involvedObject.name=<pod-name> --sort-by='.lastTimestamp'
+
+  # 4. Check exit codes
+  kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.status.containerStatuses[*].lastState.terminated}'
+
+  # 5. Quick overview all pods with restarts
+  kubectl get pods -A | awk '$5 > 0'
+
+  # 6. Detailed restart info for all containers in a pod
+  kubectl get pod <pod-name> -n <namespace> -o jsonpath='{range
+  .status.containerStatuses[*]}{.name}{"\t"}{.restartCount}{"\t"}{.lastState.terminated.reason}{"\t"}{.lastState.terminated.exitCode}{"\n"}{end}'
+
+
+  [root@k8s-master1 k8s_admin]#   kubectl describe pod mariadb-0 -n database | grep -A10 "Last State\|Restart Count"                                                                                     
+    Restart Count:  3
+    Limits:
+      cpu:     500m
+      memory:  128Mi
+    Requests:
+      cpu:     250m
+      memory:  64Mi
+    Environment:
+      NAMESPACE:         database (v1:metadata.namespace)
+      HOST_IP:            (v1:status.hostIP)
+      POD_IP:             (v1:status.podIP)
+--
+    Last State:     Terminated
+      Reason:       Unknown
+      Exit Code:    255
+      Started:      Tue, 14 Apr 2026 20:05:03 +0200
+      Finished:     Wed, 15 Apr 2026 19:44:33 +0200
+    Ready:          True
+    Restart Count:  3
+    Limits:
+      cpu:     1
+      memory:  1Gi
+    Requests:
+      cpu:      250m
+      memory:   256Mi
+    Liveness:   tcp-socket :3306 delay=30s timeout=5s period=10s #success=1 #failure=3
+    Readiness:  tcp-socket :3306 delay=5s timeout=3s period=5s #success=1 #failure=3
+    Environment:
+      MYSQL_DATABASE:            wordpress
+--
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Wed, 15 Apr 2026 20:45:41 +0200
+      Finished:     Wed, 15 Apr 2026 22:12:04 +0200
+    Ready:          True
+    Restart Count:  5
+    Limits:
+      cpu:     500m
+      memory:  128Mi
+    Requests:
+      cpu:     250m
+      memory:  64Mi
+    Environment:
+      NAMESPACE:         database (v1:metadata.namespace)
+      HOST_IP:            (v1:status.hostIP)
+      POD_IP:             (v1:status.podIP)
+[root@k8s-master1 k8s_admin]# 
+note that the worker still can login to via web mean mariadb normal , how to be normal if it it should fail if can get secret 
+check maria and vault agent of it condition 
+
+Error from server (BadRequest): previous terminated container "wordpress" in pod "wordpress-56bf4b697d-87tvx" not found
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o wide 
+NAMESPACE       NAME                                                        READY   STATUS      RESTARTS         AGE     IP               NODE                    NOMINATED NODE   READINESS GATES
+apps            wordpress-56bf4b697d-87tvx                                  2/2     Running     1 (8m9s ago)     32m     10.244.29.160    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-8k8jc                                  2/2     Running     1 (4m24s ago)    32m     10.244.29.162    k8s-worker3.lab.local   <none>           <none>
+apps            wordpress-56bf4b697d-vxc69                                  2/2     Running     1 (3m22s ago)    31m     10.244.62.17     k8s-worker1.lab.local   <none>           <none>
+database        mariadb-0                                                   2/2     Running     8 (7m12s ago)    45h     10.244.207.101   k8s-worker2.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29601750-l2wkc                                  0/1     Completed   0                2d1h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29603190-pfjmq                                  0/1     Completed   0                25h     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+etcd-backup     etcd-backup-29604630-64l6c                                  0/1     Completed   0                109m    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+flux-system     helm-controller-844f6958dc-vmdsf                            1/1     Running     16 (154m ago)    6d11h   10.244.62.55     k8s-worker1.lab.local   <none>           <none>
+flux-system     kustomize-controller-67486f5bfd-xjt7t                       1/1     Running     16 (154m ago)    6d11h   10.244.62.49     k8s-worker1.lab.local   <none>           <none>
+flux-system     notification-controller-7f5d7cb966-nnq6g                    1/1     Running     12 (154m ago)    4d7h    10.244.207.84    k8s-worker2.lab.local   <none>           <none>
+flux-system     source-controller-6d8d58659f-nf97c                          1/1     Running     17 (154m ago)    6d11h   10.244.62.44     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-4mjnt                   1/1     Running     10 (154m ago)    6d6h    10.244.207.90    k8s-worker2.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-pfpjh                   1/1     Running     12 (154m ago)    6d6h    10.244.62.34     k8s-worker1.lab.local   <none>           <none>
+ingress-nginx   ingress-nginx-controller-7d4c58858f-wx4cv                   1/1     Running     7 (154m ago)     4d7h    10.244.207.98    k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-kube-controllers-9dff488b-jl2qq                      1/1     Running     36 (156m ago)    19d     10.244.43.187    k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-756lw                                           1/1     Running     31 (154m ago)    18d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     calico-node-7nzcf                                           1/1     Running     31 (154m ago)    18d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     calico-node-dpvkz                                           1/1     Running     29 (156m ago)    18d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     calico-node-g6prh                                           1/1     Running     29 (156m ago)    18d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     calico-node-hrpcf                                           1/1     Running     39 (154m ago)    18d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     calico-node-jp9m7                                           1/1     Running     29 (156m ago)    18d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-cb6cw                                    1/1     Running     2 (156m ago)     46h     10.244.25.229    k8s-master3.lab.local   <none>           <none>
+kube-system     coredns-7777c888cd-xclvs                                    1/1     Running     12 (156m ago)    7d22h   10.244.14.171    k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-99nbm                         5/5     Running     56 (154m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-controller-8455c76c5f-snggk                         5/5     Running     42 (93m ago)     4d7h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-dgfgf                                          3/3     Running     30 (154m ago)    6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-g6cng                                          3/3     Running     28 (154m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-gkdlg                                          3/3     Running     39 (154m ago)    6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     csi-nfs-node-nzmnx                                          3/3     Running     24 (156m ago)    6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     csi-nfs-node-pgxkw                                          3/3     Running     24 (156m ago)    6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     csi-nfs-node-q96fb                                          3/3     Running     25 (156m ago)    6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     etcd-k8s-master1.lab.local                                  1/1     Running     32 (156m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     etcd-k8s-master2.lab.local                                  1/1     Running     32 (156m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     etcd-k8s-master3.lab.local                                  1/1     Running     5 (156m ago)     19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master1.lab.local                        1/1     Running     37 (156m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master2.lab.local                        1/1     Running     37 (156m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-apiserver-k8s-master3.lab.local                        1/1     Running     45 (156m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master1.lab.local               1/1     Running     36 (156m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master2.lab.local               1/1     Running     38 (93m ago)     19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-controller-manager-k8s-master3.lab.local               1/1     Running     34 (156m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-6c4z6                                            1/1     Running     32 (156m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-proxy-7sx59                                            1/1     Running     36 (154m ago)    19d     10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+kube-system     kube-proxy-8cgvz                                            1/1     Running     32 (156m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-proxy-bq4vp                                            1/1     Running     44 (154m ago)    19d     10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+kube-system     kube-proxy-hqnmt                                            1/1     Running     32 (156m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+kube-system     kube-proxy-pmm4p                                            1/1     Running     38 (154m ago)    19d     10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master1.lab.local                        1/1     Running     35 (156m ago)    19d     10.0.61.10       k8s-master1.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master2.lab.local                        1/1     Running     37 (156m ago)    19d     10.0.61.11       k8s-master2.lab.local   <none>           <none>
+kube-system     kube-scheduler-k8s-master3.lab.local                        1/1     Running     35 (156m ago)    19d     10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running     20 (154m ago)    6d6h    10.244.62.48     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-lrvqq              4/4     Running     16 (7m ago)      47h     10.244.207.93    k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-mqbk5              4/4     Running     19 (6m13s ago)   47h     10.244.62.46     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-grafana-5f6554dcf5-pbbn6              4/4     Running     18 (3m50s ago)   46h     10.244.29.151    k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-kube-state-metrics-567d49447b-tq8sg   1/1     Running     18 (154m ago)    6d6h    10.244.62.63     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-operator-7479866ff6-2dsq8             1/1     Running     13 (154m ago)    6d6h    10.244.62.54     k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dffc        1/1     Running     13 (154m ago)    6d6h    10.0.64.12       k8s-worker3.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-8dj6h        1/1     Running     10 (154m ago)    6d6h    10.0.64.11       k8s-worker2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-kk2ml        1/1     Running     11 (154m ago)    6d6h    10.0.64.10       k8s-worker1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-mkwcn        1/1     Running     8 (156m ago)     6d6h    10.0.61.10       k8s-master1.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-th2qz        1/1     Running     8 (156m ago)     6d6h    10.0.61.11       k8s-master2.lab.local   <none>           <none>
+monitoring      kube-prometheus-stack-prometheus-node-exporter-xcdmk        1/1     Running     8 (156m ago)     6d6h    10.0.61.12       k8s-master3.lab.local   <none>           <none>
+monitoring      loki-0                                                      2/2     Running     20 (154m ago)    6d6h    10.244.207.114   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-56rnc                                           1/1     Running     9 (154m ago)     6d6h    10.244.207.109   k8s-worker2.lab.local   <none>           <none>
+monitoring      loki-canary-fdm8f                                           1/1     Running     10 (154m ago)    6d6h    10.244.62.29     k8s-worker1.lab.local   <none>           <none>
+monitoring      loki-canary-kgp8g                                           1/1     Running     13 (154m ago)    6d6h    10.244.29.148    k8s-worker3.lab.local   <none>           <none>
+monitoring      prometheus-kube-prometheus-stack-prometheus-0               2/2     Running     6 (154m ago)     45h     10.244.29.163    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-54nsf                                              1/1     Running     10 (154m ago)    6d6h    10.244.62.26     k8s-worker1.lab.local   <none>           <none>
+monitoring      promtail-9s5d9                                              1/1     Running     9 (154m ago)     6d6h    10.244.207.120   k8s-worker2.lab.local   <none>           <none>
+monitoring      promtail-9vfn7                                              1/1     Running     13 (154m ago)    6d6h    10.244.29.161    k8s-worker3.lab.local   <none>           <none>
+monitoring      promtail-bhbmn                                              1/1     Running     8 (156m ago)     6d6h    10.244.14.170    k8s-master2.lab.local   <none>           <none>
+monitoring      promtail-nwmxd                                              1/1     Running     8 (156m ago)     6d6h    10.244.25.230    k8s-master3.lab.local   <none>           <none>
+monitoring      promtail-vm2k5                                              1/1     Running     8 (156m ago)     6d6h    10.244.43.188    k8s-master1.lab.local   <none>           <none>
+remediation     remediation-56bdddfcd7-t8fvv                                2/2     Running     9 (4m51s ago)    2d20h   10.244.14.172    k8s-master2.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-4h2ts                       1/1     Running     7 (156m ago)     4d      10.244.43.189    k8s-master1.lab.local   <none>           <none>
+vault           vault-agent-injector-5877589b57-cwh5f                       1/1     Running     5 (154m ago)     46h     10.244.14.169    k8s-master2.lab.local   <none>           <none>
+[root@k8s-master1 k8s_admin]# kubectl logs wordpress-56bf4b697d-87tvx -n apps -
+error: container - is not valid for pod wordpress-56bf4b697d-87tvx
+[root@k8s-master1 k8s_admin]# kubectl logs wordpress-56bf4b697d-87tvx -n apps 
+Defaulted container "wordpress" out of: wordpress, vault-agent, wait-for-mariadb (init), vault-agent-init (init)
+WordPress not found in /var/www/html - copying now...
+WARNING: '/var/www/html/wp-content/themes/twentytwentyfive' exists! (not copying the WordPress version)
+WARNING: '/var/www/html/wp-content/themes/twentytwentyfour' exists! (not copying the WordPress version)
+WARNING: '/var/www/html/wp-content/themes/twentytwentythree' exists! (not copying the WordPress version)
+Complete! WordPress has been successfully copied to /var/www/html
+No 'wp-config.php' found in /var/www/html, but 'WORDPRESS_...' variables supplied; copying 'wp-config-docker.php' (WORDPRESS_DB_HOST WORDPRESS_DB_NAME WORDPRESS_DB_PASSWORD WORDPRESS_DB_USER WORDPRESS_DEBUG WORDPRESS_DEBUG_DISPLAY WORDPRESS_DEBUG_LOG WORDPRESS_PORT WORDPRESS_PORT_80_TCP WORDPRESS_PORT_80_TCP_ADDR WORDPRESS_PORT_80_TCP_PORT WORDPRESS_PORT_80_TCP_PROTO WORDPRESS_SERVICE_HOST WORDPRESS_SERVICE_PORT WORDPRESS_SERVICE_PORT_HTTP)
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 10.244.29.160. Set the 'ServerName' directive globally to suppress this message
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 10.244.29.160. Set the 'ServerName' directive globally to suppress this message
+[Wed Apr 15 19:47:09.405744 2026] [mpm_prefork:notice] [pid 1:tid 1] AH00163: Apache/2.4.66 (Debian) PHP/8.2.30 configured -- resuming normal operations
+[Wed Apr 15 19:47:09.405791 2026] [core:notice] [pid 1:tid 1] AH00094: Command line: 'apache2 -D FOREGROUND'
+10.0.64.12 - - [15/Apr/2026:19:47:13 +0000] "GET /wp-content/index.php HTTP/1.1" 200 192 "-" "kube-probe/1.3
+
+many pods , al;m,opst any pod need vault has been restarted , only the pods which have vault agent 
+
+[root@k8s-master1 k8s_admin]# kubectl get events -n database --field-selector involvedObject.name=mariadb-0 --sort-by='.lastTimestamp'
+LAST SEEN   TYPE     REASON    OBJECT          MESSAGE
+9m51s       Normal   Pulled    pod/mariadb-0   Container image "hashicorp/vault:1.21.2" already present on machine and can be accessed by the pod
+9m50s       Normal   Created   pod/mariadb-0   Container created
+9m50s       Normal   Started   pod/mariadb-0   Container started
+[root@k8s-master1 k8s_admin]# 
+
+but the point is the who;le pod creah not only the vault agent container 
+kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{range .status.containerStatuses[*]}  {.name}{"\t"}restarts: {.restartCount}{"\t"}reason: {.lastState.terminated.reason}{"\n"}{end}{"\n"}{end}' | grep -B1 vault-agent
+
+[root@k8s-master1 k8s_admin]# kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{range .status.containerStatuses[*]}  {.name}{"\t"}restarts: {.restartCount}{"\t"}reason: {.lastState.terminated.reason}{"\n"}{end}{"\n"}{end}' | grep -B1 vault-agent
+apps	wordpress-56bf4b697d-87tvx
+  vault-agent	restarts: 1	reason: Error
+--
+apps	wordpress-56bf4b697d-8k8jc
+  vault-agent	restarts: 1	reason: Error
+--
+apps	wordpress-56bf4b697d-vxc69
+  vault-agent	restarts: 1	reason: Error
+--
+  mariadb	restarts: 3	reason: Unknown
+  vault-agent	restarts: 5	reason: Error
+--
+  grafana-sc-datasources	restarts: 4	reason: Unknown
+  vault-agent	restarts: 5	reason: Error
+--
+  grafana-sc-datasources	restarts: 3	reason: Unknown
+  vault-agent	restarts: 5	reason: Error
+--
+  grafana-sc-datasources	restarts: 3	reason: Unknown
+  vault-agent	restarts: 5	reason: Error
+--
+  remediation	restarts: 4	reason: Unknown
+  vault-agent	restarts: 5	reason: Error
+
+vault	vault-agent-injector-5877589b57-4h2ts
+--
+
+vault	vault-agent-injector-5877589b57-cwh5f
+[root@k8s-master1 k8s_admin]# 
+
+    Restart Count: 3           
+    Last Exit Code: 255
+    Last Exit Time: 2026-04-15T17:44:33Z
+    Last Start Time: 2026-04-14T18:05:03Z
+                                                                                                                                         
+  Container: vault-agent                                                                                                                                                         
+    Restart Count: 5           
+    Last Exit Code: 1
+    Last Exit Time: 2026-04-15T20:12:04Z
+    Last Start Time: 2026-04-15T18:45:41Z
+  [root@k8s-master1 k8s_admin]  for pod in mariadb-0 wordpress-56bf4b697d-87tvx wordpress-56bf4b697d-8k8jc wordpress-56bf4b697d-vxc69; do                                                                    
+    ns=$(kubectl get pods -A | grep $pod | awk '{print $1}')                                                                                                                 
+    echo "=== $pod ($ns) ==="                                                                                                                                                
+    kubectl get pod $pod -n $ns -o jsonpath='{range .status.containerStatuses[*]}{.name}: exitCode={.lastState.terminated.exitCode}                                          
+  finished={.lastState.terminated.finishedAt}{"\n"}{end}'
+    echo ""                                                                                                                                                                  
+  done 
+=== mariadb-0 (database) ===
+mariadb: exitCode=255                                          
+  finished=2026-04-15T17:44:33Z
+vault-agent: exitCode=1                                          
+  finished=2026-04-15T20:12:04Z
+
+=== wordpress-56bf4b697d-87tvx (apps) ===
+vault-agent: exitCode=1                                          
+  finished=2026-04-15T20:11:07Z
+wordpress: exitCode=                                          
+  finished=
+
+=== wordpress-56bf4b697d-8k8jc (apps) ===
+vault-agent: exitCode=1                                          
+  finished=2026-04-15T20:14:52Z
+wordpress: exitCode=                                          
+  finished=
+
+=== wordpress-56bf4b697d-vxc69 (apps) ===
+vault-agent: exitCode=1                                          
+  finished=2026-04-15T20:15:54Z
+wordpress: exitCode=                                          
+  finished=
+
+[root@k8s-master1 k8s_admin]#   kubectl get pod -n monitoring -l app.kubernetes.io/name=grafana -o jsonpath='{range .items[*]}Pod: {.metadata.name}{"\n"}{range .status.containerStatuses[*]}  {.name}:
+  exitCode={.lastState.terminated.exitCode} finished={.lastState.terminated.finishedAt}{"\n"}{end}{"\n"}{end}'
+Pod: kube-prometheus-stack-grafana-5f6554dcf5-lrvqq
+  grafana:
+  exitCode=255 finished=2026-04-15T17:44:33Z
+  grafana-sc-dashboard:
+  exitCode=255 finished=2026-04-15T17:44:33Z
+  grafana-sc-datasources:
+  exitCode=255 finished=2026-04-15T17:44:33Z
+  vault-agent:
+  exitCode=1 finished=2026-04-15T20:12:16Z
+
+Pod: kube-prometheus-stack-grafana-5f6554dcf5-mqbk5
+  grafana:
+  exitCode=255 finished=2026-04-15T17:44:23Z
+  grafana-sc-dashboard:
+  exitCode=255 finished=2026-04-15T17:44:23Z
+  grafana-sc-datasources:
+  exitCode=255 finished=2026-04-15T17:44:23Z
+  vault-agent:
+  exitCode=1 finished=2026-04-15T20:13:03Z
+
+Pod: kube-prometheus-stack-grafana-5f6554dcf5-pbbn6
+  grafana:
+  exitCode=255 finished=2026-04-15T17:44:31Z
+  grafana-sc-dashboard:
+  exitCode=255 finished=2026-04-15T17:44:31Z
+  grafana-sc-datasources:
+  exitCode=255 finished=2026-04-15T17:44:31Z
+  vault-agent:
+  exitCode=1 finished=2026-04-15T20:15:26Z
+
+[root@k8s-master1 k8s_admin]#   kubectl get pods -A -o jsonpath='{range .items[?(@.status.containerStatuses[*].restartCount>0)]}{.metadata.namespace}/{.metadata.name}{"\n"}{range
+  .status.containerStatuses[*]}  {.name}: restarts={.restartCount} exitCode={.lastState.terminated.exitCode}
+  finished={.lastState.terminated.finishedAt}{"\n"}{end}{"\n"}{end}' 2>/dev/null | head -80
+[root@k8s-master1 k8s_admin]#   kubectl get pod -n remediation -o jsonpath='{range .items[*]}Pod: {.metadata.name}{"\n"}{range .status.containerStatuses[*]}  {.name}:
+  exitCode={.lastState.terminated.exitCode} finished={.lastState.terminated.finishedAt}{"\n"}{end}{"\n"}{end}'
+Pod: remediation-56bdddfcd7-t8fvv
+  remediation:
+  exitCode=255 finished=2026-04-15T17:42:46Z
+  vault-agent:
+  exitCode=1 finished=2026-04-15T20:14:25Z
+
+[root@k8s-master1 k8s_admin]# 
+⏺ Confirmed! 100% separate events.
+                                                                                                                                  
+  Summary Table
+  ┌────────────────┬───────────┬──────────────┬─────────────────────┐
+  │ Container Type │ Exit Code │  Time (UTC)  │        Event        │
+  ├────────────────┼───────────┼──────────────┼─────────────────────┤
+  │ App containers │ 255       │ 17:42-17:44Z │ Node restart (PAST) │                                                                                                        
+  ├────────────────┼───────────┼──────────────┼─────────────────────┤
+  │ vault-agent    │ 1         │ 20:11-20:15Z │ IPA DNS down (TEST) │                                                                                                        
+  └────────────────┴───────────┴──────────────┴─────────────────────┘
+  Detailed Evidence
+
+  App Containers (Exit 255) - Node Event @ ~17:44Z:
+  mariadb:           17:44:33Z
+  grafana (pod 1):   17:44:33Z
+  grafana (pod 2):   17:44:23Z
+  grafana (pod 3):   17:44:31Z
+  remediation:       17:42:46Z
+
+  vault-agent (Exit 1) - IPA Test @ ~20:12Z:
+  mariadb:           20:12:04Z
+  wordpress (pod 1): 20:11:07Z
+  wordpress (pod 2): 20:14:52Z
+  wordpress (pod 3): 20:15:54Z
+  grafana (pod 1):   20:12:16Z
+  grafana (pod 2):   20:13:03Z
+  grafana (pod 3):   20:15:26Z
+  remediation:       20:14:25Z
+
+  WordPress containers: NEVER CRASHED
+  wordpress: exitCode=  finished=   ← Empty = no crash history
+
+  Conclusion
+  ┌───────────────────────────────────────────────────┬───────────────────────────────┐
+  │                      Finding                      │           Confirmed           │
+  ├───────────────────────────────────────────────────┼───────────────────────────────┤
+  │ vault-agent crashes are separate from app crashes │ ✅ Yes (~2.5 hour gap)        │
+  ├───────────────────────────────────────────────────┼───────────────────────────────┤
+  │ App container restarts happened before IPA test   │ ✅ Yes (17:44Z vs 20:12Z)     │
+  ├───────────────────────────────────────────────────┼───────────────────────────────┤
+  │ vault-agent crash does NOT cause app crash        │ ✅ Yes                        │
+  ├───────────────────────────────────────────────────┼───────────────────────────────┤
+  │ WordPress container never crashed                 │ ✅ Yes (only vault-agent did) │
+  └───────────────────────────────────────────────────┴───────────────────────────────┘
+  Root causes:
+  - 17:44Z (Exit 255): Node/kubelet restart event
+
+
+Login wordpress containers and mariadb 
+root@wordpress-56bf4b697d-87tvx:/var/www/html# last reboot
+bash: last: command not found
+root@wordpress-56bf4b697d-87tvx:/var/www/html# uptimer
+bash: uptimer: command not found
+root@wordpress-56bf4b697d-87tvx:/var/www/html# uptime 
+ 20:32:39 up  2:49,  0 users,  load average: 0.13, 0.17, 0.17
+root@wordpress-56bf4b697d-87tvx:/var/www/html# ls /vault/secrets/db-creds 
+/vault/secrets/db-creds
+root@wordpress-56bf4b697d-87tvx:/var/www/html# cat /etc/
+.pwd.lock               cron.daily/             ghostscript/            issue                   magic.mime              perl/                   resolv.conf             systemd/
+ImageMagick-7/          debconf.conf            gprofng.rc              issue.net               mime.types              profile                 rmt                     terminfo/
+X11/                    debian_version          group                   kernel/                 motd                    profile.d/              security/               ufw/
+adduser.conf            default/                group-                  ld.so.cache             nsswitch.conf           rc0.d/                  selinux/                update-motd.d/
+alternatives/           deluser.conf            gshadow                 ld.so.conf              opt/                    rc1.d/                  shadow                  xattr.conf
+apache2/                dpkg/                   gss/                    ld.so.conf.d/           os-release              rc2.d/                  shells                  
+apt/                    emacs/                  host.conf               libaudit.conf           pam.conf                rc3.d/                  skel/                   
+bash.bashrc             environment             hostname                localtime               pam.d/                  rc4.d/                  ssl/                    
+bindresvport.blacklist  fonts/                  hosts                   login.defs              paperspecs              rc5.d/                  subgid                  
+ca-certificates/        fstab                   init.d/                 logrotate.d/            passwd                  rc6.d/                  subuid                  
+ca-certificates.conf    gai.conf                inputrc                 magic                   passwd-                 rcS.d/                  sysctl.d/               
+root@wordpress-56bf4b697d-87tvx:/var/www/html# ps       
+    PID TTY          TIME CMD
+     81 pts/0    00:00:00 bash
+     93 pts/0    00:00:00 ps
+root@wordpress-56bf4b697d-87tvx:/var/www/html# top
+
+top - 20:33:29 up  2:49,  0 users,  load average: 0.09, 0.16, 0.17
+Tasks:  13 total,   1 running,  12 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 40.6 us,  4.7 sy,  0.0 ni, 54.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+MiB Mem :   2962.1 total,     82.0 free,   1973.1 used,   1124.0 buff/cache     
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.    988.9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                                                                                                                          
+      1 root      20   0  265312  32112  21376 S   0.0   1.1   0:00.22 apache2                                                                                                                          
+     63 www-data  20   0  266612  48264  36272 S   0.0   1.6   0:00.73 apache2                                                                                                                          
+     64 www-data  20   0  293740  58644  44388 S   0.0   1.9   0:00.39 apache2                                                                                                                          
+     66 www-data  20   0  266684  47348  35316 S   0.0   1.6   0:00.36 apache2                                                                                                                          
+     68 www-data  20   0  340416  48356  36276 S   0.0   1.6   0:00.32 apache2                                                                                                                          
+     69 www-data  20   0  293780  57760  43476 S   0.0   1.9   0:00.32 apache2                                                                                                                          
+     71 www-data  20   0  266268  43200  31532 S   0.0   1.4   0:00.13 apache2                                                                                                                          
+     73 www-data  20   0  266868  45104  33188 S   0.0   1.5   0:00.13 apache2                                                                                                                          
+     76 www-data  20   0  340288  46312  34468 S   0.0   1.5   0:00.11 apache2                                                                                                                          
+     77 www-data  20   0  266364  42416  30700 S   0.0   1.4   0:00.11 apache2                                                                                                                          
+     78 www-data  20   0  266548  45456  33532 S   0.0   1.5   0:00.17 apache2                                                                                                                          
+     81 root      20   0    4320   3860   3236 S   0.0   0.1   0:00.01 bash                                                                                                                             
+     94 root      20   0    7548   5276   3064 R   0.0   0.2   0:00.00 top        
+
+     As cghecked the credential exist inside the pod , the pod didnt restart since 2.50 hours 
+
+     'but how , i ran rollout restart from 1 hour                                                                                                                               
+                                                                                                                                  
+⏺ Good catch! The uptime command inside a container shows host/node uptime, NOT container uptime. 
+
+
+   kubectl get pod wordpress-56bf4b697d-87tvx -n apps -o jsonpath='{.status.containerStatuses[?(@.name=="wordpress")].state.running.startedAt}'
+
+  Summary:
+  ┌───────────────────────────┬─────────────────────────────────────────┐
+  │          Command          │                  Shows                  │
+  ├───────────────────────────┼─────────────────────────────────────────┤
+  │ uptime (inside container) │ Node uptime (2:49 = worker3)            │
+  ├───────────────────────────┼─────────────────────────────────────────┤
+  │ kubectl get pods AGE      │ Pod age (your rollout restart ~1hr ago) │
+  ├───────────────────────────┼─────────────────────────────────────────┤
+  │ .status.startTime         │ Actual pod creation timestamp           │
+  └───────────────────────────┴─────────────────────────────────────────┘
+  Run the kubectl command to confirm your WordPress pod is ~1 hour old as you expected.
+
+❯ [root@k8s-master1 k8s_admin]# kubectl get pod wordpress-56bf4b697d-87tvx -n apps -o jsonpath='{.status.startTime}'                                                         
+  2026-04-15T19:47:02Z[root@k8s-master1 k8s_admin]# date                                                                                                                 
+  Wed Apr 15 10:35:41 PM EET 2026                                                                                                                                        
+  [root@k8s-master1 k8s_admin]#                                                                                                                                              
+                                          
+⏺ Now it makes sense!                                                                                                                                                        
+  ┌────────────────┬──────────────────────────┬──────────────────────────────────┐                                                                                           
+  │     Metric     │          Value           │             Meaning              │                                                                                           
+  ├────────────────┼──────────────────────────┼──────────────────────────────────┤                                                                                           
+  │ Pod start time │ 19:47:02 UTC             │ Rollout restart created this pod │                                                                                           
+  ├────────────────┼──────────────────────────┼──────────────────────────────────┤
+  │ Current time   │ 20:35:41 UTC (22:35 EET) │ Now                              │                                                                                           
+  ├────────────────┼──────────────────────────┼──────────────────────────────────┤
+  │ Pod age        │ ~48 minutes              │ ✅ Matches your "~1 hour ago"    │                                                                                           
+  ├────────────────┼──────────────────────────┼──────────────────────────────────┤                                                                                         
+  │ Node uptime    │ 2:49                     │ k8s-worker3 rebooted at 17:44Z   │
+  └────────────────┴──────────────────────────┴──────────────────────────────────┘
+  Confirmed:
+  - Your rollout restart worked ~48 minutes ago
+  - WordPress container has been stable for 48 minutes
+  - The uptime command was misleading (showed node, not container)
+  - No WordPress container crashes since rollout restart
+
+  Lesson: Use kubectl get pod -o jsonpath='{.status.startTime}' for container age, not uptime inside container.
+
+  Ready for Part 2 IPA test now?
+
+❯ [root@k8s-master1 k8s_admin]# kubectl get pod mariadb-0 -n database -o jsonpath='{.status.startTime}'                                                                      
+  2026-04-13T22:27:42Z[root@k8s-master1 k8s_admin]#  brother i complete think this is off , anfd not sutable way                                                         
+                                                                                                                  
+⏺ You're right! startTime shows pod creation, not container restart.                                                                                                         
+                                                                                                                                                                           
+  Correct command for container start time:                                                                                                                                  
+  # When the container CURRENTLY started (after any restarts)
+  kubectl get pod mariadb-0 -n database -o jsonpath='{.status.containerStatuses[?(@.name=="mariadb")].state.running.startedAt}'
+                                                                                                                                                                             
+  # Or for all containers in a pod                                                                                                                                           
+  kubectl get pod mariadb-0 -n database -o jsonpath='{range .status.containerStatuses[*]}{.name}: {.state.running.startedAt}{"\n"}{end}'
+  ┌─────────────────────────────────────────────────────┬──────────────────────────────────────────┐                                                                         
+  │                        Field                        │                  Shows                   │
+  ├─────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ .status.startTime                                   │ Pod creation (doesn't change on restart) │
+  ├─────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+  │ .status.containerStatuses[].state.running.startedAt │ Current container start (after restart)  │
+  └─────────────────────────────────────────────────────┴──────────────────────────────────────────┘
+  Try the second command - it will show when mariadb container actually started running (should be ~17:44Z after the restart).
+
+❯ [root@k8s-kubectl get pod mariadb-0 -n database -o jsonpath='{.status.containerStatuses[?(@.name=="mariadb")].state.running.startedAt}'.running.startedAt}'                
+  2026-04-15T17:45:24Z                                                                                                                                                   
+                       
+⏺ Now correct!                                                                                                                                                               
+                                                                                                                                                                           
+  mariadb container started: 2026-04-15T17:45:24Z                                                                                                                            
+  Current time:              2026-04-15T20:35Z                                                                                                                               
+  Uptime:                    ~2 hours 50 minutes
+                                                                                                                                                                             
+  Correct method:                                                                                                                                                            
+  ┌─────────────────────────────────────────────────────┬─────────────────┬───────────────────────────────┐
+  │                       Command                       │      Shows      │            Use For            │                                                                  
+  ├─────────────────────────────────────────────────────┼─────────────────┼───────────────────────────────┤                                                                
+  │ .status.startTime                                   │ Pod creation    │ When pod was first created    │
+  ├─────────────────────────────────────────────────────┼─────────────────┼───────────────────────────────┤
+  │ .status.containerStatuses[].state.running.startedAt │ Container start │ After restart - actual uptime │
+  ├─────────────────────────────────────────────────────┼─────────────────┼───────────────────────────────┤
+  │ uptime inside container                             │ Node uptime     │ Misleading - avoid            │
+  └─────────────────────────────────────────────────────┴─────────────────┴───────────────────────────────┘
+  Quick reference for all containers:
+  kubectl get pod <pod> -n <ns> -o jsonpath='{range .status.containerStatuses[*]}{.name}: started={.state.running.startedAt}{"\n"}{end}'
+
+  MariaDB confirmed:
+  - Container running since 17:45:24Z (~2h50m uptime)
+  - Restarted 1 second after crash at 17:44:33Z (exit 255)
+  - Stable through entire IPA test (20:11-20:15Z)
+
+
+  So we confirmed contianer wordpress never restarted in the test and mariadb also 
+  and afutal thing which restarted was the vault agent containr on all pofs which contain it which misslead the read time of the pod restrt from kubectl get pod 
+
+                                                                                                                                                                            
+⏺ Yes, this is normal behavior!                                                                                                                                              
+                                                                                                                                                                             
+  kubectl get pods shows:                     
+  ┌──────────┬───────────────────────────────┬───────────────────────────────┐                                                                                               
+  │  Column  │         What It Shows         │ Changes on Container Restart? │                                                                                               
+  ├──────────┼───────────────────────────────┼───────────────────────────────┤                                                                                               
+  │ AGE      │ Pod creation time             │ ❌ No (stays same)            │                                                                                               
+  ├──────────┼───────────────────────────────┼───────────────────────────────┤                                                                                               
+  │ RESTARTS │ Sum of ALL container restarts │ ✅ Yes (increments)           │                                                                                               
+  └──────────┴───────────────────────────────┴───────────────────────────────┘                                                                                             
+  Example:
+  NAME        READY   STATUS    RESTARTS   AGE
+  mariadb-0   2/2     Running   8          2d    ← 8 = mariadb(3) + vault-agent(5)
+
+  The misleading part:
+  - You see RESTARTS: 8 and think pod restarted 8 times
+  - Actually: mariadb restarted 3x + vault-agent restarted 5x = 8 total
+  - Pod itself never restarted, only containers inside
+
+  To see per-container restarts:
+  kubectl get pod mariadb-0 -n database -o jsonpath='{range .status.containerStatuses[*]}{.name}: {.restartCount}{"\n"}{end}'
+
+  Summary:
+  ┌───────────────────┬──────────────────────────────────────────────────────────────┐
+  │       What        │                           Behavior                           │
+  ├───────────────────┼──────────────────────────────────────────────────────────────┤
+  │ Pod restart       │ All containers killed, pod recreated, AGE resets             │
+  ├───────────────────┼──────────────────────────────────────────────────────────────┤
+  │ Container restart │ Only that container restarts, AGE stays, RESTARTS increments │
+  └───────────────────┴──────────────────────────────────────────────────────────────┘
+  Your finding is correct: vault-agent restarts inflated the RESTARTS count, making it look worse than it was. WordPress/MariaDB containers stayed runnin
+
+  now we know that vaukt agent restart , 
+
+  want to investigate why the wordpress delay 5 seconds 
+
+
+
+  wp-admin/	200	document	Other	20.2 kB	4.27 s
+load-scripts.php?c=0&load%5Bchunk_0%5D=jquery-core,jquery-migrate,utils&ver=6.9.4	200	script	wp-admin/:242	(memory cache)	0 ms
+load-scripts.php?c=0&load%5Bchunk_0%5D=hoverIntent,wp-dom-ready,wp-hooks&ver=6.9.4	200	script	wp-admin/:842	(memory cache)	0 ms
+i18n.min.js?ver=c26c3dc7bed366793375	200	script	wp-admin/:65	(memory cache)	0 ms
+a11y.min.js?ver=cb460b4676c94bd228ed	200	script	wp-admin/:82	(memory cache)	0 ms
+common.min.js?ver=6.9.4	200	script	wp-admin/:853	(memory cache)	0 ms
+hoverintent-js.min.js?ver=2.2.1	200	script	wp-admin/:854	(memory cache)	0 ms
+admin-bar.min.js?ver=6.9.4	200	script	wp-admin/:855	(memory cache)	0 ms
+clipboard.min.js?ver=2.0.11	200	script	wp-admin/:856	(memory cache)	0 ms
+underscore.min.js?ver=1.13.7	200	script	wp-admin/:75	(memory cache)	0 ms
+wp-util.min.js?ver=6.9.4	200	script	wp-admin/:80	(memory cache)	0 ms
+
+api-request.min.js?ver=6.9.4	200	script	wp-admin/:867	(memory cache)	0 ms
+url.min.js?ver=9e178c9516d1222dc834	200	script	wp-admin/:868	(memory cache)	0 ms
+site-health.min.js?ver=6.9.4	200	script	wp-admin/:873	(memory cache)	0 ms
+wp-ajax-response.min.js?ver=6.9.4	200	script	wp-admin/:878	(memory cache)	0 ms
+jquery.color.min.js?ver=3.0.0	200	script	wp-admin/:879	(memory cache)	0 ms
+wp-lists.min.js?ver=6.9.4	200	script	wp-admin/:880	(memory cache)	0 ms
+quicktags.min.js?ver=6.9.4	200	script	wp-admin/:885	(memory cache)	0 ms
+jquery.query.js?ver=2.2.3	200	script	wp-admin/:886	(memory cache)	0 ms
+edit-comments.min.js?ver=6.9.4	200	script	wp-admin/:891	(memory cache)	0 ms
+core.min.js?ver=1.13.3	200	script	wp-admin/:892	(memory cache)	0 ms
+mouse.min.js?ver=1.13.3	200	script	wp-admin/:893	(memory cache)	0 ms
+sortable.min.js?ver=1.13.3	200	script	wp-admin/:894	(memory cache)	0 ms
+postbox.min.js?ver=6.9.4	200	script	wp-admin/:895	(memory cache)	0 ms
+moment.min.js?ver=2.30.1	200	script	wp-admin/:896	(memory cache)	0 ms
+deprecated.min.js?ver=e1f84915c5e8ae38964c	200	script	wp-admin/:901	(memory cache)	0 ms
+date.min.js?ver=795a56839718d3ff7eae	200	script	wp-admin/:902	(memory cache)	0 ms
+dashboard.min.js?ver=6.9.4	200	script	wp-admin/:911	(memory cache)	0 ms
+thickbox.js?ver=3.1-20121105	200	script	wp-admin/:916	(memory cache)	0 ms
+plugin-install.min.js?ver=6.9.4	200	script	wp-admin/:917	(memory cache)	0 ms
+
+
+thickbox.css?ver=6.9.4	200	stylesheet	wp-admin/:22	(disk cache)	2 ms
+
+editor.min.css?ver=6.9.4	200	stylesheet	wp-admin/:619	(disk cache)	3 ms
+Imagedd10eaca49214cba39083e9011942451bd2e479eae2b5fc5c69d47e905e4ebd4?s=52&d=mm&r=g	304	jpeg	wp-admin/:317	0.4 kB	149 ms
+Imagedd10eaca49214cba39083e9011942451bd2e479eae2b5fc5c69d47e905e4ebd4?s=128&d=mm&r=g	304	jpeg	wp-admin/:317	0.4 kB	148 ms
+Imagedd10eaca49214cba39083e9011942451bd2e479eae2b5fc5c69d47e905e4ebd4?s=100&d=mm&r=g	304	jpeg	wp-admin/:564	0.4 kB	148 ms
+Image8e1606e6fba450a9362af43874c1b2dfad34c782e33d0a51e1b46c18a2a567dd?s=100&d=mm&r=g	304	png	wp-admin/:590	0.4 kB	149 ms
+data:application/x-…	200	font	wp-admin/load-styles.php?c=0&dir=ltr&load%5Bchunk_0%5D=dashicons,buttons,forms,l10n,login&ver=6.9.4	(memory cache)	0 ms
+Manrope-VariableFont_wght.woff2	200	font	wp-admin/:869	(memory cache)	0 ms
+ImageloadingAnimation.gif	200	gif	thickbox.js?ver=3.1-20121105:18	(memory cache)	0 ms
+admin-ajax.php	200	xhr	load-scripts.php?c=0&load%5Bchunk_0%5D=jquery-core,jquery-migrate,utils&ver=6.9.4:2	0.7 kB	12.16 s
+favicon.ico	302	text/html / Redirect	Other	0.5 kB	4.14 s
+Otherw-logo-blue-white-bg.png	200	png	favicon.ico	(disk cache)	1 ms
+Imagespinner-2x.gif	200	gif	load-styles.php?c=0&dir=ltr&load%5Bchunk_0%5D=dashicons,admin-bar,site-health,common,forms,admin-me…	(disk cache)	
+
+
+  admin-ajax.php    200    0.7 kB    12.16 s   ← 12 SECONDS!
+  favicon.ico       302    0.5 kB    4.14 s    ← 4 SECONDS redirect
+                                          
+  And these Gravatar requests:
+  Image...d=mm&r=g    304    148 ms   ← Gravatar (external DNS)                                                                                                              
+   
+  Root Cause: WordPress is making external requests that timeout when DNS fails:                                                                                             
+  ┌─────────────────────────┬──────────────────────┬────────────────────────┐                                                                                              
+  │         Service         │       Purpose        │      DNS Required      │                                                                                              
+  ├─────────────────────────┼──────────────────────┼────────────────────────┤
+  │ Gravatar (gravatar.com) │ User avatars         │ ✅ Yes                 │
+  ├─────────────────────────┼──────────────────────┼────────────────────────┤
+  │ api.wordpress.org       │ Plugin/update checks │ ✅ Yes                 │
+  ├─────────────────────────┼──────────────────────┼────────────────────────┤
+  │ admin-ajax.php          │ WP backend calls     │ May call external APIs │
+  └─────────────────────────┴──────────────────────┴────────────────────────┘
+  When IPA DNS is down:
+  - CoreDNS can't resolve external domains
+  - Each external request times out (~5s each)
+  - Multiple timeouts = 12s total delay
+
+  Quick test - is IPA still down?
+  # From K8s node
+  nslookup gravatar.com
+  nslookup api.wordpress.org
+
+  To fix WordPress slowness during IPA outage:
+  1. Add fallback DNS to CoreDNS (8.8.8.8)
+  2. Or disable Gravatar in WordPress settings
+  3. Or disable update checks temporarily
+
+  The 12 second admin-ajax.php is multiple DNS timeouts stacking up.
+
+[root@k8s-master1 k8s_admin]#   nslookup gravatar.com
+;; communications error to 10.0.60.10#53: connection refused
+;; communications error to 10.0.60.10#53: connection refused
+;; communications error to 10.0.60.10#53: connection refused
+;; no servers could be reached
+
+[root@k8s-master1 k8s_admin]#   nslookup api.wordpress.org
+;; communications error to 10.0.60.10#53: connection refused
+;; communications error to 10.0.60.10#53: connection refused
+;; communications error to 10.0.60.10#53: connection refused
+;; no servers could be reached
+
+[root@k8s-master1 k8s_admin]# 
+
+⏺ Confirmed! IPA DNS is down → No external DNS resolution → WordPress timeouts.                                                                                              
+                                                                                                                                                                           
+  communications error to 10.0.60.10#53: connection refused                                                                                                                
+                                              
+  This is the WordPress slowness root cause:
+  ┌───────────────────┬────────────────────────────┬───────────┐
+  │      Request      │        What Happens        │  Result   │                                                                                                             
+  ├───────────────────┼────────────────────────────┼───────────┤
+  │ gravatar.com      │ DNS timeout                │ +5s delay │                                                                                                             
+  ├───────────────────┼────────────────────────────┼───────────┤                                                                                                           
+  │ api.wordpress.org │ DNS timeout                │ +5s delay │
+  ├───────────────────┼────────────────────────────┼───────────┤
+  │ admin-ajax.php    │ Multiple DNS calls timeout │ 12s total │
+  └───────────────────┴────────────────────────────┴───────────┘
+  Summary for Part 1 Test:
+  ┌─────────────┬──────────────────────────────────┐
+  │   Finding   │              Status              │
+  ├─────────────┼──────────────────────────────────┤
+  │ K8s cluster │ ✅ Works (uses IPs internally)   │
+  ├─────────────┼──────────────────────────────────┤
+  │ Node SSH    │ ✅ Works (via /etc/hosts)        │
+  ├─────────────┼──────────────────────────────────┤
+  │ Vault Agent │ ❌ Crashes (~10min)              │
+  ├─────────────┼──────────────────────────────────┤
+  │ FluxCD/Helm │ ❌ Fails (no external DNS)       │
+  ├─────────────┼──────────────────────────────────┤
+  │ WordPress   │ ⚠️ Works but slow (DNS timeouts) │
+  └─────────────┴──────────────────────────────────┘
+  Now restore IPA to complete the test:
+  ssh root@freeipa 'ipactl start'
+  ssh root@freeipa 'ipactl status'
+
+
+  [root@k8s-master1 k8s_admin]# kubectl rollout restart deployment wordpress -n apps
+deployment.apps/wordpress restarted
+[root@k8s-master1 k8s_admin]# kubectl logs -n apps wordpress-7b8c7d879-xbzfr -c vault-agent-init 
+==> Vault Agent started! Log data will stream in below:
+
+==> Vault Agent configuration:
+
+           Api Address 1: http://bufconn
+                     Cgo: disabled
+               Log Level: info
+                 Version: Vault v1.21.2, built 2026-01-06T08:33:05Z
+             Version Sha: 781ba452d731fe2d59ccbc1b37ca7c5a18edb998
+
+2026-04-15T20:46:37.406Z [INFO]  agent.sink.file: creating file sink
+2026-04-15T20:46:37.406Z [INFO]  agent.sink.file: file sink configured: path=/home/vault/.vault-token mode=-rw-r----- owner=100 group=1000
+2026-04-15T20:46:37.407Z [INFO]  agent.exec.server: starting exec server
+2026-04-15T20:46:37.407Z [INFO]  agent.exec.server: no env templates or exec config, exiting
+2026-04-15T20:46:37.407Z [INFO]  agent.auth.handler: starting auth handler
+2026-04-15T20:46:37.407Z [INFO]  agent.auth.handler: authenticating
+2026-04-15T20:46:37.407Z [INFO]  agent.sink.server: starting sink server
+2026-04-15T20:46:37.407Z [INFO]  agent.template.server: starting template server
+2026-04-15T20:46:37.407Z [INFO]  agent: (runner) creating new runner (dry: false, once: false)
+2026-04-15T20:46:37.408Z [INFO]  agent: (runner) creating watcher
+2026-04-15T20:46:43.437Z [ERROR] agent.auth.handler: error authenticating: error="Put \"https://vault.lab.local:8200/v1/auth/kubernetes/login\": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving" backoff=820ms
+2026-04-15T20:46:44.266Z [INFO]  agent.auth.handler: authenticating
+2026-04-15T20:46:52.308Z [ERROR] agent.auth.handler: error authenticating: error="Put \"https://vault.lab.local:8200/v1/auth/kubernetes/login\": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving" backoff=820ms
+2026-04-15T20:46:53.817Z [INFO]  agent.auth.handler: authenticating
+2026-04-15T20:46:57.850Z [ERROR] agent.auth.handler: error authenticating: error="Put \"https://vault.lab.local:8200/v1/auth/kubernetes/login\": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving" backoff=1.5s
+2026-04-15T20:47:00.393Z [INFO]  agent.auth.handler: authenticating
+2026-04-15T20:47:06.425Z [ERROR] agent.auth.handler: error authenticating: error="Put \"https://vault.lab.local:8200/v1/auth/kubernetes/login\": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving" backoff=2.54s
+2026-04-15T20:47:10.770Z [INFO]  agent.auth.handler: authenticating
+2026-04-15T20:47:14.803Z [ERROR] agent.auth.handler: error authenticating: error="Put \"https://vault.lab.local:8200/v1/auth/kubernetes/login\": dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving" backoff=4.34s
+[root@k8s-master1 k8s_admin]# 
+
+[k8s_admin@k8s-master1 ~]$ kubectl get pods -n apps -w &
+[1] 122611
+[k8s_admin@k8s-master1 ~]$ NAME                         READY   STATUS    RESTARTS      AGE
+wordpress-56bf4b697d-87tvx   2/2     Running   1 (35m ago)   59m
+wordpress-56bf4b697d-8k8jc   2/2     Running   1 (31m ago)   59m
+wordpress-56bf4b697d-vxc69   2/2     Running   1 (30m ago)   58m
+wordpress-7b8c7d879-xbzfr    0/2     Pending   0             0s
+wordpress-7b8c7d879-xbzfr    0/2     Pending   0             1s
+wordpress-7b8c7d879-xbzfr    0/2     Init:0/2   0             1s
+wordpress-7b8c7d879-xbzfr    0/2     Init:0/2   0             2s
+wordpress-7b8c7d879-xbzfr    0/2     Init:0/2   0             2s
+wordpress-7b8c7d879-xbzfr    0/2     Init:1/2   0             6s
+wordpress-7b8c7d879-xbzfr    0/2     Init:1/2   0             8s
+[k8s_admin@k8s-master1 ~]$ kubectl get pods -n apps -w &
+[2] 122912
+[k8s_admin@k8s-master1 ~]$ NAME                         READY   STATUS     RESTARTS      AGE
+wordpress-56bf4b697d-87tvx   2/2     Running    1 (35m ago)   59m
+wordpress-56bf4b697d-8k8jc   2/2     Running    1 (31m ago)   59m
+wordpress-56bf4b697d-vxc69   2/2     Running    1 (30m ago)   59m
+wordpress-7b8c7d879-xbzfr    0/2     Init:1/2   0             12s
+
+⏺ Hypothesis CONFIRMED! 🎉                                                                                                                                                   
+                                                                                                                                                                           
+  [ERROR] agent.auth.handler: error authenticating:                                                                                                                          
+    "dial tcp: lookup vault.lab.local on 10.96.0.10:53: server misbehaving"                                                                                                  
+                                                                                                                                                                             
+  Check pod status - should be stuck:                                                                                                                                        
+  kubectl get pods -n apps -l app=wordpress                                                                                                                                  
+                                                                                                                                                                             
+  Expected:                                                                                                                                                                  
+  NAME                        READY   STATUS     RESTARTS   AGE                                                                                                            
+  wordpress-7b8c7d879-xbzfr   0/2     Init:0/2   0          1m   ← STUCK!                                                                                                  
+
+  Critical Finding for DR:
+  ┌────────────────────────────────────┬────────────────────────┬─────────────────┐
+  │              Scenario              │       WordPress        │     Result      │
+  ├────────────────────────────────────┼────────────────────────┼─────────────────┤
+  │ IPA down, existing pods            │ Already has secrets    │ ✅ Works (slow) │
+  ├────────────────────────────────────┼────────────────────────┼─────────────────┤
+  │ IPA down, new pods (restart/scale) │ vault-agent-init fails │ ❌ CANNOT START │
+  └────────────────────────────────────┴────────────────────────┴─────────────────┘
+  This means:
+  - Don't restart deployments during IPA outage
+  - Don't scale up during IPA outage
+  - Node failure during IPA outage = pods can't reschedule
+
+  Now restore IPA to recover:
+  ssh root@freeipa 'ipactl start'
+
+  # Then watch pods recover
+  kubectl get pods -n apps -w
+
+  This is a major finding! Add to Part 1 conclusions.
+
+❯ and since wordpress didint create new , it didnt delete old pod and service not impacted [k8s_admin@k8s-master1 ~]$ NAME                         READY   STATUS            
+  RESTARTS      AGE                                                                                                                                                      
+  wordpress-56bf4b697d-87tvx   2/2     Running    1 (37m ago)   61m                                                                                                          
+  wordpress-56bf4b697d-8k8jc   2/2     Running    1 (33m ago)   61m                                                                                                          
+  wordpress-56bf4b697d-vxc69   2/2     Running    1 (32m ago)   61m                                                                                                        
+  wordpress-7b8c7d879-xbzfr    0/2     Init:1/2   0             2m16s  
+
+
+  Ansible del;ay issue adhoc 
+
+  [root@ansible dev]# ansible -i inventory/first_setup_inventory.ini 10.0.62.10 -m shell -a  "hostname" -vvv
+ansible [core 2.16.14]
+  config file = /srv/repo/ansible/dev/ansible.cfg
+  configured module search path = ['/root/.ansible/plugins/modules', '/usr/share/ansible/plugins/modules']
+  ansible python module location = /usr/lib/python3.12/site-packages/ansible
+  ansible collection location = /root/.ansible/collections:/usr/share/ansible/collections
+  executable location = /usr/bin/ansible
+  python version = 3.12.12 (main, Jan 16 2026, 00:00:00) [GCC 14.3.1 20250617 (Red Hat 14.3.1-2)] (/usr/bin/python3)
+  jinja version = 3.1.6
+  libyaml = True
+Using /srv/repo/ansible/dev/ansible.cfg as config file
+host_list declined parsing /opt/ansible/ansible/dev/inventory/first_setup_inventory.ini as it did not pass its verify_file() method
+script declined parsing /opt/ansible/ansible/dev/inventory/first_setup_inventory.ini as it did not pass its verify_file() method
+auto declined parsing /opt/ansible/ansible/dev/inventory/first_setup_inventory.ini as it did not pass its verify_file() method
+yaml declined parsing /opt/ansible/ansible/dev/inventory/first_setup_inventory.ini as it did not pass its verify_file() method
+Parsed /opt/ansible/ansible/dev/inventory/first_setup_inventory.ini inventory source with ini plugin
+Skipping callback 'default', as we already have a stdout callback.
+Skipping callback 'minimal', as we already have a stdout callback.
+Skipping callback 'oneline', as we already have a stdout callback.
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'echo ~root && sleep 0'"'"''
+<10.0.62.10> (0, b'/root\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'( umask 77 && mkdir -p "` echo /root/.ansible/tmp `"&& mkdir "` echo /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166 `" && echo ansible-tmp-1776286264.4720638-4461-54242496321166="` echo /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166 `" ) && sleep 0'"'"''
+<10.0.62.10> (0, b'ansible-tmp-1776286264.4720638-4461-54242496321166=/root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+<10.0.62.10> Attempting python interpreter discovery
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'echo PLATFORM; uname; echo FOUND; command -v '"'"'"'"'"'"'"'"'python3.12'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.11'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.10'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.9'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.8'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.7'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python3.6'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'/usr/bin/python3'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'/usr/libexec/platform-python'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python2.7'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'/usr/bin/python'"'"'"'"'"'"'"'"'; command -v '"'"'"'"'"'"'"'"'python'"'"'"'"'"'"'"'"'; echo ENDFOUND && sleep 0'"'"''
+<10.0.62.10> (0, b'PLATFORM\nLinux\nFOUND\n/usr/bin/python3.12\n/usr/bin/python3\n/usr/libexec/platform-python\nENDFOUND\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'/usr/bin/python3.12 && sleep 0'"'"''
+<10.0.62.10> (0, b'{"platform_dist_result": [], "osrelease_content": "NAME=\\"Rocky Linux\\"\\nVERSION=\\"10.1 (Red Quartz)\\"\\nID=\\"rocky\\"\\nID_LIKE=\\"rhel centos fedora\\"\\nVERSION_ID=\\"10.1\\"\\nPLATFORM_ID=\\"platform:el10\\"\\nPRETTY_NAME=\\"Rocky Linux 10.1 (Red Quartz)\\"\\nANSI_COLOR=\\"0;32\\"\\nLOGO=\\"fedora-logo-icon\\"\\nCPE_NAME=\\"cpe:/o:rocky:rocky:10::baseos\\"\\nHOME_URL=\\"https://rockylinux.org/\\"\\nVENDOR_NAME=\\"RESF\\"\\nVENDOR_URL=\\"https://resf.org/\\"\\nBUG_REPORT_URL=\\"https://bugs.rockylinux.org/\\"\\nSUPPORT_END=\\"2035-05-31\\"\\nROCKY_SUPPORT_PRODUCT=\\"Rocky-Linux-10\\"\\nROCKY_SUPPORT_PRODUCT_VERSION=\\"10.1\\"\\nREDHAT_SUPPORT_PRODUCT=\\"Rocky Linux\\"\\nREDHAT_SUPPORT_PRODUCT_VERSION=\\"10.1\\"\\n"}\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+Using module file /usr/lib/python3.12/site-packages/ansible/modules/command.py
+<10.0.62.10> PUT /root/.ansible/tmp/ansible-local-4458p7484xlx/tmpd_ksf7si TO /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/AnsiballZ_command.py
+<10.0.62.10> SSH: EXEC sftp -b - -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 '[10.0.62.10]'
+<10.0.62.10> (0, b'sftp> put /root/.ansible/tmp/ansible-local-4458p7484xlx/tmpd_ksf7si /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/AnsiballZ_command.py\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'chmod u+x /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/ /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/AnsiballZ_command.py && sleep 0'"'"''
+<10.0.62.10> (0, b'', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 -tt 10.0.62.10 '/bin/sh -c '"'"'/usr/bin/python3 /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/AnsiballZ_command.py && sleep 0'"'"''
+<10.0.62.10> (0, b'\r\n{"changed": true, "stdout": "vault1", "stderr": "", "rc": 0, "cmd": "hostname", "start": "2026-04-15 22:51:31.455013", "end": "2026-04-15 22:51:31.459074", "delta": "0:00:00.004061", "msg": "", "invocation": {"module_args": {"_raw_params": "hostname", "_uses_shell": true, "expand_argument_vars": true, "stdin_add_newline": true, "strip_empty_ends": true, "argv": null, "chdir": null, "executable": null, "creates": null, "removes": null, "stdin": null}}}\r\n', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\nConnection to 10.0.62.10 closed.\r\n")
+<10.0.62.10> ESTABLISH SSH CONNECTION FOR USER: root
+<10.0.62.10> SSH: EXEC ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o KbdInteractiveAuthentication=no -o PreferredAuthentications=gssapi-with-mic,gssapi-keyex,hostbased,publickey -o PasswordAuthentication=no -o 'User="root"' -o ConnectTimeout=10 10.0.62.10 '/bin/sh -c '"'"'rm -f -r /root/.ansible/tmp/ansible-tmp-1776286264.4720638-4461-54242496321166/ > /dev/null 2>&1 && sleep 0'"'"''
+<10.0.62.10> (0, b'', b"Warning: Permanently added '10.0.62.10' (ED25519) to the list of known hosts.\r\n")
+10.0.62.10 | CHANGED | rc=0 >>
+vault1
+[root@ansible dev]# time ansible -i inventory/inventory.ini 10.0.64.10 -m ping 
+[WARNING]: Could not match supplied host pattern, ignoring: 10.0.64.10
+[WARNING]: No hosts matched, nothing to do
+
+real    0m0.346s
+user    0m0.301s
+sys     0m0.045s
+[root@ansible dev]# time ansible -i inventory/inventory.ini 10.0.64.10 -m date
+[WARNING]: Could not match supplied host pattern, ignoring: 10.0.64.10
+[WARNING]: No hosts matched, nothing to do
+
+real    0m0.366s
+user    0m0.317s
+sys     0m0.048s
+[root@ansible dev]# time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping 
+10.0.64.10 | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/bin/python3"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+
+real    0m34.479s
+user    0m0.856s
+sys     0m0.318s
+[root@ansible dev]# date
+Wed Apr 15 10:52:53 PM EET 2026
+[root@ansible dev]# 
+
+
+ [root@ansible dev]# ssh root@10.0.64.10 'grep -i usedns /etc/ssh/sshd_config'                                                                                              
+  #UseDNS no                                                                                                                                                             
+  [root@ansible dev]# [root@ansible dev]#   ssh root@10.0.64.10 'cat /etc/resolv.conf'                                                                                   
+  # Generated by NetworkManager                                                                                                                                              
+  search lab.local                                                                                                                                                           
+  nameserver 10.0.60.10                                                                                                                                                      
+  [root@ansible dev]#  the normal ssh run in 2 seconds or 1  
+
+
+  ❯  # Option 2: Add to inventory                                                                                                                                              
+    [all:vars]                                                                                                                                                           
+    ansible_ssh_common_args='-o PreferredAuthentications=publickey' add this in inventory not help , also the kdestroy not help    
+
+
+    search lab.local
+nameserver 10.0.60.10
+[root@ansible dev]# time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping -e 'gather_facts=no'
+[WARNING]: Found variable using reserved name: gather_facts
+
+
+
+
+10.0.64.10 | SUCCESS => {
+    "ansible_facts": {
+        "discovered_interpreter_python": "/usr/bin/python3"
+    },
+    "changed": false,
+    "ping": "pong"
+}
+
+real    0m28.253s
+user    0m0.826s
+sys     0m0.297s
+[root@ansible dev]# 
+[root@ansible dev]# 
+[root@ansible dev]# 
+[root@ansible dev]# 
+[root@ansible dev]#   time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m raw -a 'hostname'                                                                                        
+10.0.64.10 | CHANGED | rc=0 >>
+k8s-worker1.lab.local
+Warning: Permanently added '10.0.64.10' (ED25519) to the list of known hosts.
+Connection to 10.0.64.10 closed.
+
+
+real    0m0.716s
+user    0m0.378s
+sys     0m0.087s
+[root@ansible dev]# 
+
+
+Found it!                   
+  ┌────────┬─────────┬─────────────────────────────┐                                                                              
+  │ Module │  Time   │    Uses Python on Target    │
+  ├────────┼─────────┼─────────────────────────────┤
+  │ raw    │ 0.7s ✅ │ No                          │
+  ├────────┼─────────┼─────────────────────────────┤
+  │ ping   │ 28s ❌  │ Yes (interpreter discovery) │                                                                                                                         
+  └────────┴─────────┴─────────────────────────────┘
+  Root cause: Python interpreter discovery runs Python on target, which does DNS lookups → timeout.                                                                          
+                                                                                                                                                                           
+  Fix - skip interpreter discovery:
+  time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping -e 'ansible_python_interpreter=/usr/bin/python3'
+
+  Permanent fix in inventory:
+  [all:vars]
+  ansible_python_interpreter=/usr/bin/python3
+
+  Or target's Python is calling socket.getfqdn() or similar which tries DNS.
+
+  Test the fix:
+  time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping -e 'ansible_python_interpreter=/usr/bin/python3'
+
+  This should be fast (~1s).
+
+● How is Claude doing this session? (optional)
+  1: Bad    2: Fine   3: Good   0: Dismiss           
+
+
+  after ipa start , the stuck pod init normla and started [root@k8s-master1 k8s_admin]# kubectl get pods -n apps -w
+NAME                         READY   STATUS     RESTARTS      AGE
+wordpress-56bf4b697d-87tvx   2/2     Running    1 (64m ago)   88m
+wordpress-56bf4b697d-8k8jc   2/2     Running    1 (60m ago)   88m
+wordpress-56bf4b697d-vxc69   2/2     Running    1 (59m ago)   88m
+wordpress-7b8c7d879-xbzfr    0/2     Init:1/2   0             29m
+wordpress-7b8c7d879-xbzfr    0/2     PodInitializing   0             29m
+wordpress-7b8c7d879-xbzfr    1/2     Running           0             29m
+wordpress-7b8c7d879-xbzfr    2/2     Running           0             29m
+wordpress-56bf4b697d-8k8jc   2/2     Terminating       1 (61m ago)   89m
+wordpress-56bf4b697d-8k8jc   2/2     Terminating       1 (61m ago)   89m
+wordpress-7b8c7d879-27b9j    0/2     Pending           0             0s
+wordpress-7b8c7d879-27b9j    0/2     Pending           0             1s
+wordpress-7b8c7d879-27b9j    0/2     Init:0/2          0             1s
+wordpress-56bf4b697d-8k8jc   2/2     Terminating       1 (61m ago)   89m
+wordpress-56bf4b697d-8k8jc   0/2     Completed         1             89m
+wordpress-7b8c7d879-27b9j    0/2     Init:0/2          0             2s
+wordpress-56bf4b697d-8k8jc   0/2     Completed         1             89m
+wordpress-56bf4b697d-8k8jc   0/2     Completed         1             89m
+wordpress-7b8c7d879-27b9j    0/2     Init:1/2          0             4s
+wordpress-7b8c7d879-27b9j    0/2     Init:1/2          0             5s
+wordpress-7b8c7d879-27b9j    0/2     PodInitializing   0             6s
+wordpress-7b8c7d879-27b9j    1/2     Running           0             7s
+wordpress-7b8c7d879-27b9j    2/2     Running           0             13s
+wordpress-56bf4b697d-vxc69   2/2     Terminating       1 (60m ago)   89m
+wordpress-7b8c7d879-7tzht    0/2     Pending           0             0s
+wordpress-56bf4b697d-vxc69   2/2     Terminating       1 (60m ago)   89m
+wordpress-7b8c7d879-7tzht    0/2     Pending           0             0s
+wordpress-7b8c7d879-7tzht    0/2     Init:0/2          0             0s
+wordpress-7b8c7d879-7tzht    0/2     Init:0/2          0             1s
+wordpress-56bf4b697d-vxc69   2/2     Terminating       1 (60m ago)   89m
+wordpress-56bf4b697d-vxc69   0/2     Completed         1             89m
+wordpress-7b8c7d879-7tzht    0/2     Init:1/2          0             2s
+wordpress-56bf4b697d-vxc69   0/2     Completed         1             89m
+wordpress-56bf4b697d-vxc69   0/2     Completed         1             89m
+wordpress-7b8c7d879-7tzht    0/2     Init:1/2          0             3s
+wordpress-7b8c7d879-7tzht    0/2     PodInitializing   0             4s
+wordpress-7b8c7d879-7tzht    1/2     Running           0             5s
+wordpress-7b8c7d879-7tzht    2/2     Running           0             11s
+wordpress-56bf4b697d-87tvx   2/2     Terminating       1 (65m ago)   89m
+wordpress-56bf4b697d-87tvx   2/2     Terminating       1 (65m ago)   89m
+wordpress-56bf4b697d-87tvx   2/2     Terminating       1 (65m ago)   89m
+wordpress-56bf4b697d-87tvx   0/2     Completed         1             89m
+wordpress-56bf4b697d-87tvx   0/2     Completed         1             89m
+wordpress-56bf4b697d-87tvx   0/2     Completed         1             89m
+[root@k8s-master1 k8s_admin]# kubectl get pods -n apps -w
+NAME                        READY   STATUS    RESTARTS   AGE
+wordpress-7b8c7d879-27b9j   2/2     Running   0          3m37s
+wordpress-7b8c7d879-7tzht   2/2     Running   0          3m24s
+wordpress-7b8c7d879-xbzfr   2/2     Running   0          33m
+

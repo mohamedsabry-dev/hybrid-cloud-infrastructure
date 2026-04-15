@@ -1,0 +1,25 @@
+---
+- name: Update /etc/hosts to avoid IPA dependancy between K8s node & Vault node 
+  hosts: k8s
+  become: yes
+  tasks:
+    - name: Add Fallback hostnames
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        append_newline: true
+        block: |
+            # K8S Nodes Masters
+            10.0.61.10  k8s-master1.lab.local k8s-master1
+            10.0.61.11  k8s-master2.lab.local k8s-master2
+            10.0.61.12  k8s-master3.lab.local k8s-master3
+            # K8S Nodes Workers
+            10.0.64.10  k8s-worker1.lab.local k8s-worker1
+            10.0.64.11  k8s-worker2.lab.local k8s-worker2
+            10.0.64.12  k8s-worker3.lab.local k8s-worker3
+            # K8S VIP
+            10.0.61.100 k8s-api.lab.local k8s-api
+            # Vault-Cluster
+            10.0.62.10  vault1.lab.local  vault1
+            10.0.62.11  vault2.lab.local  vault2
+            10.0.62.12  vault3.lab.local  vault3
+            10.0.62.100 vault.lab.local   vault
