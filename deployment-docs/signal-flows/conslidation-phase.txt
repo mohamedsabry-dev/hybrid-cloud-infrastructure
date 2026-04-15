@@ -5,15 +5,18 @@ Flux — (done today — signal flow complete)                          # Comple
 Storage ↔ NFS — PV, PVC, StorageClass, CSI driver, dynamic provisioning ## Completed 13 April 
 WordPress ↔ Deployments — stateless app, replicas, sessions, rolling update # Completed al ahamd llah 14 April 
 Ingress — ingress-nginx, routing, TLS termination, your setup // Endpoints and service and cluster ip   # Completed al ahamd llah 14 April 
-MariaDB ↔ StatefulSet — ordered deployment, stable identity, PVC binding.  # Ongoiing :: Do Reverese then read singal 
-
+MariaDB ↔ StatefulSet — ordered deployment, stable identity, PVC binding.  # Completr 15 April Al hamdllah 
+Priority Classes  
+>>  && Endpoints and service and cluster ip >> Ongoing 
+DR tests: 15 April noght in shaa allah ( tmp (partial 2 workers down , tmp exteral nginx , tmp internal nginx ingress -- note endpoints pbehaviour))
 
 
 Grafana ↔ Prometheus ↔ Loki — full observability stack as one session.                      >>
 etcd ↔ Vault ↔ AWS — backup operation, dynamic credentials, KMS unseal                      >>
 Remediation ↔ Vault ↔ Proxmox — how remediation works, Vault injection, Proxmox API         >>
-Priority Classes — what they are, why you have them, how they protect critical workloads    && Endpoints and service and cluster ip && DNScore
-FreeIPA — identity, CA, DNS, Kerberos, how everything depends on it                 &&  Ansible — playbook structure, inventory, roles, how it ties your whole infrastructure together
+ && DNScore
+ FreeIPA — identity, CA, DNS, Kerberos, how everything depends on it          
+        &&  Ansible — playbook structure, inventory, roles, how it ties your whole infrastructure together
 
 
 
