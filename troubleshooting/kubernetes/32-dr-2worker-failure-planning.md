@@ -1,4 +1,4 @@
-# TS-K8S-031 | 2026-04-15 | IN PROGRESS
+# TS-K8S-032 | 2026-04-15 | IN PROGRESS
 
 > **DR PLANNING CASE** — Gaps identified during 2-worker failure DR test planning.
 > Not a reactive incident — proactive architectural review before DR test execution.
