@@ -1,270 +1,166 @@
 # TS-K8S-016 | 2026-04-06 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Kubernetes / Pod Scheduling / Priority Classes
-- Environment: DEV (k8s-master1.lab.local)
-- Related components: All workloads - CSI NFS, Vault Injector, Ingress NGINX, Flux, MariaDB, WordPress, Monitoring
-- Discovered during: DR Test 1 preparation - prerequisite assessment
+[Info]
+Author:
+Domain: Kubernetes
+Sub-techs: Pod priority classes, preemption, eviction order, DR readiness,
+           Vault Injector, Ingress NGINX, Flux, MariaDB, WordPress
+Environment: DEV k8s-dev cluster | k8s-master1.lab.local | all namespaces
+Re-opened: No
 
-## 2. Issue
-- Symptom: Critical infrastructure pods have no priority class configured
-- Impact: During node failures or resource pressure, critical pods may be evicted before non-critical ones
-- Error: No error - configuration gap discovered during DR readiness assessment
+_____________________________________________________________________
 
-**Required Priority Order (Highest to Lowest):**
-```
-Priority 1 - Infrastructure (system-node-critical / system-cluster-critical):
-    - NFS CSI Driver (storage mounts must be available first)
-    - Vault Injector (secrets injection for new pods)
-    - Ingress NGINX (external traffic routing)
-    - Flux Controllers (GitOps reconciliation)
+[Issue Description]
+Configuration gap discovered during DR Test 1 preparation — not a live failure.
+Critical infrastructure pods have no priority class configured. During node
+failures or resource pressure, critical pods would be evicted with same priority
+as monitoring pods, causing incorrect eviction order and service disruption.
 
-Priority 2 - Database (database-critical):
-    - MariaDB (data layer must be ready before apps)
+Required priority order (highest to lowest):
+  1. Infrastructure (system-node-critical / system-cluster-critical)
+     NFS CSI driver, Vault Injector, Ingress NGINX, Flux controllers
+  2. Database (database-critical)
+     MariaDB
+  3. Application (app-standard)
+     WordPress
+  4. Monitoring (default/0)
+     Prometheus, Grafana, Alertmanager
 
-Priority 3 - Application (app-standard):
-    - WordPress (depends on database)
+_____________________________________________________________________
 
-Priority 4 - Monitoring (default/0):
-    - Prometheus, Grafana, Alertmanager (observability, non-critical)
-```
+[Analysis]
 
-## 3. Analysis
+# Initial Check Notes:
+Audited priority classes on all critical workloads.
 
-**Check 1: Available Priority Classes**
-```bash
-kubectl get priorityclass
-```
-```
-NAME                      VALUE        GLOBAL-DEFAULT   AGE   PREEMPTIONPOLICY
-system-cluster-critical   2000000000   false            10d   PreemptLowerPriority
-system-node-critical      2000001000   false            10d   PreemptLowerPriority
-```
-Finding: Only system priority classes exist. Custom classes needed for db/app. ✓
+Command:
+  kubectl get priorityclass
+Output:
+  system-cluster-critical  2000000000
+  system-node-critical     2000001000
+  (only system classes exist — custom classes needed for db/app)
 
----
+Component audit results:
 
-**Check 2: CSI NFS Driver Pods**
-```bash
-kubectl describe pod csi-nfs-controller-7d8bbb9d89-tz5jd -n kube-system | grep -i priority
-```
-```
-Priority:             2000000000
-Priority Class Name:  system-cluster-critical
-```
-Finding: CSI pods have system-cluster-critical. **OK** ✓
+  CSI NFS Controller/Node    system-cluster-critical   OK
+  Vault Injector             0 (default)               NEEDS FIX
+  Ingress NGINX              0 (default)               NEEDS FIX
+  Flux helm-controller       system-cluster-critical   OK
+  Flux kustomize-controller  system-cluster-critical   OK
+  Flux source-controller     system-cluster-critical   OK
+  Flux notification-ctrl     0 (default)               ACCEPTABLE
+  MariaDB                    0 (default)               NEEDS FIX
+  WordPress                  0 (default)               NEEDS FIX
+  Monitoring (all 11 pods)   0 (default)               OK (lowest as expected)
 
----
+Both Vault and Ingress NGINX Helm charts support priorityClassName but it
+was not set:
+  helm show values vault | grep priorityClassName → priorityClassName: ""
+  helm show values ingress-nginx | grep priorityClassName → priorityClassName: ""
 
-**Check 3: Vault Injector**
-```bash
-kubectl describe pod vault-agent-injector-94c4bcc6c-ln296 -n vault | grep -i priority
-```
-```
-Priority:         0
-```
-Finding: **NO PRIORITY CLASS SET - NEEDS FIX** ✗
 
----
+# Suspected Root Cause
+Critical workloads (Vault Injector, Ingress NGINX, MariaDB, WordPress) deployed
+without priority class configuration. During resource pressure or node failure,
+these pods would be evicted at the same priority as monitoring pods — incorrect
+eviction order, database could be evicted before monitoring.
 
-**Check 4: Ingress NGINX Controller**
-```bash
-kubectl describe pod ingress-nginx-controller-ccdf84b85-kvw6x -n ingress-nginx | grep -i priority
-```
-```
-Priority:         0
-```
-Finding: **NO PRIORITY CLASS SET - NEEDS FIX** ✗
 
----
+# More Checks Notes:
+N/A — audit confirmed all gaps. Fix direction clear.
 
-**Check 5: Flux System Controllers**
-```bash
-kubectl describe pod helm-controller-844f6958dc-bzqs7 -n flux-system | grep -i priority
-kubectl describe pod kustomize-controller-67486f5bfd-hsvmf -n flux-system | grep -i priority
-kubectl describe pod source-controller-6d8d58659f-frmw8 -n flux-system | grep -i priority
-kubectl describe pod notification-controller-7f5d7cb966-x5ggw -n flux-system | grep -i priority
-```
-```
-helm-controller:          Priority: 2000000000 (system-cluster-critical)
-kustomize-controller:     Priority: 2000000000 (system-cluster-critical)
-source-controller:        Priority: 2000000000 (system-cluster-critical)
-notification-controller:  Priority: 0 (default)
-```
-Finding: 3/4 Flux controllers have proper priority. notification-controller at default (acceptable). ✓
 
----
+# Suspected Solution
+Create custom priority classes (database-critical, app-standard) and configure
+all affected workloads via Helm values and manifest patches.
 
-**Check 6: Database (MariaDB)**
-```bash
-kubectl describe pod mariadb-0 -n database | grep -i priority
-```
-```
-Priority:         0
-```
-Finding: **NO PRIORITY CLASS SET - NEEDS CUSTOM CLASS** ✗
 
----
+# Test
+Applied priority classes and updated all workloads. Verified with:
 
-**Check 7: Application (WordPress)**
-```bash
-kubectl describe pod wordpress-6fbdd48889-r59mb -n apps | grep -i priority
-```
-```
-Priority:         0
-```
-Finding: **NO PRIORITY CLASS SET - NEEDS CUSTOM CLASS** ✗
+Command:
+  kubectl describe pod -A | grep -i priority -B 4
 
----
+Result: PASS — all components at correct priority levels (see final solution table).
 
-**Check 8: Monitoring Stack**
-```bash
-kubectl describe pods -n monitoring | grep -i priority
-```
-```
-Priority: 0 (all 11 pods)
-```
-Finding: All monitoring pods at default priority. **OK** (lowest priority as expected) ✓
+_____________________________________________________________________
 
----
+[Final Root Cause]
+Critical workloads deployed without priority class configuration. Default priority
+(0) means Vault Injector, Ingress NGINX, and MariaDB would be evicted at the same
+time as monitoring during resource pressure — incorrect order for DR and cluster
+stability.
 
-**Check 9: Helm Chart Support**
-```bash
-helm show values vault --repo https://helm.releases.hashicorp.com | grep priorityClassName
-helm show values ingress-nginx --repo https://kubernetes.github.io/ingress-nginx | grep priorityClassName
-```
-```
-priorityClassName: ""
-```
-Finding: Both charts support priorityClassName but not configured. ✓
+_____________________________________________________________________
 
----
+[Final Solution]
 
-**Findings Summary:**
-```
-+---------------------------+------------------------+------------+
-| Component                 | Current Priority       | Status     |
-+---------------------------+------------------------+------------+
-| CSI NFS Controller        | system-cluster-critical| OK         |
-| CSI NFS Node (DaemonSet)  | system-cluster-critical| OK         |
-| Vault Injector            | 0 (default)            | NEEDS FIX  |
-| Ingress NGINX             | 0 (default)            | NEEDS FIX  |
-| Flux Controllers (3/4)    | system-cluster-critical| OK         |
-| Flux notification-ctrl    | 0 (default)            | ACCEPTABLE |
-| MariaDB                   | 0 (default)            | NEEDS FIX  |
-| WordPress                 | 0 (default)            | NEEDS FIX  |
-| Monitoring (all)          | 0 (default)            | OK         |
-+---------------------------+------------------------+------------+
-```
+Step 1 — Create custom priority classes:
+  File: kubernetes/deployments/infrastructure/priority-classes.yaml
 
-## 4. Root Cause
-> Critical workloads (Vault Injector, Ingress NGINX, MariaDB, WordPress) deployed without priority class configuration. During resource pressure or node failures, these pods would be evicted with same priority as monitoring pods, causing incorrect eviction order and potential service disruption.
+  apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  metadata:
+    name: database-critical
+  value: 1000000
+  globalDefault: false
+  description: "Database workloads - higher than apps, lower than infrastructure"
+  ---
+  apiVersion: scheduling.k8s.io/v1
+  kind: PriorityClass
+  metadata:
+    name: app-standard
+  value: 500000
+  globalDefault: false
+  description: "Application workloads - standard priority"
 
-## 5. Solution
-> Create custom priority classes and configure all workloads appropriately.
+Step 2 — Update infrastructure Helm releases:
+  Vault Injector:     injector.priorityClassName: system-cluster-critical
+  Ingress NGINX:      controller.priorityClassName: system-cluster-critical
 
-**Step 1: Create Custom Priority Classes**
+Step 3 — Update application workloads:
+  MariaDB StatefulSet:   spec.template.spec.priorityClassName: database-critical
+  WordPress Deployment:  spec.template.spec.priorityClassName: app-standard
 
-**File:** `kubernetes/deployments/infrastructure/priority-classes.yaml`
-```yaml
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: database-critical
-value: 1000000
-globalDefault: false
-description: "Database workloads - higher than apps, lower than infrastructure"
----
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: app-standard
-value: 500000
-globalDefault: false
-description: "Application workloads - standard priority"
-```
+Final priority table:
+  system-node-critical    2000001000   etcd, apiserver, scheduler, controller-manager,
+                                       kube-proxy, calico-node, csi-nfs-node
+  system-cluster-critical 2000000000   calico-controllers, coredns, csi-nfs-controller,
+                                       descheduler, vault-injector, ingress-nginx,
+                                       flux controllers
+  database-critical       1000000      mariadb
+  app-standard            500000       wordpress
+  (default)               0            monitoring stack, notification-controller
 
-**Step 2: Update Infrastructure Helm Releases**
+Verified: Yes
 
-Vault Injector:
-```yaml
-injector:
-  priorityClassName: system-cluster-critical
-```
+_____________________________________________________________________
 
-Ingress NGINX:
-```yaml
-controller:
-  priorityClassName: system-cluster-critical
-```
+[Risk Level] LOW
+Note: Pods will be briefly restarted when priority class is added to existing
+deployments. No data loss expected.
 
-**Step 3: Update Application Workloads**
+_____________________________________________________________________
 
-MariaDB StatefulSet:
-```yaml
-spec:
-  template:
-    spec:
-      priorityClassName: database-critical
-```
+[References]
+- https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+- DR Test 1 prerequisites
 
-WordPress Deployment:
-```yaml
-spec:
-  template:
-    spec:
-      priorityClassName: app-standard
-```
+_____________________________________________________________________
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Pods will be recreated when priority class is added (brief restart)
+[Draft Notes]
 
-## 7. Impact After Fix
-- Observed: All priorities configured correctly
-- Startup/Eviction Order now correct: Storage → Infrastructure → Database → App → Monitoring
+Why priority classes matter for DR:
+  During node failure: pods evicted in priority order (lowest first)
+  During resource pressure: lower priority pods preempted for higher priority
+  Incorrect order example: database evicted before monitoring → data layer
+  unavailable while dashboards still show green
 
-**Post-Remediation Validation:**
-```
-+------------------------+------------+------------------------------------------+
-| Priority Class         | Value      | Components                               |
-+------------------------+------------+------------------------------------------+
-| system-node-critical   | 2000001000 | etcd, apiserver, scheduler, controller,  |
-|                        |            | kube-proxy, calico-node, csi-nfs-node    |
-+------------------------+------------+------------------------------------------+
-| system-cluster-critical| 2000000000 | calico-controllers, coredns, csi-nfs-    |
-|                        |            | controller, descheduler, vault-injector, |
-|                        |            | ingress-nginx, flux controllers          |
-+------------------------+------------+------------------------------------------+
-| database-critical      | 1000000    | mariadb                                  |
-+------------------------+------------+------------------------------------------+
-| app-standard           | 500000     | wordpress                                |
-+------------------------+------------+------------------------------------------+
-| (default)              | 0          | monitoring stack, notification-controller|
-+------------------------+------------+------------------------------------------+
-```
+Correct reasoning for each tier:
+  Monitoring at default (0) → non-critical, should be evicted first to free resources
+  Infrastructure highest    → storage and networking must be available before anything else
+  Database before app       → data layer must be ready before application layer
 
-## 8. Notes
-
-**Why Priority Classes Matter for DR:**
-- During node failure, pods are evicted in priority order (lowest first)
-- During resource pressure, lower priority pods are preempted for higher priority
-- Incorrect order = database evicted before monitoring = data layer unavailable while dashboards still up
-
-**Verification Command:**
-```bash
-kubectl describe pod -A | grep -i priority -B 4
-```
-
-**Key Points:**
-- Monitoring pods should remain at default (0) - they are non-critical and should be evicted first
-- Infrastructure must be highest - storage and networking must be available before anything else
-- Database before app - data layer must be ready before application layer
-
-## 9. Workaround (if any)
-> N/A - must configure priority classes properly for DR readiness.
-
-## References
-- DR Test 1 Prerequisites
-- [Kubernetes Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/)
-
+Verification command:
+  kubectl describe pod -A | grep -i priority -B 4

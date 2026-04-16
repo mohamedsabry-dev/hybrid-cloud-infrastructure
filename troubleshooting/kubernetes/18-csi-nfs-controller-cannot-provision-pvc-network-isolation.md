@@ -1,248 +1,204 @@
 # TS-K8S-018 | 2026-04-08 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
+[Info]
+Author:
+Domain: Kubernetes / Storage
+Sub-techs: CSI NFS driver, PVC provisioning, node affinity, network segmentation,
+           StorageClass, NFSv3, Flux HelmRelease
+Environment: DEV k8s-dev cluster | CSI NFS controller placement
+Re-opened: No
 
-- **System:** CSI NFS Driver / PVC Provisioning / Network Architecture
-- **Environment:** k8s-dev cluster
-- **Related Components:** CSI NFS controller, StorageClass, PVC provisioning, network segmentation
-- **Discovered During:** Loki StatefulSet deployment
-- **Related Cases:**
-  - TS-K8S-006 — Complete NFS storage guide (architecture reference)
-  - TS-K8S-015 — Stale NFS mount on CSI restart (companion case — both involve CSI deployment decisions causing storage failures)
+_____________________________________________________________________
 
----
+[Issue Description]
+New PVCs stuck in Pending. Loki StatefulSet could not start because PVC
+provisioning failed with mount timeouts. Existing PVCs (Grafana, Prometheus,
+MariaDB) remained Bound — only new provisioning failed.
 
-## 2. Issue
+  kubectl get pvc -A:
+  monitoring  storage-loki-0   Pending  nfs-retain  35m
+  default     test-pvc         Pending  nfs-retain   2m
 
-**Symptom:** New PVCs stuck in `Pending`. Loki StatefulSet could not start because PVC provisioning failed with mount timeouts.
-
-```bash
-kubectl get pvc -A
-# monitoring   storage-loki-0    Pending   nfs-retain   35m
-# default      test-pvc          Pending   nfs-retain   2m
-```
-
-**Existing PVCs (Grafana, Prometheus, MariaDB) were Bound** — only new provisioning failed.
-
-**CSI Controller Logs — Mount Timeout:**
-```
-I0408 18:10:30 controllerserver.go:509 internally mounting 10.0.40.120:/volume1/k8s-dev at /tmp/pvc-xxx
-I0408 18:10:30 mount_linux.go:270 Mounting cmd (mount) with arguments (-t nfs ...)
-E0408 18:12:20 utils.go:116 GRPC error: rpc error: code = Internal desc = failed to mount nfs server:
+  CSI controller logs:
+  internally mounting 10.0.40.120:/volume1/k8s-dev at /tmp/pvc-xxx
   mount volume 10.0.40.120:/volume1/k8s-dev to /tmp/pvc-xxx timeout after 110s
-```
 
-**Impact:** New PVC provisioning completely blocked. Loki cannot start.
+Related tickets:
+  TS-K8S-006 — Complete NFS storage guide (architecture reference)
+  TS-K8S-015 — Stale NFS mount on CSI restart (companion case)
 
----
+_____________________________________________________________________
 
-## 3. Analysis
+[Analysis]
 
-### Step 1: Check CSI Controller Location
+# Initial Check Notes:
+Checked where CSI controller pods were running.
 
-```bash
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-# csi-nfs-controller-xxx   5/5   Running   10.0.61.11   k8s-master2.lab.local
-# csi-nfs-controller-xxx   5/5   Running   10.0.61.10   k8s-master1.lab.local
-```
+Command:
+  kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
 
-**Problem:** Controllers on masters (10.0.61.x), NFS on 10.0.40.x — no network route between them.
+Output:
+  csi-nfs-controller-xxx  5/5  Running  10.0.61.11  k8s-master2.lab.local
+  csi-nfs-controller-xxx  5/5  Running  10.0.61.10  k8s-master1.lab.local
 
-### Step 2: Test Network from Master to NFS
+Controllers on masters (10.0.61.x). NFS server at 10.0.40.120.
+No network route between master network and storage network.
 
-```bash
-# From master node
-ping -c 2 10.0.40.120   # No reply
-nc -zv 10.0.40.120 2049  # Connection refused / timeout
-```
+Tested network from master to NFS:
+  ping -c 2 10.0.40.120   → no reply
+  nc -zv 10.0.40.120 2049 → connection timeout
 
-Finding: Masters have no route to storage network.
+Compared with prod cluster:
+  kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+  → prod: controllers on workers — provisioning works
 
-### Step 3: Compare with Prod Cluster (Working)
+Network architecture:
+  Masters   10.0.61.x   no storage NIC   no NFS access
+  Workers   10.0.64.x   10.0.40.20x (dedicated NIC)   NFS access YES
+  NFS server  10.0.40.120
 
-```bash
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-# prod: controllers on workers — provisioning works
-```
+Why existing PVCs were still Bound:
+  CSI controller is only needed for CREATE and DELETE operations.
+  It temporarily mounts NFS during provisioning to create subdirectories.
+  Once a PVC is provisioned and a pod is running, the controller is not
+  involved — the mount is managed by csi-nfs-node on each worker node.
+  Existing mounts persist independently of controller location.
 
-### Network Architecture
+Why controllers landed on masters:
+  CSI NFS Helm chart includes default tolerations for control-plane.
+  Without explicit node affinity, scheduler placed them on masters.
+  No explicit affinity was configured.
 
-| Node Type | Primary Network | Storage Network | NFS Access |
-|-----------|-----------------|-----------------|------------|
-| Masters | 10.0.61.x | None | No |
-| Workers | 10.0.64.x | 10.0.40.20x (dedicated NIC) | Yes |
-| NFS Server | — | 10.0.40.120 | — |
 
-### Why Existing PVCs Were Still Bound
+# Suspected Root Cause
+CSI NFS controller pods scheduled on master nodes which have no network route
+to the NFS storage server (10.0.40.120). Controller temporarily mounts NFS
+during PVC provisioning to create subdirectories — mount timed out after 110s.
 
-The CSI controller is only needed for **create and delete operations**. Existing mounts are managed by csi-nfs-node on each worker node. Once a PVC is provisioned and a pod is running, the controller is not involved — the mount persists independently.
 
-### Why Default Tolerations Allowed Scheduling on Masters
+# More Checks Notes:
+N/A — network test from master confirmed no route to NFS.
 
-The CSI NFS Helm chart includes default tolerations for `control-plane`, allowing controller pods to schedule on masters without any explicit configuration. Without explicit node affinity, the scheduler placed them on masters.
 
----
+# Suspected Solution
+Add nodeAffinity to CSI controller to force scheduling on worker nodes only.
+Workers have dedicated storage NICs with access to 10.0.40.x network.
 
-## 4. Root Cause
 
-CSI NFS controller pods scheduled on master nodes (10.0.61.x) which have no network route to the NFS storage server (10.0.40.120). The controller temporarily mounts NFS during PVC provisioning to create subdirectories — this mount attempt timed out after 110 seconds.
+# Test
+Applied nodeAffinity (DoesNotExist on control-plane label), reconciled HelmRelease.
+Verified controller placement, tested new PVC provisioning.
 
----
+Command:
+  kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+  kubectl apply -f test-pvc.yaml && kubectl get pvc test-pvc -w
 
-## 5. Solution
+Result: PASS — controllers on worker nodes (10.0.64.x), test-pvc Bound,
+Loki StatefulSet started successfully.
 
-### Add Node Affinity to CSI Controller
+_____________________________________________________________________
 
-```yaml
-# HelmRelease values
-controller:
-  replicas: 2
-  priorityClassName: system-cluster-critical
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: node-role.kubernetes.io/control-plane
-                operator: DoesNotExist   # DoesNotExist = workers only
-```
+[Final Root Cause]
+CSI NFS Helm chart includes default tolerations for control-plane — without
+explicit node affinity, controllers scheduled on master nodes. Masters have
+no network route to NFS storage server (10.0.40.120). Controller mount attempt
+during PVC provisioning timed out after 110s. Existing PVCs were unaffected
+because mounts are managed by csi-nfs-node on workers, not the controller.
 
-### ⚠️ DoesNotExist vs Exists — Critical Distinction
+_____________________________________________________________________
 
-| Operator | Meaning | Targets |
-|---|---|---|
-| `DoesNotExist` on control-plane label | Schedule on nodes WITHOUT the label | Workers only |
-| `Exists` on control-plane label | Schedule on nodes WITH the label | Masters only |
+[Final Solution]
+Added nodeAffinity to CSI controller HelmRelease values to force workers only:
 
-**Always verify actual placement after applying:**
-```bash
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-# Must show worker IPs (10.0.64.x), not master IPs (10.0.61.x)
-```
+  controller:
+    replicas: 2
+    priorityClassName: system-cluster-critical
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: DoesNotExist   ← nodes WITHOUT this label = workers only
 
-### Additional Fixes Applied
-
-**NFSv3 with nolock (StorageClass):**
-
-To avoid NFSv4 state recovery issues on the NAS:
-
-```yaml
-mountOptions:
-  - nfsvers=3
-  - nolock
-  - soft
-  - timeo=30
-  - retrans=3
-```
-
-**ASUSTOR NFS Recovery Directory:**
-```bash
-mkdir -p /var/lib/nfs/v4recovery
-chmod 755 /var/lib/nfs/v4recovery
-```
-
-### Apply and Verify
-
-```bash
-flux reconcile helmrelease csi-driver-nfs -n kube-system --with-source
-
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-# Should now show worker nodes
-
-# Test new PVC provisioning
-kubectl apply -f test-pvc.yaml
-kubectl get pvc test-pvc -w
-# Should go to Bound quickly
-```
-
----
-
-## 6. Architecture Decision: Controllers on Workers
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Controllers on workers (chosen)** | Matches network — workers have NFS access | Controllers share resources with workloads; if all workers down, no provisioning |
-| Controllers on masters | Dedicated resources, isolated | Requires routing masters to storage network — expanded attack surface |
-
-**Decision:** Controllers on workers — matches the network architecture where only workers have storage access. No firewall changes needed.
-
-### Known Limitation
-
-If all worker nodes are simultaneously down, CSI controller cannot provision or delete PVCs. Existing pod mounts are unaffected (handled by csi-nfs-node, but those are also down if workers are down). This is an acceptable tradeoff for the network isolation design.
-
----
-
-## 7. Solution Risk
-
-- **Risk Level:** Low
-- Controllers moving from masters to workers: Brief provisioning unavailability during rollout
-- NFSv3 downgrade: Avoids NFSv4 state recovery issues on ASUSTOR NAS
-
----
-
-## 8. Impact After Fix
-
-- CSI controllers running on worker nodes
-- New PVC provisioning working immediately
-- Loki StatefulSet started successfully
-- Existing PVCs remain bound and functional
-
----
-
-## 9. Notes
-
-### Lessons Learned
-
-1. **CSI controller needs network access to NFS storage** — It temporarily mounts NFS to create subdirectories during provisioning
-2. **Default tolerations cause unexpected placement** — CSI NFS chart tolerates control-plane by default; must add explicit affinity in network-segmented environments
-3. **Existing PVCs work ≠ new provisioning works** — Controller is only needed for create/delete, not ongoing mounts
-4. **Verify controller placement after every CSI update** — A Flux change could reschedule controllers if affinity is not explicitly configured
-5. **DoesNotExist ≠ Exists** — Easy to invert. Always verify with `kubectl get pods -o wide`
-6. **Test PVC provisioning after any infrastructure change** — `kubectl apply -f test-pvc.yaml && kubectl get pvc -w`
-
-### Commands Reference
-
-```bash
-# Check CSI controller location
-kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
-
-# Test network from master to NFS
-ping -c 2 10.0.40.120
-nc -zv 10.0.40.120 2049
-
-# Verify StorageClass mount options
-kubectl get storageclass nfs-retain -o yaml | grep -A10 mountOptions
-
-# Check PVC events
-kubectl describe pvc <n> -n <namespace> | tail -20
-
-# Check CSI controller logs
-kubectl logs -n kube-system <csi-nfs-controller-pod> -c nfs
-```
-
----
-
-## 10. Workaround
-
-**If controllers stuck on masters and PVC provisioning fails:**
-
-**Option A: Move controllers to workers (permanent fix)**
-Add nodeAffinity with DoesNotExist on control-plane label as shown above.
-
-**Option B: Manually create static PV (temporary)**
-```yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: manual-pv-loki
-spec:
-  capacity:
-    storage: 10Gi
-  accessModes: [ReadWriteOnce]
-  nfs:
-    server: 10.0.40.120
-    path: /volume1/k8s-dev/manual-loki
-  storageClassName: nfs-retain
-```
-
-Create the NAS directory manually, create the PV, create PVC with `spec.volumeName: manual-pv-loki`. This is a workaround only — fix controller placement for proper dynamic provisioning.
+⚠ CRITICAL: DoesNotExist vs Exists:
+  DoesNotExist on control-plane label → schedule on nodes WITHOUT label → workers
+  Exists on control-plane label       → schedule on nodes WITH label    → masters
+  Easy to invert. Always verify placement after applying:
+    kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+    → must show worker IPs (10.0.64.x), not master IPs (10.0.61.x)
+
+Additional fixes applied:
+  StorageClass mountOptions updated to NFSv3 with nolock:
+    mountOptions:
+      - nfsvers=3
+      - nolock
+      - soft
+      - timeo=30
+      - retrans=3
+
+  ASUSTOR NFS recovery directory created:
+    mkdir -p /var/lib/nfs/v4recovery && chmod 755 /var/lib/nfs/v4recovery
+
+Apply and verify:
+  flux reconcile helmrelease csi-driver-nfs -n kube-system --with-source
+  kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+  kubectl apply -f test-pvc.yaml && kubectl get pvc test-pvc -w
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Brief provisioning unavailability during controller rollout from masters
+to workers. NFSv3 downgrade avoids NFSv4 state recovery issues on ASUSTOR NAS.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Architecture decision — controllers on workers vs masters:
+
+  Controllers on workers (chosen):
+    Pros: matches network — workers have NFS access, no firewall changes
+    Cons: controllers share resources with workloads
+
+  Controllers on masters:
+    Pros: dedicated resources, isolated from workload noise
+    Cons: requires routing masters to storage network — expanded attack surface
+
+  Decision: workers. No network changes needed.
+
+Known limitation: if all workers are simultaneously down, CSI controller cannot
+provision or delete PVCs. Existing pod mounts also down if workers are down.
+Acceptable tradeoff for network isolation design.
+
+Key lessons:
+  1. CSI controller needs network access to NFS — it mounts NFS during provisioning
+  2. Default Helm chart tolerations cause unexpected placement in segmented networks
+  3. Existing PVCs working ≠ new provisioning works — different code paths
+  4. Verify controller placement after every CSI update — Flux can reschedule if
+     affinity is not set
+  5. DoesNotExist ≠ Exists — always verify with kubectl get pods -o wide after
+  6. Test PVC provisioning after any infrastructure change
+
+Commands reference:
+  kubectl get pods -n kube-system -o wide | grep csi-nfs-controller
+  ping -c 2 10.0.40.120
+  nc -zv 10.0.40.120 2049
+  kubectl get storageclass nfs-retain -o yaml | grep -A10 mountOptions
+  kubectl describe pvc <name> -n <namespace> | tail -20
+  kubectl logs -n kube-system <csi-nfs-controller-pod> -c nfs
+
+Workaround if controllers stuck on masters — manual static PV (temporary):
+  Create NAS directory manually.
+  Create PersistentVolume with spec.nfs.server and spec.nfs.path.
+  Create PVC with spec.volumeName pointing to the manual PV.
+  Fix controller placement for proper dynamic provisioning afterward.

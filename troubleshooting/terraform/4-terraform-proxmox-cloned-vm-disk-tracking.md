@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox
 Sub-techs: Terraform bpg/proxmox provider, disk state tracking, LXC clone,
            hot-resize, UUID mounting, disk naming race condition, SCSI, LVM

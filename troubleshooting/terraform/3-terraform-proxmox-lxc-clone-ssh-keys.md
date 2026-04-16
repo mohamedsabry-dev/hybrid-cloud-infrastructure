@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox
 Sub-techs: Terraform bpg/proxmox provider, LXC clone, operating_system block,
            user_account, SSH key injection, vzdump templates

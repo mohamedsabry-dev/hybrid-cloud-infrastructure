@@ -1,174 +1,148 @@
 # TS-K8S-020 | 2026-04-10 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
+[Info]
+Author:
+Domain: Kubernetes / Monitoring
+Sub-techs: Grafana, Loki, Promtail, kube-prometheus-stack, loki-stack,
+           HelmRelease, datasource health check, version compatibility
+Environment: DEV k8s-dev cluster | monitoring namespace
+             Grafana 12.4.2 (kube-prometheus-stack), Loki 2.9.x (loki-stack 2.10.2)
+Re-opened: No
 
-**System:** Grafana + Loki monitoring stack on Kubernetes
+_____________________________________________________________________
 
-**Environment:**
-- Grafana 12.4.2 (kube-prometheus-stack)
-- Loki 2.9.x (loki-stack chart 2.10.2)
+[Issue Description]
+Grafana datasource health check fails. Loki API works via curl but Grafana
+cannot connect.
 
-**Related Components:**
-- kube-prometheus-stack Helm chart
-- loki-stack Helm chart
-- Promtail log collector
+  Grafana datasource health check error:
+  parse error at line 1, col 1: syntax error: unexpected IDENTIFIER
 
-**Discovered During:** Grafana datasource health check configuration
+Impact: cannot configure Loki datasource in Grafana, log aggregation
+unavailable through Grafana UI, monitoring stack partially non-functional.
 
----
+_____________________________________________________________________
 
-## 2. Issue
+[Analysis]
 
-**Symptom:**
-Grafana datasource health check fails with:
-```
-parse error at line 1, col 1: syntax error: unexpected IDENTIFIER
-```
+# Initial Check Notes:
+Verified Loki API works directly from inside Grafana pod:
 
-Loki API works via curl but Grafana can't connect.
+Command:
+  kubectl exec -n monitoring deploy/kube-prometheus-stack-grafana -c grafana -- \
+    curl -s http://loki:3100/loki/api/v1/labels
 
-**Impact:**
-- Unable to configure Loki as a datasource in Grafana
-- Log aggregation/querying unavailable through Grafana UI
-- Monitoring stack partially non-functional
+Output:
+  Valid JSON response — Loki API is responding correctly.
 
----
+Checked Grafana logs for the parse error:
 
-## 3. Analysis
+Command:
+  kubectl logs deploy/kube-prometheus-stack-grafana -n monitoring -c grafana \
+    | grep -i loki
 
-### Verify Loki API works directly
-```bash
-# Verify Loki API works
-kubectl exec -n monitoring deploy/kube-prometheus-stack-grafana -c grafana -- \
-  curl -s http://loki:3100/loki/api/v1/labels
-```
+Output:
+  parse error at line 1, col 1: syntax error: unexpected IDENTIFIER
 
-### Check Grafana logs for parse error
-```bash
-kubectl logs deploy/kube-prometheus-stack-grafana -n monitoring -c grafana | grep -i loki
-```
+Loki API responds to curl but fails on Grafana health check query.
+Grafana 12.x sends health check queries using syntax Loki 2.x does not
+understand. Version incompatibility between modern Grafana and legacy Loki.
 
-**Findings:** Loki API responds correctly to curl requests, but Grafana's health check query syntax is incompatible with Loki 2.x.
+loki-stack chart is deprecated and bundles Loki 2.x — incompatible with
+Grafana 12.x query syntax.
 
----
 
-## 4. Root Cause
+# Suspected Root Cause
+Grafana 12.x health check query syntax is incompatible with Loki 2.x.
+loki-stack chart (2.10.2) bundles Loki 2.9.x which is a deprecated version
+that does not understand modern Grafana query expectations.
 
-Grafana 12.x sends health check queries using syntax that Loki 2.x doesn't understand. Version incompatibility between modern Grafana and legacy Loki.
 
-The loki-stack chart is deprecated and bundles Loki 2.x, which is incompatible with Grafana 12.x query syntax expectations.
+# More Checks Notes:
+N/A — version incompatibility confirmed from Grafana logs and chart versions.
 
----
 
-## 5. Solution
+# Suspected Solution
+Upgrade from loki-stack chart (Loki 2.x) to loki chart (Loki 3.x) which is
+compatible with Grafana 12.x. Deploy Promtail as a separate chart since loki
+chart does not bundle it.
 
-### Solution Applied
-Upgrade from `loki-stack` (Loki 2.x) to `loki` chart (Loki 3.x):
 
-```yaml
-# Old (loki-stack 2.10.2 = Loki 2.9.x)
-chart: loki-stack
-version: "2.10.2"
+# Test
+Upgraded to loki chart 6.29.0 (Loki 3.x), deployed promtail separately.
+Checked Grafana datasource health check.
 
-# New (loki 6.29.0 = Loki 3.x)
-chart: loki
-version: "6.29.0"
-```
+Result: PASS — datasource health check passes, log queries working in Grafana Explore.
 
-### Key Config Changes for Loki 3.x
+_____________________________________________________________________
 
-1. **Deployment mode**:
-```yaml
-deploymentMode: SingleBinary
-```
+[Final Root Cause]
+Grafana 12.x sends datasource health check queries using syntax that Loki 2.x
+does not understand. loki-stack chart 2.10.2 bundles Loki 2.9.x — a deprecated
+chart with an incompatible legacy version. Upgrading to Loki 3.x resolves the
+syntax incompatibility.
 
-2. **Retention requires delete_request_store**:
-```yaml
-loki:
-  compactor:
-    retention_enabled: true
-    delete_request_store: filesystem
-```
+_____________________________________________________________________
 
-3. **Disable heavy cache components** (for resource-constrained clusters):
-```yaml
-chunksCache:
-  enabled: false
-resultsCache:
-  enabled: false
-```
+[Final Solution]
+Upgraded from loki-stack (Loki 2.x) to loki chart (Loki 3.x):
 
-4. **Promtail deployed separately**:
-```yaml
-# Separate HelmRelease for promtail chart
-chart: promtail
-version: "6.16.6"
-```
+  Old: chart: loki-stack, version: 2.10.2  (Loki 2.9.x)
+  New: chart: loki,       version: 6.29.0  (Loki 3.x)
 
-### Files Changed
-- `kubernetes/*/deployments/apps/logging/helm-release.yaml`
+Key config changes for Loki 3.x:
 
-### Prevention Measures
-- Check version compatibility matrix before upgrading Grafana ecosystem tools
-- Pin chart versions in HelmRelease manifests
-- Test datasource health checks after any Grafana/Loki upgrades
+  1. Deployment mode (required):
+       deploymentMode: SingleBinary
 
----
+  2. Retention requires delete_request_store:
+       loki:
+         compactor:
+           retention_enabled: true
+           delete_request_store: filesystem
 
-## 6. Solution Risk
+  3. Disable heavy cache components (resource-constrained cluster):
+       chunksCache:
+         enabled: false
+       resultsCache:
+         enabled: false
 
-**Risk Level:** Medium
+  4. Promtail deployed as separate HelmRelease:
+       chart: promtail
+       version: 6.16.6
 
-**Potential Impact:**
-- Loki 3.x has different config structure than 2.x - requires config migration
-- Promtail must be deployed as separate chart
-- Existing log data may need migration depending on storage backend
-- Brief monitoring downtime during upgrade
+Files changed:
+  kubernetes/*/deployments/apps/logging/helm-release.yaml
 
----
+Verified: Yes
 
-## 7. Impact After Fix
+_____________________________________________________________________
 
-**Observed Results:**
-- Grafana datasource health check passes
-- Log queries work correctly in Grafana Explore
-- Loki 3.x provides improved performance and compatibility
+[Risk Level] MEDIUM
+Note: Loki 3.x has different config structure than 2.x — requires config
+migration. Brief monitoring downtime during upgrade. Existing log data may
+need migration depending on storage backend.
 
----
+_____________________________________________________________________
 
-## 8. Notes
+[References]
+- https://github.com/grafana/loki/tree/main/production/helm/loki
+- https://github.com/grafana/helm-charts/tree/main/charts/promtail
 
-### Lessons Learned
-- Check version compatibility when using multiple Grafana ecosystem tools
-- loki-stack is deprecated; use separate loki + promtail charts
-- Loki 3.x has different config structure than 2.x
-- Always verify datasource health checks after stack upgrades
+_____________________________________________________________________
 
-### Commands Reference
-```bash
-# Verify Loki API
-kubectl exec -n monitoring deploy/kube-prometheus-stack-grafana -c grafana -- \
-  curl -s http://loki:3100/loki/api/v1/labels
+[Draft Notes]
 
-# Check Grafana logs
-kubectl logs deploy/kube-prometheus-stack-grafana -n monitoring -c grafana | grep -i loki
+Key lessons:
+  1. loki-stack is deprecated — use separate loki + promtail charts going forward
+  2. Check version compatibility matrix before upgrading Grafana ecosystem tools
+  3. Always verify datasource health checks after any Grafana/Loki upgrades
+  4. Loki 3.x has different config structure than 2.x — plan migration carefully
 
-# Check Loki version
-kubectl exec -n monitoring deploy/loki -- loki --version
-```
-
-### Related Files
-- `kubernetes/*/deployments/apps/logging/helm-release.yaml`
-
-### References
-- [Grafana Loki Documentation](https://grafana.com/docs/loki/latest/)
-- [Loki Helm Chart](https://github.com/grafana/loki/tree/main/production/helm/loki)
-- [Promtail Helm Chart](https://github.com/grafana/helm-charts/tree/main/charts/promtail)
-
----
-
-## 9. Workaround
-
-No temporary workaround available - upgrading to Loki 3.x is required for Grafana 12.x compatibility.
-
-Alternative: Downgrade Grafana to a version compatible with Loki 2.x (not recommended due to security updates).
+Commands reference:
+  kubectl exec -n monitoring deploy/kube-prometheus-stack-grafana -c grafana -- \
+    curl -s http://loki:3100/loki/api/v1/labels
+  kubectl logs deploy/kube-prometheus-stack-grafana -n monitoring -c grafana \
+    | grep -i loki
+  kubectl exec -n monitoring deploy/loki -- loki --version
