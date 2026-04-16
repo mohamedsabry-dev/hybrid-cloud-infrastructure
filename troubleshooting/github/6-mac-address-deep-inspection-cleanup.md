@@ -1,131 +1,152 @@
 # TS-GH-006 | 2026-03-16 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Git repository history
-- Environment: hybrid-cloud-infrastructure repository
-- Related components: Network interface documentation, test output files
+[Info]
+Domain: GitHub Actions / Security
+Sub-techs: Git history rewrite, git-filter-repo, MAC address redaction, .gitignore
+Environment: hybrid-cloud-infrastructure repository
+Re-opened: No
 
-## 2. Issue
-- Symptom: Hardware MAC addresses from physical network interfaces committed to git history
-- Error: N/A (security audit finding)
+_____________________________________________________________________
 
-**Why MAC addresses are sensitive:**
-- Can identify and track physical devices
-- Reveal network topology and infrastructure details
-- Combined with other data, enable targeted attacks
+[Issue Description]
+Security audit finding — not a live failure.
+Hardware MAC addresses from physical network interfaces found in git history.
+Raw command outputs and server config files were committed before .gitignore
+rules were added. File deletion does not remove content from git history.
 
-## 3. Analysis
+Why MAC addresses matter:
+  - Identify and track physical devices
+  - Reveal network topology and infrastructure details
+  - Combined with other data, enable targeted attacks
 
-**Check 1: Search current files for MAC addresses**
-```bash
-grep -rE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' . --include="*" 2>/dev/null | grep -v ".git/"
-```
-Finding: MAC address in `storage/drafted_test_raw_output.txt`.
+Data found:
+  1. WiFi Adapter MAC    — deleted server config file, still in history
+  2. Ethernet Adapter MAC— deleted server config file, still in history
+  3. USB Ethernet MAC    — current file storage/drafted_test_raw_output.txt + history
 
-**Check 2: Search git history for MAC addresses**
-```bash
-git log -p --all | grep -iE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | head -50
-```
-Finding: Multiple MAC addresses in deleted files still in history.
+_____________________________________________________________________
 
-**Sensitive data found:**
+[Analysis]
 
-| # | Type | Location | Status |
-|---|------|----------|--------|
-| 1 | WiFi Adapter MAC | Deleted server config file | In git history |
-| 2 | Ethernet Adapter MAC | Deleted server config file | In git history |
-| 3 | USB Ethernet MAC | Test output file | Current file + history |
+# Initial Check Notes:
+Searched current files and git history for MAC address patterns.
 
-**Safe findings (example MACs):**
-- `AA:BB:CC:DD:EE:FF` - placeholder in docs
-- `11:22:33:44:55:66` - placeholder in docs
+Command:
+  grep -rE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' . --include="*" 2>/dev/null \
+    | grep -v ".git/"
 
-## 4. Root Cause
-> Raw command outputs and server config files containing hardware identifiers were committed before `.gitignore` rules were added. Even after file deletion, git history retains the content.
+Output:
+  MAC address found in storage/drafted_test_raw_output.txt (current file).
 
-## 5. Solution
-> Redact current files and rewrite git history using git-filter-repo.
+Command:
+  git log -p --all | grep -iE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | head -50
 
-**Step 1: Redact current files**
-```bash
-# Replace real MACs with placeholder
-# Before: MAC address is: <REAL_MAC>
-# After:  MAC address is: XX:XX:XX:XX:XX:XX
-```
+Output:
+  Multiple real MACs in deleted files still present in history.
+  Placeholder MACs (AA:BB:CC:DD:EE:FF, 11:22:33:44:55:66) confirmed safe — docs only.
 
-**Step 2: Create replacement patterns**
-```bash
-cat > /tmp/mac-replacements.txt << 'EOF'
-<WIFI_MAC>==>XX:XX:XX:XX:XX:XX
-<ETHERNET_MAC>==>XX:XX:XX:XX:XX:XX
-<USB_ETHERNET_MAC>==>XX:XX:XX:XX:XX:XX
-EOF
-```
 
-**Step 3: Run git-filter-repo**
-```bash
-git filter-repo --replace-text /tmp/mac-replacements.txt --force
-```
+# Suspected Root Cause
+Raw command outputs and server config files containing hardware MAC addresses
+were committed before .gitignore rules were in place. Even after the files were
+deleted, git history retains the full content of every commit.
 
-**Step 4: Re-add remote and force push**
-```bash
-git remote add origin git@github.com:<USERNAME>/<REPO>.git
-git push origin --force --all
-git push origin --force --tags
-```
 
-**Step 5: Verify cleanup**
-```bash
-git log -p --all | grep -iE '<WIFI_MAC>|<ETHERNET_MAC>'
-# Result: No matches
-```
+# More Checks Notes:
+Ran full deep inspection audit while in cleanup mode to confirm no other
+sensitive categories were exposed.
 
-## 6. Solution Risk
-- Risk level: HIGH (history rewrite)
-- Potential impact: All collaborators must re-clone
+  MAC addresses          grep ([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}  Found & cleaned
+  Personal emails        grep @gmail|@yahoo|@hotmail               None found
+  AWS access keys        grep AKIA[A-Z0-9]{16}                     None found
+  GitHub tokens          grep ghp_|gho_|github_pat_                None found
+  Private keys           grep BEGIN.*PRIVATE KEY                   None found
+  Hardcoded passwords    grep password.*=.*['"]                    Placeholders only
 
-## 7. Impact After Fix
-- Observed: All real MACs replaced with `XX:XX:XX:XX:XX:XX`
-- Only placeholder MACs remain in history
-- Current files use placeholders
 
-## 8. Notes
+# Suspected Solution
+Redact MACs in current files and rewrite git history using git-filter-repo
+to replace all real MAC addresses with XX:XX:XX:XX:XX:XX placeholders.
 
-**Deep inspection checklist performed:**
 
-| Category | Search Pattern | Result |
-|----------|----------------|--------|
-| MAC Addresses | `([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}` | Found & cleaned |
-| Personal Emails | `@gmail\|@yahoo\|@hotmail` | None exposed |
-| AWS Access Keys | `AKIA[A-Z0-9]{16}` | None found |
-| GitHub Tokens | `ghp_\|gho_\|github_pat_` | None found |
-| Private Keys | `BEGIN.*PRIVATE KEY` | None found |
-| Hardcoded Passwords | `password.*=.*['\"]` | Only placeholders |
+# Test
+Ran git-filter-repo with MAC replacement patterns, force-pushed, verified history.
 
-**Prevention - pre-commit hook:**
-```bash
-#!/bin/bash
-# Block commits containing MAC addresses
-if git diff --cached | grep -qE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'; then
-  if git diff --cached | grep -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | \
-     grep -qvE '(XX:XX|AA:BB|11:22|00:00|FF:FF)'; then
-    echo "ERROR: Commit contains MAC address. Please redact."
-    exit 1
+Command:
+  git log -p --all | grep -iE '<WIFI_MAC>|<ETHERNET_MAC>'
+
+Result: PASS — no matches, all real MACs replaced with placeholders.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Raw command output files and server config files containing hardware MAC addresses
+were committed before .gitignore rules were added. File deletion removed them from
+the working tree but not from git history — every past commit is permanently
+retained and searchable.
+
+_____________________________________________________________________
+
+[Final Solution]
+Redacted current files and rewrote git history using git-filter-repo.
+
+  # 1. Create replacement patterns file
+  <WIFI_MAC>==>XX:XX:XX:XX:XX:XX
+  <ETHERNET_MAC>==>XX:XX:XX:XX:XX:XX
+  <USB_ETHERNET_MAC>==>XX:XX:XX:XX:XX:XX
+
+  # 2. Run filter-repo
+  git filter-repo --replace-text /tmp/mac-replacements.txt --force
+
+  # 3. Re-add remote and force push
+  git remote add origin git@github.com:<USERNAME>/<REPO>.git
+  git push origin --force --all
+  git push origin --force --tags
+
+  # 4. Verify
+  git log -p --all | grep -iE '<WIFI_MAC>|<ETHERNET_MAC>'
+  → no matches
+
+NOTE: All existing clones invalidated after force push. Re-clone required.
+
+Added to .gitignore to prevent recurrence:
+  **/test_raw_output*.txt
+  **/network_scan*.txt
+  **/interface_discovery*.txt
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] HIGH
+Note: History rewrite invalidates all collaborator clones. Force push required.
+Disable branch protection before running, re-enable after.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Part of security cleanup chain:
+  TS-GH-003        → delete workflow logs with exposed secrets
+  TS-GH-004        → git history cleanup (AWS IDs, EIPs, passwords)
+  TS-GH-006 (this) → MAC address deep inspection cleanup
+
+Pre-commit hook to block real MAC addresses from being committed:
+  #!/bin/bash
+  if git diff --cached | grep -qE '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'; then
+    if git diff --cached | grep -E '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}' | \
+       grep -qvE '(XX:XX|AA:BB|11:22|00:00|FF:FF)'; then
+      echo "ERROR: Commit contains MAC address. Please redact."
+      exit 1
+    fi
   fi
-fi
-```
 
-**Prevention - .gitignore additions:**
-```gitignore
-**/test_raw_output*.txt
-**/network_scan*.txt
-**/interface_discovery*.txt
-```
-
-**Related security cleanup chain:**
-- TS-GH-003 → Delete workflow logs with exposed secrets
-- TS-GH-004 → Git history secrets cleanup (AWS IDs, EIPs, passwords)
-- TS-GH-006 (this) → MAC address deep inspection cleanup
-
-## 9. Workaround (if any)
-> If history rewrite not possible: ensure current files are redacted and add to .gitignore to prevent future commits.
+Workaround if history rewrite not possible:
+  Redact current files, add to .gitignore, accept history exposure as residual risk.

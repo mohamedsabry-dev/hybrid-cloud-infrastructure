@@ -1,326 +1,210 @@
 # TS-TF-003 | 2026-02-23 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform with bpg/proxmox v0.96.0
-- Environment: Dev/Prod (pve-dev, pve-prod)
-- Related components: LXC clone operations, SSH key injection, user_account block, vzdump templates
+[Info]
+Author:
+Domain: Terraform / Proxmox
+Sub-techs: Terraform bpg/proxmox provider, LXC clone, operating_system block,
+           user_account, SSH key injection, vzdump templates
+Environment: DEV & PROD | pve-dev, pve-prod | bpg/proxmox v0.96.0
+Re-opened: No
 
-## 2. Issue
-- Symptom: When cloning an LXC container from a golden template, attempting to inject SSH keys or password via `user_account` block fails
-- Error:
-```
-Error: error updating container: received an HTTP 400 response - Reason: Parameter verification failed.
-(ssh-public-keys: property is not defined in schema and the schema does not allow additional properties)
-```
+_____________________________________________________________________
 
-Or for password:
-```
-Error: error updating container: received an HTTP 400 response - Reason: Parameter verification failed.
-(password: property is not defined in schema and the schema does not allow additional properties)
-```
+[Issue Description]
+When cloning an LXC container from a golden template, attempting to inject SSH
+keys or password via user_account block fails. Ansible cannot reach newly
+deployed containers. Manual post-deploy SSH key setup required — breaks IaC.
 
-**Why This Matters:**
-- Ansible cannot reach newly deployed containers
-- Manual post-deploy SSH key setup required for each container
-- Breaks Infrastructure as Code automation
+  Error (SSH keys):
+  error updating container: received an HTTP 400 response
+  ssh-public-keys: property is not defined in schema and the schema does not
+  allow additional properties
 
-## 3. Analysis
+  Error (password):
+  error updating container: received an HTTP 400 response
+  password: property is not defined in schema and the schema does not allow
+  additional properties
 
-### Part 1: Understanding the API Limitation
+_____________________________________________________________________
 
-**Proxmox API Limitation** - Not a provider bug.
+[Analysis]
 
-The Proxmox API handles LXC creation differently:
+# Initial Check Notes:
+Proxmox API handles LXC creation differently depending on the operation:
 
-| Operation | API Method | SSH Keys / Password |
-|-----------|------------|---------------------|
-| Create from template (`operating_system` block) | POST | Supported |
-| Clone existing container (`clone` block) | POST + PUT | **NOT Supported** |
+  Operation                        API method   SSH keys / password
+  Create from template file        POST         SUPPORTED
+  Clone from existing container    POST + PUT   NOT SUPPORTED
 
 When cloning, the provider:
-1. **POST** - Clones the container (succeeds)
-2. **PUT** - Updates container config with `user_account` values (fails)
+  1. POST — clones the container (succeeds)
+  2. PUT — updates container config with user_account values (FAILS)
 
-The PUT endpoint does not accept `ssh-public-keys` or `password` parameters.
+The PUT endpoint does not accept ssh-public-keys or password parameters.
+This is a Proxmox API limitation, not a provider bug.
 
-**Reference:**
-- GitHub Issue #1905: [Error when cloning a container from a template containing ssh user key](https://github.com/bpg/terraform-provider-proxmox/issues/1905)
-- GitHub Discussion #1879: [Stuck on LXC ssh key management](https://github.com/bpg/terraform-provider-proxmox/discussions/1879)
+Reference: GitHub Issue #1905 — Error when cloning a container from a template
+containing ssh user key (bpg/terraform-provider-proxmox)
 
----
-
-### Part 2: Configuration That Fails
-
-**Golden Template (works - uses `operating_system`):**
-```hcl
-resource "proxmox_virtual_environment_container" "lxc_golden" {
-  # ...
-
-  operating_system {
-    template_file_id = var.template_file
-    type             = "centos"
-  }
-
-  initialization {
-    hostname = var.lxc_container.hostname
-
-    user_account {
-      password = var.lxc_root_password
-      keys     = []  # Works here
-    }
-    # ...
-  }
-}
-```
-
-**Cloned Container (fails - uses `clone`):**
-```hcl
-resource "proxmox_virtual_environment_container" "ansible" {
-  # ...
-
+Configuration that fails (uses clone block):
   clone {
     datastore_id = var.disks.os_disk.datastore_id
     vm_id        = var.template_ctid
   }
-
   initialization {
-    hostname = var.ansible.name
-
     user_account {
-      password = var.root_password           # FAILS
-      keys     = [var.local_runner_ssh_pubkey]  # FAILS
+      password = var.root_password         ← FAILS
+      keys     = [var.ssh_pubkey]          ← FAILS
     }
-    # ...
   }
-}
-```
 
----
+Configuration that works (uses operating_system block):
+  operating_system {
+    template_file_id = var.template_file
+    type             = "centos"
+  }
+  initialization {
+    user_account {
+      password = var.lxc_root_password     ← WORKS
+      keys     = []                        ← WORKS
+    }
+  }
 
-### Part 3: Troubleshooting Attempts
 
-**Attempt 1: Add `keys = []` placeholder to golden template**
+# Suspected Root Cause
+Proxmox API limitation — PUT endpoint for cloned container updates does not
+accept ssh-public-keys or password. Only the POST endpoint for creating
+containers from template FILES supports these parameters.
 
-Hypothesis: If the golden template has the `keys` schema defined, clones might inherit it.
 
-```hcl
-user_account {
-  password = var.lxc_root_password
-  keys     = []
-}
-```
+# More Checks Notes:
 
-Finding: Failed. The clone still cannot update SSH keys via API.
+Attempt 1 — Add keys = [] placeholder to golden template:
+  Hypothesis: if golden template has keys schema defined, clones might inherit it.
+  Result: Failed. Clone still cannot update SSH keys via PUT.
 
-**Attempt 2: Add `username = "root"` to match VM behavior**
+Attempt 2 — Add username = "root" to match VM behaviour:
+  Result: Error: Unsupported argument. LXC containers do not support username
+  field — it is always root. Only VMs support username in user_account.
 
-Hypothesis: LXC might need explicit username like VMs do.
+Attempt 3 — Use placeholder SSH key in golden template:
+  keys = ["ssh-ed25519 PLACEHOLDER_KEY_WILL_BE_REPLACED_IN_CLONES placeholder@golden"]
+  Result: HTTP 500 — SSH public key validation error. Invalid key format rejected.
 
-```hcl
-user_account {
-  username = "root"
-  password = var.lxc_root_password
-  keys     = []
-}
-```
+Attempt 4 — Add initialization to ignore_changes lifecycle:
+  lifecycle { ignore_changes = [started, description, initialization] }
+  Result: Would technically work, but rejected — changes to IP, hostname, etc.
+  in Terraform would no longer apply to existing containers. Loses IaC benefits.
 
-Finding: Failed with different error:
-```
-Error: Unsupported argument
-An argument named "username" is not expected here.
-```
 
-LXC containers don't support `username` - it's always root.
+# Suspected Solution
+Use vzdump template files (.tar.gz) instead of cloning from container ID.
+This uses the operating_system block which supports user_account with SSH keys.
 
-**Attempt 3: Use placeholder SSH key in golden template**
 
-Hypothesis: A valid SSH key format might work as placeholder.
+# Test
+Changed all LXC container configurations to use operating_system block with
+vzdump template file. Deployed containers and verified Ansible connectivity.
 
-```hcl
-user_account {
-  password = var.lxc_root_password
-  keys     = ["ssh-ed25519 PLACEHOLDER_KEY_WILL_BE_REPLACED_IN_CLONES placeholder@golden-template"]
-}
-```
+Result: PASS — SSH keys injected, Ansible reachable immediately after creation.
 
-Finding: Failed:
-```
-Error: error creating container: received an HTTP 500 response - Reason: SSH public key validation error
-```
+_____________________________________________________________________
 
-Invalid SSH key format rejected by Proxmox.
+[Final Root Cause]
+Proxmox API limitation. The PUT endpoint used to update cloned containers does
+not accept ssh-public-keys or password parameters. Only the POST endpoint used
+when creating containers from template FILES supports these parameters. The
+bpg/proxmox provider correctly uses clone → POST + PUT which hits this API
+limitation. Using operating_system → POST bypasses it entirely.
 
-**Attempt 4: Add `initialization` to `ignore_changes`**
+  Deployment method                  user_account   SSH keys   Password
+  operating_system + template file   YES            Works      Works
+  clone from container ID            NO             Fails      Fails
 
-Hypothesis: Prevent Terraform from attempting to update initialization settings after clone.
+_____________________________________________________________________
 
-```hcl
-lifecycle {
-  ignore_changes = [
-    started,
-    description,
-    initialization,
-  ]
-}
-```
+[Final Solution]
+Use vzdump template files (.tar.gz) for all LXC golden image deployments
+instead of cloning from container IDs.
 
-Finding: Would work, but rejected because:
-- Changes to IP, hostname, etc. in Terraform won't apply to existing containers
-- Reduces Infrastructure as Code benefits
-- User preference to maintain full control
+Template file creation workflow:
+  # 1. Create source container from base template
+  cd terraform/dev/proxmox/lxc/golden-template && terraform apply
 
-## 4. Root Cause
-> Proxmox API limitation - not a provider bug. The PUT endpoint used for updating cloned containers does not accept `ssh-public-keys` or `password` parameters. Only the POST endpoint used for creating containers from template FILES supports these parameters.
+  # 2. Configure container (packages, hardening, SSH setup)
+  pct enter 9010 && <configure> && exit
 
-| Deployment Method | `user_account` Support | SSH Keys | Password |
-|-------------------|------------------------|----------|----------|
-| `operating_system` + template FILE | **Yes** | Works | Works |
-| `clone` from container ID | **No** | Fails | Fails |
+  # 3. Stop and create vzdump backup
+  pct stop 9010
+  vzdump 9010 --compress gzip --storage local --mode stop
 
-## 5. Solution
-> Use vzdump template FILES (`.tar.gz`) instead of cloning from container ID. This allows `operating_system` block which supports `user_account`.
+  # 4. Move to template directory
+  mv /var/lib/vz/dump/vzdump-lxc-9010-*.tar.gz \
+     /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
 
-### Architecture
+  # 5. Verify template available
+  pveam list nas-iso
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  LXC 9010 (Source Container)                                    │
-│  - Created by Terraform from base Rocky Linux template          │
-│  - Manually configured (packages, hardening, SSH setup)         │
-│  - Used to create template file via vzdump                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                        vzdump --compress gzip
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  rocky-9-lxc-golden.tar.gz (Template File)                      │
-│  - Stored at: nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz          │
-│  - Used via operating_system.template_file_id                   │
-│  - Supports user_account block with SSH keys                    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                        terraform apply
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  New LXC Container (ansible, nginx, vault, etc.)                │
-│  - Created from template FILE (not cloned)                      │
-│  - SSH keys injected via user_account block                     │
-│  - Ansible reachable immediately                                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Working Terraform Configuration
-
-```hcl
-# This WORKS - operating_system with template FILE
-resource "proxmox_virtual_environment_container" "ansible" {
-  # ...
-
+Working Terraform configuration (operating_system block):
   operating_system {
     template_file_id = "nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
     type             = "centos"
   }
-
   initialization {
     hostname = var.ansible.name
-
     user_account {
-      keys     = var.ssh_public_keys   # ✓ SSH keys injected
-      password = var.root_password     # ✓ Password set
+      keys     = var.ssh_public_keys    ← works
+      password = var.root_password      ← works
     }
-
     ip_config {
-      ipv4 {
-        address = var.ansible.ip
-        gateway = var.ansible.gateway
-      }
+      ipv4 { address = var.ansible.ip; gateway = var.ansible.gateway }
     }
   }
-}
-```
 
-### Template File Creation Workflow
+Files changed:
+  terraform/dev/proxmox/lxc/golden-template/main.tf
+  terraform/dev/proxmox/lxc/ansible/main.tf
+  terraform/dev/proxmox/lxc/local_runner/main.tf
+  terraform/prod/proxmox/lxc/*/main.tf
 
-```bash
-# Step 1: Create source container from base template
-cd terraform/dev/proxmox/lxc/golden-template
-terraform apply
+Verified: Yes
 
-# Step 2: Configure container (packages, hardening)
-pct enter 9010
-# ... configure ...
-exit
+_____________________________________________________________________
 
-# Step 3: Stop and create backup
-pct stop 9010
-vzdump 9010 --compress gzip --storage local --mode stop
+[Risk Level] LOW
+Note: Requires vzdump workflow for template creation instead of simple clone.
+Source container (9010) can be destroyed after vzdump — unlike VMs where
+source must be kept for Terraform state consistency.
 
-# Step 4: Move to template directory
-mv /var/lib/vz/dump/vzdump-lxc-9010-*.tar.gz \
-   /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
+_____________________________________________________________________
 
-# Step 5: Verify template available
-pveam list nas-iso
-```
+[References]
+- https://github.com/bpg/terraform-provider-proxmox/issues/1905
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Requires vzdump workflow for template creation instead of simple clone
+_____________________________________________________________________
 
-## 7. Impact After Fix
-- Observed: LXC containers deploy with SSH keys injected
-- Ansible reachable immediately after container creation
-- Full Infrastructure as Code maintained
+[Draft Notes]
 
-**Summary:**
+VMs vs LXC differences in Terraform:
 
-| What | Decision |
-|------|----------|
-| LXC Template Approach | Vzdump template FILE (`.tar.gz`) |
-| Why Not Clone | Provider limitation - no `user_account` support |
-| SSH Key Injection | Works via `operating_system` block |
-| Ansible Reachability | Immediate after container creation |
-| Source Container | Can be destroyed after vzdump (unlike VMs) |
+  Aspect              VMs                              LXC Containers
+  Golden template     clone { vm_id = 9001 }           operating_system { template_file_id = ... }
+  SSH key injection   cloud-init (works with clone)     user_account (requires template file)
+  Source after tmpl   Keep (Terraform state)            Can destroy (vzdump is a backup)
+  Template format     VM disk                           .tar.gz file
 
-## 8. Notes
+Key lessons:
+  1. Proxmox API limitations are not always obvious from Terraform error messages
+  2. Clone and create have different API capabilities — clone uses PUT which
+     does not support SSH keys or password
+  3. GitHub Issues/Discussions are valuable for understanding provider limitations
+  4. vzdump template files are the correct LXC golden image approach
+  5. VMs and LXC differ fundamentally in how templates and SSH keys are handled
 
-### Key Differences: VMs vs LXC
-
-| Aspect | VMs | LXC Containers |
-|--------|-----|----------------|
-| Golden Template | Clone from VM ID (9001) | Template FILE (.tar.gz) |
-| Terraform Block | `clone { vm_id = 9001 }` | `operating_system { template_file_id = "..." }` |
-| SSH Key Injection | Cloud-init (works with clone) | `user_account` (requires template file) |
-| Source After Template | Keep (TF state consistency) | Can destroy (vzdump is backup) |
-
-### Files Changed
-
-- `terraform/dev/proxmox/lxc/golden-template/main.tf` - Added `keys = []` to `user_account`
-- `terraform/dev/proxmox/lxc/ansible/main.tf` - Changed to `operating_system` block
-- `terraform/dev/proxmox/lxc/local_runner/main.tf` - Changed to `operating_system` block
-- `terraform/prod/proxmox/lxc/*/main.tf` - Same changes for prod
-
-### Lessons Learned
-
-1. **Proxmox API limitations** are not always obvious from Terraform error messages
-2. **Clone vs Create** have different API capabilities in Proxmox
-3. **GitHub Issues/Discussions** are valuable for understanding provider limitations
-4. **Vzdump template files** are the correct approach for LXC golden images
-5. **VMs and LXC differ** in how templates and SSH keys are handled
-
-## 9. Workaround (if any)
-> If vzdump approach not possible: Remove `user_account` from cloned containers and add SSH keys manually post-deploy via `ssh-copy-id` or direct file edit.
-
-**Manual SSH Key Setup (fallback):**
-```bash
-# SSH into container (password from golden template)
-ssh root@10.0.63.20
-
-# Generate SSH key
-ssh-keygen -t ed25519 -C "local-runner" -f ~/.ssh/id_ed25519 -N ""
-
-# Copy to other containers
-ssh-copy-id root@10.0.63.10
-```
+Workaround if vzdump not possible:
+  Remove user_account from cloned containers.
+  Add SSH keys manually post-deploy:
+    ssh root@<container-ip>
+    ssh-keygen -t ed25519 -C "label" -f ~/.ssh/id_ed25519 -N ""
+    ssh-copy-id root@<target>

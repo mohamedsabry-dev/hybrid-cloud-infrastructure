@@ -1,169 +1,166 @@
 # TS-NET-004 | 2026-03 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: WireGuard VPN / CGNAT
-- Environment: Prod WireGuard tunnel (ER605 → AWS)
-- Related components: ER605, ISP Router, AWS EC2 Prod
-- Duration: ~5 days downtime
-- Related tickets: [TS-NET-005](5-wireguard-tunnel-stability-investigation.md) - WireGuard stability investigation
+[Info]
+Domain: Networking / VPN
+Sub-techs: WireGuard, CGNAT, UDP port blocking, ER605, AWS EC2, tcpdump
+Environment: Prod WireGuard tunnel (ER605 → AWS EC2 Prod)
+Re-opened: No
 
-## 2. Issue
-- Symptom: Prod WireGuard tunnel showing no handshake for ~5 days
-- Dev tunnel working perfectly on same setup
-- Error: TX bytes increasing but RX: 0 B (packets sent but nothing received back)
+_____________________________________________________________________
 
-**WireGuard Status on ER605:**
-```
-| Interface    | Endpoint            | Port  | TX Bytes | RX Bytes | Last Handshake |
-|--------------|---------------------|-------|----------|----------|----------------|
-| prod_tunnel  | REDACTED_EIP_PROD   | 51820 | 3.0 KiB  | 0 B      | ---            |
-| dev_tunnel   | REDACTED_EIP_DEV    | 51820 | 34.6 KiB | 34.4 KiB | 1 second ago   |
-```
+[Issue Description]
+Prod WireGuard tunnel showing no handshake for ~5 days. Dev tunnel on same
+setup working perfectly throughout.
 
-**Key observation:** TX bytes increasing but RX: 0 B = ER605 sending packets but receiving nothing back.
+  prod_tunnel  TX: 3.0 KiB   RX: 0 B    Last handshake: ---
+  dev_tunnel   TX: 34.6 KiB  RX: 34.4 KiB  Last handshake: 1 second ago
 
-## 3. Analysis
+TX increasing but RX: 0 B — ER605 sending packets but receiving nothing back.
 
-**Check 1: Verified Keys Match**
-```
-Action: Compared public keys on both sides
-```
-Finding: Keys matching, no changes made ✓
+Related ticket: TS-NET-005 — WireGuard stability investigation
 
----
+_____________________________________________________________________
 
-**Check 2: Time Sync Verification**
-```
-Action: Checked NTP sync on both AWS EC2 and ER605
-```
-Finding: Times synchronized, ruled out handshake timing issues ✓
+[Analysis]
 
----
+# Initial Check Notes:
+Ruled out key mismatch and time sync first — both confirmed fine.
 
-**Check 3: AWS EC2 tcpdump**
-```bash
-sudo tcpdump -i enX0 udp port 51820 -n
-```
-**Output showed bidirectional traffic:**
-```
-19:41:08.361300 IP 172.17.65.73.51820 > REDACTED_ISP_PUBLIC.51821: UDP, length 148
-19:41:13.896634 IP 172.17.65.73.51820 > REDACTED_ISP_PUBLIC.51821: UDP, length 148
-19:41:16.075610 IP REDACTED_ISP_PUBLIC.51821 > 172.17.65.73.51820: UDP, length 148
-19:41:16.075915 IP 172.17.65.73.51820 > REDACTED_ISP_PUBLIC.51821: UDP, length 92
-19:41:21.290233 IP REDACTED_ISP_PUBLIC.51821 > 172.17.65.73.51820: UDP, length 148
-19:41:21.290575 IP 172.17.65.73.51820 > REDACTED_ISP_PUBLIC.51821: UDP, length 92
-```
+Checked if AWS was receiving and responding using tcpdump:
 
-**Analysis:**
-- `REDACTED_ISP_PUBLIC:51821 > 172.17.65.73:51820` = ER605 → AWS (148 bytes = handshake initiation)
-- `172.17.65.73:51820 > REDACTED_ISP_PUBLIC:51821` = AWS → ER605 (92 bytes = handshake response)
+Command:
+  sudo tcpdump -i enX0 udp port 51820 -n  (on AWS EC2)
 
-Finding: AWS receiving packets AND sending responses. Responses NOT reaching ER605. ✓
+Output:
+  REDACTED_ISP_PUBLIC:51821 > 172.17.65.73:51820  UDP length 148  (ER605 → AWS, handshake init)
+  172.17.65.73:51820 > REDACTED_ISP_PUBLIC:51821  UDP length 92   (AWS → ER605, handshake response)
 
----
+AWS is receiving packets AND sending responses back.
+Responses are NOT reaching ER605.
+Problem is between AWS and ER605 — something blocking the return path.
 
-**Check 4: ISP Router Port Forwarding**
-```
-Initial state: No port forwarding rules configured
+Tried ISP router port forwarding:
+  Added WireGuard_Prod rule: UDP external 51821 → internal 192.168.100.175:51821
+  Result: still not working.
 
-Added port mapping:
-- Mapping Name: WireGuard_Prod
-- Protocol: UDP
-- External Port: 51821
-- Internal Host: 192.168.100.175 (ER605)
-- Internal Port: 51821
-```
-Finding: Still not working ✗
+Tried ISP router DMZ:
+  Set ER605 (192.168.100.175) as DMZ host to bypass all port restrictions.
+  Result: still not working.
 
----
+Both fixes failed — checked ISP router routing table to understand why:
 
-**Check 5: DMZ Configuration**
-```
-Action: Set ER605 (192.168.100.175) as DMZ host to bypass all port restrictions
-```
-Finding: Still not working ✗
+  Route entry: Destination 100.122.0.1 / 255.255.255.255 → Interface TR069_INTERNET
 
----
+  100.122.0.1 is in the CGNAT range (100.64.0.0/10).
+  ISP is using Carrier-Grade NAT — the real NAT is happening at ISP infrastructure
+  level, not at the local router. Port forwarding and DMZ on the local ISP router
+  are completely useless under CGNAT because they only affect the local NAT — the
+  ISP-level NAT is upstream and not configurable.
 
-**Check 6: CGNAT Discovery**
+  ISP was blocking port 51821 specifically at the CGNAT level.
+  Dev tunnel on port 51820 was not blocked — that is why dev worked fine throughout.
 
-Checked ISP router routing table:
-```
-| Number | Destination IP | Subnet Mask     | Gateway | Interface                  |
-|--------|----------------|-----------------|---------|----------------------------|
-| 4      | 100.122.0.1    | 255.255.255.255 | 0.0.0.0 | 1_TR069_INTERNET_R_VID_10  |
-```
 
-Finding: **`100.122.0.1` is in CGNAT range (100.64.0.0/10)** - Confirms ISP uses Carrier-Grade NAT. ✓
+# Suspected Root Cause
+ISP CGNAT blocking port 51821 at infrastructure level. Port forwarding and DMZ
+on local ISP router have no effect — real NAT and filtering happens upstream.
 
-## 4. Root Cause
-> ISP blocks specific UDP ports at CGNAT level. Port forwarding/DMZ on local ISP router doesn't help because the real NAT happens at ISP level before traffic reaches user's router. ISP was blocking port 51821 specifically while port 51820 (dev tunnel) was not blocked.
 
-**Why dev worked:** Both tunnels rely on ER605 initiating outbound to create NAT mapping. Dev's port 51820 wasn't blocked at CGNAT, so its NAT mapping worked.
+# More Checks Notes:
+CGNAT detection method: check ISP router routing table for any address in
+100.64.0.0/10 range. Presence of a 100.x.x.x route confirms CGNAT.
 
-## 5. Solution
-> Change ER605 prod_tunnel Listen Port to avoid blocked port.
+Why dev tunnel worked:
+  Both tunnels work by ER605 initiating outbound — creates NAT mapping.
+  PersistentKeepalive (25 sec) maintains the NAT mapping.
+  Dev port 51820 was not blocked at CGNAT level.
+  Prod port 51821 was blocked — responses never reached ER605.
 
-**Port Change:**
-```
-Before: 51821
-After:  51830
 
-ER605 → VPN → WireGuard → prod_tunnel → Edit → Listen Port: 51830
-```
+# Suspected Solution
+Change prod_tunnel Listen Port on ER605 to a different UDP port that is
+not blocked at CGNAT level.
 
-**Result:** Handshake established immediately after change.
 
-**AWS side:** No changes required - AWS responds to whatever source port packets arrive from.
+# Test
+Changed ER605 prod_tunnel Listen Port from 51821 to 51830.
+No changes needed on AWS side — AWS responds to whatever source port it receives from.
 
-**Post-Resolution Cleanup:**
-```
-1. Disabled DMZ on ISP router
-2. Deleted WireGuard_Prod port mapping rule
-```
-These are not needed when behind CGNAT since ER605 initiates outbound and PersistentKeepalive (25 sec) maintains the NAT mapping.
+Result: PASS — handshake established immediately after port change.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - just using different port number
+Post-resolution cleanup:
+  Disabled DMZ on ISP router.
+  Deleted WireGuard_Prod port forwarding rule.
+  Neither is needed — ER605 initiates outbound and PersistentKeepalive
+  maintains the NAT mapping. DMZ and port forwarding are irrelevant under CGNAT.
 
-## 7. Impact After Fix
-- Observed: Prod tunnel handshake established immediately
-- Tunnel stable after port change
-- No additional configuration needed on AWS side
+Post-fix retest — tried reverting to port 51821:
+  Result: port 51821 worked with no issues after reverting.
 
-**Post-Fix Retest:**
-After switching to 51830 and confirming it worked, tested reverting to 51821:
-- Result: Port 51821 worked smoothly with no issues
+Possible explanations for this:
+  1. Temporary ISP CGNAT issue that cleared during troubleshooting
+  2. Stale state on ER605 that cleared after config changes
+  3. DMZ/port forwarding changes triggered something at ISP level
 
-**Possible explanations:**
-1. Temporary ISP CGNAT issue that cleared during troubleshooting
-2. Stale state on ER605 router (cannot confirm - ER605 CLI is very limited)
-3. DMZ/port forwarding changes triggered something at ISP level
+Decision: keep port 51830 as precaution in case 51821 gets blocked again.
 
-**Decision:** Keep port 51830 as a precaution in case 51821 gets blocked again.
+_____________________________________________________________________
 
-## 8. Notes
+[Final Root Cause]
+ISP uses CGNAT (confirmed via 100.64.0.0/10 route in ISP router routing table).
+Port 51821 was being blocked at ISP CGNAT level — AWS was responding but responses
+never reached ER605. Port forwarding and DMZ on the local ISP router have no effect
+under CGNAT because the real NAT and filtering happen at ISP infrastructure level,
+upstream of the local router. Dev tunnel on port 51820 was unaffected because that
+port was not blocked.
 
-**Updated Configuration:**
-| Environment | ER605 Port | AWS Port |
-|-------------|------------|----------|
-| Dev         | 51820      | 51820    |
-| Prod        | 51830      | 51820    |
+Note: port 51821 worked again after changing to 51830 and back — exact cause of
+original blockage not fully confirmed (temporary CGNAT issue, stale state, or
+side effect of config changes during troubleshooting).
 
-**CGNAT Detection Method:**
-Check ISP router routing table for addresses in 100.64.0.0/10 range.
+_____________________________________________________________________
 
-**Key Takeaways:**
-1. Port forwarding/DMZ useless with CGNAT - real NAT is at ISP level
-2. tcpdump is essential - showed AWS was responding but packets not reaching ER605
-3. Port changes can help clear stale state even if not permanently blocked
-4. ER605 limitations - poor CLI makes it hard to diagnose internal router state issues
+[Final Solution]
+Changed prod_tunnel Listen Port on ER605 from 51821 to 51830.
 
-**References:**
-- `network/vpn/wireguard-setup.md` - Full VPN setup documentation
-- `network/vpn/wireguard-config.txt` - Quick reference configuration
+  ER605 → VPN → WireGuard → prod_tunnel → Edit → Listen Port: 51830
 
-## 9. Workaround (if any)
-> Change to a different UDP port (51830) to bypass ISP port blocking at CGNAT level.
+  No AWS changes needed.
+  Disabled DMZ and removed port forwarding rule from ISP router.
 
+Current port configuration:
+  dev_tunnel   ER605 port 51820  AWS port 51820
+  prod_tunnel  ER605 port 51830  AWS port 51820
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: No impact — just using a different port number.
+
+_____________________________________________________________________
+
+[References]
+- network/vpn/wireguard-setup.md
+- network/vpn/wireguard-config.txt
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+CGNAT detection: check ISP router routing table for any address in 100.64.0.0/10.
+If present, ISP is using CGNAT — port forwarding and DMZ on local router are useless.
+
+Key lesson: tcpdump on the remote side (AWS) is essential for diagnosing WireGuard
+handshake failures. It immediately shows whether the remote is receiving packets and
+responding — narrows the problem to either the sending side or the return path.
+
+Under CGNAT + PersistentKeepalive, no port forwarding or DMZ is needed at all.
+ER605 initiates outbound, CGNAT creates the mapping, keepalive maintains it.
+The only thing that matters is the ISP not blocking the outbound UDP port.
+
+ER605 limitation: very poor CLI makes it hard to diagnose internal router state.
+When troubleshooting WireGuard on ER605, rely on tcpdump on the remote (AWS) side
+rather than trying to extract diagnostic info from the ER605 itself.

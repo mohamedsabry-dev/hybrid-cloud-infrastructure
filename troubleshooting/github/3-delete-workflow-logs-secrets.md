@@ -1,89 +1,127 @@
 # TS-GH-003 | 2026-03-14 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: GitHub Actions workflow logs
-- Environment: hybrid-cloud-infrastructure repository
-- Related components: AWS Secrets Manager, Terraform outputs, workflow masking
+[Info]
+Domain: GitHub Actions
+Sub-techs: Workflow log masking, AWS Secrets Manager, GitHub CLI, security cleanup
+Environment: hybrid-cloud-infrastructure repository
+Re-opened: No
 
-## 2. Issue
-- Symptom: Past workflow runs may have logged sensitive data before proper masking was implemented
-- Error: N/A (proactive security cleanup)
+_____________________________________________________________________
 
-## 3. Analysis
+[Issue Description]
+Proactive security cleanup — not a live failure.
+Workflow masking (::add-mask::) was implemented after initial runs. Old workflow
+logs may contain unmasked secrets, passwords, and IPs from before masking was added.
 
-**Check 1: How many workflow runs exist?**
-```bash
-gh run list --limit 1000 | wc -l
-# Result: 619 runs
-```
-Finding: 619 workflow runs potentially contain unmasked secrets.
+_____________________________________________________________________
 
-**Check 2: Current masking status**
-```yaml
-# Verified all 27 workflows follow correct pattern:
-SECRET=$(aws secretsmanager get-secret-value ...)
-echo "::add-mask::${SECRET}"           # Mask first
-echo "TF_VAR_secret=${SECRET}" >> $GITHUB_ENV  # Then export
-```
-Finding: Current workflows properly mask secrets, but old logs may be exposed.
+[Analysis]
 
-## 4. Root Cause
-> Workflow masking (`::add-mask::`) was implemented after initial runs. Old workflow logs may contain unmasked secrets, passwords, and IPs.
+# Initial Check Notes:
+Counted how many workflow runs exist and need to be reviewed.
 
-## 5. Solution
-> Delete all old workflow runs to ensure no sensitive data remains in logs.
+Command:
+  gh run list --limit 1000 | wc -l
 
-**Delete all workflow runs:**
-```bash
-# Delete in batches of 500
-gh run list --limit 500 --json databaseId -q '.[].databaseId' | xargs -I {} gh run delete {}
-```
+Output:
+  619 runs potentially containing unmasked secrets.
 
-**Or loop until all gone:**
-```bash
-while [ $(gh run list --limit 1 | wc -l) -gt 0 ]; do
-  gh run list --limit 500 --json databaseId -q '.[].databaseId' | xargs -I {} gh run delete {}
-  echo "Batch deleted..."
-done
-echo "Done"
-```
+Verified current workflows all follow correct masking pattern:
 
-**Action taken:** Ran delete command twice (500 limit per batch), removed all 619 workflow runs.
+  SECRET=$(aws secretsmanager get-secret-value ...)
+  echo "::add-mask::${SECRET}"                    # mask first
+  echo "TF_VAR_secret=${SECRET}" >> $GITHUB_ENV   # then export
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Lose workflow run history for debugging - acceptable tradeoff for security
+All 27 workflows confirmed following correct pattern for new runs.
+Problem is historical logs from before masking was implemented.
 
-## 7. Impact After Fix
-- Observed: All 619 old workflow runs deleted
-- New runs use proper masking
-- No sensitive data in workflow logs
 
-## 8. Notes
+# Suspected Root Cause
+::add-mask:: was added to workflows after the initial runs were already logged.
+619 old runs may have secrets, passwords, and IPs in plain text in their logs.
 
-**Post-cleanup security audit verified:**
 
-| Check | Result |
-|-------|--------|
-| All secrets masked before export | ✅ Pass |
-| SSH keys masked before use | ✅ Pass |
-| No `terraform output` exposing sensitive values | ✅ Pass |
-| No debug flags (`TF_LOG`, `-v`) | ✅ Pass |
-| sshpass commands use pre-masked passwords | ✅ Pass |
+# More Checks Notes:
+Verified Terraform sensitive variable coverage:
 
-**Terraform sensitive variables (54 instances):**
-```bash
-grep -r "sensitive\s*=\s*true" terraform/
-```
-- `proxmox_api_token` ✅
-- `root_password` / `vm_root_password` ✅
-- `ssh_public_keys` / `ansible_ssh_public_key` ✅
-- AWS account IDs in IAM modules ✅
+Command:
+  grep -r "sensitive\s*=\s*true" terraform/
 
-**Related security cleanup chain:**
-- TS-GH-003 (this) → Delete workflow logs with exposed secrets
-- TS-GH-004 → Git history secrets cleanup (AWS IDs, EIPs, passwords)
-- TS-GH-006 → MAC address deep inspection cleanup
+Output:
+  proxmox_api_token           marked sensitive
+  root_password / vm_root_password  marked sensitive
+  ssh_public_keys / ansible_ssh_public_key  marked sensitive
+  AWS account IDs in IAM modules  marked sensitive
+  54 total instances confirmed
 
-## 9. Workaround (if any)
-> If deletion not possible, manually review each run for sensitive data exposure.
+Full security audit on current workflow state:
+  All secrets masked before export       PASS
+  SSH keys masked before use             PASS
+  No terraform output exposing secrets   PASS
+  No debug flags (TF_LOG, -v)            PASS
+  sshpass uses pre-masked passwords      PASS
+
+Current state is clean. Old logs are the only remaining risk.
+
+
+# Suspected Solution
+Delete all 619 old workflow runs. Historical logs gone, no sensitive data remains.
+
+
+# Test
+Ran batch delete command twice (500 limit per batch).
+
+Command:
+  gh run list --limit 500 --json databaseId -q '.[].databaseId' \
+    | xargs -I {} gh run delete {}
+
+Result: PASS — all 619 runs deleted, only properly masked runs will exist going forward.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Workflow secret masking was implemented after initial workflow runs were already
+logged. 619 historical runs potentially contained unmasked secrets, passwords,
+and IPs in plain text logs.
+
+_____________________________________________________________________
+
+[Final Solution]
+Deleted all old workflow runs in batches of 500 via GitHub CLI:
+
+  # Single batch
+  gh run list --limit 500 --json databaseId -q '.[].databaseId' \
+    | xargs -I {} gh run delete {}
+
+  # Loop until all gone
+  while [ $(gh run list --limit 1 | wc -l) -gt 0 ]; do
+    gh run list --limit 500 --json databaseId -q '.[].databaseId' \
+      | xargs -I {} gh run delete {}
+    echo "Batch deleted..."
+  done
+
+All 619 runs removed. New runs use proper masking.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Workflow run history lost — acceptable tradeoff for removing potential
+secret exposure from logs.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Part of a security cleanup chain:
+  TS-GH-003 (this)  → delete workflow logs with exposed secrets
+  TS-GH-004         → git history secrets cleanup (AWS IDs, EIPs, passwords)
+  TS-GH-006         → MAC address deep inspection cleanup

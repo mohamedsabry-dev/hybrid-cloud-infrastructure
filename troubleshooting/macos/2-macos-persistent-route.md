@@ -1,185 +1,141 @@
 # TS-MAC-002 | 2026-02-16 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: macOS with LaunchDaemon
-- Environment: Mac Mini workstation
-- Related components: Static routes, internal VLANs access
+[Info]
+Domain: macOS / Networking
+Sub-techs: Static routes, LaunchDaemon, macOS boot persistence
+Environment: Mac Mini workstation (192.168.0.x home LAN)
+Re-opened: No
 
-## 2. Issue
-- Symptom: Routes added via `route add` are lost after Mac reboot
-- Error:
-```bash
-# After reboot
-netstat -rn | grep "^10"
-# Empty - route gone
-```
+_____________________________________________________________________
 
-## 3. Analysis
+[Issue Description]
+Static routes added via route add are lost after Mac reboot. Internal VLANs
+(10.0.0.0/8) become unreachable until route is manually re-added.
 
-**Check 1: Does the route work when added manually?**
-```bash
-sudo route add -net 10.0.0.0/8 192.168.0.175
-netstat -rn | grep "^10"
-# 10    192.168.0.175    UGSc    en1
-```
-Finding: Route works when added manually.
+  After reboot:
+  netstat -rn | grep "^10"
+  → empty
 
-**Check 2: Why doesn't it persist?**
-```
-macOS doesn't have /etc/rc.local or systemd
-Routes added via `route add` are in-memory only
-Reboot clears routing table
-```
-Finding: macOS needs LaunchDaemon to run commands at boot.
+_____________________________________________________________________
 
-**Check 3: What's the gateway?**
-```
-192.168.0.175 = ER605 router / WireGuard endpoint
-Routes to 10.0.0.0/8 = all internal VLANs
-```
-Finding: Single route covers all internal networks.
+[Analysis]
 
-## 4. Root Cause
-> macOS `route add` commands are not persistent - they're cleared on reboot. macOS requires a LaunchDaemon to execute commands at system startup.
+# Initial Check Notes:
+Confirmed route works when added manually — not a routing or gateway issue.
 
-## 5. Solution
-> **Current:** Route configured at ISP router level pointing to ER605 router - no Mac config needed.
-> **Alternative:** Create LaunchDaemon to add route at boot (kept for reference).
+Command:
+  sudo route add -net 10.0.0.0/8 192.168.0.175
+  netstat -rn | grep "^10"
 
-**Update (2026-04):** The route `10.0.0.0/8` is now configured at the ISP router level. The LaunchDaemon below is no longer needed on Mac Mini but kept for reference or alternative setups.
+Output:
+  10    192.168.0.175    UGSc    en1 — works fine manually.
 
-**Gateway history:**
-| Phase | Gateway | Device |
-|-------|---------|--------|
-| Before MikroTik migration | 192.168.0.175 | ER605 |
-| After MikroTik migration | 192.168.100.195 | MikroTik |
-| Fallback (kept) | 192.168.0.175 | ER605 (same config retained) |
+macOS does not have /etc/rc.local or systemd. Routes added via route add are
+in-memory only — reboot clears the routing table. macOS requires a LaunchDaemon
+to execute commands at system startup.
 
----
+Gateway: 192.168.0.175 = ER605 router.
+Single route 10.0.0.0/8 covers all internal VLANs (management, prod, dev, etc).
 
-### Alternative: LaunchDaemon Method (Reference)
 
-**Why this works:** LaunchDaemon runs at system startup with root privileges, before user login.
+# Suspected Root Cause
+macOS route add is not persistent. Routes live in memory only and are cleared
+on every reboot. No native persistence mechanism without a LaunchDaemon.
 
-**Location:** Mac workstation
 
-**Files in:** `workstation/route-setup/`
+# More Checks Notes:
+N/A — cause confirmed, solution direction clear.
 
-**1. Route script:** `workstation/route-setup/add-route.sh`
-```bash
-#!/bin/bash
-# Wait for network, then add route to 10.x networks
 
-GATEWAY="192.168.100.195"
-NETWORK="10.0.0.0/8"
+# Suspected Solution
+Create a LaunchDaemon that runs the route add command at boot with a gateway
+reachability check before applying.
 
-# Wait up to 60 seconds for network
-for i in {1..60}; do
-    if /sbin/ping -c 1 -t 1 "$GATEWAY" &>/dev/null; then
-        /sbin/route add -net "$NETWORK" "$GATEWAY" 2>/dev/null
-        logger "Route $NETWORK via $GATEWAY added"
-        exit 0
-    fi
-    sleep 1
-done
 
-logger "Failed to add route - gateway $GATEWAY not reachable"
-exit 1
-```
+# Test
+LaunchDaemon installed, Mac rebooted, route verified.
 
-**2. LaunchDaemon plist:** `workstation/route-setup/com.local.route10.plist`
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.local.route10</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/add-route.sh</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <false/>
-</dict>
-</plist>
-```
+Command:
+  netstat -rn | grep "^10"
 
-**Quick install (if needed):**
-```bash
-cd workstation/route-setup
-sudo ./install-route.sh
-```
+Result: PASS — route present after reboot.
 
-**Manual install:**
-```bash
-# Copy script
-sudo cp workstation/add-route.sh /usr/local/bin/add-route.sh
-sudo chmod 755 /usr/local/bin/add-route.sh
+_____________________________________________________________________
 
-# Copy plist
-sudo cp workstation/com.local.route10.plist /Library/LaunchDaemons/
-sudo chown root:wheel /Library/LaunchDaemons/com.local.route10.plist
-sudo chmod 644 /Library/LaunchDaemons/com.local.route10.plist
+[Final Root Cause]
+macOS route add commands are in-memory only. Reboot clears the routing table.
+macOS has no /etc/rc.local or systemd — a LaunchDaemon is required to run
+commands at system startup with root privileges.
 
-# Load daemon
-sudo launchctl load /Library/LaunchDaemons/com.local.route10.plist
-```
+_____________________________________________________________________
 
-**Verification:**
-```bash
-netstat -rn | grep "^10"
-```
-Expected output:
-```
-10    192.168.0.175    UGSc    en1
-```
+[Final Solution]
+UPDATE (2026-04): Route 10.0.0.0/8 is now configured at ISP router level pointing
+to the MikroTik. LaunchDaemon no longer needed on Mac Mini. Kept below for reference.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: If gateway (192.168.0.175) is down, route won't be added (script times out after 60s)
+Gateway history:
+  Before MikroTik migration  → 192.168.0.175   (ER605)
+  After MikroTik migration   → 192.168.100.195 (MikroTik)
+  Current                    → configured at ISP router level
 
-## 7. Impact After Fix
-- Observed: Route persists after reboot
-- All internal VLANs accessible from Mac
-- No new issues caused
+--- LaunchDaemon method (reference) ---
 
-**Networks accessible via this route:**
-- 10.0.5.x (Management)
-- 10.0.50.x (Prod)
-- 10.0.53.x (Prod DMZ)
-- 10.0.63.x (Dev)
-- etc.
+Script: /usr/local/bin/add-route.sh
+  Waits up to 60s for gateway to be reachable (network may not be ready at boot)
+  then runs: route add -net 10.0.0.0/8 <GATEWAY>
+  Logs result via logger
 
-## 8. Notes
+Plist: /Library/LaunchDaemons/com.local.route10.plist
+  RunAtLoad: true
+  KeepAlive: false
 
-**Troubleshooting commands:**
-```bash
-# Check if script exists
-ls -la /usr/local/bin/add-route.sh
+Install:
+  sudo cp add-route.sh /usr/local/bin/add-route.sh
+  sudo chmod 755 /usr/local/bin/add-route.sh
+  sudo cp com.local.route10.plist /Library/LaunchDaemons/
+  sudo chown root:wheel /Library/LaunchDaemons/com.local.route10.plist
+  sudo chmod 644 /Library/LaunchDaemons/com.local.route10.plist
+  sudo launchctl load /Library/LaunchDaemons/com.local.route10.plist
 
-# Check daemon status
-sudo launchctl list | grep route
+Or use: sudo ./install-route.sh
 
-# Reload daemon
-sudo launchctl unload /Library/LaunchDaemons/com.local.route10.plist
-sudo launchctl load /Library/LaunchDaemons/com.local.route10.plist
+Verified: Yes
 
-# Delete old/wrong routes
-sudo route delete -net 10.0.0.0/16 192.168.0.175
-sudo route delete -net 10.0.2.0/24 192.168.0.185
-```
+_____________________________________________________________________
 
-**Why the script waits for gateway:**
-At boot, network interface might not be ready immediately. The script pings gateway up to 60 times (1 second apart) before adding route. This ensures network is up before adding route.
+[Risk Level] LOW
+Note: If gateway is unreachable at boot, script times out after 60s and route
+is not added. Manually run sudo route add -net 10.0.0.0/8 <GATEWAY> if needed.
 
-## 9. Workaround (if any)
-> Manually run `sudo route add -net 10.0.0.0/8 192.168.0.175` after each reboot.
+_____________________________________________________________________
 
-## Related Files
-- `workstation/route-setup/add-route.sh` - Route script
-- `workstation/route-setup/com.local.route10.plist` - LaunchDaemon plist
-- `workstation/route-setup/install-route.sh` - Installer script
-- `workstation/README.md` - Full workstation setup guide
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Networks accessible via 10.0.0.0/8 route:
+  10.0.5.x   management
+  10.0.50.x  prod
+  10.0.53.x  prod DMZ
+  10.0.63.x  dev
+  (and all other internal VLANs)
+
+Troubleshooting commands:
+  ls -la /usr/local/bin/add-route.sh          check script exists
+  sudo launchctl list | grep route            check daemon status
+  sudo launchctl unload /Library/LaunchDaemons/com.local.route10.plist
+  sudo launchctl load  /Library/LaunchDaemons/com.local.route10.plist
+
+  sudo route delete -net 10.0.0.0/16 192.168.0.175   remove old wrong routes
+  sudo route delete -net 10.0.2.0/24 192.168.0.185
+
+Related files:
+  workstation/route-setup/add-route.sh
+  workstation/route-setup/com.local.route10.plist
+  workstation/route-setup/install-route.sh
+  workstation/README.md

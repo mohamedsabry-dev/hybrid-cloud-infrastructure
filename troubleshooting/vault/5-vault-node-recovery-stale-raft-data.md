@@ -1,226 +1,219 @@
 # TS-VLT-005 | 2026-04-11 | RESOLVED
+# REAL INCIDENT — unplanned production failure (Proxmox crash during backup),
+# not planned DR testing. Documented before DR test phase began.
+_____________________________________________________________________
 
-> **REAL INCIDENT** — This case occurred during an unplanned production failure (Proxmox crash during backup), not planned DR testing. Documented before DR test phase began.
+[Info]
+Domain: Vault
+Sub-techs: HashiCorp Vault HA, Raft consensus, AWS KMS auto-unseal, vault.db,
+           LXC container recovery
+Environment: DEV lab.local | pve-dev | vault1/vault2/vault3 on LXC containers
+Re-opened: No
 
-## 1. Context
-- System: HashiCorp Vault HA Cluster (3-node Raft)
-- Environment: pve-dev (vault1, vault2, vault3 on LXC containers)
-- Related components: Raft consensus, AWS KMS auto-unseal, LXC container recovery
-- Trigger: Proxmox host crash during backup (TS-PVE-015)
+_____________________________________________________________________
 
-## 2. Issue
-- Symptom: After Proxmox crash and CT 2006 (vault3) recovery, vault3 node could not rejoin the Vault cluster. It had stale Raft data and thought it belonged to a different cluster.
-- Error:
-```bash
-[root@vault3 ~]# vault status
-Cluster Name             vault-cluster-a8b762c2    # WRONG - should be vault-cluster-3dfa00ef
-Cluster ID               83b8c62f-55d1-6c34-33bd-a1f672c7ee6d  # WRONG
-HA Mode                  standby
-Active Node Address      https://10.0.62.11:8200
-Raft Committed Index     100    # WAY BEHIND - vault1 was at 7237
+[Issue Description]
+After Proxmox host crash during backup (TS-PVE-015) and CT 2006 (vault3) recovery,
+vault3 could not rejoin the Vault cluster. It had stale Raft data and thought it
+belonged to a different cluster.
 
-# Attempting to join returned success but didn't fix the issue
-[root@vault3 ~]# vault operator raft join https://vault1.lab.local:8200
-Key       Value
----       -----
-Joined    true
+  vault3 after recovery:
+    Cluster Name  vault-cluster-a8b762c2              ← WRONG
+    Cluster ID    83b8c62f-55d1-6c34-33bd-a1f672c7ee6d  ← WRONG
+    Raft Index    100                                  ← WAY BEHIND (vault1 at 7237)
 
-# But status still showed wrong cluster
-[root@vault3 ~]# vault status
-Cluster ID               83b8c62f-55d1-6c34-33bd-a1f672c7ee6d  # Still wrong!
-```
+  vault operator raft join https://vault1.lab.local:8200
+  Key       Value
+  ---       -----
+  Joined    true
+  (but vault status still showed wrong cluster ID after joining)
 
-**Impact:**
-- Vault cluster operating with only 2 nodes instead of 3
-- Reduced fault tolerance (loss of one more node would break quorum)
-- vault3 isolated with stale data
+Impact:
+  Vault cluster operating with only 2 nodes instead of 3.
+  Reduced fault tolerance — loss of one more node would break quorum.
+  vault3 isolated with stale data.
 
-## 3. Analysis
+_____________________________________________________________________
 
-### Cluster State Comparison
+[Analysis]
 
-| Attribute | vault1 (healthy) | vault3 (broken) |
-|-----------|------------------|-----------------|
-| Cluster Name | vault-cluster-3dfa00ef | vault-cluster-a8b762c2 |
-| Cluster ID | 1caaba58-fa2a-1581-84dd-e9a6eedf583b | 83b8c62f-55d1-6c34-33bd-a1f672c7ee6d |
-| Raft Index | 7237 | 100 |
-| HA Mode | active (leader) | standby |
+# Initial Check Notes:
+Compared cluster state between healthy node (vault1) and broken node (vault3):
 
-### Attempt 1: Simple Raft Join (FAILED)
+  Attribute         vault1 (healthy)                          vault3 (broken)
+  Cluster Name      vault-cluster-3dfa00ef                    vault-cluster-a8b762c2
+  Cluster ID        1caaba58-fa2a-1581-84dd-e9a6eedf583b     83b8c62f-55d1-6c34-33bd-a1f672c7ee6d
+  Raft Index        7237                                      100
+  HA Mode           active (leader)                           standby
 
-```bash
-# Tried joining without clearing data
-vault operator raft join https://vault1.lab.local:8200
-# Returned: Joined: true
-# But vault status still showed old cluster ID
-```
 
-**Why it failed:** Vault's local `vault.db` file contained the old cluster identity. The Raft join only updates Raft consensus state, not the main Vault database.
+# Suspected Root Cause
+Proxmox crashed mid-backup leaving vault3 data in inconsistent state.
+vault3 has stale cluster identity that does not match the current cluster.
 
-### Attempt 2: Remove Raft Directory Only (FAILED)
 
-```bash
-systemctl stop vault
-mv /opt/vault/data/raft /opt/vault/data/raft.bak.20260411
-mkdir -p /opt/vault/data/raft
-chown vault:vault /opt/vault/data/raft
-systemctl start vault
-vault operator raft join https://vault1.lab.local:8200
-```
+# More Checks Notes:
 
-**Why it failed:** The `vault.db` file (main Vault database) still contained the stale cluster identity:
-```bash
-ls -la /opt/vault/data/
-# Shows vault.db still present with old cluster state
-```
+Attempt 1 — Simple raft join without clearing data (FAILED):
+  vault operator raft join https://vault1.lab.local:8200
+  Output: Joined: true
+  vault status → still showed old cluster ID
 
-### Attempt 3: Remove All Vault Data (SUCCEEDED)
+  Why it failed: vault.db file contained old cluster identity. Raft join only
+  updates Raft consensus state — it does not touch the main Vault database.
 
-```bash
-systemctl stop vault
-rm -rf /opt/vault/data/raft
-rm -f /opt/vault/data/vault.db
-mkdir -p /opt/vault/data/raft
-chown -R vault:vault /opt/vault/data
-systemctl start vault
-# Wait for auto-unseal via AWS KMS
-vault operator raft join https://vault1.lab.local:8200
-```
+Attempt 2 — Remove raft directory only (FAILED):
+  systemctl stop vault
+  mv /opt/vault/data/raft /opt/vault/data/raft.bak.20260411
+  mkdir -p /opt/vault/data/raft
+  chown vault:vault /opt/vault/data/raft
+  systemctl start vault
+  vault operator raft join https://vault1.lab.local:8200
 
-## 4. Root Cause
-> **Stale vault.db persisted old cluster identity.** When Proxmox crashed mid-backup, vault3's data was in an inconsistent state. The `vault.db` file contained an old cluster identity that didn't match the current cluster. Simply removing the Raft directory was insufficient because Vault stores cluster identity in both:
-> 1. `/opt/vault/data/raft/` - Raft consensus logs and snapshots
-> 2. `/opt/vault/data/vault.db` - Main Vault database including cluster metadata
->
-> Both must be removed for a clean rejoin.
+  vault status → still showed old cluster ID.
 
-## 5. Solution
+  ls -la /opt/vault/data/
+  → vault.db still present with old cluster state.
 
-### Complete Node Recovery Procedure
+  Why it failed: vault.db (main Vault database) stores cluster identity separately
+  from the Raft directory. Both must be cleared for a clean rejoin.
 
-```bash
-# 1. Stop Vault service
-systemctl stop vault
+  Vault stores cluster identity in TWO locations:
+    /opt/vault/data/raft/    Raft consensus logs and snapshots
+    /opt/vault/data/vault.db Main Vault database including cluster metadata
 
-# 2. Backup existing data (optional, for investigation)
-mv /opt/vault/data/raft /opt/vault/data/raft.bak.$(date +%Y%m%d)
-mv /opt/vault/data/vault.db /opt/vault/data/vault.db.bak.$(date +%Y%m%d)
+Attempt 3 — Remove all vault data (SUCCEEDED):
+  systemctl stop vault
+  rm -rf /opt/vault/data/raft
+  rm -f /opt/vault/data/vault.db
+  mkdir -p /opt/vault/data/raft
+  chown -R vault:vault /opt/vault/data
+  systemctl start vault
+  (waited for AWS KMS auto-unseal, ~5-10 seconds)
+  vault operator raft join https://vault1.lab.local:8200
 
-# 3. Or simply remove all data for clean rejoin
-rm -rf /opt/vault/data/raft
-rm -f /opt/vault/data/vault.db
 
-# 4. Recreate directory structure
-mkdir -p /opt/vault/data/raft
-chown -R vault:vault /opt/vault/data
+# Suspected Root Cause (confirmed)
+Stale vault.db persisted old cluster identity from before the crash.
+Removing only the Raft directory was insufficient — vault.db must also be
+removed for a clean cluster rejoin. Both files together define the node's
+cluster identity.
 
-# 5. Start Vault (will auto-unseal via AWS KMS)
-systemctl start vault
 
-# 6. Wait for unsealing (5-10 seconds with KMS)
-sleep 5
-vault status  # Should show Sealed: false but not joined yet
+# Test
+After Attempt 3, verified from both vault3 and vault1.
 
-# 7. Join the existing cluster
-vault operator raft join https://vault1.lab.local:8200
-# Or: vault operator raft join https://vault2.lab.local:8200
+Command:
+  vault status  (on vault3)
+  vault operator raft list-peers  (on vault1)
 
-# 8. Verify join successful
-vault status
-# Should show:
-# - Correct Cluster Name: vault-cluster-3dfa00ef
-# - Correct Cluster ID: 1caaba58-fa2a-1581-84dd-e9a6eedf583b
-# - HA Mode: standby
-# - Raft Index matching leader
+Result: PASS
 
-# 9. Verify from leader node
-vault operator raft list-peers
-# Should show all 3 nodes
-```
+  vault3 status:
+    Cluster Name  vault-cluster-3dfa00ef               ← correct
+    Cluster ID    1caaba58-fa2a-1581-84dd-e9a6eedf583b  ← correct
+    HA Mode       standby
+    Raft Committed Index  7246                          ← synced to leader
 
-### Verification Output
+  vault operator raft list-peers:
+    vault1  10.0.62.10:8201  leader    true
+    vault2  10.0.62.11:8201  follower  true
+    vault3  10.0.62.12:8201  follower  true
 
-```bash
-[root@vault1 ~]# vault operator raft list-peers
-Node      Address            State       Voter
-----      -------            -----       -----
-vault1    10.0.62.10:8201    leader      true
-vault2    10.0.62.11:8201    follower    true
-vault3    10.0.62.12:8201    follower    true
+_____________________________________________________________________
 
-[root@vault3 ~]# vault status
-Cluster Name             vault-cluster-3dfa00ef
-Cluster ID               1caaba58-fa2a-1581-84dd-e9a6eedf583b
-HA Mode                  standby
-Active Node Address      https://10.0.62.10:8200
-Raft Committed Index     7246
-Raft Applied Index       7246
-```
+[Final Root Cause]
+Proxmox crashed mid-backup leaving vault3 with inconsistent data. vault.db
+contained an old cluster identity that did not match the current cluster.
+vault operator raft join returns success but does not clear the cluster identity
+stored in vault.db — it only updates Raft consensus state. Both vault.db and
+the raft directory must be removed for a clean rejoin.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Removing data from a single follower node is safe when:
-  - Cluster still has quorum (2 of 3 nodes healthy)
-  - Leader node has current data
-  - Node will replicate all data after rejoin
-- Data loss: None (vault3 receives all data from leader after rejoining)
+_____________________________________________________________________
 
-## 7. Impact After Fix
-- Observed: vault3 successfully rejoined cluster as follower
-- Raft index synced to current state (7246)
-- Cluster back to full 3-node redundancy
-- Kubernetes workloads unaffected throughout (were using vault1/vault2)
+[Final Solution]
+Complete node recovery procedure (safe on follower nodes when cluster has quorum):
 
-## 8. Notes
+  # 1. Stop Vault
+  systemctl stop vault
 
-### What Gets Lost When Removing vault.db
+  # 2. Backup existing data (optional, for investigation)
+  mv /opt/vault/data/raft /opt/vault/data/raft.bak.$(date +%Y%m%d)
+  mv /opt/vault/data/vault.db /opt/vault/data/vault.db.bak.$(date +%Y%m%d)
 
-When you remove a follower node's vault.db:
-- Local node identity (regenerated on join)
-- Cached lease data (re-synced from leader)
-- **Nothing permanent** - all secrets are replicated from leader
+  # 3. Remove both files
+  rm -rf /opt/vault/data/raft
+  rm -f /opt/vault/data/vault.db
 
-**Important:** NEVER do this on the leader node or when cluster has no quorum!
+  # 4. Recreate directory structure
+  mkdir -p /opt/vault/data/raft
+  chown -R vault:vault /opt/vault/data
 
-### Why Auto-Unseal Still Worked
+  # 5. Start Vault — AWS KMS auto-unseal triggers automatically
+  systemctl start vault
 
-With AWS KMS auto-unseal:
-1. Vault starts and reads config from `/etc/vault.d/vault.hcl`
-2. Contacts AWS KMS to decrypt the unseal key
-3. Unseals automatically
-4. Then waits for Raft join command to join cluster
+  # 6. Wait for unseal (~5-10 seconds)
+  sleep 5
+  vault status  # Sealed: false, not yet joined
 
-The unseal key is stored in AWS KMS, not in local files, so removing `vault.db` doesn't affect unsealing.
+  # 7. Join the cluster
+  vault operator raft join https://vault1.lab.local:8200
 
-### Prevention
+  # 8. Verify
+  vault status                      # correct cluster name and ID
+  vault operator raft list-peers    # all 3 nodes present
 
-To prevent stale data issues after crashes:
-1. Use `systemctl stop vault` gracefully before maintenance
-2. Ensure clean shutdown before backups
-3. Consider adding `retry_join` to vault.hcl for automatic cluster discovery
+Why removing vault.db is safe on a follower:
+  All secrets are replicated from the leader after rejoin.
+  Local node identity is regenerated on join.
+  Cached lease data re-synced from leader.
+  Nothing permanent is lost — leader holds the source of truth.
 
-### Commands Reference
+IMPORTANT: NEVER do this on the leader node or when cluster has no quorum.
 
-```bash
-# Check cluster status from any node
-vault status
-vault operator raft list-peers
-vault operator members
+Why AWS KMS auto-unseal still works after removing vault.db:
+  Vault reads unseal config from /etc/vault.d/vault.hcl (not vault.db).
+  Contacts AWS KMS to decrypt the unseal key.
+  Unseals automatically, then waits for raft join command.
+  Unseal key is in AWS KMS — not affected by local file removal.
 
-# Force remove a dead peer (from leader)
-vault operator raft remove-peer <node-id>
+Verified: Yes
 
-# Join existing cluster
-vault operator raft join https://<leader>:8200
+_____________________________________________________________________
 
-# Check Raft autopilot status
-vault operator raft autopilot state
-```
+[Risk Level] LOW
+Note: Safe only on a follower node when the cluster still has quorum (2 of 3
+nodes healthy). All data replicates from leader after rejoin. No data loss.
 
-### Related Cases
-- TS-PVE-015: Proxmox crash that caused this issue
-- TS-K8S-024: Vault cluster resilience (2-node quorum survived)
-- TS-VLT-001: Initial Vault cluster setup
+_____________________________________________________________________
 
-## 9. Workaround (if any)
-> If `vault operator raft join` fails silently (returns success but doesn't fix cluster ID), always check and remove `vault.db` in addition to the raft directory. The cluster identity is stored in multiple locations.
+[References]
+- TS-PVE-015 — Proxmox crash that triggered this incident
+- TS-K8S-024 — Vault cluster resilience (2-node quorum survived during this)
+- TS-VLT-001 — Initial Vault cluster setup
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Key lesson: vault operator raft join returning success does not mean the node
+is properly rejoined. Always verify cluster name and cluster ID in vault status
+match the expected cluster. If they do not match, vault.db must be removed —
+not just the raft directory.
+
+If vault operator raft join fails silently (returns success but cluster ID wrong):
+  Check and remove vault.db in addition to raft directory.
+  Cluster identity stored in multiple locations.
+
+Prevention:
+  Use systemctl stop vault gracefully before any maintenance
+  Ensure clean shutdown before backups
+  Consider adding retry_join to vault.hcl for automatic cluster discovery
+
+Commands reference:
+  vault status                                    check cluster name, ID, raft index
+  vault operator raft list-peers                  verify all nodes present
+  vault operator members                          alternative membership check
+  vault operator raft autopilot state             detailed autopilot health
+  vault operator raft remove-peer <node-id>       force remove dead peer (from leader)
+  vault operator raft join https://<leader>:8200  rejoin cluster
