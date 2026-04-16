@@ -6,5 +6,6 @@ resources:
   - storage
   - vault
   - ingress
+  - coredns
   # NOTE: remediation moved to apps/ - requires vault-agent injection
   # and must deploy AFTER vault-agent-injector is ready

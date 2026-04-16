@@ -1,4 +1,4 @@
-# TS-K8S-033 | 2026-04-15 | IN PROGRESS
+# TS-K8S-033 | 2026-04-16 | RESOLVED
 
 ## 1. Context
 - **System:** Vault Agent Sidecar / CoreDNS / FreeIPA DNS
@@ -354,18 +354,240 @@ Vault Agent uses hostname `vault.lab.local` for Vault server address. Pod-level 
 
 ## 9. Solution
 
-**Status:** Not implemented yet - documenting for future resolution
+**Status:** RESOLVED — CoreDNS hosts plugin fix implemented
 
-**Potential solutions to evaluate:**
-1. Add `vault.lab.local` static entry to CoreDNS hosts plugin
-2. Configure Vault Agent to use IP address instead of hostname
-3. Add fallback DNS (8.8.8.8) to CoreDNS for external resolution
-4. Increase Vault Agent retry tolerance
+---
+
+### 9.1 Investigation Sequence
+
+**Initial Thought:**
+After fixing Linux nodes DNS fallback (TS-LNX-003), WordPress external DNS slowness was resolved.
+But vault-agent still failing with:
+```
+lookup vault.lab.local on 10.96.0.10:53: no such host
+```
+
+**First Wrong Assumption:**
+Thought `/etc/hosts` on K8s nodes would help — added vault.lab.local entry.
+But pods don't use node's /etc/hosts. CoreDNS handles pod DNS, and CoreDNS only forwards
+to `/etc/resolv.conf`, not `/etc/hosts`.
+
+**Key Realization:**
+```
+vault.lab.local = internal domain (.lab.local)
+8.8.8.8 = external DNS (Google)
+8.8.8.8 doesn't know about .lab.local — it's internal!
+```
+
+When FreeIPA is down:
+- External domains (google.com) → works via 8.8.8.8 fallback
+- Internal domains (vault.lab.local) → FAILS, only FreeIPA knows these
+
+**Solution Identified:**
+Add static hosts entry directly in CoreDNS config — CoreDNS resolves vault.lab.local
+before forwarding to upstream DNS.
+
+---
+
+### 9.2 Fix Implementation
+
+**Step 1: Check current CoreDNS ConfigMap**
+```bash
+kubectl get configmap coredns -n kube-system -o yaml
+```
+
+Output showed standard config with `forward . /etc/resolv.conf` — no hosts plugin.
+
+**Step 2: Edit CoreDNS ConfigMap to add hosts block**
+```bash
+kubectl edit configmap coredns -n kube-system
+```
+
+Added `hosts` block BEFORE `forward` line:
+```
+        prometheus :9153
+        hosts {
+            10.0.62.100 vault.lab.local vault
+            10.0.61.100 k8s.lab.local k8s
+            fallthrough
+        }
+        forward . /etc/resolv.conf {
+```
+
+**Step 3: Restart CoreDNS to pick up new config**
+```bash
+kubectl rollout restart deployment coredns -n kube-system
+```
+
+**Step 4: Verify CoreDNS pods restarted**
+```bash
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+```
+
+Output:
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+coredns-65495d9957-m7bw6   1/1     Running   0          25s
+coredns-65495d9957-t8p4b   1/1     Running   0          28s
+```
+
+---
+
+### 9.3 Fix Verification
+
+**Test 1: DNS resolution from test pod**
+```bash
+kubectl run test-dns --rm -it --image=busybox -- nslookup vault.lab.local
+```
+
+Output:
+```
+Server:        10.96.0.10
+Address:    10.96.0.10:53
+
+Name:    vault.lab.local
+Address: 10.0.62.100
+```
+
+**Result:** CoreDNS now resolves vault.lab.local directly via hosts plugin!
+
+**Test 2: WordPress pods with vault-agent**
+```bash
+kubectl get pods -n apps
+```
+
+Output:
+```
+NAME                         READY   STATUS    RESTARTS   AGE
+wordpress-6bf87d667d-bkjx2   2/2     Running   0          53s
+wordpress-6bf87d667d-h77vz   2/2     Running   0          42s
+wordpress-6bf87d667d-zzq9l   2/2     Running   0          15m
+```
+
+**Result:** All pods Running 2/2 — vault-agent-init completed successfully!
+
+---
+
+### 9.4 Final CoreDNS ConfigMap
+
+```bash
+kubectl get configmap coredns -n kube-system -o yaml | grep -A20 "Corefile"
+```
+
+```yaml
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        hosts {
+            10.0.62.100 vault.lab.local vault
+            10.0.61.100 k8s.lab.local k8s
+            fallthrough
+        }
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }
+```
+
+---
+
+### 9.5 Permanent Fix (Flux GitOps)
+
+Created Flux-managed CoreDNS config to persist across cluster rebuilds:
+
+**Files created:**
+```
+kubernetes/dev/deployments/infrastructure/coredns/
+├── kustomization.yaml
+└── coredns-custom.yaml
+```
+
+**kubernetes/dev/deployments/infrastructure/coredns/coredns-custom.yaml:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        # ... (full config with hosts block)
+        hosts {
+            10.0.62.100 vault.lab.local vault
+            10.0.61.100 k8s.lab.local k8s
+            fallthrough
+        }
+        # ...
+    }
+```
+
+**Updated:** `kubernetes/dev/deployments/infrastructure/kustomization.yaml`
+```yaml
+resources:
+  - namespaces
+  - priority-classes
+  - storage
+  - vault
+  - ingress
+  - coredns    # ← Added
+```
+
+Commit and push → Flux manages CoreDNS config permanently.
+
+---
+
+### 9.6 Why This Fix Works
+
+```
+BEFORE (IPA down):
+  Pod → CoreDNS → forward to FreeIPA (10.0.60.10) → DOWN → "no such host"
+
+AFTER (IPA down):
+  Pod → CoreDNS → hosts plugin matches vault.lab.local → Returns 10.0.62.100 → SUCCESS
+```
+
+CoreDNS `hosts` plugin is checked BEFORE `forward` — static entries resolve immediately
+without contacting any upstream DNS server.
+
+---
+
+### 9.7 Summary
+
+| Step | Action | Result |
+|------|--------|--------|
+| 1 | Identified /etc/hosts doesn't help pods | Understood DNS flow |
+| 2 | Realized 8.8.8.8 can't resolve .lab.local | Found root cause |
+| 3 | Added hosts block to CoreDNS | vault.lab.local resolves locally |
+| 4 | Restarted CoreDNS | New config active |
+| 5 | Tested with busybox nslookup | DNS works |
+| 6 | Verified WordPress pods | vault-agent-init succeeds |
+| 7 | Created Flux config | Permanent fix |
 
 ---
 
 ## 10. Related Files
 
 - `disaster-recovery/tmp-ipa-domain-down-part2.md` — DR test documentation
-- `troubleshooting/kubernetes/34-wordpress-external-dns-slowness.md` — Related WordPress slowness issue
+- `troubleshooting/kubernetes/34-wordpress-external-dns-slowness.md` — Related WordPress slowness issue (RESOLVED)
 - `troubleshooting/kubernetes/35-pod-restart-investigation-ipa-down.md` — Pod restart investigation
+- `troubleshooting/linux/3-linux-nodes-dns-fallback.md` — TS-LNX-003: Linux node DNS fallback fix (prerequisite)
+- `kubernetes/dev/deployments/infrastructure/coredns/` — Flux-managed CoreDNS config
