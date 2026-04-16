@@ -1,74 +1,75 @@
-# TS-K8S-025 | 2026-04-11 | PLACEHOLDER
+# TS-K8S-025 | 2026-04-11 | OPEN
+# Placeholder — identified during DR Task 1 pod kill testing, not yet investigated.
+_____________________________________________________________________
 
-## 1. Context
-- System: Promtail / Loki / Vault
-- Environment: k8s-dev cluster
-- Related components: Promtail DaemonSet, Vault namespace, Loki
-- Discovered during: DR Task 1 - Pod Kill testing
-- Related Cases:
-  - DR Task 1 RESULTS — Pod kill testing where issue was observed
+[Info]
+Author:
+Domain: Kubernetes / Monitoring
+Sub-techs: Promtail, Loki, Vault namespace, log collection, DaemonSet
+Environment: DEV k8s-dev cluster
+Re-opened: No
 
----
+_____________________________________________________________________
 
-## 2. Issue
+[Issue Description]
+Promtail not collecting logs from Vault namespace. Observed during DR Task 1
+pod kill testing. Not yet investigated.
 
-**Symptom:** Promtail not collecting logs from Vault namespace during DR testing.
+Related: DR Task 1 RESULTS — pod kill testing where issue was observed.
 
-**Status:** NOT YET INVESTIGATED
+_____________________________________________________________________
 
-**Placeholder:** This case was identified during DR Task 1 pod kill testing but has not been fully investigated yet.
+[Analysis]
 
----
+# Initial Check Notes:
+Not yet investigated.
 
-## 3. Analysis
 
-TODO: Investigation pending
+# Suspected Root Cause
+Unknown. Possible causes to investigate:
+  - Vault namespace excluded from Promtail scraping configuration
+  - Permission issue preventing Promtail from accessing Vault pod logs
+  - Vault pods have special log configuration or path
 
----
 
-## 4. Root Cause
+# More Checks Notes:
+N/A — pending investigation.
 
-TODO: Pending investigation
 
----
+# Suspected Solution
+Pending investigation.
 
-## 5. Solution
 
-TODO: Pending investigation
+# Test
+Not yet performed.
 
----
+_____________________________________________________________________
 
-## 6. Solution Risk
+[Final Root Cause]
+Not yet determined.
 
-TODO: Pending investigation
+_____________________________________________________________________
 
----
+[Final Solution]
+Pending investigation.
 
-## 7. Impact After Fix
+Verified: No
 
-TODO: Pending investigation
+_____________________________________________________________________
 
----
+[Risk Level] Unknown — pending investigation.
 
-## 8. Notes
+_____________________________________________________________________
 
-### Discovery context
+[References]
+- disaster-recovery/task-1-pod-kill/RESULTS.md
 
-During DR Task 1 pod kill testing, it was observed that Promtail was not collecting logs from the Vault namespace. This needs further investigation to determine:
+_____________________________________________________________________
 
-1. Is this a configuration issue?
-2. Is Vault namespace excluded from Promtail scraping?
-3. Are there permission issues preventing log collection?
+[Draft Notes]
 
-### Next steps
-
-- [ ] Check Promtail configuration for namespace exclusions
-- [ ] Verify Promtail can access Vault pod logs
-- [ ] Check if Vault pods have special log configurations
-- [ ] Review Loki for any Vault namespace logs
-
----
-
-## 9. Workaround
-
-None documented yet.
+Investigation checklist:
+  [ ] Check Promtail configuration for namespace exclusions
+  [ ] Verify Promtail can access Vault pod logs
+  [ ] Check if Vault pods have special log configurations
+  [ ] Review Loki for any existing Vault namespace logs

@@ -1,1 +1,32 @@
-1- Readme Update
+What Pending to publish:
+
+1- Complete DR Test 6 Tests 
+    - Power Down 
+    - Storage Down 
+    - 2-3 Workers down <> Self Healing recovery
+    - 2 master down <> Self Healing recovery
+    - Nginx internal / External Down <> Endpoints
+    - IPA Down
+
+2- Conslidation and Documentation && Add Signal Flow
+    - Grafana ↔ Prometheus ↔ Loki Integration 
+    - etcd ↔ Vault ↔ AWS Integration
+    - Remediation ↔ Vault ↔ Proxmo Integration
+    - CoreDNS <> IPA
+
+3- Readmes Across the Env 
+    - Update Capacity planning File 
+
+4- Security Inspection in commit histories 
+
+5- Cleanup Remain TS Cases structure <> 
+    - 1-10 k8s , 
+    - 31 - 35 k8s , 
+    - proxmox folder 
+
+
+
+What to be moved After publish
+    - Check ROADMAP files 
+
+

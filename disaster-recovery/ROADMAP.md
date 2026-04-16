@@ -1,6 +1,12 @@
 Excluded from Chaos Engineering Test Plan (Out of Scope)
 =========================================================
 
+
+
+Kuberbetes Full ETCD Backup
+
+
+
 AWS / Cloud Dependencies:
 - CloudWatch monitoring and alerting integration
 - Lambda-based automated remediation for node failures

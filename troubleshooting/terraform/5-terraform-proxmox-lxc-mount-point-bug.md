@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox
 Sub-techs: Terraform bpg/proxmox provider, LXC mount_point, NFS storage,
            provider bug, provider mirror, local runner

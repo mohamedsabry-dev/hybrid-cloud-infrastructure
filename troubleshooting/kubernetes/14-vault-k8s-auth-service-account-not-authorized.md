@@ -1,236 +1,182 @@
 # TS-K8S-014 | 2026-04-05 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
+[Info]
+Author:
+Domain: Kubernetes / Vault
+Sub-techs: Vault Agent Injector, Kubernetes auth, ServiceAccount, HelmRelease,
+           kube-prometheus-stack, Grafana, Flux
+Environment: DEV k8s-dev cluster | monitoring namespace
+Re-opened: No
 
-- **System:** HashiCorp Vault with Kubernetes authentication
-- **Environment:** Development cluster (dev), monitoring namespace
-- **Related Components:** Vault Agent Injector, Kubernetes ServiceAccounts, kube-prometheus-stack Helm chart, Grafana
-- **Discovered During:** Deployment of kube-prometheus-stack via Flux HelmRelease
+_____________________________________________________________________
 
-## 2. Issue
+[Issue Description]
+Grafana pod stuck in Init:1/2 state after kube-prometheus-stack deployment via
+Flux HelmRelease. Vault Agent init container failing to authenticate.
 
-**Symptom:** Pods with Vault Agent injection get stuck in `Init:1/2` or `PodInitializing` state because the Vault Kubernetes auth role doesn't allow the actual service account being used by the pod.
+  kubectl get pods -n monitoring:
+  kube-prometheus-stack-grafana-57c9447f79  0/4  Init:1/2  0  7m58s
 
-**Error - Pod stuck in Init state:**
-```bash
-$ kubectl get pods -n monitoring
-NAME                                        READY   STATUS     RESTARTS   AGE
-kube-prometheus-stack-grafana-57c9447f79    0/4     Init:1/2   0          7m58s
-```
+  vault-agent-init logs:
+  [ERROR] agent.auth.handler: error authenticating:
+  URL: PUT https://vault.lab.local:8200/v1/auth/kubernetes/login
+  Code: 403. Errors: * service account name not authorized
+  backoff=43.47s
 
-**Error - Vault agent init container shows auth error:**
-```bash
-$ kubectl logs kube-prometheus-stack-grafana-xxx -n monitoring -c vault-agent-init
-2026-04-05T18:24:43.759Z [ERROR] agent.auth.handler: error authenticating:
-  error=
-  | Error making API request.
-  |
-  | URL: PUT https://vault.lab.local:8200/v1/auth/kubernetes/login
-  | Code: 403. Errors:
-  |
-  | * service account name not authorized
-   backoff=43.47s
-```
+  HelmRelease:
+  kube-prometheus-stack  False  Helm upgrade failed: timeout waiting for:
+  Deployment/monitoring/kube-prometheus-stack-grafana status: 'InProgress'
 
-**Error - HelmRelease times out:**
-```bash
-$ kubectl get helmrelease -n monitoring
-NAME                    READY   STATUS
-kube-prometheus-stack   False   Helm upgrade failed: timeout waiting for: [Deployment/monitoring/kube-prometheus-stack-grafana status: 'InProgress']
-```
+_____________________________________________________________________
 
-**Impact:** Grafana deployment blocked. Monitoring stack incomplete. HelmRelease stuck in failed state.
+[Analysis]
 
-## 3. Analysis
+# Initial Check Notes:
+Identified the stuck init container and checked its logs.
 
-### Step 1: Identify the stuck init container
-```bash
-$ kubectl describe pod kube-prometheus-stack-grafana-xxx -n monitoring
-# Look for Events showing vault-agent-init container starting
-```
+Command:
+  kubectl get pod <pod-name> -n monitoring -o jsonpath='{.spec.serviceAccountName}'
 
-### Step 2: Check vault-agent-init logs
-```bash
-$ kubectl logs <pod-name> -n monitoring -c vault-agent-init
-# Look for "service account name not authorized" error
-```
+Output:
+  kube-prometheus-stack-grafana
 
-### Step 3: Find the actual service account being used
-```bash
-$ kubectl get pod <pod-name> -n monitoring -o jsonpath='{.spec.serviceAccountName}'
-kube-prometheus-stack-grafana
-```
+Command:
+  vault read auth/kubernetes/role/grafana
 
-### Step 4: Check what Vault role expects
-```bash
-$ vault read auth/kubernetes/role/grafana
-Key                                 Value
----                                 -----
-bound_service_account_names         [grafana-sa]
-bound_service_account_namespaces    [monitoring]
-policies                            [grafana]
-```
+Output:
+  bound_service_account_names:       [grafana-sa]
+  bound_service_account_namespaces:  [monitoring]
+  policies:                          [grafana]
 
-**Evidence from session:**
-```bash
-$ kubectl get pod kube-prometheus-stack-grafana-57c9447f79-cc4dk -n monitoring -o jsonpath='{.spec.serviceAccountName}'
-kube-prometheus-stack-grafana
-# But Vault expected: grafana-sa
-```
+Mismatch confirmed:
+  Vault role expects:  grafana-sa
+  Pod is using:        kube-prometheus-stack-grafana
 
-## 4. Root Cause
+The Helm chart creates a ServiceAccount named <release-name>-grafana by default.
+The Vault role was configured with a custom SA name (grafana-sa) that was never
+actually created or used by the chart.
 
-Mismatch between:
-1. The service account name configured in Vault's Kubernetes auth role
-2. The actual service account name used by the pod
 
-**In this case:**
-- Vault role `grafana` was configured to allow service account: `grafana-sa`
-- Helm chart created and used service account: `kube-prometheus-stack-grafana`
+# Suspected Root Cause
+Mismatch between the ServiceAccount name configured in the Vault Kubernetes auth
+role and the actual ServiceAccount name created and used by the Helm chart.
+Vault role expected grafana-sa, chart created kube-prometheus-stack-grafana.
 
-The Helm chart by default creates a ServiceAccount named `<release-name>-grafana`, but the Vault role was expecting a custom ServiceAccount name `grafana-sa`.
 
-## 5. Solution
+# More Checks Notes:
+N/A — SA name mismatch confirmed from pod spec and vault role inspection.
 
-### Option A: Update Vault Role (Quick Fix)
-Change Vault to accept the actual service account name:
-```bash
-$ vault write auth/kubernetes/role/grafana \
+
+# Suspected Solution
+Option A (quick): update Vault role to accept the actual SA name from the chart.
+Option B (recommended): configure Helm values to use the expected custom SA name.
+
+
+# Test
+Applied Option B — set serviceAccount.create: false, name: grafana-sa in Helm
+values, created matching ServiceAccount manifest.
+
+Command:
+  kubectl get pod <pod-name> -n monitoring -o jsonpath='{.spec.serviceAccountName}'
+  kubectl logs <pod-name> -n monitoring -c vault-agent-init
+  kubectl get pods -n monitoring
+
+Result: PASS
+  SA: grafana-sa (correct)
+  vault-agent-init: authentication successful, rendered grafana-admin secret
+  pod: 4/4 Running
+
+_____________________________________________________________________
+
+[Final Root Cause]
+kube-prometheus-stack Helm chart creates a ServiceAccount named
+kube-prometheus-stack-grafana by default (<release-name>-grafana). The Vault
+Kubernetes auth role was configured to allow grafana-sa which does not match.
+Vault returns 403 service account name not authorized on every auth attempt.
+Pod stays in Init:1/2 indefinitely, HelmRelease times out.
+
+_____________________________________________________________________
+
+[Final Solution]
+
+Option A — update Vault role (quick, no pod restart needed):
+  vault write auth/kubernetes/role/grafana \
     bound_service_account_names=kube-prometheus-stack-grafana \
     bound_service_account_namespaces=monitoring \
     policies=grafana \
     ttl=1h
-```
 
-### Option B: Fix Helm Values (Recommended)
-Configure the Helm chart to use the expected service account name.
+Option B — fix Helm values to use expected SA (recommended, requires pod recreate):
 
-**Wrong configuration:**
-```yaml
-grafana:
-  serviceAccountName: grafana-sa  # This only sets which SA to use, not the name
-```
+  Wrong (only sets which SA to use, does not control the name):
+    grafana:
+      serviceAccountName: grafana-sa
 
-**Correct configuration:**
-```yaml
-grafana:
-  serviceAccount:
-    create: false        # Don't create, use existing
-    name: grafana-sa     # Use this specific SA name
-```
+  Correct (tell chart not to create its own, use the named one):
+    grafana:
+      serviceAccount:
+        create: false
+        name: grafana-sa
 
-**If you have a separate ServiceAccount manifest:**
-```yaml
-# service-account.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: grafana-sa
-  namespace: monitoring
-```
+  Plus a separate ServiceAccount manifest:
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: grafana-sa
+      namespace: monitoring
 
-Then set `create: false` in Helm values so it uses your existing SA instead of creating its own.
+  Full HelmRelease values example:
+    grafana:
+      serviceAccount:
+        create: false
+        name: grafana-sa
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "grafana"
+        vault.hashicorp.com/agent-inject-secret-grafana-admin: "secret/data/grafana/config"
+        vault.hashicorp.com/agent-inject-template-grafana-admin: |
+          {{- with secret "secret/data/grafana/config" -}}
+          GF_SECURITY_ADMIN_USER={{ .Data.data.admin_user }}
+          GF_SECURITY_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+          {{- end }}
 
-**Full working example:**
-```yaml
-# helm-release.yaml
-grafana:
-  serviceAccount:
-    create: false
-    name: grafana-sa
+Verified: Yes
 
-  podAnnotations:
-    vault.hashicorp.com/agent-inject: "true"
-    vault.hashicorp.com/role: "grafana"
-    vault.hashicorp.com/agent-inject-secret-grafana-admin: "secret/data/grafana/config"
-    vault.hashicorp.com/agent-inject-template-grafana-admin: |
-      {{- with secret "secret/data/grafana/config" -}}
-      GF_SECURITY_ADMIN_USER={{ .Data.data.admin_user }}
-      GF_SECURITY_ADMIN_PASSWORD={{ .Data.data.admin_password }}
-      {{- end }}
-```
+_____________________________________________________________________
 
-### Common Helm Chart Service Account Patterns
+[Risk Level] LOW
+Note: Option A — immediate effect, no pod restart.
+Option B — requires pod recreation, brief service interruption.
 
-| Chart | SA Value Path | Default SA Name |
-|-------|--------------|-----------------|
-| kube-prometheus-stack (grafana) | `grafana.serviceAccount.name` | `<release>-grafana` |
-| kube-prometheus-stack (prometheus) | `prometheus.serviceAccount.name` | `<release>-prometheus` |
-| MariaDB | `serviceAccount.name` | `<release>-mariadb` |
-| WordPress | `serviceAccount.name` | `<release>-wordpress` |
+_____________________________________________________________________
 
-### Prevention Measures
-- Always verify the actual SA name a Helm chart creates: `kubectl get sa -n <namespace>`
-- When using Vault injection, test SA authorization before deploying to production
-- Document the expected SA names in Vault role configurations
-- Use consistent naming conventions: chart name or explicit custom names
+[References]
+-
+-
 
-## 6. Solution Risk
+_____________________________________________________________________
 
-- **Risk Level:** Low
-- **Potential Impact:**
-  - Option A (Vault update): Immediate effect, no pod restart needed
-  - Option B (Helm values): Requires pod recreation, brief service interruption
+[Draft Notes]
 
-## 7. Impact After Fix
+Common Helm chart SA naming patterns:
+  kube-prometheus-stack (grafana)    grafana.serviceAccount.name      default: <release>-grafana
+  kube-prometheus-stack (prometheus) prometheus.serviceAccount.name   default: <release>-prometheus
+  MariaDB                            serviceAccount.name              default: <release>-mariadb
+  WordPress                          serviceAccount.name              default: <release>-wordpress
 
-**Observed Results:**
+Key lessons:
+  1. Helm charts create ServiceAccounts with release-name prefixes by default
+  2. Always verify actual SA name before configuring Vault roles:
+     kubectl get sa -n <namespace>
+     kubectl get pod <pod> -o jsonpath='{.spec.serviceAccountName}'
+  3. serviceAccountName and serviceAccount.name are different fields with
+     different behaviours in Helm values
+  4. Test Vault authentication in isolation before full deployment
 
-### Step 1: Check pod uses correct SA
-```bash
-$ kubectl get pod <pod-name> -n monitoring -o jsonpath='{.spec.serviceAccountName}'
-grafana-sa
-```
-
-### Step 2: Verify vault-agent-init succeeds
-```bash
-$ kubectl logs <pod-name> -n monitoring -c vault-agent-init
-2026-04-05T18:34:56.453Z [INFO]  agent.auth.handler: authentication successful, sending token to sinks
-2026-04-05T18:34:56.490Z [INFO]  agent: (runner) rendered "(dynamic)" => "/vault/secrets/grafana-admin"
-```
-
-### Step 3: Verify pod is running
-```bash
-$ kubectl get pods -n monitoring
-NAME                                        READY   STATUS    RESTARTS   AGE
-kube-prometheus-stack-grafana-76d659dc49    4/4     Running   0          2m
-```
-
-## 8. Notes
-
-### Lessons Learned
-- Helm charts often create ServiceAccounts with release-name prefixes
-- Always check actual SA names before configuring Vault roles
-- The `serviceAccountName` field and `serviceAccount.name` field have different behaviors in Helm charts
-- Test Vault authentication in isolation before full deployment
-
-### Commands Reference
-```bash
-kubectl get sa -n <namespace>                                          # List service accounts
-kubectl get pod <pod> -o jsonpath='{.spec.serviceAccountName}'         # Get pod's SA
-kubectl logs <pod> -c vault-agent-init                                 # Check Vault agent logs
-vault read auth/kubernetes/role/<role>                                 # Read Vault role config
-vault write auth/kubernetes/role/<role> bound_service_account_names=<sa>  # Update Vault role
-```
-
-### Related Files
-- Vault Kubernetes auth role configuration
-- Helm release values for kube-prometheus-stack
-- ServiceAccount manifests (if using custom SAs)
-
-### References
-- Vault Kubernetes Auth Method documentation
-- kube-prometheus-stack Helm chart values
-
-## 9. Workaround
-
-**Quick fix:** Update the Vault role to accept the actual ServiceAccount name created by the Helm chart:
-```bash
-vault write auth/kubernetes/role/grafana \
-    bound_service_account_names=kube-prometheus-stack-grafana \
-    bound_service_account_namespaces=monitoring \
-    policies=grafana \
-    ttl=1h
-```
-
-This allows immediate resolution without modifying Helm values or recreating pods.
+Commands reference:
+  kubectl get sa -n <namespace>
+  kubectl get pod <pod> -o jsonpath='{.spec.serviceAccountName}'
+  kubectl logs <pod> -c vault-agent-init
+  vault read auth/kubernetes/role/<role>
+  vault write auth/kubernetes/role/<role> bound_service_account_names=<sa>
