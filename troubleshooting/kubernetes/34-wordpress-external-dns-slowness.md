@@ -1,4 +1,4 @@
-# TS-K8S-034 | 2026-04-15 | IN PROGRESS
+# TS-K8S-034 | 2026-04-16 | RESOLVED
 
 ## 1. Context
 - System: CoreDNS / External DNS Resolution
@@ -313,12 +313,52 @@ Add Google DNS (8.8.8.8) as fallback for external domains in CoreDNS config.
 
 ---
 
-## 9. Status
+## 9. Solution
 
-**IN PROGRESS** - Root cause identified, solution not yet implemented.
+### Step 1: Apply DNS Fallback to All Linux Nodes
 
-### Next Steps
-1. Review CoreDNS forward configuration
-2. Test fallback DNS option
-3. Evaluate WordPress configuration changes
-4. Document recommended DR procedures for degraded mode
+Run the DNS fallback playbook (adds 8.8.8.8 to zzz-ipa.conf on all nodes):
+
+```bash
+ansible-playbook playbooks/freeipa/dns_fallback.yml
+```
+
+See: `troubleshooting/linux/3-linux-nodes-dns-fallback.md` (TS-LNX-003)
+
+### Step 2: Restart CoreDNS to Pick Up New DNS Config
+
+CoreDNS caches the node's `/etc/resolv.conf` at startup. After applying the DNS fix,
+restart CoreDNS to load the new fallback DNS:
+
+```bash
+kubectl rollout restart deployment coredns -n kube-system
+```
+
+Verify pods restarted:
+
+```bash
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+```
+
+---
+
+## 10. Fix Evidence
+
+### Before Fix
+```
+wordpress-dev.lab.local    200    document    15.3 kB    4.19 s
+admin-ajax.php             200    xhr         0.7 kB     12.16 s
+```
+
+### After Fix
+```
+wordpress-dev.lab.local    200    document    13.9 kB    189 ms
+```
+
+**Result:** 4+ seconds → 189ms (22x faster)
+
+---
+
+## 11. Status
+
+**RESOLVED**

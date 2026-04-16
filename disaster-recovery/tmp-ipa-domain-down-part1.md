@@ -276,7 +276,7 @@ dial tcp: lookup helm.releases.hashicorp.com on 10.96.0.10:53: server misbehavin
 **Root Cause:** CoreDNS forwards to FreeIPA (10.0.60.10), no fallback upstream.
 
 **3. Node /etc/resolv.conf - No Fallback DNS**
-**TS Case:** `troubleshooting/linux/10-linux-nodes-dns-fallback.md` (TS-LNX-010)
+**TS Case:** `troubleshooting/linux/3-linux-nodes-dns-fallback.md` (TS-LNX-003)
 
 ```
 nameserver 10.0.60.10   # Only FreeIPA, no public DNS fallback
