@@ -556,8 +556,8 @@ ansible_ssh_common_args='-o KnownHostsCommand=none'
 ## Recommendations
 
 ### Immediate (Low Risk)
-1. ✅ **DONE** - Add `KnownHostsCommand=none` to all Ansible inventories
-2. Add fallback DNS to CoreDNS (8.8.8.8) for external resolution
+1. ✅ **DONE** - Add `KnownHostsCommand=none` to all Ansible inventories (TS-IDN-009)
+2. ✅ **DONE** - Add fallback DNS to Linux nodes via `zzz-ipa.conf` (TS-LNX-010)
 3. Document operational guidelines for IPA outage scenarios
 
 ### Medium Term
@@ -581,6 +581,7 @@ ansible_ssh_common_args='-o KnownHostsCommand=none'
 | `troubleshooting/kubernetes/33-vault-agent-dns-failure-new-pod-blocking.md` | TS-K8S-033: Vault Agent DNS failure + new pod blocking |
 | `troubleshooting/kubernetes/34-wordpress-external-dns-slowness.md` | TS-K8S-034: WordPress external DNS timeouts |
 | `troubleshooting/kubernetes/35-pod-restart-investigation-ipa-down.md` | TS-K8S-035: Pod restart investigation (vault-agent vs app) |
+| `troubleshooting/linux/3-linux-nodes-dns-fallback.md` | TS-LNX-003: Linux nodes DNS fallback fix |
 | `disaster-recovery/tmp-ipa-domain-down-part1.md` | Part 1 test results |
 
 ---
