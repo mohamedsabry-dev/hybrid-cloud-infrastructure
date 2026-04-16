@@ -23,7 +23,18 @@ What Pending to publish:
     - 1-10 k8s , 
     - 31 - 35 k8s , 
     - proxmox folder 
-
+6- Remediation Pod Conslidation Phase 
+    - Own and imporve python script 
+    - Fix the potenial node overwrite with copy mechanism using either pool of vmid or counter lock of action apply 
+    - its critical to add mail notification 
+    - In case worker nodes up but master down , master own vault injector , but does it own ingresss nnginx ? 
+    - based on traffic flow i expect the service to remain up if there is no call dependacy on master which i think there no dependacy but will see via test 
+    - if prom keep up on pods on worker its a good way to trigger email notification ... can we let the worker to trigger sealf healing for master 
+    ?? maybe , worker >> prom notification >> worker have remediation pod ?? it still can use vault agent "unless the core dns is dependancy on master node 
+    - if it like thta ? , we may put cronjob on node level not k8s cluster , sense the dsconnection of master node like specific condition 
+        - master node 2 put of 3 not respinding reahcability ++ another second step verfication using something from kubelet logsfor disconenction error , and the trigger is somthing for somone to take action 
+        i cant allow worker to direct talk with vault or prox api .. so it might call api to aws ? ,,, lok it we can make it a pod , and it surviced we can make it have the api already inside it during creation for proxmox api token , and it triger the node restart or stop and start 
+        later we can see aws cloudwtch + in june in shaa allah 
 
 
 What to be moved After publish
