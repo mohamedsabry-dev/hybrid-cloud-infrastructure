@@ -1,253 +1,197 @@
 # TS-IDN-009 | 2026-04-15 | RESOLVED
+# NOTE: Duplicate ID — this ticket conflicts with TS-IDN-009 (2026-03-20 keytab case).
+# Needs renumbering before filing.
+_____________________________________________________________________
 
-## 1. Context
-- System: SSSD / FreeIPA / SSH / Ansible
-- Environment: DEV (lab.local)
-- Related components: Ansible automation, SSH KnownHostsCommand, sss_ssh_knownhosts
-- Discovery: **Discovered during IPA Domain Down DR Test (Part 2)**
+[Info]
+Domain: Identity / FreeIPA
+Sub-techs: SSSD, SSH KnownHostsCommand, sss_ssh_knownhosts, Ansible, FreeIPA SSH config
+Environment: DEV lab.local | Ansible control node | all managed hosts
+Re-opened: No
 
-## 2. Issue
-- Symptom: Ansible ad-hoc commands and playbooks take ~28-34 seconds to execute when FreeIPA is down
-- Direct SSH connections work normally (~1-2 seconds)
-- `raw` module executes fast (~0.7 seconds)
-- `ping`, `shell`, `command` modules are slow (~28-34 seconds)
+_____________________________________________________________________
 
-**Example (slow):**
-```bash
-[root@ansible dev]# time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping
-10.0.64.10 | SUCCESS => {
-    "ansible_facts": {
-        "discovered_interpreter_python": "/usr/bin/python3"
-    },
-    "changed": false,
-    "ping": "pong"
-}
+[Issue Description]
+Ansible ad-hoc commands and playbooks take 28-34 seconds to execute when FreeIPA
+is down. Direct SSH and raw module are fast — only Python-based modules are slow.
 
-real    0m34.479s
-user    0m0.856s
-sys     0m0.318s
-```
+Discovered during IPA Domain Down DR Test (Part 2).
 
-**Example (fast with raw module):**
-```bash
-[root@ansible dev]# time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m raw -a 'hostname'
-10.0.64.10 | CHANGED | rc=0 >>
-k8s-worker1.lab.local
+  raw module  → 0.7s   (fast)
+  ping module → 34s    (slow)
+  direct ssh  → 1.2s   (fast)
 
-real    0m0.716s
-user    0m0.378s
-sys     0m0.087s
-```
+_____________________________________________________________________
 
-## 3. Analysis
+[Analysis]
 
-### Check 1: Initial hypothesis - Python interpreter discovery
-```
-| Module | Time   | Uses Python on Target |
-|--------|--------|----------------------|
-| raw    | 0.7s   | No                   |
-| ping   | 28s    | Yes                  |
-```
-Initial finding: Suspected Python-related DNS lookups. **This was incorrect.**
+# Initial Check Notes:
+First suspected Python interpreter discovery since raw (no Python) was fast
+and ping (uses Python) was slow.
 
-### Check 2: Test with explicit Python interpreter
-```bash
-time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping \
-  -e 'ansible_python_interpreter=/usr/bin/python3'
+Command:
+  time ansible 10.0.64.10 -m ping -e 'ansible_python_interpreter=/usr/bin/python3'
 
-real    0m28.253s  # Still slow - not the root cause
-```
-Finding: Python interpreter discovery is NOT the root cause.
+Output:
+  real 0m28.253s — still slow. Python interpreter discovery is not the cause.
 
-### Check 3: Test SSH directly
-```bash
-time ssh root@10.0.64.10 'hostname'
-k8s-worker1.lab.local
-real    0m1.2s  # Fast
-```
-Finding: Direct SSH is fast. Issue is Ansible-specific.
+Tested direct SSH:
 
-### Check 4: Test with PreferredAuthentications
-```bash
-# Added to inventory:
-ansible_ssh_common_args='-o PreferredAuthentications=publickey'
+Command:
+  time ssh root@10.0.64.10 'hostname'
 
-# Result: Still slow ~28 seconds
-```
-Finding: Kerberos/GSSAPI fallback is NOT the root cause.
+Output:
+  real 0m1.2s — fast. Issue is Ansible-specific, not SSH itself.
 
-### Check 5: Destroy Kerberos tickets
-```bash
-kdestroy
-time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping
-# Result: Still slow ~28 seconds
-```
-Finding: Kerberos tickets are NOT the root cause.
+Tested disabling Kerberos/GSSAPI and destroying tickets:
 
-### Check 6: Deep verbose analysis (-vvvv)
-```bash
-time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping -vvvv
-```
+Command:
+  ansible_ssh_common_args='-o PreferredAuthentications=publickey'
+  kdestroy then re-run
 
-**Critical finding in SSH debug output:**
-```
-debug3: subprocess: KnownHostsCommand-ORDER command "/usr/bin/sss_ssh_knownhosts 10.0.64.10" running as root (flags 0x1a)
-debug3: subprocess: KnownHostsCommand-ORDER pid 4948
-...
-debug3: subprocess: KnownHostsCommand-HOSTNAME command "/usr/bin/sss_ssh_knownhosts 10.0.64.10" running as root (flags 0x1a)
-debug3: subprocess: KnownHostsCommand-HOSTNAME pid 4949
-```
+Output:
+  Still ~28 seconds both times. Not Kerberos, not GSSAPI.
 
-This is configured by FreeIPA in `/etc/ssh/ssh_config.d/04-ipa.conf`:
-```
-Match exec "true"
-    KnownHostsCommand /usr/bin/sss_ssh_knownhosts %H
-```
+Ran full verbose output to find what is different between Ansible SSH and direct SSH:
 
-### Check 7: Count SSH connections per Ansible ping
-From verbose output, Ansible `ping` module requires **7 SSH connections**:
+Command:
+  time ansible 10.0.64.10 -m ping -vvvv
 
-| Step | Purpose |
-|------|---------|
-| 1 | Get home directory (`echo ~root`) |
-| 2 | Create temp directory |
-| 3 | Python interpreter discovery |
-| 4 | Get platform info via Python |
-| 5 | SFTP upload module |
-| 6 | chmod the module |
-| 7 | Execute the module |
-| 8 | Cleanup temp files |
+Output (critical finding):
+  debug3: KnownHostsCommand-ORDER "/usr/bin/sss_ssh_knownhosts 10.0.64.10" pid 4948
+  debug3: KnownHostsCommand-HOSTNAME "/usr/bin/sss_ssh_knownhosts 10.0.64.10" pid 4949
 
-Each SSH connection calls `sss_ssh_knownhosts` **TWICE**:
-- KnownHostsCommand-ORDER
-- KnownHostsCommand-HOSTNAME
+This is configured by FreeIPA in /etc/ssh/ssh_config.d/04-ipa.conf:
+  KnownHostsCommand /usr/bin/sss_ssh_knownhosts %H
 
-### Check 8: Calculate the delay
-```
-| Component                        | Count |
-|----------------------------------|-------|
-| SSH connections per ping         | 7-8   |
-| sss_ssh_knownhosts calls per SSH | 2     |
-| Total SSSD lookups               | 14-16 |
-| Timeout per lookup (approx)      | ~2s   |
-| Total delay                      | ~28s  |
-```
 
-## 4. Root Cause
-> When FreeIPA is down, the SSH `KnownHostsCommand` (`/usr/bin/sss_ssh_knownhosts`) attempts to contact SSSD to retrieve host keys from FreeIPA. SSSD times out waiting for the IPA server on each lookup. Since Ansible makes 7-8 SSH connections per module execution, and each SSH connection triggers 2 SSSD lookups, the cumulative timeout is ~28-34 seconds.
+Background — what is known_hosts and why did this happen:
 
-**Key insight:** This is NOT related to:
-- Kerberos/GSSAPI authentication
-- Python interpreter discovery
-- SSH connection itself
-- DNS resolution
+  When you SSH to a machine for the first time SSH asks "do you trust this host?"
+  When you say yes, SSH saves that machine's fingerprint in ~/.ssh/known_hosts.
+  Next connection it checks — same machine as before? Yes → connect silently.
 
-It is specifically the **SSSD-based SSH host key lookup** timing out.
+  KnownHostsCommand is an override for this. Instead of checking the local file,
+  SSH runs a command to dynamically fetch host keys. FreeIPA injects this during
+  client enrollment — it tells SSH: ask sss_ssh_knownhosts instead, which asks
+  SSSD, which asks FreeIPA, which has all host keys stored centrally.
 
-## 5. Solution
-> Disable the SSSD KnownHostsCommand for Ansible connections.
+  All hosts were manually accepted before (the "yes" prompt was answered for each).
+  Those fingerprints are still saved in known_hosts on disk. But once FreeIPA
+  sets KnownHostsCommand, SSH stops looking at the local file entirely and always
+  goes to FreeIPA instead. The manual accepts are bypassed.
 
-**Why this works:** SSH will use local `known_hosts` files instead of querying SSSD/FreeIPA for host keys.
+  This is fine when FreeIPA is up — SSSD responds instantly.
+  When FreeIPA is down — sss_ssh_knownhosts tries to reach SSSD, SSSD tries to
+  reach FreeIPA, gets no response, waits until timeout (~2s), then gives up.
 
-**Location:** Ansible inventory file (`inventory/first_setup_inventory.ini`)
+Each SSH connection calls sss_ssh_knownhosts twice (ORDER + HOSTNAME).
+When FreeIPA is down each call times out.
 
-**Add to inventory:**
-```ini
-[all:vars]
-ansible_ssh_common_args='-o KnownHostsCommand=none'
-```
+Ansible ping module makes 7-8 SSH connections per execution:
+  get home dir, create temp dir, python discovery, platform info,
+  sftp upload, chmod, execute module, cleanup
 
-**Verification:**
-```bash
-[root@ansible dev]# time ansible -i inventory/first_setup_inventory.ini 10.0.64.10 -m ping
-10.0.64.10 | SUCCESS => {
-    "ansible_facts": {
-        "discovered_interpreter_python": "/usr/bin/python3"
-    },
-    "changed": false,
-    "ping": "pong"
-}
+Delay calculation:
+  7-8 SSH connections × 2 SSSD lookups × ~2s timeout = ~28-34 seconds
 
-real    0m2.996s
-user    0m0.502s
-sys     0m0.161s
-```
 
-**Result:** From **28 seconds to 3 seconds** - issue resolved.
+# Suspected Root Cause
+FreeIPA injects KnownHostsCommand during client enrollment which overrides the
+local known_hosts file. SSH now asks FreeIPA for host keys on every connection
+instead of checking the local file. When FreeIPA is down each lookup times out.
+Ansible makes 7-8 SSH connections per module — 14-16 timeouts accumulate to
+28-34 seconds. raw module is fast because it uses a single SSH connection.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: SSH host key verification will use local `known_hosts` instead of SSSD/FreeIPA
-- Security consideration: Host keys are still verified, just not dynamically fetched from IPA
 
-## 7. Impact After Fix
-- Observed: Ansible commands execute in ~3 seconds regardless of FreeIPA availability
-- No negative side effects observed
-- Ansible automation remains functional during IPA outages
+# More Checks Notes:
+Confirmed the KnownHostsCommand source:
 
-## 8. Alternative Solutions Considered
+Command:
+  cat /etc/ssh/ssh_config.d/04-ipa.conf
 
-### Option A: Reduce SSSD timeout (NOT recommended)
-```bash
-# /etc/sssd/sssd.conf
-[domain/lab.local]
-dns_resolver_timeout = 1
-```
-**Risk:** May cause false failures during network blips, affecting user authentication.
+Output:
+  Match exec "true"
+      KnownHostsCommand /usr/bin/sss_ssh_knownhosts %H
 
-### Option B: Modify IPA SSH config (NOT recommended)
-```bash
-# Comment out KnownHostsCommand in:
-/etc/ssh/ssh_config.d/04-ipa.conf
-```
-**Risk:** Affects all SSH connections system-wide, not just Ansible.
+FreeIPA injects this during client enrollment. Overrides local known_hosts lookup.
 
-### Option C: SSSD SSH-specific timeout (Alternative)
-```bash
-# /etc/sssd/sssd.conf
-[ssh]
-ssh_known_hosts_timeout = 1
-```
-**Risk:** May have unintended effects on other SSH operations.
 
-**Selected: Option via `ansible_ssh_common_args`** - Targeted, low-risk, Ansible-specific.
+# Suspected Solution
+Disable KnownHostsCommand specifically for Ansible connections via
+ansible_ssh_common_args. Targeted fix — does not affect system-wide SSH behavior.
 
-## 9. Workaround (if any)
-> Use `raw` module for critical operations when IPA is down - it doesn't require Python and uses single SSH connection.
 
-```bash
-# Fast even without the fix:
-ansible -i inventory/first_setup_inventory.ini all -m raw -a 'systemctl status sshd'
-```
+# Test
+Added to inventory [all:vars]:
+  ansible_ssh_common_args='-o KnownHostsCommand=none'
 
-## 10. Evidence Summary
+Command:
+  time ansible 10.0.64.10 -m ping
 
-### Timeline of Investigation
-| Time | Test | Result | Conclusion |
-|------|------|--------|------------|
-| 22:51 | ping module | 34.479s | Slow |
-| 22:52 | raw module | 0.716s | Fast |
-| 22:53 | ansible_python_interpreter | 28.253s | Still slow - not Python |
-| 22:54 | PreferredAuthentications | 28s | Still slow - not Kerberos |
-| 22:55 | kdestroy | 28s | Still slow - not tickets |
-| 23:02 | -vvvv analysis | Found sss_ssh_knownhosts | Root cause identified |
-| 23:05 | KnownHostsCommand=none | 2.996s | **SOLVED** |
+Result: PASS
+  real 0m2.996s — from 34 seconds down to 3 seconds.
 
-### Comparison: Before vs After Fix
-| Metric | Before Fix | After Fix |
-|--------|------------|-----------|
-| Ansible ping | ~28-34 seconds | ~3 seconds |
-| SSH connections | 7-8 | 7-8 (unchanged) |
-| SSSD lookups | 14-16 (all timeout) | 0 |
+_____________________________________________________________________
 
-## Related Files
-- `/etc/ssh/ssh_config.d/04-ipa.conf` - FreeIPA SSH configuration
-- `/usr/bin/sss_ssh_knownhosts` - SSSD host key lookup command
-- `ansible/dev/inventory/first_setup_inventory.ini` - Ansible inventory with fix
-- `disaster-recovery/tmp-ipa-domain-down-part1.md` - IPA DR test documentation
+[Final Root Cause]
+FreeIPA injects KnownHostsCommand into /etc/ssh/ssh_config.d/04-ipa.conf during
+client enrollment. This overrides the local known_hosts file — SSH stops checking
+manually accepted fingerprints and always queries sss_ssh_knownhosts instead.
+When FreeIPA is down, each lookup times out (~2s). Ansible makes 7-8 SSH connections
+per module and each triggers 2 SSSD lookups — 14-16 timeouts accumulate to 28-34
+seconds total.
 
-## Notes
-- This issue only manifests when FreeIPA is unavailable
-- Normal operations with IPA running are unaffected (SSSD responds instantly)
-- The fix is additive and doesn't break any existing functionality
-- Consider adding this to all inventory files as a resilience measure
+_____________________________________________________________________
+
+[Final Solution]
+Added KnownHostsCommand=none to ansible_ssh_common_args in inventory.
+SSH falls back to local known_hosts — host keys still verified via manually
+accepted fingerprints, just not dynamically fetched from FreeIPA.
+
+  ansible/dev/inventory/first_setup_inventory.ini:
+    [all:vars]
+    ansible_ssh_common_args='-o KnownHostsCommand=none'
+
+Consider adding this to all inventory files as a resilience measure.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Host keys still verified via local known_hosts. Only change is keys are
+no longer dynamically fetched from FreeIPA during Ansible runs.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Alternatives considered and rejected:
+  Option A: Reduce SSSD dns_resolver_timeout
+    Risk: May cause false failures during network blips, affects user auth
+
+  Option B: Modify /etc/ssh/ssh_config.d/04-ipa.conf directly
+    Risk: Affects all SSH connections system-wide, not just Ansible
+
+  Option C: ssh_known_hosts_timeout in sssd.conf [ssh] section
+    Risk: May affect other SSH operations unintentionally
+
+  Selected: ansible_ssh_common_args — targeted, Ansible-only, no side effects
+
+Workaround if fix is not applied:
+  Use raw module for critical operations when IPA is down — single SSH connection,
+  no Python, no cumulative delay.
+  ansible all -m raw -a 'systemctl status sshd'
+
+Related files:
+  /etc/ssh/ssh_config.d/04-ipa.conf
+  /usr/bin/sss_ssh_knownhosts
+  ansible/dev/inventory/first_setup_inventory.ini
+  disaster-recovery/tmp-ipa-domain-down-part1.md

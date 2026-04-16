@@ -1,114 +1,123 @@
 # TS-GH-001 | 2026-02-16 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: GitHub Actions / Self-hosted runner
-- Environment: Mac Mini runner
-- Related components: GitHub Actions workflows, LaunchDaemon service
+[Info]
+Domain: GitHub Actions
+Sub-techs: Self-hosted runner, LaunchDaemon, GitHub CLI
+Environment: Mac Mini runner
+Re-opened: No
 
-## 2. Issue
-- Symptom: After Mac Mini reboot, runner doesn't start automatically. Jobs get stuck.
-- Error:
-```
-Job is about to start running on the runner...
-```
-Status loops between "Waiting for runner" and "About to start". Cancel button in GitHub UI doesn't work.
+_____________________________________________________________________
 
-**Observed behavior:**
-- Runner shows as offline in Settings > Actions > Runners
-- Jobs queued during downtime stuck indefinitely
-- Cancel button unresponsive
+[Issue Description]
+After Mac Mini reboot, GitHub Actions runner does not start automatically.
+Queued jobs get stuck indefinitely and the cancel button in GitHub UI stops working.
 
-## 3. Analysis
+  Runner shows offline in Settings > Actions > Runners
+  Job status loops: "Waiting for runner" → "About to start" → loops
+  Cancel button unresponsive in GitHub UI
 
-**Check 1: Runner service status**
-```bash
-cd ~/WorkSpace/actions-runner
-./svc.sh status
-```
-Finding: Service not running after reboot.
+_____________________________________________________________________
 
-**Check 2: Is runner process alive?**
-```bash
-ps aux | grep Runner.Listener
-```
-Finding: No Runner.Listener process running.
+[Analysis]
 
-**Check 3: Was service installed as persistent?**
-```bash
-ls /Library/LaunchDaemons/ | grep actions
-```
-Finding: Service not installed as LaunchDaemon (wasn't using `sudo ./svc.sh install`).
+# Initial Check Notes:
+Checked runner service status and whether the process was alive.
 
-## 4. Root Cause
-> The runner service wasn't configured to start on boot. Without `sudo ./svc.sh install`, the runner only runs when manually started and doesn't survive reboots.
+Command:
+  cd ~/WorkSpace/actions-runner
+  ./svc.sh status
+  ps aux | grep Runner.Listener
 
-## 5. Solution
-> Install runner as system service and force-cancel stuck jobs.
+Output:
+  Service not running.
+  No Runner.Listener process found.
 
-**Location:** Mac Mini runner machine
+Checked if the runner was installed as a persistent LaunchDaemon:
 
-**Step 1: Start the runner service**
-```bash
-cd ~/WorkSpace/actions-runner
-./svc.sh start
-```
+Command:
+  ls /Library/LaunchDaemons/ | grep actions
 
-**Step 2: Force cancel stuck job**
+Output:
+  Nothing — service was never installed as a LaunchDaemon.
+  sudo ./svc.sh install was never run.
+  Runner only starts when manually launched and does not survive reboots.
 
-If cancel button doesn't work in UI, use GitHub CLI:
-```bash
-# Get run ID from the Actions URL (e.g., /actions/runs/22073570387)
-gh run cancel <run-id> --repo <owner>/<repo>
-```
 
-If still stuck, force cancel via API:
-```bash
-gh api -X POST /repos/<owner>/<repo>/actions/runs/<run-id>/force-cancel
-```
+# Suspected Root Cause
+Runner service not installed as a persistent system service. Without
+sudo ./svc.sh install it only runs when manually started and stops on reboot.
 
-**Step 3: Nuclear option - kill and restart runner**
-```bash
-cd ~/WorkSpace/actions-runner
-./svc.sh stop
-pkill -9 -f Runner
-./svc.sh start
-```
 
-**Prevention - install as persistent service:**
-```bash
-cd ~/WorkSpace/actions-runner
-sudo ./svc.sh install
-sudo ./svc.sh start
-```
+# More Checks Notes:
+N/A — cause was clear from service status check.
 
-**Verification:**
-```bash
-./svc.sh status
-# Should show: "Running" and the plist path
-```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Force-canceling jobs may leave partial state - review workflow outputs
+# Suspected Solution
+Start the runner manually to unblock jobs, force-cancel stuck jobs via GitHub CLI,
+then install the runner as a persistent service to prevent recurrence.
 
-## 7. Impact After Fix
-- Observed: Runner starts automatically on reboot
-- Jobs process correctly
-- No new issues caused
 
-## 8. Notes
+# Test
+Started runner service, force-cancelled stuck job, verified runner picks up new jobs.
 
-**Useful commands:**
-```bash
-# View stuck run details
-gh run view <run-id> --repo <owner>/<repo>
+Command:
+  ./svc.sh start
+  gh run cancel <run-id> --repo <owner>/<repo>
 
-# List recent runs
-gh run list --repo <owner>/<repo>
+Result: PASS — runner online, stuck job cancelled, new jobs processing normally.
 
-# Check runner process
-ps aux | grep Runner.Listener
-```
+_____________________________________________________________________
 
-## 9. Workaround (if any)
-> Manually start runner after each reboot: `cd ~/WorkSpace/actions-runner && ./svc.sh start`
+[Final Root Cause]
+Runner service was never installed as a persistent LaunchDaemon on the Mac Mini.
+sudo ./svc.sh install was not run during initial setup. Runner only starts when
+manually launched and does not survive reboots.
+
+_____________________________________________________________________
+
+[Final Solution]
+Installed runner as a persistent system service:
+
+  cd ~/WorkSpace/actions-runner
+  sudo ./svc.sh install
+  sudo ./svc.sh start
+
+  Verify: ./svc.sh status → should show Running + plist path
+
+For stuck jobs — cancel via GitHub CLI (UI cancel button stops working when
+runner goes offline):
+
+  # Standard cancel
+  gh run cancel <run-id> --repo <owner>/<repo>
+
+  # Force cancel if standard doesn't work
+  gh api -X POST /repos/<owner>/<repo>/actions/runs/<run-id>/force-cancel
+
+  # Nuclear — kill and restart runner if still stuck
+  ./svc.sh stop
+  pkill -9 -f Runner
+  ./svc.sh start
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Force-canceling jobs may leave partial workflow state.
+Review workflow outputs after force-cancel to confirm nothing was left half-done.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Useful commands:
+  gh run view <run-id> --repo <owner>/<repo>   view stuck run details
+  gh run list --repo <owner>/<repo>            list recent runs
+  ps aux | grep Runner.Listener                check runner process is alive

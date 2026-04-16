@@ -1,95 +1,146 @@
 # TS-NET-002 | 2026-02-12 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Network routing / TCP connections
-- Environment: WAN to Proxmox DEV via ER605
-- Related components: Mac Mini (192.168.0.223), ER605, Proxmox DEV (WiFi: 10.0.5.110, vmbr0: 192.168.0.220)
+[Info]
+Domain: Networking
+Sub-techs: Asymmetric routing, TCP, SSH, Proxmox network interfaces
+Environment: Home network | Mac Mini 192.168.0.223 | ER605 | Proxmox DEV (WiFi 10.0.5.110, vmbr0 192.168.0.220)
+Re-opened: No
 
-## 2. Issue
-- Symptom: SSH from WAN to Proxmox hangs (no password prompt), ping works
-- Error:
-```
-kex_exchange_identification: read: Connection reset by peer
-```
+_____________________________________________________________________
 
-**Observed behavior:**
-| Test | Result |
-|------|--------|
-| Ping 10.0.5.110 from Mac Mini | PASS |
-| SSH to 10.0.5.110 from Mac Mini | HANG (no password prompt) |
-| curl to HTTP on 10.0.5.110 | FAIL |
-| SSH from same VLAN (10.0.5.x) | PASS |
+[Issue Description]
+SSH from WAN to Proxmox hangs with no password prompt. Ping works fine.
 
-## 3. Analysis
+  ping 10.0.5.110 from Mac Mini       → PASS
+  SSH to 10.0.5.110 from Mac Mini     → hangs, then connection reset
+  SSH from same VLAN (10.0.5.x)       → PASS
+  curl HTTP to 10.0.5.110             → FAIL
 
-**Check 1: SSH service status**
-```bash
-systemctl status ssh
-```
-Finding: SSH running, listening on 0.0.0.0:22 ✓
+  kex_exchange_identification: read: Connection reset by peer
 
-**Check 2: Proxmox firewall**
-- Datacenter → Firewall → Options → Firewall: No (disabled)
-Finding: Not the issue ✓
+_____________________________________________________________________
 
-**Check 3: Routing table**
-```bash
-ip route
-```
-Finding: Default gateway correct (10.0.5.1 via wlp1s0) ✓
+[Analysis]
 
-**Check 4: ER605 ACL rules for return traffic**
-- Added: Allow_LAN_to_Mac (LAN→WAN direction)
-- Added: rrrrr (ALL direction, IPGROUP_LAN → Mac_Mini_PC)
-Finding: Still failed ✗
+# Initial Check Notes:
+Checked the obvious first — SSH service, firewall, routing table.
 
-**Check 5: Verbose SSH test**
-```bash
-ssh -v root@10.0.5.110
-```
-Finding: "Connection established" but then hung, later showed connection reset.
+Command:
+  systemctl status ssh
+  ip route
 
-**Check 6: Multiple network paths discovered**
-Proxmox had TWO network paths to 192.168.0.x:
-1. WiFi (wlp1s0) → Gateway 10.0.5.1 → ER605 → WAN → 192.168.0.x
-2. vmbr0 with IP 192.168.0.220 → DIRECT to 192.168.0.x (same subnet)
+Output:
+  SSH running, listening on 0.0.0.0:22.
+  Default gateway correct: 10.0.5.1 via wlp1s0.
 
-Finding: **ASYMMETRIC ROUTING** - inbound via WiFi, outbound via vmbr0.
+Proxmox firewall was disabled at datacenter level — not the cause.
 
-## 4. Root Cause
-> Asymmetric routing due to old IP (192.168.0.220) still configured on vmbr0. Inbound traffic came via WiFi interface, but Proxmox replied directly via vmbr0 (same subnet as source). TCP requires symmetric routing - SYN came in on wlp1s0, but SYN-ACK went out on vmbr0 = connection reset.
+Tried adding ER605 ACL rules to allow return traffic — still failed.
 
-**Why Ping worked but SSH failed:**
-- ICMP (ping): Stateless, doesn't care about path symmetry
-- TCP (SSH): Stateful, requires packets to flow on same path for connection tracking
+Ran verbose SSH to see where it stalls:
 
-## 5. Solution
-> Remove the old 192.168.0.220 IP from vmbr0.
+Command:
+  ssh -v root@10.0.5.110
 
-```bash
-ip addr del 192.168.0.220/24 dev vmbr0
-ip route del 192.168.0.0/24 dev vmbr0
-```
+Output:
+  Connection established, then hung, then connection reset.
+  TCP handshake starts but never completes properly.
 
-Then update `/etc/network/interfaces` to remove old config permanently.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Any services relying on old IP will lose connectivity
+# Suspected Root Cause
+Something is causing the TCP handshake to break after the initial connection.
+Ping (ICMP) works fine — TCP-specific problem. Suspected routing asymmetry.
 
-## 7. Impact After Fix
-- Observed: SSH connections work from WAN to Proxmox
-- All TCP connections now symmetric through ER605
 
-## 8. Notes
+# More Checks Notes:
+Discovered Proxmox had TWO network paths to 192.168.0.x:
 
-**Key Takeaway:** When migrating management from one interface to another, REMOVE the old IP completely. Having IPs on multiple interfaces in overlapping/related subnets causes asymmetric routing issues for TCP connections.
+  Path 1: WiFi (wlp1s0) → gateway 10.0.5.1 → ER605 → WAN → 192.168.0.x
+  Path 2: vmbr0 with IP 192.168.0.220 → direct to 192.168.0.x (same subnet)
 
-**Prevention checklist:**
-1. Plan the migration completely
-2. Remove old IP from old interface BEFORE relying on new interface
-3. Or ensure old and new interfaces are on completely separate subnets with no overlap
-4. Test with TCP connections (SSH, HTTP), not just ping
+Inbound traffic from Mac Mini (192.168.0.223) arrived via WiFi interface.
+Proxmox reply went out via vmbr0 — same subnet as source, direct path.
 
-## 9. Workaround (if any)
-> N/A - must fix the routing asymmetry.
+TCP SYN came in on wlp1s0, SYN-ACK went out on vmbr0.
+Mac Mini never received the SYN-ACK on the expected path — connection reset.
+
+Why ping worked but SSH failed:
+  ICMP is stateless — does not care about path symmetry.
+  TCP is stateful — SYN and SYN-ACK must flow on the same path for connection
+  tracking to work. Asymmetric path breaks the handshake.
+
+
+# Suspected Root Cause
+Asymmetric routing caused by old IP (192.168.0.220) still configured on vmbr0.
+Inbound via WiFi, outbound via vmbr0 — TCP handshake breaks.
+
+
+# More Checks Notes:
+Confirmed vmbr0 still had 192.168.0.220 configured — leftover from before
+management was migrated to WiFi interface. Two IPs on overlapping subnets,
+two possible paths for the same return traffic.
+
+
+# Suspected Solution
+Remove old IP 192.168.0.220 from vmbr0. Single path for all traffic, no
+asymmetry.
+
+
+# Test
+Removed IP and route from vmbr0, tested SSH from Mac Mini.
+
+Command:
+  ip addr del 192.168.0.220/24 dev vmbr0
+  ip route del 192.168.0.0/24 dev vmbr0
+  ssh root@10.0.5.110
+
+Result: PASS — SSH connects immediately, no hang.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Old IP (192.168.0.220/24) was still configured on vmbr0 after management was
+migrated to WiFi. Proxmox had two paths to 192.168.0.x — via WiFi through ER605,
+and via vmbr0 directly. Inbound traffic from Mac Mini arrived via WiFi, but
+Proxmox replied via vmbr0 (shorter path, same subnet). TCP SYN and SYN-ACK took
+different paths — connection tracking broke, handshake reset. Ping worked because
+ICMP is stateless and does not require path symmetry.
+
+_____________________________________________________________________
+
+[Final Solution]
+Removed old IP from vmbr0:
+
+  ip addr del 192.168.0.220/24 dev vmbr0
+  ip route del 192.168.0.0/24 dev vmbr0
+
+Updated /etc/network/interfaces to remove the config permanently.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Any service relying on 192.168.0.220 loses connectivity after removal.
+Verify nothing is bound to that IP before applying.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Key lesson: when migrating management from one interface to another, remove
+the old IP completely before or immediately after. Two IPs on overlapping or
+related subnets will cause asymmetric routing for TCP connections.
+
+Prevention checklist:
+  - Plan interface migration completely before starting
+  - Remove old IP from old interface before relying on the new one
+  - If keeping both, ensure subnets have no overlap
+  - Always test with TCP (SSH, HTTP) not just ping — ping hides asymmetry

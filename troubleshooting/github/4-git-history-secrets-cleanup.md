@@ -1,140 +1,171 @@
 # TS-GH-004 | 2026-03-14 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Git repository history
-- Environment: hybrid-cloud-infrastructure repository
-- Related components: AWS account IDs, Elastic IPs, passwords, SSH keys
+[Info]
+Domain: GitHub Actions / Security
+Sub-techs: Git history rewrite, git-filter-repo, secrets management, GitHub Secrets
+Environment: hybrid-cloud-infrastructure repository
+Re-opened: No
 
-## 2. Issue
-- Symptom: Sensitive values exposed in git commit history even though current files are clean
-- Error: N/A (security audit finding)
+_____________________________________________________________________
 
-**Data found in history:**
-| # | Type | Location Found |
-|---|------|----------------|
-| 1 | AWS Account ID (DEV) | Workflows, docs, terraform defaults |
-| 2 | AWS Account ID (PROD) | Workflows, docs, terraform defaults |
-| 3 | AWS Elastic IP (wg-dev) | VPN documentation |
-| 4 | AWS Elastic IP (wg-prod) | VPN documentation |
-| 5 | Password | Terraform config |
-| 6 | SSH RSA Public Key | GitHub known hosts |
+[Issue Description]
+Security audit finding — not a live failure.
+Sensitive values found in git commit history even though current files are clean.
+Secrets were initially hardcoded, later moved to GitHub Secrets, but git history
+retains all committed content even after files are modified.
 
-## 3. Analysis
+Data found in history:
+  1. AWS Account ID (DEV)    — workflows, docs, terraform defaults
+  2. AWS Account ID (PROD)   — workflows, docs, terraform defaults
+  3. AWS Elastic IP (wg-dev) — VPN documentation
+  4. AWS Elastic IP (wg-prod)— VPN documentation
+  5. Password                — terraform config
+  6. SSH RSA Public Key      — GitHub known hosts
 
-**Check 1: Search for AWS credentials in history**
-```bash
-git log -p --all | grep -iE "(aws_account|account_id|AKIA[A-Z0-9]{16})" | head -50
-```
-Finding: AWS account IDs found in multiple commits.
+_____________________________________________________________________
 
-**Check 2: Search for public IPs (excluding private ranges)**
-```bash
-git log -p --all | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u | grep -v "^10\.\|^192\.168\.\|^172\.1[6-9]\.\|^0\.0\.0\.0\|^127\."
-```
-Finding: AWS Elastic IPs found in VPN documentation.
+[Analysis]
 
-**Check 3: Verify current files are clean**
-```bash
-grep -rE "(PATTERN1|PATTERN2|...)" . --include="*" 2>/dev/null | grep -v ".git/" | wc -l
-# Result: 0
-```
-Finding: Current files clean. Only git history contains sensitive values.
+# Initial Check Notes:
+Searched git history for sensitive values across all commits and branches.
 
-## 4. Root Cause
-> Secrets were initially hardcoded, then later moved to GitHub Secrets. Git history retains all committed content even after files are modified.
+Command:
+  git log -p --all | grep -iE "(aws_account|account_id|AKIA[A-Z0-9]{16})" | head -50
 
-## 5. Solution
-> Use git-filter-repo to rewrite history, replacing sensitive values with REDACTED placeholders.
+Output:
+  AWS account IDs found in multiple commits across workflows, docs, and terraform.
 
-**Step 1: Create replacement file**
-```
-# cleanup-secrets.txt
-literal:<DEV_ACCOUNT_ID>==>REDACTED_AWS_DEV
-literal:<PROD_ACCOUNT_ID>==>REDACTED_AWS_PROD
-literal:<DEV_EIP>==>REDACTED_EIP_DEV
-literal:<PROD_EIP>==>REDACTED_EIP_PROD
-literal:<PASSWORD>==>REDACTED_PASSWORD
-literal:<SSH_KEY>==>REDACTED_SSH_KEY
-```
+Command:
+  git log -p --all | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u \
+    | grep -v "^10\.\|^192\.168\.\|^172\.1[6-9]\.\|^0\.0\.0\.0\|^127\."
 
-**Step 2: Backup and run cleanup**
-```bash
-# Backup .git directory
-cp -r .git .git-backup
+Output:
+  AWS Elastic IPs found in VPN documentation commits.
 
-# Disable branch protection on GitHub
+Verified current files are clean:
 
-# Run filter-repo
-git filter-repo --replace-text cleanup-secrets.txt --force
+Command:
+  grep -rE "(PATTERN1|PATTERN2|...)" . --include="*" 2>/dev/null \
+    | grep -v ".git/" | wc -l
 
-# Re-add remote (filter-repo removes it)
-git remote add origin git@github.com:USERNAME/REPO.git
+Output:
+  0 — current files clean. Exposure is in history only.
 
-# Force push ALL branches and tags
-git push origin --force --all
-git push origin --force --tags
 
-# Delete cleanup file (contains sensitive patterns)
-rm cleanup-secrets.txt
+# Suspected Root Cause
+Secrets were hardcoded in early commits then later moved to GitHub Secrets.
+Git retains full history of all committed content — cleaning current files does
+not remove values from past commits. History is the exposure surface.
 
-# Re-enable branch protection
-```
 
-**Step 3: Verify cleanup**
-```bash
-git log -p --all | grep -E "<SENSITIVE_VALUE>" | head -5
-# Result: empty - secrets removed
+# More Checks Notes:
+N/A — scope of exposure confirmed from history search results.
 
-git log -p --all | grep -E "REDACTED_AWS_DEV|REDACTED_AWS_PROD" | head -10
-# Result: REDACTED placeholders confirmed
-```
 
-## 6. Solution Risk
-- Risk level: HIGH (history rewrite)
-- Potential impact: All collaborators must re-clone. Force push required.
+# Suspected Solution
+Use git-filter-repo to rewrite history, replacing all sensitive values with
+REDACTED placeholders across all commits and branches.
 
-## 7. Impact After Fix
-- Observed: Git history cleaned, REDACTED placeholders in place
-- All clones invalidated (expected)
-- No sensitive data in history
 
-**Configuration changes made:**
-| Item | Before | After |
-|------|--------|-------|
-| AWS_ACCOUNT_ID_DEV | Variable | Secret |
-| AWS_ACCOUNT_ID_PROD | Variable | Secret |
-| PUBLIC_IP | Variable | Renamed to HOME_PUBLIC_IP (Secret) |
-| WG_VPN_EIP_DEV | Not tracked | New Secret |
-| WG_VPN_EIP_PROD | Not tracked | New Secret |
+# Test
+Ran git-filter-repo with replacement file, force-pushed all branches, verified
+history no longer contains sensitive values.
 
-## 8. Notes
+Command:
+  git log -p --all | grep -E "<SENSITIVE_VALUE>" | head -5
+  git log -p --all | grep -E "REDACTED_AWS_DEV|REDACTED_AWS_PROD" | head -10
 
-**Prevention - best practices:**
-1. Use GitHub Secrets from day one
-2. Review diffs before committing
-3. Use `.gitignore` for sensitive files
-4. Consider pre-commit hooks (`git-secrets`, `gitleaks`)
+Result: PASS — first grep returns empty, REDACTED placeholders confirmed in history.
 
-**Audit commands for future use:**
-```bash
-# Check terraform for sensitive marking
-grep -rE "variable.*(password|token|key|secret)" terraform/ | \
-  xargs -I {} grep -L "sensitive" {}
+_____________________________________________________________________
 
-# Check workflows for masking
-grep -rE "echo.*\$\{.*\}.*>>" .github/workflows/ | \
-  grep -v "add-mask"
+[Final Root Cause]
+Secrets were hardcoded in early commits and later moved to GitHub Secrets.
+Git history retains all committed content permanently. Cleaning current files
+does not remove values from past commits — the full diff history was the exposure.
 
-# Quick scan for common patterns
-git log -p --all | grep -iE "(password|secret|token|key)" | head -100
-```
+_____________________________________________________________________
 
-**Key lesson:** Git remembers everything. Clean files doesn't mean clean repo.
+[Final Solution]
+Rewrote git history using git-filter-repo to replace all sensitive values
+with REDACTED placeholders.
 
-**Related security cleanup chain:**
-- TS-GH-003 → Delete workflow logs with exposed secrets
-- TS-GH-004 (this) → Git history secrets cleanup (AWS IDs, EIPs, passwords)
-- TS-GH-006 → MAC address deep inspection cleanup
+  # 1. Create replacement file (cleanup-secrets.txt)
+  literal:<DEV_ACCOUNT_ID>==>REDACTED_AWS_DEV
+  literal:<PROD_ACCOUNT_ID>==>REDACTED_AWS_PROD
+  literal:<DEV_EIP>==>REDACTED_EIP_DEV
+  literal:<PROD_EIP>==>REDACTED_EIP_PROD
+  literal:<PASSWORD>==>REDACTED_PASSWORD
+  literal:<SSH_KEY>==>REDACTED_SSH_KEY
 
-## 9. Workaround (if any)
-> If history rewrite not possible: rotate all exposed credentials immediately.
+  # 2. Backup and run
+  cp -r .git .git-backup
+  # Disable branch protection on GitHub first
+  git filter-repo --replace-text cleanup-secrets.txt --force
+
+  # 3. Re-add remote (filter-repo removes it)
+  git remote add origin git@github.com:USERNAME/REPO.git
+
+  # 4. Force push all branches and tags
+  git push origin --force --all
+  git push origin --force --tags
+
+  # 5. Cleanup
+  rm cleanup-secrets.txt        # contains sensitive patterns
+  # Re-enable branch protection
+
+Configuration changes made after cleanup:
+  AWS_ACCOUNT_ID_DEV  → moved from Variable to Secret
+  AWS_ACCOUNT_ID_PROD → moved from Variable to Secret
+  PUBLIC_IP           → renamed to HOME_PUBLIC_IP, moved to Secret
+  WG_VPN_EIP_DEV      → new Secret (was not tracked before)
+  WG_VPN_EIP_PROD     → new Secret (was not tracked before)
+
+NOTE: All existing clones are invalidated after force push. Re-clone required.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] HIGH
+Note: History rewrite invalidates all collaborator clones. Force push required.
+Disable branch protection before running, re-enable after.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Key lesson: git remembers everything. Clean files does not mean clean repo.
+Always assume history is permanent and public from day one.
+
+Prevention going forward:
+  - Use GitHub Secrets from day one, never hardcode
+  - Review diffs before committing
+  - Use .gitignore for sensitive files
+  - Consider pre-commit hooks (git-secrets, gitleaks)
+
+Audit commands for future use:
+  # Check terraform for missing sensitive marking
+  grep -rE "variable.*(password|token|key|secret)" terraform/ | \
+    xargs -I {} grep -L "sensitive" {}
+
+  # Check workflows for unmasked exports
+  grep -rE "echo.*\$\{.*\}.*>>" .github/workflows/ | grep -v "add-mask"
+
+  # Quick scan for common patterns in history
+  git log -p --all | grep -iE "(password|secret|token|key)" | head -100
+
+Part of security cleanup chain:
+  TS-GH-003       → delete workflow logs with exposed secrets
+  TS-GH-004 (this)→ git history cleanup
+  TS-GH-006       → MAC address deep inspection cleanup
+
+Workaround if history rewrite is not possible:
+  Rotate all exposed credentials immediately.

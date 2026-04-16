@@ -1,226 +1,187 @@
 # TS-GH-010 | 2026-04-10 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Git / GitHub Pull Requests
-- Environment: Multi-branch workflow (dev → dev-security → prod)
-- Related components: GitHub PR merge settings, long-lived branches
+[Info]
+Domain: Git / GitHub
+Sub-techs: Git merge strategy, squash merge, merge commit, branch protection, PR settings
+Environment: Multi-branch workflow (dev → dev-security → prod)
+Re-opened: No
 
-## 2. Issue
-- Symptom: Every second merge from dev to prod/dev-security causes conflicts, even when only dev branch is edited
-- Error:
-```
-CONFLICT (content): Merge conflict in <filename>
-Automatic merge failed; fix conflicts and then commit the result.
+_____________________________________________________________________
 
-# GitHub PR shows:
-"This branch has conflicts that must be resolved"
-```
+[Issue Description]
+Every second merge from dev to prod/dev-security causes conflicts, even when only
+dev branch is edited. Pattern started ~2-3 weeks ago after changing merge settings.
 
-**Observed behavior:**
-- First merge of new file: works fine
-- Second merge (edit same file): conflict!
-- Conflict highlights the exact edit made, as if Git doesn't know previous merge happened
-- Pattern repeats on every subsequent edit
-- Issue appeared ~2-3 weeks ago after changing merge settings
+  First merge of a new file    → works fine
+  Second merge (edit same file)→ CONFLICT
 
-## 3. Analysis
+  "This branch has conflicts that must be resolved"
+  CONFLICT (content): Merge conflict in <filename>
 
-**Check 1: Review GitHub merge settings**
-```
+Conflict highlights the exact edit made — as if Git has no memory of the previous merge.
+
+_____________________________________________________________________
+
+[Analysis]
+
+# Initial Check Notes:
+Reviewed GitHub merge settings since the pattern started after a settings change.
+
 Repository Settings → Pull Requests:
-- Allow merge commits: ❌ OFF
-- Allow squash merging: ✅ ON  ← PROBLEM
-- Allow rebase merging: ✅ ON
-```
-Finding: Squash merge was enabled and being used for dev→prod PRs.
+  Allow merge commits:  OFF
+  Allow squash merging: ON   ← in use for dev→prod PRs
+  Allow rebase merging: ON
 
-**Check 2: Examine prod branch commit history**
-```bash
-git log --oneline prod -10
-```
-```
-23a0d46 Dev (#128)   ← Squash commit (new hash)
-8128654 Dev (#126)   ← Squash commit (new hash)
-a79671a Dev (#125)   ← Squash commit (new hash)
-```
-Finding: All commits named "Dev (#xxx)" - these are squash merge commits with new hashes.
+Checked prod branch commit history:
 
-**Check 3: Compare commit hashes between branches**
-```bash
-# Original commit on dev
-git log --oneline dev | grep "Add feature X"
-# abc1234 Add feature X
+Command:
+  git log --oneline prod -10
 
-# After squash merge to prod
-git log --oneline prod | grep "Add feature X"
-# (not found - squash created "Dev (#128)" instead)
-```
-Finding: Squash merge creates entirely new commits. Git cannot track that the original commits are already merged.
+Output:
+  23a0d46 Dev (#128)   ← squash commit, new hash
+  8128654 Dev (#126)   ← squash commit, new hash
+  a79671a Dev (#125)   ← squash commit, new hash
 
-## 4. Root Cause
-> **Squash merge breaks Git's merge tracking for long-lived branches.**
->
-> When you squash merge:
-> 1. Git combines all commits into ONE new commit with a NEW hash
-> 2. The original commits remain on the source branch with their original hashes
-> 3. Git has no way to know the new squash commit contains the same changes
-> 4. Next merge: Git sees "unmerged" commits and tries to apply them again → CONFLICT
->
-> ```
-> SQUASH MERGE FLOW:
->
-> dev:  A ─── B ─── C ─── D (edit file)
->                         │
->                         ▼ squash merge
-> prod: ─────────── ABC' ───
->                   ↑
->                   New hash! Git doesn't know ABC' = A+B+C
->
-> Next merge attempt:
-> - Git sees: dev has A,B,C,D and prod has ABC'
-> - Git thinks: A,B,C not merged yet (different hashes!)
-> - Result: CONFLICT on files touched by A,B,C
-> ```
+All merges named "Dev (#xxx)" — squash commits with entirely new hashes.
 
-## 5. Solution
-> Disable squash/rebase merge, use regular merge commits, and reset all branches to source of truth (dev).
+Compared original commit hashes between dev and prod:
 
-### Part A: Update GitHub repo settings
+Command:
+  git log --oneline dev | grep "Add feature X"
+  git log --oneline prod | grep "Add feature X"
 
-Go to: Repository → Settings → Pull Requests
+Output:
+  dev:  abc1234 Add feature X
+  prod: (not found — squash created "Dev (#128)" instead)
 
-| Setting | Change to |
-|---------|-----------|
-| Allow merge commits | ✅ ON |
-| Allow squash merging | ❌ OFF |
-| Allow rebase merging | ❌ OFF |
+The original commits exist on dev but are not traceable on prod. Git has no way
+to know the squash commit contains those changes.
 
-### Part B: Nuclear Reset - Sync all branches to dev (Chosen Solution)
+What squash merge does:
+  dev:  A ─── B ─── C ─── D (edit file)
+                          │
+                          ▼ squash merge
+  prod: ─────────── ABC' ───  ← new hash, Git has no record of A, B, C
 
-Due to extensive divergence from past squash merges, manual conflict resolution was impractical (20+ files). Instead, all branches were reset to match `dev` (source of truth).
+  Next merge attempt:
+  Git sees dev has A, B, C, D and prod has ABC' (unknown to dev)
+  Git thinks A, B, C were never merged
+  Result: conflict on every file those commits touched
 
-**Step 1: Create backups of all branches**
-```bash
-git checkout prod-security && git branch prod-security-backup-$(date +%Y%m%d)
-git checkout prod && git branch prod-backup-$(date +%Y%m%d)
-git checkout dev-security && git branch dev-security-backup-$(date +%Y%m%d)
-git checkout main && git branch main-backup-$(date +%Y%m%d)
-```
 
-**Step 2: Temporarily disable branch protection**
+# Suspected Root Cause
+Squash merge was being used for dev→prod PRs. Squash creates a new combined commit
+with a new hash, discarding the original commit identities. Git cannot track that the
+squash commit contains those changes. On the next merge, Git sees the original commits
+as unmerged and tries to apply them again — conflict.
 
-GitHub → Settings → Branches → Edit each protected branch → Disable or allow force push
 
-**Step 3: Reset each branch to dev**
-```bash
-# Reset prod-security
-git checkout prod-security
-git reset --hard origin/dev
-git push origin prod-security --force
+# More Checks Notes:
+Confirmed the divergence scale — 20+ files in conflict across all branches due to
+accumulated squash merges over several weeks. Manual conflict resolution was impractical.
 
-# Reset prod
-git checkout prod
-git reset --hard origin/dev
-git push origin prod --force
 
-# Reset dev-security
-git checkout dev-security
-git reset --hard origin/dev
-git push origin dev-security --force
+# Suspected Solution
+Disable squash/rebase merge in repo settings, use regular merge commits only.
+Reset all branches to dev (source of truth) to clear accumulated divergence.
 
-# Reset main
-git checkout main
-git reset --hard origin/dev
-git push origin main --force
-```
 
-**Step 4: Verify all branches synced**
-```bash
-git fetch origin
-git rev-list --left-right --count origin/dev...origin/dev-security  # Should be 0 0
-git rev-list --left-right --count origin/dev...origin/main          # Should be 0 0
-git rev-list --left-right --count origin/dev...origin/prod          # Should be 0 0
-git rev-list --left-right --count origin/dev...origin/prod-security # Should be 0 0
-```
+# Test
+Reset all branches to dev, made a test edit on dev, merged to prod using merge commit.
 
-**Step 5: Re-enable branch protection**
+Command:
+  git rev-list --left-right --count origin/dev...origin/prod
 
-GitHub → Settings → Branches → Restore protection rules
+Result: PASS — 0 0, branches identical. Second merge of same file had no conflict.
 
-### Part C: Future workflow
+_____________________________________________________________________
 
-When merging PRs from dev → prod:
-- Click the merge button dropdown
-- Select **"Create a merge commit"** (never squash or rebase)
+[Final Root Cause]
+Squash merge was enabled and used for dev→prod PRs. Squash combines all commits into
+one new commit with a new hash — original commit hashes are discarded. Git uses commit
+hashes to track what has been merged. On the next merge, Git sees the original commits
+on dev, finds no matching hashes on prod, and treats them as unmerged. Conflict on
+every file those commits touched. Pattern repeats on every subsequent edit.
 
-## 6. Solution Risk
-- Risk level: MEDIUM (force push to multiple branches)
-- Potential impact:
-  - Any unique commits on target branches are lost (backed up first)
-  - Requires temporary disable of branch protection
-  - Team members need to `git fetch && git reset --hard origin/<branch>` to sync local copies
+_____________________________________________________________________
 
-## 7. Impact After Fix
-- Observed: All branches now identical (0-0 commit difference)
-- All future merges using "Create a merge commit" work without conflicts
-- Clean git history going forward
-- Backups preserved:
-  - `prod-security-backup-20260410`
-  - `prod-backup-20260410`
-  - `dev-security-backup-20260410`
-  - `main-backup-20260410`
+[Final Solution]
+Two parts — fix settings, reset branches.
 
-## 8. Notes
+Part A: GitHub repo settings:
+  Allow merge commits:  ON
+  Allow squash merging: OFF
+  Allow rebase merging: OFF
 
-**When to use each merge type:**
+Part B: Nuclear reset — sync all branches to dev:
 
-| Merge Type | Creates New Hash? | Git Tracks Merge? | Use For |
-|------------|-------------------|-------------------|---------|
-| Merge commit | No (preserves original) | ✅ Yes | Long-lived branches (dev/prod/main) |
-| Squash merge | Yes (new combined hash) | ❌ No | Feature branches deleted after merge |
-| Rebase merge | Yes (rewrites all hashes) | ❌ No | Feature branches deleted after merge |
+  # 1. Create backups
+  git checkout prod-security && git branch prod-security-backup-20260410
+  git checkout prod          && git branch prod-backup-20260410
+  git checkout dev-security  && git branch dev-security-backup-20260410
+  git checkout main          && git branch main-backup-20260410
 
-**Why squash seemed like a good idea:**
+  # 2. Disable branch protection on GitHub temporarily
 
-The original reason for enabling squash was to avoid "polluting" dev with prod's history if backward merges (prod→dev) were needed. However:
+  # 3. Reset each branch to dev
+  git checkout prod && git reset --hard origin/dev && git push origin prod --force
+  git checkout prod-security && git reset --hard origin/dev && git push origin prod-security --force
+  git checkout dev-security && git reset --hard origin/dev && git push origin dev-security --force
+  git checkout main && git reset --hard origin/dev && git push origin main --force
 
-1. Backward merges should NEVER happen (see TS-GH-008)
-2. If prod has changes dev needs, manually copy or cherry-pick them
-3. The "cleaner history" benefit of squash is outweighed by the conflict problems
+  # 4. Verify
+  git rev-list --left-right --count origin/dev...origin/prod          # 0 0
+  git rev-list --left-right --count origin/dev...origin/prod-security # 0 0
+  git rev-list --left-right --count origin/dev...origin/dev-security  # 0 0
+  git rev-list --left-right --count origin/dev...origin/main          # 0 0
 
-**Related cases:**
-- TS-GH-008: Established one-way merge flow rule (dev→prod only)
-- This case (TS-GH-010): Adds requirement for regular merge commits (no squash/rebase)
+  # 5. Re-enable branch protection
 
-**Complete branching rules:**
-1. ONE-WAY FLOW: dev → prod only, never merge backward
-2. MERGE TYPE: Always use "Create a merge commit"
-3. NO SQUASH: Squash/rebase breaks merge tracking
-4. MANUAL COPY: If prod has something dev needs, manually recreate it
+Going forward — always select "Create a merge commit" when merging PRs.
+Never use squash or rebase for dev→prod or any long-lived branch merges.
 
-## 9. Workaround (if any)
+Related: TS-GH-008 — established one-way merge flow rule (dev→prod only).
+This case adds the merge commit type requirement on top of that.
 
-**Alternative to nuclear reset (if branches have unique changes you can't lose):**
-> Manually resolve all conflicts once. After this painful merge, future merges should be clean:
-> ```bash
-> git checkout prod
-> git merge dev
-> # Resolve each conflict, keeping the correct version
-> git add .
-> git commit
-> git push
-> ```
+Complete branching rules:
+  1. ONE-WAY FLOW    → dev → prod only, never merge backward
+  2. MERGE TYPE      → always use "Create a merge commit"
+  3. NO SQUASH       → squash/rebase breaks merge tracking on long-lived branches
+  4. MANUAL COPY     → if prod has something dev needs, manually recreate in dev
 
-**If squash merge must be used in future (not recommended):**
-> Sync branches after each squash:
-> ```bash
-> # After squash merging dev → prod
-> git checkout dev
-> git rebase prod
-> git push --force-with-lease
-> ```
-> This is error-prone and not recommended for team workflows.
+Verified: Yes
 
-## 10. References
-- TS-GH-008: Git branch merge conflicts (one-way flow rule)
+_____________________________________________________________________
+
+[Risk Level] MEDIUM
+Note: Force push to multiple branches required. Any unique commits on target
+branches are lost — backed up first. Team members need to re-sync local copies
+after force push: git fetch && git reset --hard origin/<branch>
+
+_____________________________________________________________________
+
+[References]
+- TS-GH-008 — one-way merge flow rule
 - https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Merge type comparison:
+  Merge commit  → preserves original hashes, Git tracks merge history  ← use for dev/prod
+  Squash merge  → new combined hash, Git loses tracking                ← only for feature branches deleted after merge
+  Rebase merge  → rewrites all hashes, same problem as squash          ← only for feature branches deleted after merge
+
+Why squash seemed like a good idea originally:
+  Wanted to avoid polluting dev with prod history if backward merges were needed.
+  But backward merges should never happen (TS-GH-008), and the "cleaner history"
+  benefit of squash is completely outweighed by the recurring conflict problem.
+
+Alternative if nuclear reset is not acceptable:
+  Manually resolve all conflicts once — after that painful merge, future merges
+  with merge commits will be clean.
+  git checkout prod && git merge dev
+  # resolve each conflict, keeping correct version
+  git add . && git commit && git push
