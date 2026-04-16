@@ -574,3 +574,4 @@ Note: First 2 requests hit worker1 during NFS mount recovery. After ~6s, fully r
 - TS-K8S-015 — Stale NFS mount on CSI restart
 - TS-K8S-018 — CSI controller network placement
 - TS-K8S-026 — Released PV cleanup
+- `disaster-recovery/nginx-dr-test.md` — NGINX layer failures (references readiness probe endpoint removal)
