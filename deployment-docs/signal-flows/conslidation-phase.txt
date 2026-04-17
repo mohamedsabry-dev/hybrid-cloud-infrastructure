@@ -11,6 +11,7 @@ Priority Classes
 DR tests: 15 April noght in shaa allah ( tmp (partial 2 workers down , tmp exteral nginx , tmp internal nginx ingress -- note endpoints pbehaviour))
 
 
+<> Integration of prom <> alert <> vault <> rules >< remeditaiton 
 Grafana ↔ Prometheus ↔ Loki — full observability stack as one session.                      >>
 etcd ↔ Vault ↔ AWS — backup operation, dynamic credentials, KMS unseal                      >>
 Remediation ↔ Vault ↔ Proxmox — how remediation works, Vault injection, Proxmox API         >>
