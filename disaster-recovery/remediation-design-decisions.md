@@ -639,9 +639,93 @@ NODE_MAP = {
 
 ---
 
+## Successful Test Results (2026-04-17)
+
+### Full Remediation Flow Tested
+
+**Scenario:** Shut down worker2 and worker3 manually.
+
+**Results:**
+```
+--- Health check ---
+k8s-worker1.lab.local: Healthy
+k8s-worker2.lab.local: UNHEALTHY! (Node NotReady)
+[Attempt 1] Remediating k8s-worker2.lab.local (VM 1021)
+  -> VM 1021 status: stopped
+  -> Starting VM 1021
+  -> Alert sent: reboot - initiated
+
+[Attempt 2] Remediating k8s-worker2.lab.local (VM 1021)
+  -> VM 1021 status: stopped
+  -> Starting VM 1021
+  -> Alert sent: reset - initiated
+
+[Attempt 3] Remediating k8s-worker3.lab.local (VM 1022)
+  -> Stopping VM 1022
+  -> Deleting VM 1022
+  -> Restoring from nas-dev-data:backup/vzdump-qemu-1022-2026_04_16-21_09_39.vma.zst
+  -> Restore initiated, VM 1022 starting
+  -> Alert sent: restore - initiated
+
+--- Next health check ---
+k8s-worker2.lab.local: Recovered! Resetting counter.
+  -> Alert sent: recovery - node is healthy again
+k8s-worker3.lab.local: Recovered! Resetting counter.
+  -> Alert sent: recovery - node is healthy again
+```
+
+**All nodes recovered:**
+```
+NAME                    CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)
+k8s-master1.lab.local   449m         22%      1700Mi          80%
+k8s-master2.lab.local   179m         8%       1579Mi          74%
+k8s-master3.lab.local   164m         8%       1586Mi          75%
+k8s-worker1.lab.local   133m         6%       2093Mi          73%
+k8s-worker2.lab.local   170m         8%       1882Mi          65%
+k8s-worker3.lab.local   142m         7%       1566Mi          54%
+```
+
+### Restore Timing
+
+| Phase | Duration |
+|-------|----------|
+| Proxmox restore API call | Instant (async) |
+| Actual restore from backup | ~3.5 minutes |
+| VM boot + K8s node Ready | ~1-2 minutes |
+| **Total** | ~5 minutes |
+
+**Problem:** Restore API returns immediately, but actual restore takes 3.5 min.
+If CHECK_INTERVAL (5 min) passes before restore completes, next check would try to remediate again.
+
+**Solution:** Added 2 minute buffer sleep after triggering restore.
+```python
+if result == "restored":
+    send_alert(node_name, "restore", "initiated", severity="critical")
+    print(f"  -> Waiting 120s buffer for restore to complete...")
+    time.sleep(120)  # 2 min buffer
+```
+
+**New timing after restore:**
+- 2 min buffer + 5 min interval = 7 min before next check
+- Gives restore enough time to complete
+
+### Workload Distribution After Recovery
+
+**Observation:** Worker3 had lower load after recovery.
+
+**Why:** Kubernetes scheduler places NEW pods but doesn't rebalance existing ones.
+During outage, pods were scheduled to worker1/2 and stayed there.
+
+**Solutions:**
+1. Manual: `kubectl rollout restart deployment <name>`
+2. Automatic: Deploy Descheduler to rebalance
+
+---
+
 ## Future Improvements
 
 1. **Add /metrics endpoint** - Expose remediation metrics to Prometheus
 2. **Grafana dashboard** - Visualize remediation history
-3. **Test restore flow** - Verify full restore works after simplification
+3. **Descheduler** - Auto-rebalance workloads after node recovery
 4. **Document runbook** - Manual intervention steps when automation fails
+5. **CPU alerts** - Alert on high CPU (qemu-ga bug discovered during testing)

@@ -218,7 +218,9 @@ data:
         elif attempt == 3:
             result = restore_vm(proxmox, vmid)
             if result == "restored":
-                send_alert(node_name, "restore", "completed", severity="critical")
+                send_alert(node_name, "restore", "initiated", severity="critical")
+                print(f"  -> Waiting 120s buffer for restore to complete...")
+                time.sleep(120)  # 2 min buffer for restore
             else:
                 send_alert(node_name, "restore", "failed", severity="critical")
 

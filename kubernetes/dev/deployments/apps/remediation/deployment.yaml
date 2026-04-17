@@ -14,7 +14,7 @@ spec:
         app: remediation
       annotations:
         # Bump this to restart pod when configmap changes
-        config-version: "5"
+        config-version: "6"
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "remediation"
         vault.hashicorp.com/agent-inject-secret-proxmox-creds: "secret/data/remediation/config"
