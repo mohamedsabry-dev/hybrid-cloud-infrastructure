@@ -90,12 +90,6 @@ spec:
         serviceMonitorSelectorNilUsesHelmValues: false
         podMonitorSelectorNilUsesHelmValues: false
 
-        # Point to our standalone Alertmanager (deployed separately for Vault integration)
-        alertingEndpoints:
-          - name: alertmanager
-            namespace: monitoring
-            port: web
-
         storageSpec:
           volumeClaimTemplate:
             spec:
@@ -152,11 +146,18 @@ spec:
           effect: NoSchedule
 
     # ---------------------------------------------------------------------------
-    # Alertmanager - DISABLED (deployed separately for Vault integration)
+    # Alertmanager (keeping stack version for now - standalone WIP)
     # ---------------------------------------------------------------------------
+    # TODO: Replace with standalone deployment for Vault integration
     # See: kubernetes/dev/deployments/apps/alertmanager/
-    # Reason: Prometheus Operator doesn't allow overriding --config.file,
-    #         so Vault injection can't work. Standalone deployment gives us control.
     # ---------------------------------------------------------------------------
     alertmanager:
-      enabled: false
+      alertmanagerSpec:
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: nfs-retain
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 5Gi
