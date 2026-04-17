@@ -90,6 +90,12 @@ spec:
         serviceMonitorSelectorNilUsesHelmValues: false
         podMonitorSelectorNilUsesHelmValues: false
 
+        # Point to our standalone Alertmanager (deployed separately for Vault integration)
+        alertingEndpoints:
+          - name: alertmanager
+            namespace: monitoring
+            port: web
+
         storageSpec:
           volumeClaimTemplate:
             spec:
@@ -146,103 +152,11 @@ spec:
           effect: NoSchedule
 
     # ---------------------------------------------------------------------------
-    # Alertmanager (with Vault SMTP credentials injection)
+    # Alertmanager - DISABLED (deployed separately for Vault integration)
     # ---------------------------------------------------------------------------
-    # Setup: Run these commands to configure Vault for Alertmanager:
-    #
-    #   vault login -method=ldap username=YOUR_USER
-    #
-    #   vault kv put secret/alertmanager/config \
-    #     smtp_from="your@gmail.com" \
-    #     smtp_password="your-app-password" \
-    #     alert_email="your@gmail.com"
-    #
-    #   vault policy write alertmanager-policy - <<EOF
-    #   path "secret/data/alertmanager/config" { capabilities = ["read"] }
-    #   EOF
-    #
-    #   vault write auth/kubernetes/role/alertmanager \
-    #     bound_service_account_names="alertmanager-sa" \
-    #     bound_service_account_namespaces="monitoring" \
-    #     policies="alertmanager-policy" ttl="1h"
-    #
-    #   vault token revoke -self
+    # See: kubernetes/dev/deployments/apps/alertmanager/
+    # Reason: Prometheus Operator doesn't allow overriding --config.file,
+    #         so Vault injection can't work. Standalone deployment gives us control.
     # ---------------------------------------------------------------------------
     alertmanager:
-      alertmanagerSpec:
-        # Service account for Vault injection
-        serviceAccountName: alertmanager-sa
-
-        # Vault agent injects full alertmanager.yaml config
-        podMetadata:
-          annotations:
-            vault.hashicorp.com/agent-inject: "true"
-            vault.hashicorp.com/role: "alertmanager"
-            vault.hashicorp.com/agent-inject-secret-alertmanager.yaml: "secret/data/alertmanager/config"
-            vault.hashicorp.com/agent-inject-template-alertmanager.yaml: |
-              {{- with secret "secret/data/alertmanager/config" -}}
-              global:
-                resolve_timeout: 5m
-                smtp_smarthost: 'smtp.gmail.com:587'
-                smtp_require_tls: true
-                smtp_from: '{{ .Data.data.smtp_from }}'
-                smtp_auth_username: '{{ .Data.data.smtp_from }}'
-                smtp_auth_password: '{{ .Data.data.smtp_password }}'
-              inhibit_rules:
-              - equal:
-                - namespace
-                - alertname
-                source_matchers:
-                - severity = critical
-                target_matchers:
-                - severity =~ warning|info
-              - equal:
-                - namespace
-                - alertname
-                source_matchers:
-                - severity = warning
-                target_matchers:
-                - severity = info
-              - equal:
-                - namespace
-                source_matchers:
-                - alertname = InfoInhibitor
-                target_matchers:
-                - severity = info
-              - target_matchers:
-                - alertname = InfoInhibitor
-              receivers:
-              - name: "null"
-              - name: "email-alerts"
-                email_configs:
-                - to: '{{ .Data.data.alert_email }}'
-                  send_resolved: true
-              route:
-                group_by:
-                - namespace
-                group_interval: 5m
-                group_wait: 30s
-                receiver: "email-alerts"
-                repeat_interval: 4h
-                routes:
-                - matchers:
-                  - alertname = "Watchdog"
-                  receiver: "null"
-              {{- end }}
-            vault.hashicorp.com/tls-skip-verify: "false"
-            vault.hashicorp.com/tls-secret: "vault-ca"
-            vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
-
-        # Point Alertmanager to Vault-injected config
-        additionalArgs:
-          - name: config.file
-            value: /vault/secrets/alertmanager.yaml
-
-        storage:
-          volumeClaimTemplate:
-            spec:
-              storageClassName: nfs-retain
-              accessModes: ["ReadWriteOnce"]
-              resources:
-                requests:
-                  storage: 5Gi
+      enabled: false
