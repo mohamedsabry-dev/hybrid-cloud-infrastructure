@@ -1,0 +1,67 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: custom-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    environment: dev
+spec:
+  groups:
+  # External infrastructure nodes (FreeIPA, Vault, Ansible, etc.)
+  - name: external-nodes
+    rules:
+    - alert: ExternalNodeDown
+      expr: up{job="external-nodes"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "{{ $labels.instance }} is down"
+        description: "{{ $labels.role }} node unreachable for 2 minutes"
+
+    - alert: ExternalNodeHighCPU
+      expr: 100 - (avg by(instance, role) (rate(node_cpu_seconds_total{job="external-nodes", mode="idle"}[5m])) * 100) > 90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "{{ $labels.instance }} high CPU (>90%)"
+
+    - alert: ExternalNodeHighMemory
+      expr: (1 - (node_memory_MemAvailable_bytes{job="external-nodes"} / node_memory_MemTotal_bytes{job="external-nodes"})) * 100 > 90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "{{ $labels.instance }} high memory (>90%)"
+
+  # Kubernetes workload alerts
+  - name: workloads
+    rules:
+    - alert: PodCrashLooping
+      expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "{{ $labels.namespace }}/{{ $labels.pod }} crash looping"
+        description: "Pod restarted more than 5 times in the last hour"
+
+    - alert: HPAMaxedOut
+      expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} at max"
+        description: "HPA running at max replicas for 15 minutes - may need more capacity"
+
+    - alert: NodeStillDownAfterRemediation
+      expr: kube_node_status_condition{condition="Ready", status="true"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Node {{ $labels.node }} still down"
+        description: "Node not ready for 5 minutes - remediation may have failed"
