@@ -7,6 +7,7 @@ resources:
   - vault
   - ingress
   - coredns
+  - metrics-server
   # - descheduler
   # NOTE: remediation moved to apps/ - requires vault-agent injection
   # and must deploy AFTER vault-agent-injector is ready
