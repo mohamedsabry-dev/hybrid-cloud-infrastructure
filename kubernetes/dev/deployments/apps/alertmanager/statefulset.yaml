@@ -79,6 +79,16 @@ spec:
         vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
     spec:
       serviceAccountName: alertmanager-sa
+      # Run on master - survives if all workers are down
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: alertmanager
           image: quay.io/prometheus/alertmanager:v0.27.0
@@ -122,4 +132,4 @@ spec:
         storageClassName: nfs-retain
         resources:
           requests:
-            storage: 1Gi
+            storage: 10Gi
