@@ -9,4 +9,4 @@ resources:
   # Moved from infrastructure/ - requires vault-agent injection
   - remediation
   - etcd-backup
-  # - alertmanager  # TODO: Enable after fixing vault-ca conflict
+  - alertmanager  # TODO: Enable after fixing vault-ca conflict
