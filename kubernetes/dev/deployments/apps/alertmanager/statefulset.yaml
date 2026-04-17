@@ -124,12 +124,6 @@ spec:
           volumeMounts:
             - name: alertmanager-data
               mountPath: /alertmanager
-  volumeClaimTemplates:
-    - metadata:
-        name: alertmanager-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: nfs-retain
-        resources:
-          requests:
-            storage: 1Gi
+      volumes:
+        - name: alertmanager-data
+          emptyDir: {}
