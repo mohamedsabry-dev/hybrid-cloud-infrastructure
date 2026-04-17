@@ -6,4 +6,5 @@ resources:
   - pvc.yaml
   - service.yaml
   - deployment.yaml
+  - hpa.yaml
   # - servicemonitor.yaml

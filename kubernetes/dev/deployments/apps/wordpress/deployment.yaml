@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: flux
     environment: dev
 spec:
-  replicas: 3
+  # replicas managed by HPA (see hpa.yaml)
   selector:
     matchLabels:
       app: wordpress
