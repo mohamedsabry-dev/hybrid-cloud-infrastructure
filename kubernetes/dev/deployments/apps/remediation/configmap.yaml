@@ -137,9 +137,22 @@ data:
                 print(f"  -> Start failed: {e}")
 
     def reset_vm(proxmox, vmid):
-        """Hard reset."""
-        print(f"  -> Hard resetting VM {vmid}")
-        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reset.post()
+        """Hard reset - checks status first."""
+        vm_status = get_vm_status(proxmox, vmid)
+        print(f"  -> VM {vmid} status: {vm_status}")
+
+        if vm_status == "stopped":
+            print(f"  -> VM {vmid} is stopped, starting instead of resetting")
+            start_vm(proxmox, vmid)
+        elif vm_status == "running":
+            print(f"  -> Hard resetting VM {vmid}")
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reset.post()
+        else:
+            print(f"  -> VM {vmid} in state '{vm_status}', attempting start")
+            try:
+                start_vm(proxmox, vmid)
+            except Exception as e:
+                print(f"  -> Start failed: {e}")
 
     def get_latest_backup(proxmox, vmid):
         """Get the latest backup for a VMID."""
@@ -281,6 +294,7 @@ data:
         while True:
             print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
 
+            remediation_performed = False
             for node_name, vmid in NODE_MAP.items():
                 healthy, reason = is_node_healthy(v1, node_name)
 
@@ -294,8 +308,15 @@ data:
                 else:
                     print(f"{node_name}: UNHEALTHY! ({reason})")
                     remediate(proxmox, node_name, vmid)
+                    remediation_performed = True
 
-            time.sleep(CHECK_INTERVAL)
+            # If remediation happened, already waited 4 min - just do quick recheck
+            # Otherwise wait full interval
+            if remediation_performed:
+                print("Remediation performed - quick recheck in 60s...")
+                time.sleep(60)
+            else:
+                time.sleep(CHECK_INTERVAL)
 
     if __name__ == "__main__":
         main()
