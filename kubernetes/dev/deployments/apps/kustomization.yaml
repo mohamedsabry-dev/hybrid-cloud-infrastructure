@@ -9,4 +9,4 @@ resources:
   # Moved from infrastructure/ - requires vault-agent injection
   - remediation
   - etcd-backup
-  - alertmanager  # Standalone for Vault integration (disabled in prometheus-stack)
+  # - alertmanager  # TODO: Enable after fixing vault-ca conflict
