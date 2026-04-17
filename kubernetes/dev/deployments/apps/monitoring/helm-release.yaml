@@ -90,6 +90,12 @@ spec:
         serviceMonitorSelectorNilUsesHelmValues: false
         podMonitorSelectorNilUsesHelmValues: false
 
+        # Point to standalone Alertmanager (Vault-integrated)
+        alertingEndpoints:
+          - name: alertmanager
+            namespace: monitoring
+            port: web
+
         storageSpec:
           volumeClaimTemplate:
             spec:
@@ -146,18 +152,10 @@ spec:
           effect: NoSchedule
 
     # ---------------------------------------------------------------------------
-    # Alertmanager (keeping stack version for now - standalone WIP)
+    # Alertmanager - DISABLED (using standalone deployment with Vault)
     # ---------------------------------------------------------------------------
-    # TODO: Replace with standalone deployment for Vault integration
-    # See: kubernetes/dev/deployments/apps/alertmanager/
+    # Standalone deployment: kubernetes/dev/deployments/apps/alertmanager/
+    # Prometheus points to it via alertingEndpoints above
     # ---------------------------------------------------------------------------
     alertmanager:
-      alertmanagerSpec:
-        storage:
-          volumeClaimTemplate:
-            spec:
-              storageClassName: nfs-retain
-              accessModes: ["ReadWriteOnce"]
-              resources:
-                requests:
-                  storage: 5Gi
+      enabled: false
