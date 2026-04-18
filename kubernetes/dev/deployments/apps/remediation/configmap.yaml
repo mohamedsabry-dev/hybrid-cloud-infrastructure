@@ -248,7 +248,7 @@ data:
         time.sleep(CHECK_INTERVAL)
 
         while True:
-            print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
+            print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())} ---")
 
             # Phase 1: Check all nodes first
             unhealthy_nodes = []

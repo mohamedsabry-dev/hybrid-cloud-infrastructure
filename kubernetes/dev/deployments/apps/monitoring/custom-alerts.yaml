@@ -4,6 +4,7 @@ metadata:
   name: custom-alerts
   namespace: monitoring
   labels:
+    release: kube-prometheus-stack
     app.kubernetes.io/name: prometheus
     environment: dev
 spec:
