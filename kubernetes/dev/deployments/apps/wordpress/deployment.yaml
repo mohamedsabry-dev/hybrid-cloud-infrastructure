@@ -93,7 +93,7 @@ spec:
               value: "0"
           resources:
             requests:
-              memory: "128Mi"
+              memory: "200Mi"  # Increased from 128Mi - see disaster-recovery/issues/hpa-memory-scaling-behavior.md
               cpu: "100m"
             limits:
               memory: "512Mi"

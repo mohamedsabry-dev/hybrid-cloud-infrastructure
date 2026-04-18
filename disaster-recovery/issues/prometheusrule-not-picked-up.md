@@ -103,7 +103,44 @@ Sent to Alertmanager → email/slack/etc
 
 ---
 
-## Verification
+## Solution Verified - Evidence
+
+After adding `release: kube-prometheus-stack` label and re-applying, **both alerts now fire**:
+
+**Custom ExternalNodeDown (working):**
+```
+alertname = ExternalNodeDown
+instance = local-runner.lab.local        ← Custom label from scrape config
+job = external-nodes
+prometheus = monitoring/kube-prometheus-stack-prometheus
+role = automation                        ← Custom label from scrape config
+severity = critical
+
+Annotations:
+  description = automation node unreachable for 2 minutes
+  summary = local-runner.lab.local is down
+```
+
+**Built-in TargetDown (also fires):**
+```
+alertname = TargetDown
+job = external-nodes
+prometheus = monitoring/kube-prometheus-stack-prometheus
+severity = warning
+
+Annotations:
+  description = 14.29% of the external-nodes/ targets in namespace are down.
+  summary = One or more targets are unreachable.
+```
+
+**Key difference:**
+- `ExternalNodeDown` has specific `instance` and `role` labels from the scrape config
+- `TargetDown` is generic percentage-based alert from kube-prometheus-stack
+- Both are useful: custom for specific node identification, built-in for overall health
+
+---
+
+## Verification Commands
 
 ```bash
 # Check PrometheusRule exists with correct labels
