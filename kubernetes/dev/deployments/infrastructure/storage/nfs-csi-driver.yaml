@@ -33,6 +33,12 @@ spec:
               - matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: DoesNotExist
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: csi-nfs-controller
+              topologyKey: kubernetes.io/hostname
     node:
       priorityClassName: system-node-critical
       affinity:
