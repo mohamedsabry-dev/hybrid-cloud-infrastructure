@@ -20,7 +20,7 @@ spec:
     # ---------------------------------------------------------------------------
     grafana:
       # HA: 3 replicas spread across workers (DR Test finding - single replica was SPOF)
-      replicas: 3
+      replicas: 1
 
       affinity:
         podAntiAffinity:

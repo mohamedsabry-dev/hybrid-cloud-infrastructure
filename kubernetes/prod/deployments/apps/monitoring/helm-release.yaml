@@ -19,12 +19,14 @@ spec:
     # Grafana
     # ---------------------------------------------------------------------------
     grafana:
-      # HA: 3 replicas spread across workers (DR Test finding - single replica was SPOF)
-      replicas: 3
+      # Single replica - SQLite DB corrupts with multiple writers on NFS (RWX)
+      # See: disaster-recovery/issues/grafana-dashboards-missing.md
+      # For HA, would need external PostgreSQL/MySQL database
+      replicas: 1
 
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
+          preferredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchLabels:
                   app.kubernetes.io/name: grafana
