@@ -1,9 +1,14 @@
 # Issue: QEMU Guest Agent CPU Busy Loop
 
-**Status:** OPEN (Workaround applied, root cause not fully identified)
+**Status:** TRIGGER NOT IDENTIFIED (Bug mechanism understood, monitoring alerts implemented)
 **Date Discovered:** 2026-04-17
-**Affected Node:** k8s-master3.lab.local
-**Severity:** High (node CPU maxed out)
+**Affected Nodes:**
+- k8s-master3.lab.local (2026-04-17)
+- k8s-master1.lab.local (2026-04-18 19:09)
+- k8s-master1.lab.local + k8s-master2.lab.local (2026-04-18 22:36)
+**Occurrences:** 3 total (all self-recovered)
+**Severity:** High (node CPU maxed out, can self-recover in 2-8 min)
+**Next Step:** Wait for next occurrence to capture more evidence
 
 ---
 
@@ -72,20 +77,194 @@ write(4, "\377{\"return\": 35553302}\n", 22) = -1 EAGAIN (Resource temporarily u
 
 ---
 
-## Root Cause
+## Root Cause - CONFIRMED (2026-04-18)
 
-### What We Know
-- virtio-serial channel between VM and Proxmox was stuck/full
-- Proxmox side was not reading from the channel
-- qemu-ga has no backoff logic when write fails
+### Confirmed Root Cause
+1. Proxmox sends `guest-ping` via virtio-serial channel
+2. qemu-ga processes the ping and tries to write response `{"return": {}}`
+3. virtio-serial buffer becomes full/stuck (Proxmox not reading fast enough)
+4. `write()` returns `EAGAIN` (Resource temporarily unavailable)
+5. qemu-ga immediately retries without any backoff
+6. Result: 100% CPU busy loop
 
-### What We Don't Know (OPEN QUESTION)
-- **Why did this happen on master3?** We were testing clone/restore on worker3
-- **Possible theories:**
-  1. Proxmox-wide channel issue affecting multiple VMs
-  2. Coincidental timing - unrelated backup job on master3
-  3. Proxmox host resource exhaustion during clone operation
-  4. Bug in Proxmox 8.x qemu-guest-agent handling
+### Evidence from Second Occurrence (master1, 2026-04-18)
+
+**strace output:**
+```
+write(4, "{\"return\": {}}\n", 15) = -1 EAGAIN (Resource temporarily unavailable)
+write(4, "{\"return\": {}}\n", 15) = -1 EAGAIN (Resource temporarily unavailable)
+... (infinite loop)
+```
+
+**journalctl showing trigger:**
+```
+Apr 18 19:09:57 k8s-master1.lab.local qemu-ga[970]: info: guest-ping called
+```
+
+**Proxmox socket status:**
+```bash
+lsof /var/run/qemu-server/1010.qga
+# Shows: kvm process LISTENING but not actively reading
+```
+
+### Self-Recovery Observed
+- Issue lasted ~4 minutes (19:09:57 to 19:14:18)
+- Buffer eventually drained when Proxmox resumed reading
+- Multiple `qm guest cmd ping` from Proxmox may help clear buffer
+- CPU returned to normal without manual restart
+
+### Why It Happens
+- Proxmox periodically pings VMs via guest agent
+- If host is busy or socket read is delayed, buffer fills up
+- qemu-ga bug: no exponential backoff on EAGAIN
+
+---
+
+## Deep Investigation (2026-04-18)
+
+### Trigger Investigation - INCONCLUSIVE
+
+Attempted to identify the exact trigger that causes the buffer to fill up.
+
+#### What We Checked
+
+**Proxmox logs around failure times:**
+```bash
+journalctl -u pvedaemon --since "2026-04-18 19:05" --until "2026-04-18 19:15" | grep -i "1010\|ping"
+```
+```
+Apr 18 19:09:37 - vncproxy:1010 started (user opened VNC to investigate)
+Apr 18 19:09:42 - VM 1010 qga command 'guest-ping' failed - got timeout
+Apr 18 19:09:55 - VM 1010 qga command 'guest-ping' failed - got timeout
+```
+
+**Proxmox socket status:**
+```bash
+lsof /var/run/qemu-server/1010.qga
+# Shows: kvm 789875 root 15u unix LISTEN (not being read)
+```
+
+**First occurrence correlation:**
+```
+Apr 17 22:30:36 - shutdown VM 1022 (worker3) - remediation test
+Apr 17 22:30:50 - VM 1022 qga command 'guest-ping' failed - timeout
+Apr 17 22:31:20 - VM 1010 qga command 'guest-ping' failed - timeout (master1)
+Apr 17 22:31:23 - VM 1012 qga command 'guest-ping' failed - timeout (master3)
+```
+
+#### Theories Tested
+
+| Theory | Test | Result |
+|--------|------|--------|
+| SSH connections trigger it | Opened 3 SSH sessions simultaneously | Not reproduced |
+| VM operations trigger it | Correlated with worker3 shutdown | Partial correlation but not consistent |
+| VNC console triggers it | VNC was opened AFTER issue started | VNC was for investigation, not trigger |
+| Proxmox host load | Checked systemd-logind suspend spam | Unrelated (lid closed, masked) |
+| Scheduled tasks | Checked cron, timers | No correlation |
+
+#### What We Know For Certain
+
+1. **Bug is in qemu-ga** - no backoff on EAGAIN (confirmed via strace)
+2. **Only affects K8s VMs** - FreeIPA on same host is fine
+3. **Timing-based** - cannot reproduce on demand
+4. **Self-recovers sometimes** - buffer eventually drains (~4 min)
+5. **Proxmox not actively reading** - socket in LISTEN state during issue
+
+#### Proxmox Host IO Delay Correlation (2026-04-18)
+
+**Evidence from Proxmox CPU/IO graph:**
+
+| Timestamp | Event |
+|-----------|-------|
+| 2026-04-17 ~22:30-23:00 | First qemu-ga CPU loop on master3 |
+| 2026-04-17 23:39:00 | **IO delay spike: 38.54%** on Proxmox host |
+
+**Theory: qemu-ga loop CAUSES host IO delay (not the opposite)**
+
+```
+qemu-ga busy loop (millions of write() syscalls/sec)
+    ↓
+Each write() syscall = VM exit to KVM hypervisor
+    ↓
+Proxmox host overwhelmed handling VM exits
+    ↓
+IO delay spike on host (38.54% observed)
+```
+
+**Supporting evidence:**
+- qemu-ga issue started BEFORE the IO delay spike (timeline matches)
+- High syscall rate from VM creates hypervisor overhead
+- Could be a feedback loop: initial delay → buffer fills → EAGAIN loop → more host pressure
+
+**To verify on next occurrence:**
+```bash
+# On Proxmox host during qemu-ga spike - check KVM process CPU
+top -p $(pgrep -f "kvm.*<VMID>")
+```
+
+#### What Remains Unknown
+
+- Exact trigger that causes Proxmox to stop reading qga socket
+- Why only K8s VMs (more activity? timing? specific config?)
+- Why production Proxmox laptop doesn't have this issue
+- Whether qemu-ga loop causes host IO delay or vice versa (chicken/egg)
+
+#### Normal vs Stuck Behavior
+
+**Normal (from strace):**
+```
+poll() → wait for data
+read(4, ...) → nothing to read
+clock_nanosleep() → sleep 100ms
+repeat (low CPU)
+```
+
+**Stuck (from strace):**
+```
+write(4, "{\"return\": {}}\n") → EAGAIN
+write(4, "{\"return\": {}}\n") → EAGAIN
+... (infinite, no sleep, 100% CPU)
+```
+
+### What is qemu-ga?
+
+QEMU Guest Agent is a service inside VMs that enables:
+- Graceful shutdown/reboot via Proxmox
+- Filesystem freeze for consistent snapshots
+- VM info reporting (IP, hostname, OS)
+- Time synchronization
+- Command execution inside VM
+
+### Recommendation
+
+Until root cause is identified:
+1. **Keep monitoring alerts** - Early detection implemented
+2. **Workaround ready** - `systemctl restart qemu-guest-agent`
+3. **Consider disabling on masters** - Control plane doesn't need qemu-ga features
+4. **Wait for next occurrence** - Capture more evidence when it happens
+
+### Evidence to Capture on Next Occurrence
+
+```bash
+# IMMEDIATELY when issue detected (before recovery):
+
+# 1. On affected VM
+strace -p $(pgrep qemu-ga) -o /tmp/qemu-ga-stuck.txt &
+sleep 10 && kill %1
+
+# 2. On Proxmox host
+journalctl -u pvedaemon --since "5 min ago" > /tmp/pvedaemon.log
+lsof /var/run/qemu-server/*.qga > /tmp/qga-sockets.txt
+cat /proc/loadavg > /tmp/host-load.txt
+ps aux | grep -E "qm|kvm" > /tmp/processes.txt
+
+# 3. Check if qemu-ga loop causes host CPU/IO pressure
+top -b -n 1 -p $(pgrep -f "kvm.*<VMID>") > /tmp/kvm-process-cpu.txt
+cat /proc/stat > /tmp/host-cpu-stat.txt
+
+# 4. Timing
+date > /tmp/issue-time.txt
+```
 
 ### Bug Location
 The bug is in `qemu-ga` code - it should implement exponential backoff when `write()` returns `EAGAIN`:
@@ -131,60 +310,61 @@ k8s-master3.lab.local   192m         9%      # Was 57% (1098m)
 
 ---
 
-## TODO: Monitoring Alert
+## Monitoring Alerts - IMPLEMENTED
 
-**Need to implement:** Alert when CPU usage is abnormally high on nodes, indicating process hang.
+**Status:** Implemented on 2026-04-18
+**File:** `kubernetes/dev/deployments/apps/monitoring/custom-alerts.yaml`
 
-### Proposed Thresholds
+### Alerts Added
 
-| Node Type | CPU Threshold | Duration |
-|-----------|---------------|----------|
-| Master    | > 50%         | 5 min    |
-| Worker    | > 75%         | 5 min    |
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| `KubernetesNodeHighCPU` | > 85% | 5 min | General high CPU warning |
+| `KubernetesNodeCriticalCPU` | > 95% | 2 min | Critical CPU saturation |
+| `KubernetesNodeHighLoad` | Load > 2x CPUs | 5 min | High load average detection |
+| `KubernetesNodeHighSystemCPU` | > 30% system | 5 min | High kernel CPU (qemu-ga EAGAIN symptom) |
 
-### PrometheusRule (TO BE IMPLEMENTED)
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PrometheusRule
-metadata:
-  name: node-cpu-alerts
-  namespace: monitoring
-spec:
-  groups:
-  - name: node-cpu
-    rules:
-    - alert: MasterNodeHighCPU
-      expr: |
-        100 - (avg by(node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 50
-        and on(node) kube_node_role{role="control-plane"}
-      for: 5m
-      labels:
-        severity: warning
-      annotations:
-        summary: "Master {{ $labels.node }} CPU > 50%"
-        description: "High CPU may indicate process hang (qemu-ga, etcd, etc.)"
-
-    - alert: WorkerNodeHighCPU
-      expr: |
-        100 - (avg by(node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 75
-        and on(node) kube_node_role{role="worker"}
-      for: 5m
-      labels:
-        severity: warning
-      annotations:
-        summary: "Worker {{ $labels.node }} CPU > 75%"
-        description: "High CPU may indicate process hang or resource exhaustion"
-```
+The `KubernetesNodeHighSystemCPU` alert specifically targets the symptom observed in this incident (39.8% system CPU from repeated syscalls in busy loop).
 
 ---
 
 ## Prevention
 
-1. **Monitor for early detection** (alerts above)
+1. ~~**Monitor for early detection**~~ ✅ Implemented - see Monitoring Alerts section
 2. **Consider disabling qemu-ga** on masters if not needed
 3. **Report bug upstream** to QEMU project with strace evidence
 4. **Check Proxmox forums** for similar reports
+
+---
+
+## Mitigation Attempt: Increase Master CPU Cores
+
+**Date:** 2026-04-18
+**Status:** PENDING MONITORING
+
+**Idea:** Increase master node CPU from 2 cores to 4 cores.
+
+**Rationale:**
+- qemu-ga busy loop consumes 1 CPU core at 100%
+- With 2 cores: 50% total CPU impact, node severely degraded
+- With 4 cores: 25% total CPU impact, node remains more responsive
+- Other processes (kubelet, kube-apiserver, etcd) can still run on remaining cores
+
+**Change:**
+```bash
+# On Proxmox
+qm set 1010 --cores 4  # master1
+qm set 1011 --cores 4  # master2
+qm set 1012 --cores 4  # master3
+```
+
+**Expected outcome:**
+- qemu-ga spike still happens (bug not fixed)
+- But node impact reduced from ~50% to ~25%
+- Control plane remains more responsive during spike
+- Self-recovery may be faster
+
+**To monitor:** Compare next occurrence behavior with 4 cores vs previous 2 cores.
 
 ---
 
@@ -200,6 +380,8 @@ This issue was discovered during remediation system testing:
 
 ## Timeline
 
+### First Occurrence - master3 (2026-04-17)
+
 | Time | Event |
 |------|-------|
 | ~20:30 | Started remediation testing on worker3 |
@@ -209,9 +391,52 @@ This issue was discovered during remediation system testing:
 | ~00:03 | Applied workaround (restart qemu-guest-agent) |
 | ~00:03 | CPU returned to normal (9%) |
 
+### Second Occurrence - master1 (2026-04-18)
+
+| Time | Event |
+|------|-------|
+| 19:09:57 | guest-ping triggered, qemu-ga stuck in EAGAIN loop |
+| 19:09-19:14 | CPU at 99%, kubectl commands failing |
+| 19:14:18 | Buffer self-cleared, multiple pings processed |
+| 19:16:xx | System fully recovered without manual intervention |
+
+**Key difference:** Second occurrence self-recovered (~4 min), first required manual restart.
+
+### Third Occurrence - master1 + master2 (2026-04-18 22:36)
+
+Occurred during DR Test 2.
+
+| Node | Start Time | Duration | Recovery |
+|------|------------|----------|----------|
+| master1 | ~22:36 | ~2 min | Self-recovered |
+| master2 | ~22:38 | ~8 min | Self-recovered |
+
+**strace captured on master2:**
+```
+write(4, "{\"return\": {}}\n", 15) = -1 EAGAIN (Resource temporarily unavailable)
+write(4, "{\"return\": {}}\n", 15) = -1 EAGAIN (Resource temporarily unavailable)
+... (infinite loop)
+```
+
+**Proxmox logs (VM 1011 = master2):**
+```
+22:39:37 vncproxy:1011 started
+22:39:41 VM 1011 qga command 'guest-ping' failed - got timeout
+```
+
+**Note:** VNC console was opened AFTER issue started (to investigate), not the trigger. Trigger remains unknown.
+
+**Proxmox host CPU graph:**
+- Showed 60%+ CPU for ~40 minutes
+- User experienced actual hang for only 2-4 minutes
+- Discrepancy between graph and perceived duration
+
+**Impact on DR test:** Did NOT block remediation - workers were still recovered successfully.
+
 ---
 
 ## Files
 
-- **This document:** `disaster-recovery/issues/qemu-guest-agent-cpu-loop.md`
+- **This document:** `troubleshooting/kubernetes/38-qemu-guest-agent-cpu-loop.md`
+- **Monitoring alerts:** `kubernetes/dev/deployments/apps/monitoring/custom-alerts.yaml`
 - **Related:** `disaster-recovery/remediation-design-decisions.md`

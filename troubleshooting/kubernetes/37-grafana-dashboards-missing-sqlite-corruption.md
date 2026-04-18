@@ -125,6 +125,41 @@ Considered using external MySQL/PostgreSQL for true HA, but:
 - Adding new database infrastructure adds complexity and creates another SPOF
 - Single Grafana replica is acceptable for this environment (monitoring is not mission-critical)
 
+### Flux Deployment Sequence
+After updating helm-release.yaml, the fix was deployed using GitOps:
+
+```bash
+# 1. Commit and push changes
+git add kubernetes/prod/deployments/apps/monitoring/helm-release.yaml \
+        disaster-recovery/issues/grafana-dashboards-missing.md
+git commit -m "fix(grafana): reduce replicas to 1 - SQLite corruption on NFS with multi-writer"
+git push
+
+# 2. Wait for Flux kustomizations to reconcile in order
+flux reconcile kustomization flux-system --with-source
+flux reconcile kustomization infrastructure
+flux reconcile kustomization apps
+
+# 3. Verify all kustomizations are ready
+flux get kustomization
+# NAME            REVISION                SUSPENDED       READY   MESSAGE
+# apps            dev@sha1:xxxxxxxx       False           True    Applied revision: dev@sha1:xxxxxxxx
+# flux-system     dev@sha1:xxxxxxxx       False           True    Applied revision: dev@sha1:xxxxxxxx
+# infrastructure  dev@sha1:xxxxxxxx       False           True    Applied revision: dev@sha1:xxxxxxxx
+
+# 4. Then resume the suspended HelmRelease
+flux resume helmrelease kube-prometheus-stack -n monitoring
+# ► resuming helmrelease kube-prometheus-stack in monitoring namespace
+# ✔ helmrelease resumed
+# ✔ HelmRelease kube-prometheus-stack reconciliation completed
+# ✔ applied revision 82.18.0
+
+# 5. Verify Grafana pod is running with 1 replica
+kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana
+```
+
+**Important:** Always wait for all kustomizations to reconcile BEFORE resuming the HelmRelease. This ensures Flux has the new config (1 replica) and won't reconcile with old values (3 replicas).
+
 ---
 
 ## Recommendations
@@ -198,6 +233,7 @@ providers:
 
 - `kubernetes/prod/deployments/apps/monitoring/helm-release.yaml` - Grafana config
 - Dashboard ConfigMaps in monitoring namespace (label: `grafana_dashboard=1`)
+- **This document:** `troubleshooting/kubernetes/37-grafana-dashboards-missing-sqlite-corruption.md`
 
 ---
 

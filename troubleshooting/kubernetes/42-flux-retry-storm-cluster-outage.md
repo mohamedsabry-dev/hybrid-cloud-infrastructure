@@ -4,6 +4,8 @@
 **Duration:** ~45 minutes (10:00 - 10:45 UTC approximately)
 **Severity:** Critical (P1)
 **Status:** RESOLVED
+**Workaround Applied:** Physical reboot of affected nodes (master2, worker2)
+**Follow-up:** Incident repeat planned for controlled simulation and deeper investigation
 
 ---
 
