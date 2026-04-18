@@ -1,8 +1,9 @@
 # Issue: kube-system TargetDown Alerts - False Positives
 
-**Status:** OPEN
+**Status:** SUSPENDED
 **Date Discovered:** 2026-04-18
 **Severity:** Low (false positives, not actual failures)
+**Reason Suspended:** Fix requires modifying kubeadm manifests on all 3 masters via Ansible - deferred for later
 
 ---
 

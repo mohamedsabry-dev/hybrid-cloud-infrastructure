@@ -109,6 +109,24 @@ grafana:
 
 ---
 
+## ⚠️ WARNING: Cascaded Incident
+
+**Applying this fix incorrectly caused a major cluster outage.**
+
+During the initial fix attempt, the anti-affinity YAML structure was malformed (missing `podAffinityTerm` wrapper). This caused:
+
+1. Flux detected invalid HelmRelease and entered retry loop
+2. Retry storm overloaded etcd with rapid reconciliation attempts
+3. etcd leader election failures cascaded to API server
+4. Cluster became unresponsive
+5. Multiple pods entered CrashLoopBackOff
+
+**Full incident documented in:** `troubleshooting/kubernetes/42-flux-retry-storm-cluster-outage.md`
+
+**Lesson learned:** Always validate YAML structure before pushing Helm value changes. Use `helm template` or `kubectl diff` to verify.
+
+---
+
 ## Files Modified
 
 - `kubernetes/dev/deployments/apps/monitoring/helm-release.yaml` - Changed anti-affinity from required to preferred

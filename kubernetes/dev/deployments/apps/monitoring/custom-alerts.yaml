@@ -66,3 +66,42 @@ spec:
       annotations:
         summary: "Node {{ $labels.node }} still down"
         description: "Node not ready for 5 minutes - remediation may have failed"
+
+  # Kubernetes node resource alerts
+  - name: kubernetes-nodes
+    rules:
+    - alert: KubernetesNodeHighCPU
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} high CPU ({{ $value | printf \"%.1f\" }}%)"
+        description: "Node CPU above 85% for 5 minutes. Check for runaway processes (qemu-ga, stuck loops)."
+
+    - alert: KubernetesNodeCriticalCPU
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Node {{ $labels.instance }} critical CPU ({{ $value | printf \"%.1f\" }}%)"
+        description: "Node CPU above 95% for 2 minutes. Immediate investigation required."
+
+    - alert: KubernetesNodeHighLoad
+      expr: node_load5 / count without(cpu, mode) (node_cpu_seconds_total{mode="idle"}) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} high load average ({{ $value | printf \"%.2f\" }})"
+        description: "5-minute load average is 2x CPU count for 5 minutes. Possible CPU saturation or busy loop."
+
+    - alert: KubernetesNodeHighSystemCPU
+      expr: avg by(instance) (rate(node_cpu_seconds_total{mode="system"}[5m])) * 100 > 30
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} high system CPU ({{ $value | printf \"%.1f\" }}%)"
+        description: "High kernel/system CPU usage. May indicate I/O issues, busy loops (qemu-ga EAGAIN), or driver problems."
