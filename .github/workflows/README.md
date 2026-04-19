@@ -40,7 +40,7 @@ IAM/Security Changes:
 | `{env}-ansible-full-setup` | 4 | Deploy Ansible LXC + Deploy Key + Setup |
 | `{env}-freeipa-full-setup` | 2 | Deploy FreeIPA VM + Install IPA Server |
 | `{env}-local-runner-full-setup` | 3 | Deploy Runner LXC + GH Runner + Tools |
-| `{env}-k8s-full-setup` | 2 | Deploy K8s Masters + Workers |
+| `{env}-k8s-full-setup` | 3 | Deploy K8s Masters + Workers + Cluster Setup |
 | `{env}-nginx-full-setup` | 1 | Deploy Nginx reverse proxy |
 | `{env}-vault-full-setup` | 2 | Deploy Vault cluster + Setup |
 | `{env}-proxmox-storage` | 1 | Configure NAS storage mounts |
@@ -54,6 +54,15 @@ IAM/Security Changes:
 | `{env}-aws-compute` | dev/prod | Deploy WireGuard VPN EC2 |
 | `{env}-aws-iam` | dev-security/prod-security | Deploy IAM roles & policies |
 | `{env}-aws-kms-vault-unseal` | dev-security/prod-security | Deploy KMS key for Vault |
+| `{env}-aws-vault-trust` | dev-security/prod-security | Deploy IAM user/role for Vault AWS Secrets Engine |
+
+### Container Images
+
+| Workflow | Branch | Purpose |
+|----------|--------|---------|
+| `build-docker-images` | dev | Build & push custom container images to GHCR (remediation, etcd-backup) |
+
+Triggered by changes under `kubernetes/docker-images/**`. Uses `dorny/paths-filter` to rebuild only the image whose source changed. Images are pushed to `ghcr.io/<owner>/<image>:latest` and consumed by the Kubernetes workloads (self-healing remediation pod, etcd backup CronJob).
 
 ---
 

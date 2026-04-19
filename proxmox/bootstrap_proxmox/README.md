@@ -2,6 +2,8 @@
 
 Initial setup scripts for Proxmox VE servers. Run once after fresh Proxmox installation.
 
+> **Design notes & reasoning** — for how these scripts grew from a manual-first run, why `bootstrap.sh` and `network-setup.sh` are split (SSH-disconnect risk), why Terraform gets its own long-lived Proxmox token, and what the scripts deliberately do NOT do, see [`DESIGN.md`](DESIGN.md).
+
 ## Scripts
 
 | Script | Purpose | Usage |

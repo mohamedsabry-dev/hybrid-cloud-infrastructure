@@ -18,6 +18,36 @@ DNS: FreeIPA (per environment)
 
 ---
 
+### A note for anyone implementing this
+
+Some of the specifics in this guide are choices that were forced on me by my
+own hardware and ISP, not architectural requirements. If you are implementing
+this yourself you do not need to copy them unless you also hit the same
+issues. The specifics worth calling out:
+
+- **Service VLANs going directly from each Proxmox server's svc0 to the
+  router**, bypassing the switch. This was NOT the original plan. I pushed
+  service VLANs through the switch initially and only switched to direct-
+  to-router after the instability documented in TS-NET-003 — the USB-
+  ethernet adapters on my Proxmox servers would not hold a stable link
+  through the switch at gigabit. If your physical NICs / cables are stable,
+  you can keep service VLANs on the switch like a normal deployment.
+- **SVC ports forced to 100M** (not gigabit). Same root cause as above —
+  dropping to 100M stabilised the link on my USB adapters. A native PCIe
+  NIC doesn't need this.
+- **ER605 → MikroTik router migration** — this happened in my setup for
+  reasons captured in network/README.md. A greenfield deployment can start
+  directly on whichever router you prefer; no migration needed.
+- **Per-tunnel listen port split (prod on 51830 instead of 51820)** — driven
+  by TS-NET-004 (CGNAT port blocking at my specific ISP). Not a general
+  requirement; pick one port unless you hit the same block.
+
+These are accepted drifts from the "clean" design, documented so my future
+self knows why, and so any implementer knows what is optional baggage vs.
+what is part of the actual architecture.
+
+---
+
 ## Network Components
 
 | Component        | Model              | Purpose                          |
@@ -63,16 +93,36 @@ Note: Switch ports 2-5 are NOT used. Service VLANs bypass the switch
 
 ---
 
-## Why Direct Server-to-Router Connection?
+## Why I bypass the switch for service VLANs
 
-Due to persistent network instability issues with USB-Ethernet adapters and
-gigabit auto-negotiation through the switch, the architecture was simplified:
+The "clean" topology would push both service VLAN trunks (dev and prod)
+through the switch like any normal deployment. I started there. I moved
+away from it because of a long and painful instability I hit on the Dev
+side — dev VMs cyclically losing gateway connectivity, with the link
+flapping every 2-30 seconds on the trunk between the switch and the Dev
+Proxmox server.
 
-- Servers connect svc0 DIRECTLY to router ports (bypassing switch)
-- Switch is only used for isolated storage network (VLAN 40)
-- Fewer failure points, easier troubleshooting
+Full investigation is in
+troubleshooting/network/3-svc-network-instability-investigation.md
+(TS-NET-003) — six days, four phases. Initially I blamed a Port 4 gigabit-
+negotiation defect on the ER605 router, then a port issue on the switch.
+Neither turned out to be the actual root cause. The real problem was in
+the USB-ethernet adapters on the Proxmox host; their negotiation behaviour
+at gigabit through the switch was unreliable for me.
 
-See troubleshooting Case 3 (SVC Network Instability) in troubleshooting/network/
+What I settled on:
+
+- Each Proxmox server's svc0 interface goes DIRECTLY to a dedicated router
+  port, not through the switch. This kept the adapter happy against a known
+  stable peer (the router).
+- The switch is kept in service but only for the isolated storage network
+  (VLAN 40).
+- Fewer switch hops in the critical path = fewer places the instability
+  could reassert itself.
+
+Trade-off: router ports become the scaling limit for new Proxmox servers.
+Fine for a two-server lab; a bigger fleet would need a more reliable NIC
+stack on the server side and the switch put back in the middle.
 
 ---
 
@@ -85,7 +135,11 @@ See troubleshooting Case 3 (SVC Network Instability) in troubleshooting/network/
 | Port 6 | Dev Server svc0         | Tagged 60-65          | 100M      |
 | Port 7 | AC750 AP                | Untagged VLAN 5       | Auto      |
 
-Note: 100M forced on SVC ports due to USB-Ethernet adapter instability at Gigabit.
+Note: SVC ports forced to 100M, not gigabit. This is not a general
+recommendation — it is specific to the USB-ethernet adapter behaviour I
+hit on my Proxmox servers during TS-NET-003. Forcing 100M was the final
+piece that stabilised the link after the direct-to-router wiring change.
+A native PCIe NIC would not need this.
 
 For router configuration, see: network/router/mikrotik/
 
@@ -217,16 +271,23 @@ Each server has 3 network paths:
 
 ## VPN Setup
 
-WireGuard VPN connects on-premises to AWS VPCs.
+WireGuard VPN connects on-premises to AWS VPCs. Tunnels terminate on the
+MikroTik router.
 
 | Tunnel       | Local Endpoint | AWS Endpoint    | Purpose            |
 |--------------|----------------|-----------------|---------------------|
 | dev_tunnel   | 172.16.200.1   | 172.16.200.2    | On-prem ↔ AWS Dev   |
 | prod_tunnel  | 172.17.200.1   | 172.17.200.2    | On-prem ↔ AWS Prod  |
 
-VPN setup will be covered in a separate dedicated guide.
+Full setup (AWS EC2 side config, on-prem peer config, keepalive service,
+CGNAT workaround, AllowedIPs reasoning, TS references) is documented in:
 
-For reference, see: network/vpn/
+    network/vpn/wireguard-setup.md
+
+The per-device configs live in:
+
+    network/vpn/                   (AWS side + setup-wireguard.sh)
+    network/router/mikrotik/       (on-prem side config + backups)
 
 ---
 
@@ -248,15 +309,17 @@ For reference, see: network/vpn/
 
 ## Troubleshooting Reference
 
-Key network troubleshooting cases:
+Key network troubleshooting cases, all under troubleshooting/network/:
 
-| Case | Issue | Resolution |
-|------|-------|------------|
-| 43 | Switch port link flapping | Direct server-to-router connection |
-| 48 | ER605 Port 4 PHY failure | Migrated to different port |
-| 57 | USB adapter Gigabit instability | Force 100M on SVC ports |
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-NET-001 | 1-static-route-ssh-disconnect.md | SSH disconnect triggered by static route change |
+| TS-NET-002 | 2-asymmetric-routing-ssh-wan-lan.md | Asymmetric routing on SSH between WAN and LAN |
+| TS-NET-003 | 3-svc-network-instability-investigation.md | Service VLAN link flapping investigation — 4 phases, ended in "direct svc0 → router" wiring and 100M forced speed. Also contains the ER605 "Port 4 defect" false lead. |
+| TS-NET-004 | 4-wireguard-cgnat-port-blocking.md | Prod WireGuard tunnel blocked by ISP CGNAT on UDP 51820; resolved by moving on-prem listen port to 51830. |
+| TS-NET-005 | 5-wireguard-tunnel-stability-investigation.md | Four-phase WireGuard tunnel stability investigation; ended with prod compute/network migration to us-east-1 and ER605 → MikroTik router replacement. |
 
-For all cases, see: troubleshooting/network/
+The ER605 → MikroTik migration story is in network/README.md.
 
 ---
 

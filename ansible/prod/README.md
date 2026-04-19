@@ -1,6 +1,8 @@
 # Ansible PROD Environment
 
-This directory contains Ansible configuration for the PROD environment infrastructure.
+Ansible configuration for the PROD environment. Covers the full node lifecycle after Terraform provisioning — bootstrap (before FreeIPA exists), domain join, Vault HA cluster, Kubernetes node prep and cluster init, Nginx proxy, self-hosted GH Actions runner setup, and day-to-day ops.
+
+For the reasoning behind the dev/prod split, see [`../README.md`](../README.md). For day-to-day operations (keytab setup, git workflow, utility commands) see [`operation_guide.txt`](operation_guide.txt).
 
 ---
 
@@ -18,11 +20,7 @@ ansible/prod/
 │       ├── all.yml             # Variables for all hosts
 │       ├── freeipa.yml         # FreeIPA server/domain config
 │       ├── vault_cluster.yml   # HashiCorp Vault cluster config
-│       ├── k8s_masters.yml     # K8s master nodes (reserved)
-│       ├── k8s_workers.yml     # K8s worker nodes (reserved)
-│       ├── ansible.yml         # Ansible control node (reserved)
-│       ├── local_runner.yml    # CI/CD runners (reserved)
-│       └── nginx.yml           # Nginx proxy (reserved)
+│       └── k8s_masters.yml     # K8s master nodes
 ├── examples/                   # Manual operations & usage examples
 │   └── vault/
 │       └── usage.md            # Vault CLI and API examples
@@ -68,20 +66,43 @@ We use two inventory files for different stages of infrastructure lifecycle:
 | `first_setup_inventory.ini` | Bootstrap | root | IP addresses | Before FreeIPA exists |
 | `inventory.ini` | Production | super_bot | FQDN hostnames | After FreeIPA configured |
 
-### Why Two Inventories?
+### Why I kept two inventory files
 
-**first_setup_inventory.ini (Bootstrap)**
-- Uses IP addresses because FreeIPA DNS doesn't exist yet
-- Uses root user because domain users (super_bot) don't exist yet
-- SSH keys pre-copied during Terraform provisioning
-- Usage: `ansible-playbook -i inventory/first_setup_inventory.ini playbooks/...`
+The repo has two inventories by design, not by accident. There are two distinct scenarios where Ansible has to run differently, and I wanted each one to be explicit instead of toggling flags inside one combined file.
 
-**inventory.ini (Production)**
-- Uses FQDN hostnames because FreeIPA provides DNS
-- Uses super_bot domain user with HBAC rules and sudo
-- Kerberos/GSSAPI authentication requires hostnames (not IPs)
+**1. Initial bootstrap — before FreeIPA exists**
+
+When a fresh environment is being built, FreeIPA is not there yet, so:
+- No `.lab.local` DNS (can't resolve FQDN hostnames)
+- No `super_bot` domain user (can't use Kerberos/GSSAPI auth)
+- SSH keys are already pre-copied to nodes by Terraform during provisioning
+
+For this phase I use `first_setup_inventory.ini` — IP-based addressing, `root` user, no dependency on FreeIPA at all.
+
+Workflows that run during bootstrap and therefore use this inventory:
+
+| Workflow | Playbook invoked |
+|----------|------------------|
+| `{env}-freeipa-full-setup.yml` | `playbooks/freeipa/freeipa_setup.yml` (installing FreeIPA itself — can't depend on what it's installing) |
+| `{env}-ansible-full-setup.yml` | `playbooks/ansible/ansible_setup.yml` (sets up the Ansible LXC before it joins the domain) |
+| `{env}-local-runner-full-setup.yml` | `playbooks/local-runner/setup_tools.yml` (sets up the GH Actions runner LXC before domain-join) |
+
+Any workflow that depends on `first_setup_inventory.ini` is running before the domain and the keytabs exist — that is the rule of thumb.
+
+**2. DR / fallback — when FreeIPA is down**
+
+FreeIPA is a single-node service in my current setup, so when it goes down Kerberos auth breaks and the normal FQDN-based inventory stops working. `first_setup_inventory.ini` is my emergency fallback path — no DNS dependency, no domain-user dependency, so I can still reach the fleet and run recovery playbooks even while identity is offline. This pattern is also part of the DR runbook under `/disaster-recovery/`.
+
+Usage: `ansible-playbook -i inventory/first_setup_inventory.ini playbooks/...`
+
+**3. Normal operation — `inventory.ini`**
+
+Once FreeIPA is up and the hosts are domain-joined, `inventory.ini` is the default (wired in `ansible.cfg`). FQDN hostnames, `super_bot` user, Kerberos/GSSAPI auth. Any playbook run without an explicit `-i` uses this one.
+
 - Requires `kinit super_bot` before running Ansible
-- Usage: `ansible-playbook playbooks/...` (default from ansible.cfg)
+- Usage: `ansible-playbook playbooks/...` (default from `ansible.cfg`)
+
+**Troubleshooting reference:** `/troubleshooting/identity/9-ansible-sssd-knownhosts-timeout.md` documents an SSSD / known_hosts timeout I hit while moving between these two modes — worth checking if Ansible runs start hanging after a FreeIPA join.
 
 ### Special Cases
 

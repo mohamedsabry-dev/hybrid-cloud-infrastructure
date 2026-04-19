@@ -6,7 +6,7 @@
 #        which fails due to UID mapping in unprivileged containers
 # SOLUTION: Switch to FILE-based ccache (/tmp/krb5cc_%U)
 #
-# REFERENCE: See NOTES.md troubleshooting case 17 (UID mapping issues)
+# REFERENCE: /troubleshooting/identity/1-lxc-kerberos-keyring-auth-failure.md
 # RUN AFTER: add_hosts_to_ipa.yml (requires SSSD to be configured)
 # ============================================================================
 ---

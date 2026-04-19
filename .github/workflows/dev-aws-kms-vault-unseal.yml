@@ -45,7 +45,6 @@ jobs:
   deploy:
     name: "Deploy KMS Key & Unseal User"
     runs-on: mac-mini
-    # runs-on: ubuntu-latest
 
     defaults:
       run:
@@ -60,9 +59,6 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_DEV }}
-
-      # - name: Install Terraform
-      #   uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init
         run: terraform init -upgrade

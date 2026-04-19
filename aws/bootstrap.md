@@ -2,6 +2,10 @@
 
 Multi-account architecture with OIDC authentication for GitHub Actions.
 
+> **Design notes & reasoning** — for the full iteration history behind this layout (why two accounts, why two mirrored state backends, why CloudFormation for bootstrap instead of Terraform, the 2-tier IAM origin of the `dev-security` branch, and why prod ended up in a mixed-region setup), see [`DESIGN.md`](DESIGN.md).
+
+This file is the operational reference — account structure, resources created, how to deploy, post-bootstrap steps, IAM roles and policies, state access isolation.
+
 ---
 
 ## Account Structure
@@ -11,7 +15,7 @@ Multi-account architecture with OIDC authentication for GitHub Actions.
 | Production | xxxxxxxxxxxx | eu-west-2 (London) | admin_prod | Enabled |
 | Development | xxxxxxxxxxxx | us-east-1 (N. Virginia) | admin_dev | Enabled |
 
-> **Note:** Dev was migrated to us-east-1 for cost optimization. Prod remains in eu-west-2 for lower latency.
+> **Note:** Both envs started in `eu-west-2` (London, closest to Egypt). Dev was migrated to `us-east-1` after a Reserved Instance purchase failure. Prod's **state backend + IAM + KMS + vault-trust + secrets remain in `eu-west-2`**, but prod's **network + compute (VPC + WireGuard EC2) later moved to `us-east-1`** to escape tunnel instability with the London IP. See "Why these regions — and why prod ended up mixed" above for the full story.
 
 ---
 

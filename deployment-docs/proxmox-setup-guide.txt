@@ -18,6 +18,33 @@ as the API token generated during bootstrap is stored in AWS Secrets Manager.
 
 ---
 
+### A note for anyone implementing this
+
+The specifics below — "Proxmox on laptops", three *physical* NICs per host
+(built-in WiFi + two USB-Ethernet adapters), WiFi used as the management
+plane, 100M forced on the service port — reflect MY hardware constraints and
+learning goals, not Proxmox best practice.
+
+If you have rack servers with multiple built-in NICs, the "3-plane
+separation with USB-ETH" part of this guide doesn't apply — you'd wire
+management / service / storage to 3 on-board ports and skip the USB
+adapters entirely. Likewise, "management over WiFi" is a consequence of the
+laptop form factor (no second built-in wired port), not a recommendation.
+
+For the full reasoning — why Proxmox on laptops, why two physical hosts
+instead of one nested, why the 3-plane NIC pattern, why the bootstrap
+scripts grew from a manual-first run, why OS disks stay on local Proxmox
+storage while workloads run on NAS — see the sibling design docs:
+
+  - proxmox/DESIGN.md              (layer-level story)
+  - proxmox/bootstrap_proxmox/DESIGN.md   (bootstrap-script origin + Terraform-user design)
+  - proxmox/storage/DESIGN.md      (why OS-on-local, NAS-for-data split + VLAN 40 worker NIC)
+  - proxmox/golden_templates/DESIGN.md    (what goes in golden vs Ansible)
+  - proxmox/backup/DESIGN.md       (why no PBS, config + vzdump backup split, retention evolution)
+  - proxmox/disaster_recovery/DESIGN.md   (host-layer runbooks + prevention scripts vs platform chaos tests)
+
+---
+
 ## Server Details
 
 | Environment | Hostname              | Management IP | Storage IP   | API URL                         |
@@ -27,27 +54,33 @@ as the API token generated during bootstrap is stored in AWS Secrets Manager.
 
 ---
 
-## Network Architecture (3-Port Design)
+## Network Architecture (3-plane design, laptop form factor)
 
 ```
 Laptop Hardware
-+------------------+------------------+------------------+
-|     WiFi         |      svc0        |      stor0       |
-|   (wlp1s0)       |   (Ethernet)     |  (USB-Ethernet)  |
-+------------------+------------------+------------------+
-        |                  |                   |
-        v                  v                   v
-   VLAN 5 (Mgmt)     VLANs 60-65        VLAN 40 (Storage)
-   10.0.5.x          Service VMs        10.0.40.x
-                     via vmbr0          via vmbr1
++--------------------+--------------------+--------------------+
+|      WiFi          |       svc0         |       stor0        |
+|   (wlp1s0/wlp4s0)  | (USB-Ethernet A)   |  (USB-Ethernet C)  |
++--------------------+--------------------+--------------------+
+          |                     |                     |
+          v                     v                     v
+   VLAN 5 (Mgmt)         VLANs 60-65 (Dev)      VLAN 40 (Storage)
+   10.0.5.x              VLANs 50-55 (Prod)     10.0.40.x
+                         via vmbr0              via vmbr1
 ```
+
+Three *physical* NICs per host, one per traffic plane. The two Ethernet
+adapters are USB-attached (one Type-A, one Type-C) — the laptop has only
+one built-in wired port, so USB adapters are what makes the plane split
+possible. See proxmox/DESIGN.md → "Three traffic planes, physically
+separated" for the full reasoning.
 
 ### Port Naming (During Installation)
 
 During Proxmox installation, name each interface:
-- Main Ethernet → svc0 (service trunk port, all VLANs)
-- USB-Ethernet → stor0 (storage network)
-- WiFi → keep original name (e.g., wlp1s0)
+- USB-Ethernet (Type-A) → svc0 (service trunk, VLANs 50-55 prod / 60-65 dev)
+- USB-Ethernet (Type-C) → stor0 (storage plane, VLAN 40)
+- WiFi → keep original name (e.g. wlp1s0 on dev, wlp4s0 on prod)
 
 ### Interface Configuration
 
@@ -163,8 +196,8 @@ Create shares via NAS web interface:
 | prod-storage   | /volume1/prod-storage  | 10.0.40.100 only                 |
 | dev-storage    | /volume1/dev-storage   | 10.0.40.110 only                 |
 | Backups        | /volume1/Backups       | 10.0.40.100 + 10.0.40.110        |
-| k8s-dev        | /volume1/k8s-dev       | 10.0.40.201-203 (K8s workers)    |
-| k8s-prod       | /volume1/k8s-prod      | 10.0.40.201-203 (K8s workers)    |
+| k8s-prod       | /volume1/k8s-prod      | 10.0.40.101-103 (Prod K8s workers) |
+| k8s-dev        | /volume1/k8s-dev       | 10.0.40.201-203 (Dev K8s workers)  |
 
 NFS Settings: root Mapping = root (0), Async = Yes
 
@@ -199,20 +232,24 @@ For Kubernetes persistent volumes, dedicated NFS shares are configured on the NA
 
 | Share     | NFS Path          | Allowed Clients              | Purpose                    |
 |-----------|-------------------|------------------------------|----------------------------|
+| k8s-prod  | /volume1/k8s-prod | 10.0.40.101, 102, 103        | Prod K8s PV storage        |
 | k8s-dev   | /volume1/k8s-dev  | 10.0.40.201, 202, 203        | Dev K8s PV storage         |
-| k8s-prod  | /volume1/k8s-prod | 10.0.40.201, 202, 203        | Prod K8s PV storage        |
+
+Note: Dev workers use the `.200` range deliberately — wide gap from Prod's
+`.100` range so an NFS allowlist typo can't silently cross envs. See
+proxmox/storage/DESIGN.md for the IP-range reasoning.
 
 ### 5.2 NAS NFS Configuration
 
 On ASUSTOR NAS (https://10.0.5.120:8001):
-1. Control Panel → Shared Folders → Create k8s-dev and k8s-prod
+1. Control Panel → Shared Folders → Create k8s-prod and k8s-dev
 2. Control Panel → NFS → Enable NFS, add permissions:
-   - Path: /volume1/k8s-dev
-   - IP: 10.0.40.201, 10.0.40.202, 10.0.40.203 (or 10.0.40.201-203)
+   - Path: /volume1/k8s-prod
+   - IP: 10.0.40.101, 10.0.40.102, 10.0.40.103 (or 10.0.40.101-103)
    - Privilege: Read/Write
    - Root Mapping: Map to root (0)
    - Async: Yes
-3. Repeat for /volume1/k8s-prod
+3. Repeat for /volume1/k8s-dev with IPs 10.0.40.201-203
 
 ### 5.3 Subdirectory Structure
 
@@ -244,12 +281,19 @@ Create subdirectories for workload separation:
 | Component                | Path                                              |
 |--------------------------|---------------------------------------------------|
 | Proxmox README           | proxmox/README.md                                 |
+| Proxmox layer DESIGN     | proxmox/DESIGN.md                                 |
 | Bootstrap README         | proxmox/bootstrap_proxmox/README.md               |
+| Bootstrap DESIGN         | proxmox/bootstrap_proxmox/DESIGN.md               |
 | Bootstrap Script         | proxmox/bootstrap_proxmox/bootstrap.sh            |
 | Network Script           | proxmox/bootstrap_proxmox/network-setup.sh        |
+| Storage README           | proxmox/storage/README.md                         |
+| Storage DESIGN           | proxmox/storage/DESIGN.md                         |
 | NAS Storage Config       | proxmox/storage/nas-storage-config.md             |
+| Golden templates DESIGN  | proxmox/golden_templates/DESIGN.md                |
 | Golden VM Script         | proxmox/golden_templates/golden-vm-setup.sh       |
 | Golden LXC Script        | proxmox/golden_templates/golden-lxc-setup.sh      |
+| Backup layer DESIGN      | proxmox/backup/DESIGN.md                          |
+| DR (host layer) DESIGN   | proxmox/disaster_recovery/DESIGN.md               |
 | NAS Terraform (Dev)      | terraform/dev/proxmox/storage/nas/                |
 | NAS Terraform (Prod)     | terraform/prod/proxmox/storage/nas/               |
 | Storage Workflow         | .github/workflows/dev-proxmox-storage.yml         |

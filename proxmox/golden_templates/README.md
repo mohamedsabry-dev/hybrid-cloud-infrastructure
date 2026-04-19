@@ -1,6 +1,8 @@
 # Golden Templates
 
-Scripts to prepare base VM/LXC images for cloning. Run once to create golden templates.
+Scripts to prepare base VM/LXC images for cloning. Run once (per OS rebuild) to create the golden templates that Terraform then clones from.
+
+> **Design notes & reasoning** — for why each package is in the list, why `firewalld` is installed-but-disabled by default, why debugging tools are shipped on every node, and how these scripts grew iteratively, see [`DESIGN.md`](DESIGN.md).
 
 ## Scripts
 

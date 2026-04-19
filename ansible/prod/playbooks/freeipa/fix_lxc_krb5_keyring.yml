@@ -1,14 +1,17 @@
 # ============================================================================
 # FIX_LXC_KRB5_KEYRING.YML - Fix Kerberos Credential Cache on LXC
 # ============================================================================
-# PURPOSE: Switch LXC containers from kernel keyring to FILE-based ccache
-# PROBLEM: Unprivileged LXC kernel keyring fails due to UID mapping
-# SOLUTION: Use FILE:/tmp/krb5cc_%U instead
-# REF: /troubleshooting/identity/17-lxc-kerberos-keyring-auth-failure.md
+# PURPOSE: Fix Kerberos keyring issue on unprivileged LXC containers
+# ISSUE: LXC containers use kernel keyring for krb5 ccache by default,
+#        which fails due to UID mapping in unprivileged containers
+# SOLUTION: Switch to FILE-based ccache (/tmp/krb5cc_%U)
+#
+# REFERENCE: /troubleshooting/identity/1-lxc-kerberos-keyring-auth-failure.md
+# RUN AFTER: add_hosts_to_ipa.yml (requires SSSD to be configured)
 # ============================================================================
 ---
 - name: Fix Kerberos keyring issue on LXC containers
-  hosts: vault_cluster:ansible:local_runners:nginx
+  hosts: lxc
   become: yes
 
   tasks:

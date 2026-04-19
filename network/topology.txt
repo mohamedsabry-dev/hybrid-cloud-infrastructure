@@ -3,85 +3,127 @@
 ================================================================================
 
 COMPONENTS:
-  1. ISP ONT             - Internet gateway (fiber terminal)
-  2. ER605               - Firewall, VPN, Gateway, Router
-  3. FS308GP             - L2 Switch, PoE, VLAN switching
-  4. AX3000              - Home WiFi Access Point only
-  5. AC750               - Lab Management WiFi Access Point
-  6. NAS FS6706T         - ASUSTOR FlashStor Storage
-  7. Prod Server         - Proxmox Production
-  8. Dev Server          - Proxmox Development
+  1. ISP ONT                 - Internet gateway (fiber terminal)
+  2. MikroTik L009UiGS-RM    - Firewall, VPN, Gateway, Router
+                               (replaced a TP-Link ER605 — see network/README.md)
+  3. FS308GP                 - L2 Switch, PoE, VLAN switching (storage only now)
+  4. AX3000                  - Home WiFi Access Point (home devices only, not lab)
+  5. AC750                   - Lab Management WiFi Access Point
+  6. NAS FS6706T             - ASUSTOR FlashStor NFS Storage
+  7. Prod Server             - Proxmox Production host (+ VMs / LXCs)
+  8. Dev Server              - Proxmox Development host (+ VMs / LXCs)
 
 ================================================================================
-                         PHYSICAL TOPOLOGY
+                         PHYSICAL TOPOLOGY (CURRENT)
 ================================================================================
 
 ISP ONT
-├── ER605 [WAN Port] ─────────────────── Lab Network Gateway
-│   │
-│   ├── Port 2 ─── FS308GP [Dev SVC Uplink] *moved from Port 4 (mirror enabled)
-│   │
-│   ├── Port 3 ─── AC750 AP [VLAN 5 Untagged]
-│   │               ├── NAS Mgmt Port
-│   │               └── WiFi SSID: unified_mgmt
-│   │                   ├── Prod Server (wlp4s0) - Mgmt
-│   │                   └── Dev Server (wlp1s0) - Mgmt
-│   │
-│   ├── Port 4 ─── UNUSED (defective - gigabit negotiation failure)
-│   │
-│   └── Port 5 ─── FS308GP [Prod SVC Uplink]
-│
-├── FS308GP [Direct to ISP for Festa Cloud management] (Mgmt IP: 192.168.100.185)
-│   │
-│   ├── VLAN 40 (Storage) ─ Tagged
-│   │   ├── Port 8 ─── Prod Server (stor0)
-│   │   ├── Port 7 ─── Dev Server (stor0)
-│   │   └── Port 6 ─── NAS (LAN 1)
-│   │
-│   ├── VLAN 50-55 (Prod Services) ─ Tagged
-│   │   └── Port 5 ─── Prod Server (trunk)
-│   │
-│   └── VLAN 60-65 (Dev Services) ─ Tagged
-│       └── Port 4 ─── Dev Server (trunk)
-│
-└── AX3000 [WiFi AP Mode] ─────────────── Home Devices WiFi Only
-    └── Home devices (phones, tablets, etc.)
+ ├── MikroTik [ether1 - WAN/mgmt uplink] ───── Lab Network Gateway (10.0.5.1)
+ │     │
+ │     │  NOTE: service VLAN trunks for both envs go DIRECTLY from each
+ │     │        Proxmox host's svc0 into a dedicated MikroTik port. They
+ │     │        no longer go through the FS308GP switch. See the "Why
+ │     │        bypass the switch" section in network/README.md and
+ │     │        TS-NET-003 (troubleshooting/network/) for the reason.
+ │     │
+ │     ├── ether5 ─── Prod Server svc0 (DIRECT, 100M forced) ─ VLANs 50-55 trunk
+ │     │
+ │     ├── ether6 ─── Dev Server svc0 (DIRECT, 100M forced) ─ VLANs 60-65 trunk
+ │     │                   (bridge br-dev on MikroTik)
+ │     │
+ │     └── ether7 ─── AC750 AP (VLAN 5 untagged — mgmt plane)
+ │                       ├── NAS Mgmt Port (downlink, VLAN 5)
+ │                       └── WiFi SSID: unified_mgmt (AP Isolation enabled)
+ │                           ├── Prod Server (wlp4s0)  10.0.5.100
+ │                           └── Dev Server  (wlp1s0)  10.0.5.110
+ │
+ ├── FS308GP [Port 1 direct to ISP for Festa Cloud mgmt] (Mgmt IP 192.168.100.185)
+ │     │
+ │     │  Switch now carries ONLY the storage VLAN. Service-VLAN trunks
+ │     │  that used to ride on Ports 2-5 are gone — those ports are unused.
+ │     │  See switch/fs308gp/config.txt for current vs historical layout.
+ │     │
+ │     └── VLAN 40 (Storage, tagged, L2-isolated)
+ │           ├── Port 6 ─── NAS (LAN 1)         10.0.40.120
+ │           ├── Port 7 ─── Dev Proxmox (stor0) 10.0.40.110
+ │           └── Port 8 ─── Prod Proxmox (stor0) 10.0.40.100
+ │
+ │           Each Proxmox in turn provides VLAN 40 via stor0 to its
+ │           k8s worker VMs, so each worker has a second NIC on VLAN 40
+ │           for CSI-NFS PersistentVolume access:
+ │
+ │             Prod workers:  10.0.40.101 / .102 / .103
+ │             Dev  workers:  10.0.40.201 / .202 / .203
+ │
+ └── AX3000 [WiFi AP Mode] ─────── Home devices only (phones, tablets, etc.)
+       └── Isolated from lab entirely — goes straight to ISP
 
 ================================================================================
                          TRAFFIC FLOW
 ================================================================================
 
 Lab Traffic:
-└── All lab traffic routes through ER605 for firewall/ACL control
+ └── All lab service-VLAN traffic routes through MikroTik for firewall / ACL
+     control (dev→prod isolation, env→AWS VPN, etc.)
 
 Home Traffic:
-└── Home devices on AX3000 WiFi go directly to ISP (isolated from lab)
+ └── Home devices on AX3000 WiFi go directly to ISP (isolated from lab)
 
 Storage Traffic:
-└── VLAN 40 isolated at L2 level (no ER605 routing)
+ └── VLAN 40 is L2-isolated on the FS308GP switch — NO router hop.
+     Proxmox hosts and k8s worker VMs talk to the NAS directly over L2
+     on VLAN 40. This was intentional from day one and has stayed the same
+     across both the ER605 era and the MikroTik era.
 
 ================================================================================
                          VLAN SUMMARY
 ================================================================================
 
-  VLAN 5      │ Management      │ ER605 LAN, Lab WiFi Mgmt
-  VLAN 40     │ Storage         │ NAS, Server Storage NICs
-  VLAN 50-55  │ Prod Services   │ Production workloads
-  VLAN 60-65  │ Dev Services    │ Development workloads
-  VLAN 99     │ Dump/Isolation  │ Native VLAN on trunk ports (unused traffic)
+  VLAN 5      │ Management      │ Mgmt plane on MikroTik + Lab WiFi (AC750)
+  VLAN 40     │ Storage         │ Switch-isolated; NAS, Proxmox stor0, k8s workers
+  VLAN 50-55  │ Prod Services   │ Production workloads (trunked via MikroTik)
+  VLAN 60-65  │ Dev Services    │ Development workloads (trunked via MikroTik)
+  VLAN 99     │ Dump / Isolation│ Native PVID on trunk ports (unused traffic)
+
+================================================================================
+                         HISTORICAL NOTE
+================================================================================
+
+Two things have changed since the original topology was laid out:
+
+  1. Router. Originally a TP-Link ER605 (Port 3 = AC750 AP, Port 4 = Dev
+     SVC uplink to switch, Port 5 = Prod SVC uplink to switch). Replaced
+     by the MikroTik L009UiGS-RM after a stack of VPN and debug-tooling
+     issues documented in TS-NET-003 / 004 / 005.
+
+  2. Service-VLAN path. Originally service VLANs (50-55 and 60-65) ran
+     from the Proxmox servers through the FS308GP switch, then out to the
+     router. After TS-NET-003 revealed the real root cause of the Dev
+     network flapping was the Proxmox USB-ethernet adapter (NOT a router
+     port or the switch, though both had been suspected at different
+     phases), I rewired the service trunks to go DIRECTLY from each
+     Proxmox host's svc0 to a dedicated router port. The FS308GP is kept,
+     but only for the storage VLAN now.
+
+Both the old ER605 config and the original "service VLAN through the
+switch" setup are documented in the retired sections of the relevant
+per-device files — see router/er605/README.md and the HISTORICAL parts
+of switch/fs308gp/config.txt.
 
 ================================================================================
                          RELATED DOCUMENTATION
 ================================================================================
 
-  Configuration Guides:
-  ├── ip-planning.txt             - IP allocations & VLAN assignments
-  ├── router/er605/config.txt     - ER605 router/firewall configuration
-  ├── ap/ac750/config.txt         - Access point configuration
-  ├── switch/fs308gp/config.txt   - FS308GP switch configuration
-  └── vpn/                        - WireGuard VPN setup & config
+  Configuration guides (current):
+  ├── network/ip-planning.txt           - IP allocations, VLANs, VIPs
+  ├── network/router/mikrotik/          - MikroTik router config + .rsc scripts
+  ├── network/ap/ac750/config.txt       - Access point configuration
+  ├── network/switch/fs308gp/config.txt - FS308GP switch (current + historical)
+  └── network/vpn/wireguard-setup.md    - WireGuard VPN setup + reasoning
+
+  Retired / historical reference:
+  └── network/router/er605/             - Previous router, kept as archive
 
   Domain: lab.local
-  DNS Servers: FreeIPA (Prod/Dev)
-
+  DNS:    FreeIPA (one per environment)
 ================================================================================

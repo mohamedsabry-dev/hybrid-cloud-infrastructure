@@ -145,7 +145,7 @@ iface ${WIFI_INTERFACE} inet static
     gateway ${MGMT_GATEWAY}
     wpa-conf /etc/wpa_supplicant/wpa_supplicant-${WIFI_INTERFACE}.conf
 
-# Service VLAN Trunk (to ER605)
+# Service VLAN Trunk (to MikroTik router — previously ER605; see /network/README.md)
 auto ${SERVICE_INTERFACE}
 iface ${SERVICE_INTERFACE} inet manual
 

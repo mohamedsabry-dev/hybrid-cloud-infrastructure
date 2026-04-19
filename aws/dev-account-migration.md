@@ -1,37 +1,39 @@
 # AWS Dev Account Migration
 
-Migration of dev environment from eu-west-2 (London) to us-east-1 (N. Virginia) in a new AWS account.
+I migrated the dev environment from eu-west-2 (London) to us-east-1 (N. Virginia), into a new AWS account. This doc is the record of what drove the decision and what the migration looked like — kept here as a reference for the next time I need to move an environment between accounts or regions.
 
-**Date:** March 2026 (us-east-1 migration)
-**Duration:** ~3 hours
+**Date:** March 2026
+**Duration:** ~3 hours end-to-end
 
 ---
 
-## Reasoning
+## Why I migrated
 
 ```
 Why migrate?
 │
-├── Trigger: Reserved Instance Purchase Failed
-│   ├── Attempted to buy Reserved Instance in old dev account (eu-west-2)
-│   ├── Purchase failed with error
-│   └── Decision: Migrate to different account instead of troubleshooting
+├── Trigger: a Reserved Instance purchase failed
+│   ├── I tried to buy a Reserved Instance in the old dev account (eu-west-2)
+│   ├── The purchase failed with an error I didn't want to burn time debugging
+│   └── Decided: migrate to a different account instead of troubleshooting it
 │
-├── Cost Optimization
-│   ├── US regions are significantly cheaper than London
-│   ├── Reserved Instances cheaper in us-east-1
-│   ├── Dev account = paid account (no free tier)
-│   └── Prod account = has $100+ AWS free tier credits
+├── Cost optimization
+│   ├── US regions are significantly cheaper than London for what I run
+│   ├── Reserved Instances are cheaper in us-east-1
+│   ├── My dev account is a paid account (no free tier left)
+│   └── My prod account has $100+ in AWS free tier credits I want to preserve
 │
-├── Account Separation
-│   ├── Dev: Old personal AWS account (repurposed)
-│   └── Prod: New AWS account with free tier benefits
+├── Account separation
+│   ├── Dev: my old personal AWS account, repurposed for this project
+│   └── Prod: a new AWS account with free tier benefits
 │
-└── Latency Trade-off (acceptable)
-    ├── London → Egypt: ~65ms (prod)
-    └── US → Egypt: ~120ms (dev)
-    └── Dev latency is acceptable for non-production workloads
+└── Latency trade-off (I accepted this)
+    ├── London → Egypt: ~65ms
+    └── US → Egypt:     ~120ms
+    └── 55ms extra on dev is fine for non-production workloads
 ```
+
+> **Update (later):** The latency framing above assumed prod would stay in London to keep interactive latency low. That turned out not to survive contact with reality — prod's WireGuard tunnel on the London IP was intermittently unstable (see [`../troubleshooting/network/5-wireguard-tunnel-stability-investigation.md`](../troubleshooting/network/5-wireguard-tunnel-stability-investigation.md)), so I later migrated prod's **network + compute only** (VPC + WireGuard EC2) to `us-east-1`, matching dev's compute region. The rest of prod (state backend, IAM, KMS, vault-trust, secrets) stayed in `eu-west-2`. Full reasoning for the mixed-region result is in [`bootstrap.md`](bootstrap.md) — "Why these regions — and why prod ended up mixed".
 
 ---
 
@@ -270,27 +272,27 @@ Repository Changes
 
 ---
 
-## Lessons Learned
+## What I learned
 
 ```
-Key Takeaways
+Key takeaways
 │
-├── S3 Bucket Names
-│   └── Deletion takes time to propagate globally
-│   └── Use versioned names (-v2) when recreating
+├── S3 bucket names
+│   └── Deletion takes time to propagate globally across AWS
+│   └── I used versioned names (-v2 suffix) when recreating to dodge name conflicts
 │
-├── WireGuard Tunnels
-│   └── Sometimes a clean slate is faster than debugging
-│   └── New EIP + new tunnel entry = fresh start
+├── WireGuard tunnels
+│   └── Sometimes a clean slate is faster than debugging an existing tunnel
+│   └── New EIP + new tunnel entry = fresh start (same trick I'd use in a DR)
 │
-├── Automation Opportunities
-│   ├── SSH key pairs can be Terraform-managed
-│   ├── Admin users belong in CloudFormation stack
-│   └── Reduce manual console operations
+├── Automation opportunities I spotted
+│   ├── SSH key pairs can be fully Terraform-managed (not manual anymore)
+│   ├── Admin users belong inside the CloudFormation bootstrap stack (I moved them there after this migration)
+│   └── Goal: minimise manual console operations in any future migration
 │
-└── Cost vs Latency
+└── Cost vs latency
     └── 55ms extra latency is acceptable for dev
-    └── Significant cost savings justify the trade-off
+    └── The cost savings justify the trade-off comfortably
 ```
 
 ---

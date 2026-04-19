@@ -27,12 +27,12 @@ Home/Datacenter (10.0.x.x)
    (172.16.200.1 dev)
    (172.17.200.1 prod)
         |
-        +-------- WireGuard (UDP 51830) ------> AWS Dev EC2 (172.16.200.2)
+        +-------- WireGuard (UDP 51820) ------> AWS Dev EC2 (172.16.200.2)
         |                                            |
         |                                       AWS Dev VPC
         |                                       172.16.0.0/16
         |
-        +-------- WireGuard (UDP 51831) ------> AWS Prod EC2 (172.17.200.2)
+        +-------- WireGuard (UDP 51830) ------> AWS Prod EC2 (172.17.200.2)
                                                      |
                                                 AWS Prod VPC
                                                 172.17.0.0/16
@@ -44,11 +44,20 @@ Home/Datacenter (10.0.x.x)
 
 | Environment | MikroTik Tunnel IP | AWS Tunnel IP   | MikroTik Port | AWS Port |
 |-------------|-------------------|-----------------|---------------|----------|
-| Dev         | 172.16.200.1      | 172.16.200.2    | 51830         | 51820    |
-| Prod        | 172.17.200.1      | 172.17.200.2    | 51831         | 51820    |
+| Dev         | 172.16.200.1      | 172.16.200.2    | 51820         | 51820    |
+| Prod        | 172.17.200.1      | 172.17.200.2    | 51830         | 51820    |
 
-IMPORTANT: Tunnel IPs are within AWS VPC CIDR to solve routing issues.
-See troubleshooting Case 5 for why (routing design).
+Note on prod's listen port: dev and prod both originally used 51820 on the
+on-prem side. Prod was moved to 51830 after the ISP CGNAT started silently
+dropping return traffic on 51820 for the prod tunnel — see TS-NET-004 in
+troubleshooting/network/. AWS side stays on 51820 for both envs; it
+responds to whatever source port the packet arrived from.
+
+IMPORTANT: Tunnel IPs are deliberately placed within each AWS VPC CIDR so
+one AllowedIPs entry covers both tunnel and VPC. Full reasoning (including
+why this pattern emerged from an ER605 single-CIDR-per-peer limitation and
+was kept on MikroTik for continuity) is in network/vpn/wireguard-setup.md
+under "Why tunnel IPs live inside the VPC CIDR".
 
 ---
 
@@ -65,11 +74,15 @@ Creates: VPC, Internet Gateway, VPN Subnet, Management Subnet, Route Tables
 
 ### GitHub Secrets Required
 
-| Secret             | Purpose                           |
-|--------------------|-----------------------------------|
-| HOME_PUBLIC_IP     | Your public IP for security group |
-| VPN_PUBLIC_KEY_DEV | SSH public key for EC2 access     |
-| WG_VPN_EIP_DEV     | Elastic IP for VPN EC2            |
+| Secret              | Purpose                                    |
+|---------------------|--------------------------------------------|
+| HOME_PUBLIC_IP      | Your home public IP for AWS security group |
+| VPN_PUBLIC_KEY_DEV  | SSH public key for Dev VPN EC2 access      |
+| VPN_PUBLIC_KEY_PROD | SSH public key for Prod VPN EC2 access     |
+
+Note: the AWS Elastic IPs for the VPN EC2 instances are NOT stored in
+GitHub Secrets. They are created by Terraform and surfaced via Terraform
+output / AWS console. Reference them via SSH config (see Phase 3.4 below).
 
 ---
 
@@ -188,8 +201,8 @@ Template available at: workstation/ssh-wg/ssh-config-template
 ### 4.1 Create WireGuard Interfaces
 
   /interface wireguard
-  add comment="Dev AWS tunnel" listen-port=51830 mtu=1420 name=dev-tunnel
-  add comment="Prod AWS tunnel" listen-port=51831 mtu=1420 name=prod-tunnel
+  add comment="Dev AWS tunnel"  listen-port=51820 mtu=1420 name=dev-tunnel
+  add comment="Prod AWS tunnel" listen-port=51830 mtu=1420 name=prod-tunnel
 
 ### 4.2 Assign Tunnel IPs
 
@@ -219,9 +232,9 @@ Template available at: workstation/ssh-wg/ssh-config-template
 ### 4.5 Firewall Rules
 
   /ip firewall filter
-  add action=accept chain=input comment="WireGuard Dev" dst-port=51830 \
+  add action=accept chain=input comment="WireGuard Dev"  dst-port=51820 \
       in-interface=ether1 protocol=udp
-  add action=accept chain=input comment="WireGuard Prod" dst-port=51831 \
+  add action=accept chain=input comment="WireGuard Prod" dst-port=51830 \
       in-interface=ether1 protocol=udp
 
 For full config reference, see: network/router/mikrotik/backups/backup-config-stable.rsc
@@ -260,22 +273,25 @@ See troubleshooting Case 5 for NAT timeout and tunnel stability details.
 
 ### Symptoms
 
-- One tunnel works (dev on 51830), other doesn't (prod on 51831)
+- One tunnel works (dev on 51820), the other doesn't
 - AWS tcpdump shows bidirectional packets
 - MikroTik shows TX bytes increasing but RX: 0 B
 - No handshake established
 
-### How to Identify CGNAT
+### How to identify CGNAT
 
 Check ISP router routing table for addresses in 100.64.0.0/10 range.
 
 ### Solution
 
-Change MikroTik Listen Port to a different value:
-- Original 51821 was blocked, changed to 51830/51831
-- AWS side doesn't need changes (responds to source port)
+Change the on-prem listen port to a port the ISP isn't blocking:
+- Dev originally worked fine on 51820 and kept it.
+- Prod was originally 51821, got CGNAT-blocked, moved to 51830.
+- AWS side never changes — it responds to whatever source port the packet
+  arrived from.
 
-See troubleshooting Case 4 for CGNAT port blocking diagnosis steps.
+See TS-NET-004 (troubleshooting/network/4-wireguard-cgnat-port-blocking.md)
+for full diagnosis and fix.
 
 ---
 
@@ -303,12 +319,15 @@ See troubleshooting Case 4 for CGNAT port blocking diagnosis steps.
 
 Key VPN troubleshooting cases in troubleshooting/network/:
 
-| Case | Issue                              | Resolution                              |
-|------|------------------------------------|-----------------------------------------|
-| 4    | CGNAT port blocking                | Change MikroTik listen port             |
-| 5    | Tunnel stability/ISP EIP blocking  | Recreate AWS EIP, keepalive service     |
+| TS case    | Issue                              | Resolution                                                                 |
+|------------|------------------------------------|----------------------------------------------------------------------------|
+| TS-NET-004 | CGNAT port blocking (prod tunnel)  | Moved prod on-prem listen port from 51821 to 51830                         |
+| TS-NET-005 | Tunnel stability (4-phase invest.) | Keepalive service + moved prod compute/network to us-east-1 + ER605 → MikroTik |
 
-For all cases, see: troubleshooting/network/
+TS-NET-005 resolution also drove the retirement of the ER605 router (see
+network/README.md) and the mixed-region prod setup on AWS (see aws/bootstrap.md).
+
+For all cases: troubleshooting/network/
 
 ---
 
@@ -361,13 +380,16 @@ Cross-environment traffic is blocked.
 
 ## GitHub Secrets Reference
 
-| Secret             | Purpose                              |
-|--------------------|--------------------------------------|
-| HOME_PUBLIC_IP     | Home IP for AWS security groups      |
-| VPN_PUBLIC_KEY_DEV | Dev VPN EC2 SSH public key           |
-| VPN_PUBLIC_KEY_PROD| Prod VPN EC2 SSH public key          |
-| WG_VPN_EIP_DEV     | AWS Elastic IP for dev VPN           |
-| WG_VPN_EIP_PROD    | AWS Elastic IP for prod VPN          |
+| Secret              | Purpose                              |
+|---------------------|--------------------------------------|
+| HOME_PUBLIC_IP      | Home IP for AWS security groups      |
+| VPN_PUBLIC_KEY_DEV  | Dev VPN EC2 SSH public key           |
+| VPN_PUBLIC_KEY_PROD | Prod VPN EC2 SSH public key          |
+
+See github/variables-secrets.md for the full repo-level secrets reference.
+AWS Elastic IPs for the VPN EC2 instances are NOT GitHub secrets — they
+are Terraform-managed and retrieved via `terraform output` or the AWS
+console after `dev-aws-compute` / `prod-aws-compute` workflows complete.
 
 ---
 

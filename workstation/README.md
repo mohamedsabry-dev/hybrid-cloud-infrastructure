@@ -113,7 +113,7 @@ terraform providers mirror -platform=darwin_arm64 ~/.terraform.d/providers-mirro
 Copy template to `~/.ssh/config`:
 
 ```bash
-cat ssh-config-template >> ~/.ssh/config
+cat ssh-wg/ssh-config-template >> ~/.ssh/config
 ```
 
 **Template contents:**
@@ -140,12 +140,12 @@ Host github.com
 
 Persistent route to reach on-premises 10.x networks via local gateway.
 
-> **Note:** The route `10.0.0.0/8` is now configured at the ISP router level pointing to the ER605 router. The custom route script below is no longer needed on Mac Mini but kept here for reference or alternative setups.
+> **Note:** The `10.0.0.0/8` route is now configured one hop up — at the ISP router level — pointing to the MikroTik router (previously the ER605). The custom route script below is no longer needed on the Mac Mini in the current setup, but is kept here as a reference or fallback for situations where the ISP router can't hold the route (e.g. emergency local runs, different ISP hardware, or when the MikroTik is being rebuilt).
 
 ### Install
 
 ```bash
-cd workstation
+cd workstation/route-setup
 sudo ./install-route.sh
 ```
 
@@ -190,10 +190,15 @@ sudo rm /usr/local/bin/add-route.sh
 
 ## Files in This Directory
 
-| File | Purpose |
-|------|---------|
-| `README.md` | This setup guide |
-| `ssh-config-template` | SSH config entries for VPN hosts |
-| `add-route.sh` | Route add script (called by launchd) |
-| `install-route.sh` | Installer for persistent route |
-| `com.local.route10.plist` | launchd service definition |
+```
+workstation/
+├── README.md                            # This setup guide
+├── route-setup/                         # Persistent route to 10.0.0.0/8 (fallback — see §5)
+│   ├── README.md                        # Local overview
+│   ├── add-route.sh                     # Route add script (called by launchd)
+│   ├── install-route.sh                 # Installer for persistent route
+│   └── com.local.route10.plist          # launchd service definition
+└── ssh-wg/                              # SSH config templates for VPN hosts
+    ├── README.md                        # Local overview
+    └── ssh-config-template              # SSH config entries for wg-dev / wg-prod / GitHub:443
+```

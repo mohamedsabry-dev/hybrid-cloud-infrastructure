@@ -69,12 +69,9 @@ Datacenter → Backup → Add
 
 ### Retention Strategy
 
-**Why `keep_last = 2`?**
+**Current: `keep_last = 5`.** Story behind the number:
 
-| Backup | Purpose | Scenario |
-|--------|---------|----------|
-| Thursday | Pre-weekend restore point | Rollback if Fri/Sat changes break something |
-| Saturday | Captures weekend work | Latest state after changes |
+I started on `keep_last = 2` — one backup Thursday (pre-weekend) and one Saturday (post-weekend). The thinking was minimal footprint: the Thursday copy is a rollback point if Fri/Sat changes break something, and the Saturday copy captures the weekend work. That's the pattern in the diagram below:
 
 ```
 Mon─Tue─Wed─Thu─────────Fri─Sat─────────Sun
@@ -83,9 +80,9 @@ Mon─Tue─Wed─Thu─────────Fri─Sat───────�
         pre-change    post-change
 ```
 
-If Saturday's changes break something → restore Thursday's backup.
+I moved it to `keep_last = 5` after realising how much I actually rely on backups inside the k8s layer — the incident captured in [`troubleshooting/terraform/10-cloud-init-ssh-host-key-regeneration.md`](../../../troubleshooting/terraform/10-cloud-init-ssh-host-key-regeneration.md) is a good example of why: a change made on day 1 doesn't necessarily show up as broken until day 3 or 4, and by then the 2-backup window is already gone. With 5, if I hit an issue on day 5 that turns out to be rooted in an edit from day 1, I can still restore a dummy VM from that day's backup and diff the config / behaviour side-by-side, or do a full restore if I need to.
 
-**Storage cost:** ~24GB total (very light for NAS)
+NAS capacity is not the constraint — there's plenty of storage. The real constraint is how far back in time I can look when an issue turns out to be rooted deeper than I thought.
 
 ### Terraform Config
 Storage retention managed via Terraform:
@@ -95,7 +92,7 @@ variable "nas_data" {
   default = {
     id        = "nas-dev-data"
     content   = ["images", "rootdir", "backup"]
-    keep_last = 2
+    keep_last = 5
   }
 }
 ```

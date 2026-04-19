@@ -10,6 +10,77 @@ Gateway: 192.168.100.1
 DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
 
 ================================================================================
+                         !! READ FIRST !! STATE OF THIS FILE
+================================================================================
+
+This file documents the ORIGINAL switch design, where the FS308GP carried
+BOTH the service VLAN trunks (Ports 2-5) AND the storage VLAN (Ports 6-8).
+
+THAT IS NO LONGER THE CURRENT WIRING.
+
+After the investigation in
+  /troubleshooting/network/3-svc-network-instability-investigation.md
+(TS-NET-003) found the real root cause — USB-ethernet adapter instability
+on the Proxmox servers, not the switch or the router — I simplified the
+wiring:
+
+  - Each Proxmox server's svc0 now connects DIRECTLY to a router port
+    (bypassing the switch entirely for service VLANs).
+  - The FS308GP keeps only the storage VLAN (VLAN 40) role.
+  - Switch ports 2-5 are unused.
+
+I am keeping the sections below because the original design was useful
+reference material and someone reading this (including future-me) should
+be able to see what the "full" switch-based VLAN layout looked like. Think
+of the Port Assignments, VLAN Networks, and Port Profiles sections as the
+HISTORICAL design. The summary right below this block is what is actually
+deployed TODAY.
+
+Also note: references to "ER605 Port 4 / Port 5" in the historical port
+table are the OLD on-prem router. That router has since been replaced by a
+MikroTik L009UiGS-RM — see /network/README.md for the full story.
+
+================================================================================
+                         CURRENT STATE (TODAY)
+================================================================================
+
+Wiring actually in place now:
+
+   ┌───────┬─────────────┬───────────────────────────────────┐
+   │ Port  │ Profile     │ Description                       │
+   ├───────┼─────────────┼───────────────────────────────────┤
+   │ Port1 │ LAN         │ ISP Uplink (Cloud Mgmt)           │
+   │ Port2 │ UNUSED      │ -- (historical: Prod SVC uplink) --│
+   │ Port3 │ UNUSED      │ -- (historical: Dev SVC uplink) -- │
+   │ Port4 │ UNUSED      │ -- (historical: Dev svc0 trunk) -- │
+   │ Port5 │ UNUSED      │ -- (historical: Prod svc0 trunk) --│
+   │ Port6 │ Storage     │ NAS (LAN 1)                       │
+   │ Port7 │ Storage     │ Dev Server (stor0)                │
+   │ Port8 │ Storage     │ Prod Server (stor0)               │
+   └───────┴─────────────┴───────────────────────────────────┘
+
+VLANs actually switching today:
+  - VLAN 1  (management interface — static 192.168.100.185)
+  - VLAN 40 (storage — the only workload VLAN still on this switch)
+  - VLAN 99 (native/dump — native PVID on the unused trunk ports)
+
+Service VLANs (50-55 Prod, 60-65 Dev) are still DEFINED on the switch
+for cleanliness and so the VLAN table matches the rest of the repo, but
+no traffic for those VLANs flows through the switch anymore. It all goes
+Proxmox svc0 -> router directly.
+
+For the router side of this story see /network/router/mikrotik/ and
+/deployment-docs/network-setup-guide.txt.
+
+================================================================================
+                         HISTORICAL DESIGN (FOR REFERENCE)
+================================================================================
+
+The sections below describe the switch as it was originally configured
+when service VLAN trunks ran through it. Kept as reference — no longer
+the deployed wiring.
+
+================================================================================
                          1. INITIAL SETUP (Festa Cloud)
 ================================================================================
 
@@ -19,8 +90,12 @@ DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
    └── Configure VLANs and port profiles
 
 ================================================================================
-                         2. PORT ASSIGNMENTS
+                         2. PORT ASSIGNMENTS   [HISTORICAL]
 ================================================================================
+
+   [!] This table reflects the ORIGINAL wiring. Ports 2-5 are now UNUSED.
+       See "CURRENT STATE" section near the top for today's layout.
+       ER605 references are the old on-prem router (now MikroTik).
 
    ┌───────┬─────────────┬───────────────────────────────────┬─────┬───────────┐
    │ Port  │ Profile     │ Description                       │ PoE │ LoopDet   │
@@ -66,7 +141,9 @@ DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
    └──────────────────┴─────────┴──────┴───────────────────────────────────────┘
 
 ================================================================================
-                         4. PORT PROFILES
+                         4. PORT PROFILES   [HISTORICAL — Prod_SVC_All and
+                                              Dev_SVC_All no longer applied
+                                              to any port; kept for reference]
 ================================================================================
 
    ┌─────────────┬────────────────┬───────────┬───────────────────────┐
@@ -84,7 +161,8 @@ DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
          PVID 99 (DUMP_VLAN) used as native for all trunk ports.
 
 ================================================================================
-                         5. CLI CONFIG REFERENCE
+                         5. CLI CONFIG REFERENCE   [HISTORICAL
+                                                    for the Port2/Port3 trunks]
 ================================================================================
 
    Exported from: network/backups/switchCfg.cfg
@@ -127,19 +205,25 @@ DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
                          6. ACL (Future)
 ================================================================================
 
-   STATUS: Not configured yet
+   STATUS: Not configured yet.
 
-   The FS308GP supports ACLs based on:
-   ├── Port-based rules
-   └── IP-based rules (L3 traffic inspection)
+   NOTE: the original plan here was switch-level ACLs to block inter-VLAN
+   traffic as a defense-in-depth layer alongside the ER605 firewall. Two
+   things have changed since that plan was written:
 
-   ACLs will be added as an additional security layer once the
-   infrastructure reaches a stable phase. This provides defense-in-depth
-   alongside the ER605 firewall rules.
+     1. The switch no longer carries the service VLANs at all (the whole
+        point of the post-TS-NET-003 simplification). So inter-VLAN traffic
+        between service VLANs never even touches this switch anymore — it
+        is all enforced one hop up, at the router.
+     2. The router is now MikroTik, not ER605 — which gives me a much
+        richer firewall-rules surface to do this kind of enforcement
+        cleanly at the router layer rather than pushing it down to the
+        switch.
 
-   TODO:
-   ├── Block inter-VLAN traffic at switch level
-   ├── Restrict management access to specific IPs
-   └── Rate limiting for sensitive ports
+   So "switch-level ACLs for service VLAN isolation" is effectively no
+   longer a goal. What is still potentially useful on the FS308GP:
+     ├── Restrict management access (to the switch itself) to specific IPs
+     └── Storage VLAN hardening if ever needed (currently overkill for a
+         single-NAS setup)
 
 ================================================================================
