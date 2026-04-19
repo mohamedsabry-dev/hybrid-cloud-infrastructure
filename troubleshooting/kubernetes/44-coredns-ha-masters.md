@@ -1,6 +1,6 @@
 # Issue: CoreDNS Not Highly Available - Should Run on Masters
 
-**Status:** SOLUTION IDENTIFIED - Apply Pending
+**Status:** RESOLVED
 **Date Discovered:** 2026-04-18
 **Severity:** CRITICAL
 **Discovered During:** DR Test 2 - Total Worker Loss
@@ -65,28 +65,49 @@ Controller-manager couldn't maintain leadership because DNS was down.
 
 ---
 
-## Solution
+## Solution Applied
 
-Force CoreDNS to run on control-plane nodes only.
+Force CoreDNS to run on control-plane nodes only with podAntiAffinity to spread across masters.
 
-### Command (Apply via Ansible or kubectl):
+### Command Applied (2026-04-18):
 
 ```bash
-kubectl patch deployment coredns -n kube-system --type='strategic' -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/control-plane":""},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+kubectl patch deployment coredns -n kube-system --type='strategic' -p '{
+  "spec":{
+    "template":{
+      "spec":{
+        "nodeSelector":{"node-role.kubernetes.io/control-plane":""},
+        "tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}],
+        "affinity":{
+          "podAntiAffinity":{
+            "requiredDuringSchedulingIgnoredDuringExecution":[{
+              "labelSelector":{"matchLabels":{"k8s-app":"kube-dns"}},
+              "topologyKey":"kubernetes.io/hostname"
+            }]
+          }
+        }
+      }
+    }
+  }
+}'
 ```
 
-### Expected Result:
+### Verified Result:
 
 ```bash
 kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide
 ```
 ```
-NAME                       READY   NODE
-coredns-xxx-yyy            1/1     k8s-master1.lab.local
-coredns-xxx-zzz            1/1     k8s-master2.lab.local
+NAME                       READY   STATUS    NODE
+coredns-74b76c898f-94k7p   1/1     Running   k8s-master2.lab.local
+coredns-74b76c898f-rr6s9   1/1     Running   k8s-master3.lab.local
 ```
 
 Both CoreDNS pods on different masters. Workers can all die, DNS stays up.
+
+### Manual Operations Reference
+
+Command recorded in: `kubernetes/docs/manual-operation.txt`
 
 ---
 
@@ -171,3 +192,6 @@ kubectl run test-dns --rm -it --restart=Never --image=busybox -- nslookup kubern
 | 2026-04-18 21:30 | Manual start of master3 for DNS |
 | 2026-04-18 22:20 | Confirmed DNS works with 1 CoreDNS on master1 |
 | 2026-04-18 22:45 | Solution identified |
+| 2026-04-18 ~23:45 | Fix applied with podAntiAffinity |
+| 2026-04-18 ~23:45 | Verified: CoreDNS on master2 + master3 |
+| 2026-04-18 | **RESOLVED** |

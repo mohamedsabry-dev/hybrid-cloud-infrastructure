@@ -1,0 +1,68 @@
+# Manual Operations
+# Commands that must be run manually (not managed by Flux/GitOps)
+
+================================================================================
+## CoreDNS HA - Force to Masters Only
+================================================================================
+
+When to run:
+- After cluster initial setup
+- After kubeadm upgrade (may reset CoreDNS config)
+- After cluster rebuild
+
+Command:
+kubectl patch deployment coredns -n kube-system --type='strategic' -p '{
+  "spec":{
+    "template":{
+      "spec":{
+        "nodeSelector":{"node-role.kubernetes.io/control-plane":""},
+        "tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}],
+        "affinity":{
+          "podAntiAffinity":{
+            "requiredDuringSchedulingIgnoredDuringExecution":[{
+              "labelSelector":{"matchLabels":{"k8s-app":"kube-dns"}},
+              "topologyKey":"kubernetes.io/hostname"
+            }]
+          }
+        }
+      }
+    }
+  }
+}'
+
+Verify:
+kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide
+
+Expected: Both CoreDNS pods on different master nodes.
+
+Reference: troubleshooting/kubernetes/44-coredns-ha-masters.md
+
+================================================================================
+## kube-controller-manager - Unhealthy Zone Threshold
+================================================================================
+
+When to run:
+- After cluster initial setup
+- After kubeadm upgrade (may reset controller-manager config)
+- After cluster rebuild
+
+Purpose:
+Raise threshold so PartialDisruption mode triggers at 80% instead of 55%.
+This ensures all NotReady nodes get NoExecute taint for proper eviction.
+
+Edit on ALL masters:
+/etc/kubernetes/manifests/kube-controller-manager.yaml
+
+Add this flag:
+    - --unhealthy-zone-threshold=0.8
+
+Static pod restarts automatically after file save.
+
+Verify:
+kubectl get pod -n kube-system kube-controller-manager-k8s-master1.lab.local -o yaml | grep unhealthy
+
+Expected: --unhealthy-zone-threshold=0.8
+
+Reference: troubleshooting/kubernetes/43-noexecute-taint-not-applied.md
+
+================================================================================
