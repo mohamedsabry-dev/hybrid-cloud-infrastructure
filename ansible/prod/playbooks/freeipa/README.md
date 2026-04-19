@@ -1,88 +1,66 @@
-# FreeIPA Playbooks
+# FreeIPA Playbooks — PROD
 
-Identity management playbooks for FreeIPA server and client configuration.
+Ansible playbooks that install FreeIPA, enroll managed hosts in the domain,
+create users/groups/HBAC/sudo rules, and apply the LXC-specific Kerberos
+fixes. The Ansible side of the broader FreeIPA story — for the full identity
+layer (DNS architecture, keytab lifecycle, dependency map, LXC UID range
+rationale, dual inventory) see
+[`../../../../deployment-docs/freeipa-overview.md`](../../../../deployment-docs/freeipa-overview.md).
+
+For run order + commands see [`freeipa-setup-guide.txt`](freeipa-setup-guide.txt).
+
+---
 
 ## Playbooks
 
 | Playbook | Purpose | Target |
 |----------|---------|--------|
-| `freeipa_setup.yml` | Install and configure FreeIPA server | freeipa |
-| `add_hosts_to_ipa.yml` | Join hosts to FreeIPA domain | all (except freeipa) |
-| `domain_config.yml` | Configure users, groups, HBAC, sudo rules | freeipa |
-| `fix_lxc_krb5_keyring.yml` | Fix Kerberos ccache on LXC containers | lxc |
+| `freeipa_setup.yml` | Install + configure FreeIPA server | `freeipa` |
+| `add_hosts_to_ipa.yml` | Join managed hosts to the domain via `ipaclient` role | all (except freeipa) |
+| `domain_config.yml` | Create host groups, bot + admin users, HBAC, sudo rules, password policies | `freeipa` |
+| `add_dns_records.yml` | Add A records for VIPs (`vault.lab.local`, `k8s.lab.local`) + per-app names | `freeipa` |
+| `fix_lxc_krb5_keyring.yml` | Switch LXC Kerberos cache from keyring to FILE (fixes TS-IDN-001) | `lxc` |
+| `dns_fallback.yml` | Add 8.8.8.8 fallback in `/etc/NetworkManager/conf.d/zzz-ipa.conf` on every node | all managed hosts |
 
-## Deployment Order
+## Key settings (applied by `freeipa_setup.yml`)
 
-Run playbooks in this order for initial setup:
+- **Domain / Realm:** `lab.local` / `LAB.LOCAL`
+- **UID range:** `60001–65500` (fits LXC unprivileged UID mapping — TS-IDN-006)
+- **DNS forwarders:** `8.8.8.8`, `1.1.1.1`
+- **Credential source:** env vars injected by GitHub workflow from AWS Secrets Manager
 
-```
-1. freeipa_setup.yml      - Install FreeIPA server
-2. add_hosts_to_ipa.yml   - Join all hosts to domain
-3. domain_config.yml      - Create users, groups, rules
-4. fix_lxc_krb5_keyring.yml - Fix LXC Kerberos issues
-```
+## Domain structure (applied by `domain_config.yml`)
 
-## Playbook Details
+- **Host groups:** `automation_group`, `k8s_masters`, `k8s_workers`, `vault_cluster`, `ansible_nodes`, `runner_nodes`, `nginx_nodes`
+- **Bot users:** `super_bot` (passwordless sudo via HBAC for automation)
+- **Admin users:** `k8s_admin`, `vault_admin`, `nginx_admin`, `ansible_admin`, `runner_admin`
+- **Password policies:** relaxed for `automation_users`, strict for `admin_users` (cospriority gate — TS-IDN-004)
 
-### freeipa_setup.yml
+## LXC-specific (applied by `fix_lxc_krb5_keyring.yml`)
 
-Installs FreeIPA server with:
-- Domain: `lab.local`
-- Realm: `LAB.LOCAL`
-- UID range: 60001-65500 (fits LXC unprivileged mapping)
-- DNS with forwarders (8.8.8.8, 1.1.1.1)
-
-**Credentials:** Injected via environment variables from AWS Secrets Manager.
-
-### add_hosts_to_ipa.yml
-
-Joins all managed hosts to the FreeIPA domain using the `ipaclient` role.
-
-**Pre-requisites:**
-- FreeIPA server must be running
-- Target hosts must resolve FreeIPA DNS
-
-### domain_config.yml
-
-Creates domain structure:
-- **Host Groups:** automation_group, k8s_masters, k8s_workers, vault_cluster, etc.
-- **Bot Users:** super_bot (passwordless sudo)
-- **Admin Users:** k8s_admin, vault_admin, nginx_admin, etc.
-- **HBAC Rules:** SSH access rules per user/hostgroup
-- **Sudo Rules:** Privilege escalation rules
-- **Password Policies:** 4 years for automation, 1 year for admins
-
-### fix_lxc_krb5_keyring.yml
-
-Fixes Kerberos credential cache issue on LXC containers.
-
-**Problem:** Unprivileged LXC uses kernel keyring by default, which fails due to UID mapping.
-
-**Solution:** Switch to FILE-based ccache (`/tmp/krb5cc_%U`).
-
-**Reference:** See `/troubleshooting/identity/17-lxc-kerberos-keyring-auth-failure.md`
-
-## Usage
-
-```bash
-# Install FreeIPA server (run from mac-mini via workflow)
-ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml
-
-# Join hosts to domain
-ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml
-
-# Configure domain (requires kinit admin)
-ansible-playbook playbooks/freeipa/domain_config.yml
-
-# Fix LXC Kerberos (after domain join)
-ansible-playbook playbooks/freeipa/fix_lxc_krb5_keyring.yml
-```
+Unprivileged LXC containers use UID-remapping that breaks the default kernel
+keyring Kerberos cache. The playbook sets `krb5_ccache_template = FILE:/tmp/krb5cc_%U`
+in sssd.conf so credentials go to a file path instead. See TS-IDN-001.
 
 ## Troubleshooting
 
-See `/troubleshooting/` (repo root) for detailed issue resolutions:
+See `/troubleshooting/identity/` (repo root) for the per-case writeups:
 
-| Category | Issues |
-|----------|--------|
-| identity/ | FreeIPA DNS, Kerberos, LXC keyring, SSSD |
-| linux/ | UID mapping, NTP, Rocky Linux repos |
+| Case | Issue |
+|------|-------|
+| 1 | LXC Kerberos keyring UID mismatch → FILE ccache |
+| 2 | FreeIPA DNS forwarders + BIND recursion |
+| 3 | Kerberos GSSAPI requires FQDN (not IP) |
+| 4 | Per-group password policy needs `cospriority` |
+| 5 | FreeIPA server is provider, not a client (sudo rules don't apply to itself) |
+| 6 | UID range must fit LXC subuid map |
+| 7 | Skip NTP on LXC client enrollment |
+| 8 | Keytab invalidated by password change (regenerate with `-r`) |
+| 9 | Ansible 28s delay from SSSD KnownHostsCommand |
+
+## Related
+
+- [`freeipa-setup-guide.txt`](freeipa-setup-guide.txt) — run order + commands
+- [`../../../../deployment-docs/freeipa-overview.md`](../../../../deployment-docs/freeipa-overview.md) — identity-layer system overview
+- [`../../../../deployment-docs/freeipa-initial-setup-guide.txt`](../../../../deployment-docs/freeipa-initial-setup-guide.txt) — sequenced step-7 walkthrough
+- [`../../inventory/group_vars/freeipa.yml`](../../inventory/group_vars/freeipa.yml) — host groups + user definitions + encrypted passwords

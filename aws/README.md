@@ -40,53 +40,7 @@ Future one-off operations stories (another account migration, a region move, a d
 
 Bootstrap stacks are sensitive — they manage state buckets, admin users, and the permissions boundary that protects everything else. **Never execute a stack update without inspecting the change set first.**
 
-### Step 1 — Create a change set (Console or CLI, do NOT execute immediately)
-
-### Step 2 — Inspect changes
-
-```bash
-# Generic form — replace <STACK_NAME>, <CHANGE_SET_NAME>, <REGION>
-aws cloudformation describe-change-set \
-    --stack-name <STACK_NAME> \
-    --change-set-name <CHANGE_SET_NAME> \
-    --region <REGION> \
-    --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
-```
-
-Per-env quick commands:
-
-```bash
-# Dev (us-east-1)
-aws cloudformation describe-change-set --stack-name bootstrap-dev \
-    --change-set-name <CHANGE_SET_NAME> --region us-east-1 \
-    --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
-
-# Prod (eu-west-2)
-aws cloudformation describe-change-set --stack-name bootstrap-prod \
-    --change-set-name <CHANGE_SET_NAME> --region eu-west-2 \
-    --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
-```
-
-### Step 3 — What to accept / what to reject
-
-Only execute the change set if every row matches:
-
-| What to check | Safe value |
-|---------------|------------|
-| `Action` | `Modify` — avoid `Delete` or `Replace` on bootstrap resources |
-| `RequiresRecreation` | `Never` |
-| `ChangeSource` | `DirectModification` |
-| `Target.Attribute` | Matches what you actually edited in the YAML |
-
-### Understanding `Target.Attribute`
-
-| Value | Meaning |
-|-------|---------|
-| `Tags` | Only tags changing — harmless |
-| `Properties` | Resource configuration changing — inspect which property |
-| `PolicyDocument` | IAM policy content changing — read the diff carefully |
-
-**Heads-up on stack-level tags:** adding a tag in the CloudFormation console during a stack update (a stack-level tag) propagates to every taggable resource. You'll see every resource show `Action: Modify` with `Target.Attribute: Tags`. Expected and harmless, not actual infrastructure change.
+Commands + what-to-accept table: [`change-set-inspection-guide.txt`](change-set-inspection-guide.txt)
 
 ---
 

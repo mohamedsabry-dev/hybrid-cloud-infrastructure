@@ -4,7 +4,7 @@ Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
 Relevant folders: troubleshooting/network/ (Cases 4-5: WireGuard CGNAT and stability)
 
-For more details, see: network/vpn/wireguard-setup.md
+For more details, see: network/vpn/wireguard-setup-guide.txt
 
 ---
 
@@ -56,7 +56,7 @@ responds to whatever source port the packet arrived from.
 IMPORTANT: Tunnel IPs are deliberately placed within each AWS VPC CIDR so
 one AllowedIPs entry covers both tunnel and VPC. Full reasoning (including
 why this pattern emerged from an ER605 single-CIDR-per-peer limitation and
-was kept on MikroTik for continuity) is in network/vpn/wireguard-setup.md
+was kept on MikroTik for continuity) is in network/vpn/wireguard-setup-guide.txt
 under "Why tunnel IPs live inside the VPC CIDR".
 
 ---
@@ -366,7 +366,7 @@ Cross-environment traffic is blocked.
 
 | Component                | Path                                              |
 |--------------------------|---------------------------------------------------|
-| WireGuard Setup Guide    | network/vpn/wireguard-setup.md                    |
+| WireGuard Setup Guide    | network/vpn/wireguard-setup-guide.txt                    |
 | Setup Script             | network/vpn/setup-wireguard.sh                    |
 | Quick Config Reference   | network/vpn/wireguard-config.txt                  |
 | AWS Network Terraform    | terraform/dev/aws/network/                        |

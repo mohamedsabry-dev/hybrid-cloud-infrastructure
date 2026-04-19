@@ -20,8 +20,11 @@ Follow these guides **in order**. Each step depends on the previous ones being c
 | 7 | [freeipa-initial-setup-guide.txt](freeipa-initial-setup-guide.txt) | FreeIPA identity management |
 | 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster |
 | 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster |
-| 10 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection |
-| 11 | [nginx-setup-guide.txt](nginx-setup-guide.txt) | Nginx reverse proxy for K8s services |
+| 10 | [k8s-flux-setup-guide.txt](k8s-flux-setup-guide.txt) | Flux bootstrap on K8s + app/infra loop pattern |
+| 11 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection |
+| 12 | [k8s-etcd-vault-aws-integration.txt](k8s-etcd-vault-aws-integration.txt) | etcd backup CronJob → Vault AWS Secrets Engine → S3 (temp STS creds, no long-lived keys in K8s) |
+| 13 | [enpoint-dns-ingress-exnginx-setup-guide.txt](enpoint-dns-ingress-exnginx-setup-guide.txt) | Endpoint DNS + ingress-nginx controller + external Nginx reverse proxy |
+| 14 | [remediation-integration-guide.txt](remediation-integration-guide.txt) | Remediation integration — Proxmox API + K8s + Alertmanager for worker self-healing |
 
 ---
 
@@ -46,7 +49,11 @@ Ansible + Runner (Step 6)
     └── FreeIPA (Step 7)     ← All services depend on FreeIPA for DNS/auth
             ├── Vault (Step 8)
             └── Kubernetes (Step 9)
-                    └── Nginx (Step 11)  ← Reverse proxy for K8s services
+                    └── Flux bootstrap (Step 10)        ← GitOps reconciles everything below
+                            ├── Vault-K8s trust (Step 11)
+                            ├── etcd-backup → Vault → S3 (Step 12)
+                            ├── Endpoint DNS + ingress (Step 13)
+                            └── Remediation (Step 14)   ← Worker self-healing via Proxmox API
 ```
 
 ---
@@ -57,7 +64,7 @@ These documents provide reference information, not deployment steps:
 
 | Document | Purpose |
 |----------|---------|
-| [capacity-planning.md](capacity-planning.md) | Resource allocation for VMs/LXCs |
+| [../proxmox/capacity-planning.md](../proxmox/capacity-planning.md) | Resource allocation for VMs/LXCs (lives in the proxmox/ folder) |
 
 ---
 

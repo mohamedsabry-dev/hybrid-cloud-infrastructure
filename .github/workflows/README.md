@@ -66,88 +66,21 @@ Triggered by changes under `kubernetes/docker-images/**`. Uses `dorny/paths-filt
 
 ---
 
-## Key Decisions
+## Patterns worth knowing
 
-### 1. Always Use `terraform init -upgrade`
+- **`terraform init -upgrade` everywhere.** Picks up the latest patch version within each pinned constraint. Providers are cached in the Mac Mini runner's `~/.terraform.d/providers-mirror`, so no download overhead. Pin exact versions only when debugging a regression.
 
-**Decision:** All workflows use `terraform init -upgrade`
+- **Mask secrets BEFORE jq parsing.** `echo "::add-mask::${API_SECRET}"` runs on the raw JSON first, then individual field extraction happens after. Otherwise a jq error could leak the secret into logs.
 
-**Why:**
-- Provider versions are locked in Terraform provider blocks (e.g., `version = "~> 0.96.0"`)
-- `-upgrade` gets the latest patch version within our constraints (bug fixes, security patches)
-- Local provider mirror at `$HOME/.terraform.d/providers-mirror` caches versions (no overhead)
-- Without `-upgrade`, Terraform reuses whatever's in `.terraform/` which may be outdated
+- **`ANSIBLE_HOST` / `ANSIBLE_USER` env vars at workflow top.** Not hardcoded in every step. Single source per workflow, dev/prod difference is one line.
 
-**Exception:** If debugging a regression, temporarily pin exact version: `version = "= 0.95.0"`
+- **`always()` on dependent jobs**, so each evaluates its own lock instead of being auto-skipped when upstream is skipped:
+  ```
+  if: ${{ always() && needs.deploy.result != 'failure' && needs.deploy.result != 'cancelled' && vars.LOCK != 'true' }}
+  ```
+  Rows in a multi-job workflow: success/skipped upstream → downstream runs (if unlocked); failed/cancelled upstream → downstream skips.
 
-### 2. Mask Secrets Immediately After Fetch
-
-**Decision:** Mask `API_SECRET` before any jq parsing
-
-```yaml
-API_SECRET=$(aws secretsmanager get-secret-value ...)
-echo "::add-mask::${API_SECRET}"    # FIRST - mask raw JSON
-
-TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
-# ... then mask parsed values
-```
-
-**Why:** If jq fails or logs the input, the raw secret could be exposed. Masking first ensures it's redacted in all scenarios.
-
-### 3. Environment Variables for IPs
-
-**Decision:** Use `ANSIBLE_HOST`/`ANSIBLE_USER` env vars instead of hardcoded IPs
-
-```yaml
-env:
-  ANSIBLE_HOST: 10.0.63.10
-  ANSIBLE_USER: root
-
-# In steps:
-ssh ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "command"
-```
-
-**Why:**
-- Single source of truth at top of workflow
-- Easy to spot environment differences (DEV=63, PROD=53)
-- Prevents copy-paste errors
-
-### 4. Multi-Job Workflow Pattern with `always()`
-
-**Decision:** Use `always()` to ensure downstream jobs evaluate their conditions
-
-```yaml
-if: ${{ always() && needs.deploy.result != 'failure' && needs.deploy.result != 'cancelled' && vars.LOCK != 'true' }}
-```
-
-**Why:** GitHub auto-skips downstream jobs when upstream is skipped. Using `always()` forces condition evaluation so each job can decide independently based on its own lock.
-
-| Previous Job | Next Job Behavior |
-|--------------|-------------------|
-| Success | Runs (if unlocked) |
-| Skipped (locked) | Runs (if unlocked) |
-| Failed | Skips |
-| Cancelled | Skips |
-
-### 5. Standardized Section Headers
-
-**Decision:** Use consistent comment separators
-
-```yaml
-# =============================================================================
-# FILE LEVEL - Title and description
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# SECTION LEVEL - Triggers, Permissions, etc.
-# -----------------------------------------------------------------------------
-
-  # ---------------------------------------------------------------------------
-  # JOB LEVEL - Job description with lock variable
-  # ---------------------------------------------------------------------------
-```
-
-**Why:** Makes workflows scannable, clear hierarchy, easy to navigate.
+- **Three-tier comment separators** (file / section / job) for scannability. See any existing workflow for the exact format.
 
 ---
 
@@ -221,37 +154,10 @@ The `{ENV}_GH_RUNNER_TOKEN` expires in ~1 hour. Generate fresh token immediately
 
 ## LXC SSH Key Injection
 
-### The Problem
+The bpg/proxmox provider's `clone` block silently ignores `user_account` keys/passwords on LXCs. All LXC modules in this repo use the `operating_system { template_file_id = ... }` pattern (vzdump template file on `nas-iso`) instead. Full reasoning + commands:
 
-The bpg/proxmox Terraform provider's **clone method** for LXC containers does NOT support SSH key injection. Keys specified in `user_account {}` are silently ignored.
-
-### Solution: Template Conversion
-
-Convert LXC to template file using vzdump:
-
-```bash
-pct stop 9001
-vzdump 9001 --compress gzip --storage local --mode stop
-mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
-```
-
-Then use `operating_system { template_file_id }` instead of `clone {}`:
-
-```hcl
-operating_system {
-  template_file_id = "nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
-  type             = "centos"
-}
-
-initialization {
-  user_account {
-    keys     = var.ssh_public_keys  # Works with template method
-    password = var.root_password
-  }
-}
-```
-
-**Decision:** We use Template Conversion for all LXCs to ensure SSH keys work at first boot.
+- [`../../terraform/dev/proxmox/lxc/DESIGN.md`](../../terraform/dev/proxmox/lxc/DESIGN.md) — why template-file vs clone-from-ID
+- [`../../proxmox/golden_templates/lxc-template-finalize-guide.txt`](../../proxmox/golden_templates/lxc-template-finalize-guide.txt) — the vzdump + move commands
 
 ---
 

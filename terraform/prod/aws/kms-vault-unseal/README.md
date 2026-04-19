@@ -1,35 +1,45 @@
-# AWS KMS Vault Unseal Module
+# AWS KMS Vault Unseal Module — PROD
 
-Manages KMS key and IAM user for HashiCorp Vault auto-unseal.
+Provisions the AWS-side pieces Vault needs for auto-unseal: the KMS key,
+a dedicated IAM user, and two Secrets Manager entries holding the IAM
+credentials and the Vault recovery keys.
 
-## Resources Created
+---
+
+## Resources
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| KMS Key | `vault-unseal-key` | Encrypt/decrypt Vault master key |
-| KMS Alias | `alias/vault-unseal` | Human-readable key reference |
-| IAM User | `vault-unseal` | Service account for Vault |
-| IAM Access Key | - | Credentials for Vault |
-| Secret | `prod/vault/unseal-credentials` | Stores IAM credentials |
-| Secret | `prod/vault/unseal-keys` | Stores Vault recovery keys |
+| KMS Key | `vault-unseal-key` | Encrypt/decrypt Vault master key (auto-unseal) |
+| KMS Alias | `alias/vault-unseal` | Stable alias Vault config references |
+| IAM User | `vault-unseal` | Dedicated service account used ONLY for unseal |
+| IAM Access Key | — | Credentials for the `vault-unseal` user |
+| Secret | `prod/vault/unseal-credentials` | Stores the IAM access key / secret key |
+| Secret | `prod/vault/unseal-keys` | Stores Vault recovery keys (populated post-init) |
 
-## Usage
-
-After Vault initialization, store recovery keys:
-
-```bash
-aws secretsmanager put-secret-value \
-  --secret-id prod/vault/unseal-keys \
-  --secret-string '{"key1":"xxx","key2":"xxx","key3":"xxx","key4":"xxx","key5":"xxx","root":"xxx"}'
-```
-
-## File Structure
+## File structure
 
 | File | Purpose |
 |------|---------|
-| `kms.tf` | KMS key with IAM policy (identical dev/prod) |
-| `user.tf` | IAM user and access key (identical dev/prod) |
+| `kms.tf` | KMS key + alias + IAM policy (identical dev/prod) |
+| `user.tf` | IAM user + access key (identical dev/prod) |
 | `secret.tf` | Secrets Manager resources (identical dev/prod) |
-| `outputs.tf` | Key and secret ARNs (identical dev/prod) |
-| `variables.tf` | Environment-specific configuration |
-| `provider.tf` | Backend and provider config |
+| `outputs.tf` | Key + secret ARNs (identical dev/prod) |
+| `variables.tf` | Env-specific config |
+| `provider.tf` | Backend + provider config |
+
+## Populating recovery keys after Vault init
+
+The `prod/vault/unseal-keys` secret is created with a placeholder. After
+Vault is initialized (manual step, one-time), the recovery keys returned
+by `vault operator init` must be stored here. Procedure + commands:
+
+  deployment-docs/vault-initial-setup-guide.txt
+  deployment-docs/vault-overview.md
+
+## Related
+
+- [`../vault-trust/`](../vault-trust/) — the OTHER Vault-AWS integration (AWS Secrets Engine for etcd-backup)
+- [`../../../../.github/workflows/prod-aws-kms-vault-unseal.yml`](../../../../.github/workflows/prod-aws-kms-vault-unseal.yml) — apply workflow (runs on `prod-security` branch, elevated privileges)
+- [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md) — how Vault consumes this
+- [`../../../../deployment-docs/vault-initial-setup-guide.txt`](../../../../deployment-docs/vault-initial-setup-guide.txt) — recovery-key storage procedure

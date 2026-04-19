@@ -59,21 +59,7 @@ Scripts to prepare base VM/LXC images for cloning. Run once (per OS rebuild) to 
    - Clear network config, SSH host keys
    - Clear machine-id, logs, cache, history
 
-**Final steps (manual):**
-```bash
-# Stop container
-pct stop 9001
-
-# Create vzdump backup
-vzdump 9001 --compress gzip --storage local --mode stop
-
-# Move to template cache
-mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz \
-   /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
-
-# Verify
-pveam list nas-iso
-```
+**Final steps (manual)** — Proxmox-host-side vzdump + move to template cache. See [`lxc-template-finalize-guide.txt`](lxc-template-finalize-guide.txt) for the commands.
 
 ## Key Differences
 

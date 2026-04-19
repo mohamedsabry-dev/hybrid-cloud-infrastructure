@@ -335,7 +335,7 @@ AWS EIP cost: free while associated with a running instance.
 _____________________________________________________________________
 
 [References]
-- network/vpn/wireguard-setup.md
+- network/vpn/wireguard-setup-guide.txt
 - network/vpn/wireguard-config.txt
 - TS-NET-004 — CGNAT port blocking (related separate incident)
 

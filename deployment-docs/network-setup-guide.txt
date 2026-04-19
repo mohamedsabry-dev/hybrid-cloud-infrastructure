@@ -282,7 +282,7 @@ MikroTik router.
 Full setup (AWS EC2 side config, on-prem peer config, keepalive service,
 CGNAT workaround, AllowedIPs reasoning, TS references) is documented in:
 
-    network/vpn/wireguard-setup.md
+    network/vpn/wireguard-setup-guide.txt
 
 The per-device configs live in:
 

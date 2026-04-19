@@ -1,0 +1,81 @@
+# Proxmox Bootstrap — Operation Guide
+
+Run-order + per-script description for the three bootstrap scripts in this
+folder. Run once per Proxmox VE host after a fresh install.
+
+See DESIGN.md for why the scripts are split this way. See README.md for
+scope + environment differences table.
+
+---
+
+## Run order
+
+  # 1. Core system setup (console OR SSH is fine)
+  ./bootstrap.sh dev          # or: ./bootstrap.sh prod
+
+  # 2. Network configuration (run from CONSOLE — NOT over WiFi,
+  #    it will disconnect you)
+  ./network-setup.sh dev      # or: ./network-setup.sh prod
+
+  # 3. Reboot to apply network changes
+  reboot
+
+  # 4. Optional: email notifications via Gmail SMTP
+  #    (see mail-config-guide.txt for the full procedure)
+  ./mail-config.sh
+
+---
+
+## What each script does
+
+### bootstrap.sh
+
+1. Disable sleep / suspend / hibernate
+2. Add fallback DNS (8.8.8.8)
+3. Disable Proxmox enterprise repos, enable no-subscription repo
+4. apt update + upgrade
+5. Remove subscription nag popup
+6. Configure Chrony NTP + timezone (Africa/Cairo)
+7. Create admin user (`admin_dev` or `admin_prod`)
+8. Create Terraform automation user (`tf_dev` or `tf_prod`)
+
+### network-setup.sh
+
+1. Install wpa_supplicant
+2. Configure WiFi (unified_mgmt SSID)
+3. Test WiFi connectivity
+4. Configure /etc/network/interfaces:
+   - WiFi management interface
+   - Service VLAN trunk (vmbr0)
+   - Storage VLAN interface (stor0)
+5. Update /etc/hosts
+6. Regenerate Proxmox SSL certificate
+
+### mail-config.sh
+
+Minimal wrapper. For the full manual procedure, see:
+  mail-config-guide.txt
+
+---
+
+## Prerequisites
+
+- Fresh Proxmox VE 9.x installation
+- Console or storage-network access (for network-setup.sh)
+- WiFi password for `unified_mgmt` network
+- Gmail App Password for mail-config.sh (see mail-config-guide.txt)
+
+## Notes
+
+- **network-setup.sh** — run from console or storage network, NOT over WiFi;
+  reconfiguring the WiFi interface will disconnect you mid-script.
+- **mail-config.sh** — requires Gmail App Password, not regular password.
+  See mail-config-guide.txt for the App Password generation procedure.
+- Scripts are idempotent — safe to re-run.
+
+## Related
+
+- README.md                       — folder scope + file listing + env differences
+- DESIGN.md                       — why the scripts split (SSH-disconnect risk, manual-first origin)
+- mail-config-guide.txt           — full Gmail SMTP relay manual setup
+- vmbr1-vlan40-setup.txt          — storage VLAN bridge setup reference

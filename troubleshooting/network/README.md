@@ -55,6 +55,6 @@ Documentation of network-level issues encountered in the hybrid cloud infrastruc
 
 ## Related Documentation
 
-- `network/vpn/wireguard-setup.md` - Full VPN setup guide
+- `network/vpn/wireguard-setup-guide.txt` - Full VPN setup guide
 - `network/vpn/wireguard-config.txt` - Quick reference config
 

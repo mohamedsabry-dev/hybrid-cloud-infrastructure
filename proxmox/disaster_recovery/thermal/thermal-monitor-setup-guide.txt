@@ -1,0 +1,41 @@
+# Thermal Monitor — Setup & Manual Check
+
+Install, schedule, and spot-check `temperature_monitor.sh` on each Proxmox host.
+
+See README.md for the threshold table and the mail-config dependency.
+
+---
+
+## Install
+
+  # On each Proxmox host
+  mkdir -p /root/scripts
+  scp temperature_monitor.sh root@pve-dev:/root/scripts/
+  scp temperature_monitor.sh root@pve-prod:/root/scripts/
+  chmod +x /root/scripts/temperature_monitor.sh
+
+---
+
+## Schedule via cron (every 5 min)
+
+  crontab -e
+
+Add the line:
+
+  */5 * * * * /root/scripts/temperature_monitor.sh >> /var/log/temperature_monitor.log 2>&1
+
+---
+
+## Manual check
+
+  cat /sys/class/thermal/thermal_zone0/temp              # raw milli-°C
+  /root/scripts/temperature_monitor.sh                    # one-shot run
+  tail -20 /var/log/temperature_monitor.log               # recent readings
+
+---
+
+## Related
+
+- README.md               — threshold table + scope
+- temperature_monitor.sh  — the monitor script
+- ../../bootstrap_proxmox/mail-config-guide.txt — mail relay setup (prereq for alert emails)

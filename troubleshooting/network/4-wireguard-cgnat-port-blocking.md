@@ -143,7 +143,7 @@ Note: No impact — just using a different port number.
 _____________________________________________________________________
 
 [References]
-- network/vpn/wireguard-setup.md
+- network/vpn/wireguard-setup-guide.txt
 - network/vpn/wireguard-config.txt
 
 _____________________________________________________________________

@@ -1,0 +1,73 @@
+# CloudFormation Change Set Inspection — Guide
+
+Bootstrap stacks manage state buckets, admin users, and the permissions
+boundary that protects everything else. **Never execute a stack update
+without inspecting the change set first.**
+
+See aws/README.md for the rule + what-to-accept table. This file is the
+commands.
+
+---
+
+## Step 1 — Create a change set (Console or CLI)
+
+Do NOT execute immediately. Create the change set first so you can inspect
+it before applying.
+
+---
+
+## Step 2 — Inspect the change set
+
+### Generic form
+
+  aws cloudformation describe-change-set \
+      --stack-name <STACK_NAME> \
+      --change-set-name <CHANGE_SET_NAME> \
+      --region <REGION> \
+      --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
+
+### Per-env shortcuts
+
+  # Dev (us-east-1)
+  aws cloudformation describe-change-set --stack-name bootstrap-dev \
+      --change-set-name <CHANGE_SET_NAME> --region us-east-1 \
+      --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
+
+  # Prod (eu-west-2)
+  aws cloudformation describe-change-set --stack-name bootstrap-prod \
+      --change-set-name <CHANGE_SET_NAME> --region eu-west-2 \
+      --query 'Changes[].ResourceChange.{LogicalId:LogicalResourceId,Action:Action,Details:Details}'
+
+---
+
+## Step 3 — Execute only if every row matches the safe values
+
+| What to check | Safe value |
+|---------------|------------|
+| `Action` | `Modify` — avoid `Delete` or `Replace` on bootstrap resources |
+| `RequiresRecreation` | `Never` |
+| `ChangeSource` | `DirectModification` |
+| `Target.Attribute` | Matches what you actually edited in the YAML |
+
+### Understanding `Target.Attribute`
+
+| Value | Meaning |
+|-------|---------|
+| `Tags` | Only tags changing — harmless |
+| `Properties` | Resource configuration changing — inspect which property |
+| `PolicyDocument` | IAM policy content changing — read the diff carefully |
+
+### Common false alarm
+
+Adding a tag in the CloudFormation console during a stack update (a stack-level
+tag) propagates to every taggable resource. You'll see every resource show
+`Action: Modify` with `Target.Attribute: Tags`. Expected and harmless — not an
+actual infrastructure change.
+
+---
+
+## Related
+
+- README.md        — folder scope + when to run this
+- bootstrap.md     — what the stacks contain (resources + IAM)
+- DESIGN.md        — why CloudFormation for bootstrap (and not Terraform)
