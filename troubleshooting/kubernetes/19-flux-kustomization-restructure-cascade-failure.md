@@ -285,7 +285,7 @@ _____________________________________________________________________
 [References]
 - troubleshooting/kubernetes/22-worker-node-failure-cascading-pod-failures.md
 - disaster-recovery/task-1-pod-kill/RESULTS.md
-- kubernetes/docs/flux_restructuring_operation_guide.md
+- kubernetes/docs/flux-restructuring-operation-guide.md
 
 _____________________________________________________________________
 

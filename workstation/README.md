@@ -24,6 +24,7 @@
 
 # Required tools
 brew install python node terraform ansible awscli sshpass
+brew install kubectl fluxcd/tap/flux kustomize kubeconform
 brew install --cask docker powershell
 ```
 
@@ -37,6 +38,10 @@ brew install --cask docker powershell
 | Node.js | GitHub Actions runner |
 | PowerShell | VMware/Windows automation |
 | sshpass | SSH password auth for LXC provisioning |
+| kubectl | Read cluster state from laptop |
+| flux CLI | `flux diff` pre-push validation + `flux get` status checks |
+| kustomize | Local `kustomize build` for offline manifest rendering |
+| kubeconform | Offline manifest schema validation (CRD-aware fallback when cluster unreachable) |
 
 ---
 
@@ -175,7 +180,36 @@ sudo rm /usr/local/bin/add-route.sh
 
 ---
 
-## 6. Validation Checklist
+## 6. Local kubectl + flux access (for pre-push validation)
+
+The Mac Mini also reaches the on-prem Kubernetes clusters directly over the `10.x` route, so I can run `kubectl`, `flux get`, and most importantly `flux diff` as part of my pre-push review loop — catching schema errors, accidental prunes, and misconfigurations *before* they hit the `dev` branch and trigger a Flux reconcile. This was adopted after reviewing the Flux apply flow during consolidation and tying the pattern back to two incidents the habit would have prevented (TS-K8S-019 restructure cascade, TS-K8S-042 retry storm).
+
+Full setup guide:
+- [`../kubernetes/docs/local-kubectl-flux-setup.md`](../kubernetes/docs/local-kubectl-flux-setup.md)
+
+Quick summary:
+
+```bash
+brew install kubectl fluxcd/tap/flux kustomize kubeconform
+
+# Pull kubeconfigs from masters (one per env):
+ssh super_bot@<dev-master-ip>  'sudo cat /etc/kubernetes/admin.conf' > ~/.kube/config-dev
+ssh super_bot@<prod-master-ip> 'sudo cat /etc/kubernetes/admin.conf' > ~/.kube/config-prod
+
+# Aliases in ~/.zshrc:
+alias kdev='export KUBECONFIG=~/.kube/config-dev'
+alias kprod='export KUBECONFIG=~/.kube/config-prod'
+
+# Pre-push validation workflow (dev-only, matches the terraform plan-from-dev pattern):
+kdev
+flux diff kustomization infrastructure --path ./kubernetes/dev/deployments/infrastructure
+```
+
+> **Acknowledged flaw:** this currently uses `admin.conf` on the laptop — an unrestricted superuser identity. Logged as a known gap; intent is to later replace with a read-only RBAC-governed user, with mutating operations confined to GitOps + CI. See the setup guide for the acknowledgement.
+
+---
+
+## 7. Validation Checklist
 
 | Check | Command | Expected |
 |-------|---------|----------|
@@ -185,6 +219,8 @@ sudo rm /usr/local/bin/add-route.sh
 | SSH to WG | `ssh wg-dev` | Connects |
 | Terraform | `terraform version` | Shows version |
 | Docker | `docker ps` | No errors |
+| kubectl (dev) | `kdev && kubectl get nodes` | 6 nodes Ready |
+| flux CLI | `flux get kustomizations` | flux-system / infrastructure / apps all Ready: True |
 
 ---
 
