@@ -1,8 +1,18 @@
-# Troubleshooting
+# Troubleshooting (PoC v1 — archived)
+
+> **Archived PoC v1 material.** These 31 cases document real incidents I hit
+> during the VMware-based PoC that was retired before the Kubernetes phase.
+> The infrastructure they refer to is no longer deployed. See
+> [`../README.md`](../README.md) for the retirement story.
+>
+> Troubleshooting for the **current** project lives at
+> [`/troubleshooting/`](../../troubleshooting/) (repo root).
 
 **Cross-Cutting Concern - Common Issues, Solutions, and Lessons Learned**
 
-This section contains troubleshooting guides, common issues, and lessons learned across all layers of the infrastructure.
+This section contains the troubleshooting record from the PoC v1 era — real
+incidents across vCenter, ESXi, Windows host, pfSense, Veeam, NAS, FreeIPA,
+and Prometheus. Kept as portfolio material.
 
 ---
 

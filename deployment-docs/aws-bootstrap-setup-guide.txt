@@ -19,6 +19,35 @@ For more details, see: aws/bootstrap.md and aws/README.md
 
 ---
 
+### A note for anyone implementing this
+
+The specific regions, account IDs, bucket names (with the `-v2` suffix on dev),
+and admin user names shown throughout this guide are MINE. They reflect the
+accounts, regions, and history I happened to land on. You do not need to
+replicate any of those specifics. Pick whatever regions make sense for your
+situation (cost, latency, free tier, compliance) and whatever bucket / table
+names are unique to your accounts.
+
+### Important — the mixed-region drift in my prod is NOT the design
+
+You will see elsewhere in the repo that my prod ended up with a mixed-region
+setup: prod bootstrap + most Terraform-managed resources live in `eu-west-2`,
+but prod's network + compute (VPC + WireGuard EC2) live in `us-east-1`.
+
+That is NOT a design choice, and it is NOT something you should copy. It was
+forced on me by a specific WireGuard tunnel instability between my ISP and
+the AWS elastic IP in `eu-west-2` (full investigation in
+`/troubleshooting/network/5-wireguard-tunnel-stability-investigation.md`
+— TS-NET-005). That issue is tied to my home ISP's NAT behaviour, not to
+anything about the architecture.
+
+If you are implementing this cleanly, deploy each environment as a pure
+single-region mirror. The architectural intent is clean separation per
+environment; the mixed-region prod in my setup is an accepted operational
+drift after hitting hardware/ISP constraints, not a pattern worth following.
+
+---
+
 ## Architecture
 
 ### Multi-Account Structure
@@ -28,7 +57,10 @@ For more details, see: aws/bootstrap.md and aws/README.md
 | Development | xxxxxxxxxxxx | us-east-1   | admin_dev   |
 | Production  | xxxxxxxxxxxx | eu-west-2   | admin_prod  |
 
-Note: Dev uses us-east-1 for cost optimization. Prod uses eu-west-2 for lower latency.
+Note: the regions above are the specific ones I landed on for my situation
+(cost, free-tier, latency from Egypt). They are not requirements — pick
+whatever regions fit your context. See "A note for anyone implementing this"
+near the top of this file.
 
 ### 2-Tier IAM Role System
 

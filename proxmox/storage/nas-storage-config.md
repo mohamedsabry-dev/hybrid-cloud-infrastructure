@@ -14,20 +14,30 @@
 | LAN 1 | 10.0.40.120 | None | 1000Mb | Storage (VLAN 40) |
 
 **Connection Paths:**
-- LAN 2 → AC750 AP → ER605 Port 3 → VLAN 5 (untagged)
-- LAN 1 → FS308GP Port 6 → VLAN 40 (tagged, L2 isolated, no gateway)
+- LAN 2 → AC750 AP → MikroTik Port 7 → VLAN 5 (untagged)
+- LAN 1 → FS308GP Port 6 → VLAN 40 (tagged, L2 isolated, no router hop)
+
+The router was previously a TP-Link ER605 (mgmt path went via ER605 Port 3). See [`../../network/DESIGN.md`](../../network/DESIGN.md) for the ER605 → MikroTik migration story.
 
 ---
 
 ## VLAN 40 - Storage Network
 
-Isolated L2 network on FS308GP managed switch (no ER605 routing)
+Isolated L2 network on the FS308GP managed switch (no router routing; Proxmox hosts, NAS, and k8s workers talk to each other directly over L2).
 
 | Device | IP | Role |
 |--------|-----|------|
 | NAS | 10.0.40.120 | NFS Server |
-| Prod Proxmox | 10.0.40.100 | NFS Client (stor0 interface) |
-| Dev Proxmox | 10.0.40.110 | NFS Client (stor0 interface) |
+| Prod Proxmox host | 10.0.40.100 | NFS Client (stor0 interface) |
+| Prod K8s Worker 1 | 10.0.40.101 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+| Prod K8s Worker 2 | 10.0.40.102 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+| Prod K8s Worker 3 | 10.0.40.103 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+| Dev Proxmox host | 10.0.40.110 | NFS Client (stor0 interface) |
+| Dev K8s Worker 1 | 10.0.40.201 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+| Dev K8s Worker 2 | 10.0.40.202 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+| Dev K8s Worker 3 | 10.0.40.203 | NFS Client — CSI-NFS for k8s PVs (second NIC) |
+
+K8s worker VMs each have a second NIC on VLAN 40 — added after initial setup when CSI-NFS was introduced so pods on workers could mount NFS PVs directly without proxying through the Proxmox host. See [`../../network/ip-planning.txt`](../../network/ip-planning.txt) for the full VLAN 40 address plan.
 
 ---
 
@@ -39,11 +49,13 @@ Isolated L2 network on FS308GP managed switch (no ER605 routing)
 - Deny All
 
 **LAN 1 (Storage):**
-- Allow 10.0.40.100 (Prod)
-- Allow 10.0.40.110 (Dev)
+- Allow 10.0.40.100 (Prod Proxmox host)
+- Allow 10.0.40.101-.103 (Prod K8s workers, CSI-NFS)
+- Allow 10.0.40.110 (Dev Proxmox host)
+- Allow 10.0.40.201-.203 (Dev K8s workers, CSI-NFS)
 - Deny All
 
-*Result: Only Mac Mini manages NAS. Proxmox servers access storage only.*
+*Result: Only Mac Mini manages the NAS over the mgmt plane. On the storage plane, only the two Proxmox hosts + the six k8s workers can reach the NFS service.*
 
 ---
 
@@ -51,12 +63,16 @@ Isolated L2 network on FS308GP managed switch (no ER605 routing)
 
 | Share | NFS Path | Access | Content |
 |-------|----------|--------|---------|
-| shared-iso | /volume1/shared-iso | 10.0.40.100 + 10.0.40.110 (RW) | ISOs, CT templates |
-| prod-storage | /volume1/prod-storage | 10.0.40.100 only (RW) | VM images, rootdir |
-| dev-storage | /volume1/dev-storage | 10.0.40.110 only (RW) | VM images, rootdir |
-| Backups | /volume1/Backups | 10.0.40.100 + 10.0.40.110 (RW) | vzdump backups |
+| shared-iso | /volume1/shared-iso | 10.0.40.100 + 10.0.40.110 (RW) | ISOs, CT templates (shared between hosts) |
+| prod-storage | /volume1/prod-storage | 10.0.40.100 only (RW) | Prod VM/LXC images, rootdir, non-k8s backups |
+| dev-storage | /volume1/dev-storage | 10.0.40.110 only (RW) | Dev VM/LXC images, rootdir, non-k8s backups |
+| k8s-prod | /volume1/k8s-prod | 10.0.40.101-103 (RW) | Prod k8s CSI-NFS PersistentVolumes (pod data) |
+| k8s-dev | /volume1/k8s-dev | 10.0.40.201-203 (RW) | Dev k8s CSI-NFS PersistentVolumes (pod data) |
+| Backups | /volume1/Backups | 10.0.40.100 + 10.0.40.110 (RW) | vzdump backups from both Proxmox hosts |
 
 **NFS Settings:** root Mapping = root (0), Async = Yes
+
+Note: `k8s-dev` and `k8s-prod` are exposed directly to the worker VMs (via their VLAN 40 second NIC), not through the Proxmox hosts. This means pod PVs get straight L2 access to NAS storage without the Proxmox hypervisor in the critical path — important for CSI-NFS performance and for avoiding the hypervisor becoming a bottleneck under pod-mount load.
 
 ---
 
@@ -89,7 +105,7 @@ Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
 | Storage ID | NFS Export | Content | Retention |
 |------------|------------|---------|-----------|
 | nas-iso | /volume1/shared-iso | iso, vztmpl | - |
-| nas-dev-data | /volume1/dev-storage | images, rootdir, backup | keep_last=2 |
+| nas-dev-data | /volume1/dev-storage | images, rootdir, backup | keep_last=5 |
 | nas-backups | /volume1/Backups | backup, rootdir | keep_last=5 |
 
 **PROD Server:**
@@ -97,7 +113,7 @@ Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
 | Storage ID | NFS Export | Content | Retention |
 |------------|------------|---------|-----------|
 | nas-iso | /volume1/shared-iso | iso, vztmpl | - |
-| nas-prod-data | /volume1/prod-storage | images, rootdir, backup | keep_last=2 |
+| nas-prod-data | /volume1/prod-storage | images, rootdir, backup | keep_last=5 |
 | nas-backups | /volume1/Backups | backup, rootdir | keep_last=5 |
 
 **Verify:** `showmount -e 10.0.40.120`
@@ -113,5 +129,7 @@ Dedicated share for Proxmox environment configuration backups (not VM/LXC data).
 | shared-iso | ~50GB | ISOs, container templates |
 | prod-storage | ~500GB | PROD VM images, container rootfs |
 | dev-storage | ~300GB | DEV VM images, container rootfs |
+| k8s-prod | (carved from Volume 1) | Prod k8s CSI-NFS PVs (pod-managed quotas) |
+| k8s-dev | (carved from Volume 1) | Dev k8s CSI-NFS PVs (pod-managed quotas) |
 | Backups | ~200GB | vzdump backups (both envs) |
-| Reserved | ~750GB | Future expansion |
+| Reserved | remaining | Future expansion |

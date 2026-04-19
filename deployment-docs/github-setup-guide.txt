@@ -29,7 +29,7 @@ infrastructure deployment workflows.
 | dev-security    | Dev IAM/security changes         | GitHubActions-TerraformAdmin-dev |
 | prod-security   | Prod IAM/security changes        | GitHubActions-TerraformAdmin-prod |
 
-For more details, see: github/repository-setup.md
+For more details, see: github/README.md
 
 ---
 
@@ -330,7 +330,7 @@ With folder isolation: Work stays isolated until explicitly copied to prod.
 
 | Component                  | Path                                    |
 |----------------------------|-----------------------------------------|
-| Repository Setup           | github/repository-setup.md              |
+| GitHub Folder Overview     | github/README.md                        |
 | Variables & Secrets        | github/variables-secrets.md             |
 | Deployment Pattern         | github/deployment-pattern.md            |
 | Deployment Flow            | github/deployment-flow.md               |

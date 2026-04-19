@@ -1,35 +1,57 @@
-# TP-Link ER605 Router
+# TP-Link ER605 — Historical archive
 
-Current primary router/firewall configuration.
+> **Status:** Retired. Replaced by the MikroTik L009UiGS-RM.
+> See [`../../README.md`](../../README.md) → "Why the network stack evolved" for the full story.
+
+This folder records the previous router state — kept as reference, not as something to deploy against. Useful if you are reading the TS cases that reference the ER605 (TS-NET-003 / 004 / 005) and want to see the configuration that was in place at the time.
+
+---
 
 ## Contents
 
-| Path | Description |
-|------|-------------|
-| `config.txt` | Router configuration details |
-| `backups/` | Configuration backup files (.bin) |
-| `docs/` | Official TP-Link documentation (PDFs) |
+| Path | Description | In git? |
+|------|-------------|---------|
+| `config.txt` | ER605 configuration as it was at retirement | Yes |
+| `backups/*.bin` | Binary config backups from the ER605 era | No — gitignored (`.bin` pattern catches them; they contain credentials and VPN keys) |
+| `docs/*.pdf` | Official TP-Link manuals | No — gitignored (vendor material) |
 
-## Device Info
+> `backups/` and `docs/` exist on disk locally but are excluded from git via `.gitignore`. Backups are retained in case I ever need to restore the device for TS reference; they are not safe to commit publicly because TP-Link `.bin` exports embed administrator credentials and PSKs.
+
+---
+
+## Device info (historical)
 
 | Property | Value |
 |----------|-------|
 | Model | ER605 v2 |
 | Firmware | 2.2.0 |
-| Management IP | 10.0.5.1 |
-| Role | Router/Firewall/VPN Gateway |
+| Former Management IP | 10.0.5.1 (now used by the MikroTik replacement) |
+| Former role | Router / Firewall / WireGuard VPN Gateway |
 
-## Port Assignments
+---
+
+## Port assignments (historical)
 
 | Port | Connection | Purpose |
 |------|------------|---------|
 | WAN | ISP ONT | Internet uplink |
 | Port 3 | AC750 AP | WiFi Management (VLAN 5) |
-| Port 4 | FS308GP | Dev Services Trunk |
+| Port 2 | FS308GP | Dev Services Trunk — cable moved here from Port 4 under the suspected "Port 4 defect" theory, which later turned out to be a false trail (see TS-NET-003) |
+| Port 4 | UNUSED | Originally the Dev trunk, left vacant after the cable move; not actually defective |
 | Port 5 | FS308GP | Prod Services Trunk |
 
-## Backups
+---
 
-Backup naming convention: `backup-ER605_UN_<version>-<date>-<description>.bin`
+## Backup naming convention
+
+`backup-ER605_UN_<version>-<date>-<description>.bin`
 
 Example: `backup-ER605_UN_v2.20-2026-03-22-After-Port4-defect-mirror-to-port2.bin`
+
+---
+
+## Why this folder is still here
+
+1. The three TS cases that drove the migration (`TS-NET-003 / 004 / 005`) reference the ER605 by name — readers checking those incidents should be able to land here to see the device context.
+2. The "Port 4 defect" backup in particular documents a workaround I applied based on a theory that was later disproven. It's a useful record of how a false lead shaped a config before the real root cause was found.
+3. Comparing the ER605 `config.txt` against the current MikroTik `.rsc` scripts gives a clear before/after for anyone reviewing how the network stack was rebuilt.

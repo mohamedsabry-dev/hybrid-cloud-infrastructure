@@ -2,27 +2,29 @@
 
 ## Overview
 
-This guide covers setting up WireGuard VPN between AWS EC2 and on-premises ER605 router for both Dev and Prod environments.
+This guide covers the WireGuard VPN setup between AWS EC2 (one instance per env) and my on-prem router, providing site-to-site connectivity for both Dev and Prod. Two independent tunnels, one per environment, terminating on the same router at home.
+
+> **Router note:** the on-prem endpoint is now a **MikroTik L009UiGS-RM**. Earlier in the project it was a TP-Link **ER605** — the migration story is in [`../README.md`](../README.md) → "Why the network stack evolved". The tunnel IPs, ports, AllowedIPs, and AWS side of the setup are the same across the migration; only the on-prem router's configuration surface changed (from ER605 GUI tables to MikroTik RouterOS scripts in [`../router/mikrotik/`](../router/mikrotik/)).
 
 ## Architecture
 
 ```
-                        AWS Dev (172.16.0.0/16)
-                              |
-Home/Datacenter          WireGuard EC2 Dev
-  10.0.x.x               (172.16.200.2)
-      |                        |
-      |                   UDP 51820
-      |                        |
-   ER605 ─────────────────────┘
-(172.16.200.1 dev)
-(172.17.200.1 prod)            |
-      |                   UDP 51820
-      |                        |
-      |                   WireGuard EC2 Prod
-      |                   (172.17.200.2)
-      |                        |
-      └───────────────── AWS Prod (172.17.0.0/16)
+                          AWS Dev (172.16.0.0/16)
+                                  |
+Home / Lab                   WireGuard EC2 Dev
+  10.0.x.x                   (172.16.200.2)
+      |                            |
+      |                       UDP 51820
+      |                            |
+  MikroTik  ──────────────────────┘
+(172.16.200.1 dev_tunnel)
+(172.17.200.1 prod_tunnel)          |
+      |                       UDP 51820
+      |                            |
+      |                       WireGuard EC2 Prod
+      |                       (172.17.200.2)
+      |                            |
+      └─────────────────────── AWS Prod (172.17.0.0/16)
 ```
 
 ---
@@ -31,24 +33,24 @@ Home/Datacenter          WireGuard EC2 Dev
 
 | Setting | Dev | Prod |
 |---------|-----|------|
-| **Hostname** | **wg-dev** | **wg-prod** |
+| **Hostname (AWS side)** | **wg-dev** | **wg-prod** |
 | AWS VPC CIDR | 172.16.0.0/16 | 172.17.0.0/16 |
-| AWS WireGuard Subnet | 172.16.65.0/24 | 172.17.65.0/24 |
-| **AWS Tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
-| AWS Listen Port | 51820 | 51820 |
-| **ER605 Tunnel IP** | **172.16.200.1** | **172.17.200.1** |
-| ER605 Listen Port | 51820 | 51830 |
-| ER605 Interface Name | dev_tunnel | prod_tunnel |
-| ER605 Peer AllowedIPs | 172.16.0.0/16 | 172.17.0.0/16 |
-| On-Prem VLANs | 10.0.60-65.0/24 | 10.0.50-55.0/24 |
+| AWS WireGuard subnet | 172.16.65.0/24 | 172.17.65.0/24 |
+| **AWS tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
+| AWS listen port | 51820 | 51820 |
+| **On-prem tunnel IP** (MikroTik) | **172.16.200.1** | **172.17.200.1** |
+| On-prem listen port | 51820 | 51830 |
+| Tunnel interface name | dev_tunnel | prod_tunnel |
+| Peer AllowedIPs (on-prem side) | 172.16.0.0/16 | 172.17.0.0/16 |
+| On-prem VLANs routed | 10.0.60-65.0/24 | 10.0.50-55.0/24 |
 
-> **IMPORTANT**: Tunnel IPs are within the AWS VPC range. See [Routing Issue & Solution](#routing-issue--solution) for why.
+> See "Why tunnel IPs live inside the VPC CIDR" below for why both tunnel IPs look like VPC IPs rather than something like `10.200.x.x`.
 
 ---
 
-## AWS EC2 WireGuard Setup
+## AWS EC2 WireGuard setup
 
-### SSH Config (Recommended)
+### SSH config (recommended)
 
 Add to `~/.ssh/config` for easy access:
 
@@ -64,23 +66,13 @@ Host wg-prod
     IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
 ```
 
-Optional `/etc/hosts` entries:
-```
-REDACTED_EIP_DEV  wg-dev
-REDACTED_EIP_PROD   wg-prod
-```
+Then connect with `ssh wg-dev` or `ssh wg-prod`.
 
-Then connect with:
-```bash
-ssh wg-dev
-ssh wg-prod
-```
-
-### Quick Setup (Recommended)
+### Quick setup (recommended path)
 
 ```bash
 # Copy script to EC2
-scp network/setup-wireguard.sh wg-dev:~/   # or wg-prod
+scp network/vpn/setup-wireguard.sh wg-dev:~/   # or wg-prod
 
 # SSH and run
 ssh wg-dev   # or wg-prod
@@ -88,18 +80,17 @@ chmod +x setup-wireguard.sh
 ./setup-wireguard.sh dev   # or prod
 ```
 
-### Manual Setup
+### Manual setup
 
-#### 1. Install Required Packages
+#### 1. Install required packages
 
 ```bash
 sudo dnf update -y
 sudo dnf install wireguard-tools tcpdump nmap-ncat cronie iptables -y
-sudo systemctl enable crond
-sudo systemctl start crond
+sudo systemctl enable --now crond
 ```
 
-#### 2. Generate WireGuard Keys
+#### 2. Generate WireGuard keys
 
 ```bash
 wg genkey | sudo tee /etc/wireguard/private.key | wg pubkey | sudo tee /etc/wireguard/public.key
@@ -107,9 +98,9 @@ sudo chmod 600 /etc/wireguard/private.key
 cat /etc/wireguard/public.key
 ```
 
-#### 3. Create WireGuard Configuration
+#### 3. Create WireGuard configuration
 
-**Dev Environment (`/etc/wireguard/wg0.conf`):**
+**Dev (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
 Address = 172.16.200.2/16
@@ -119,11 +110,11 @@ PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACC
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o enX0 -j MASQUERADE
 
 [Peer]
-PublicKey = <ER605_DEV_TUNNEL_PUBLIC_KEY>
+PublicKey = <MIKROTIK_DEV_TUNNEL_PUBLIC_KEY>
 AllowedIPs = 172.16.200.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24, 10.0.5.0/24
 ```
 
-**Prod Environment (`/etc/wireguard/wg0.conf`):**
+**Prod (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
 Address = 172.17.200.2/16
@@ -133,11 +124,11 @@ PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACC
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o enX0 -j MASQUERADE
 
 [Peer]
-PublicKey = <ER605_PROD_TUNNEL_PUBLIC_KEY>
+PublicKey = <MIKROTIK_PROD_TUNNEL_PUBLIC_KEY>
 AllowedIPs = 172.17.200.1/32, 10.0.50.0/24, 10.0.51.0/24, 10.0.52.0/24, 10.0.53.0/24, 10.0.54.0/24, 10.0.55.0/24, 10.0.5.0/24
 ```
 
-#### 4. Enable IP Forwarding
+#### 4. Enable IP forwarding
 
 ```bash
 sudo sysctl -w net.ipv4.ip_forward=1
@@ -160,156 +151,82 @@ sudo wg show
 
 ---
 
-## ER605 Configuration
+## On-prem router configuration (MikroTik)
 
-### IP Addresses
+Current config lives in [`../router/mikrotik/`](../router/mikrotik/) as RouterOS scripts and backup files. The logical settings mirror the AWS side of the tunnel:
 
-| ID | Name | Type | Address |
-|----|------|------|---------|
-| 22 | AWS_DEV_Subnet | IP Address/Mask | 172.16.0.0/16 |
-| 23 | AWS_PROD_Subnet | IP Address/Mask | 172.17.0.0/16 |
+| Item | Dev | Prod |
+|------|-----|------|
+| Tunnel interface name | `dev_tunnel` | `prod_tunnel` |
+| Local tunnel IP | 172.16.200.1 | 172.17.200.1 |
+| Listen port | 51820 | 51830 *(see "Why prod uses port 51830" below)* |
+| Peer endpoint | `<AWS_DEV_EIP>:51820` | `<AWS_PROD_EIP>:51820` |
+| Peer public key | `<AWS_DEV_PUBLIC_KEY>` | `<AWS_PROD_PUBLIC_KEY>` |
+| Peer AllowedIPs | `172.16.0.0/16` | `172.17.0.0/16` |
+| Persistent keepalive | 25 | 25 |
+| MTU | 1420 | 1420 |
 
-### IP Groups
+### ACL traffic segmentation
 
-| ID | Group Name | Address Name | Description |
-|----|------------|--------------|-------------|
-| 12 | vpn_prod | vpn_AWS_PROD_Subnet | --- |
-| 13 | vpn_dev | vpn_AWS_DEV_Subnet | --- |
-
-### Access Control List (ACL)
-
-| ID | Name | Policy | Service Type | Direction | Source | Destination |
-|----|------|--------|--------------|-----------|--------|-------------|
-| 7 | vpn_dev | Allow | ALL | ALL | vpn_dev | Development_Env |
-| 8 | vpn_prod | Allow | ALL | ALL | vpn_prod | Production_Env |
-
-> **Note**: VPN traffic is segmented - Dev VPN only reaches Dev VLANs (60-65), Prod VPN only reaches Prod VLANs (50-55).
+I keep dev-tunnel traffic reachable only to dev VLANs, and prod-tunnel traffic only to prod VLANs — cross-env traffic through the tunnels is denied at the router. On the MikroTik this is implemented as `/ip firewall filter` rules (in `router/mikrotik/backups/*.rsc`); on the old ER605 it was an ACL table.
 
 ---
 
-### WireGuard Interfaces
+## Why tunnel IPs live inside the VPC CIDR
 
-| ID | Name | MTU | Listen Port | Local IP | Status |
-|----|------|-----|-------------|----------|--------|
-| 1 | dev_tunnel | 1420 | 51820 | 172.16.200.1 | Enabled |
-| 2 | prod_tunnel | 1420 | 51830 | 172.17.200.1 | Enabled |
+Early in this setup I tried tunnel IPs in a separate range (e.g. `10.200.0.1/2` for dev, `10.200.1.1/2` for prod). That ran into a hard limitation of my on-prem router's WireGuard `AllowedIPs` field: it accepts one CIDR entry per peer, not a list. That meant I had to choose:
 
-#### Dev Tunnel Interface Settings
-
-| Setting | Value |
-|---------|-------|
-| Name | dev_tunnel |
-| MTU | 1420 |
-| Listen Port | 51820 |
-| Private Key | `<HIDDEN>` |
-| Public Key | `<ER605_DEV_PUBLIC_KEY>` |
-| Local IP Address | 172.16.200.1 |
-| Status | Enable |
-
-#### Prod Tunnel Interface Settings
-
-| Setting | Value |
-|---------|-------|
-| Name | prod_tunnel |
-| MTU | 1420 |
-| Listen Port | 51830 |
-| Private Key | `<HIDDEN>` |
-| Public Key | `<ER605_PROD_PUBLIC_KEY>` |
-| Local IP Address | 172.17.200.1 |
-| Status | Enable |
-
----
-
-### WireGuard Peers
-
-| Interface | Endpoint | Endpoint Port | Allowed Address | Persistent Keepalive | Status |
-|-----------|----------|---------------|-----------------|---------------------|--------|
-| dev_tunnel | `<AWS_DEV_EIP>` | 51820 | 172.16.0.0/16 | 25 | Enabled |
-| prod_tunnel | `<AWS_PROD_EIP>` | 51820 | 172.17.0.0/16 | 25 | Enabled |
-
-#### Dev Tunnel Peer Settings
-
-| Setting | Value |
-|---------|-------|
-| Interface | dev_tunnel |
-| Public Key | `<AWS_DEV_PUBLIC_KEY>` |
-| Endpoint | `<AWS_DEV_ELASTIC_IP>` |
-| Endpoint Port | 51820 |
-| **Allowed Address** | **172.16.0.0/16** |
-| Preshared Key | (Optional) |
-| Persistent Keepalive | 25 |
-| Status | Enable |
-
-#### Prod Tunnel Peer Settings
-
-| Setting | Value |
-|---------|-------|
-| Interface | prod_tunnel |
-| Public Key | `<AWS_PROD_PUBLIC_KEY>` |
-| Endpoint | `<AWS_PROD_ELASTIC_IP>` |
-| Endpoint Port | 51820 |
-| **Allowed Address** | **172.17.0.0/16** |
-| Preshared Key | (Optional) |
-| Persistent Keepalive | 25 |
-| Status | Enable |
-
----
-
-## Routing Issue & Solution
-
-### The Problem
-
-ER605's WireGuard AllowedIPs field only accepts ONE entry. This caused routing issues:
-
-| AllowedIPs Setting | Result |
+| AllowedIPs setting | Result |
 |--------------------|--------|
-| `10.200.x.0/24` (tunnel only) | VPN→Internal works, Internal→VPN fails |
-| `172.x.0.0/16` (VPC only) | Internal→VPN works, VPN→Internal fails |
-| `0.0.0.0/0` (any) | Routes ALL traffic through ONE tunnel (wrong tunnel selected) |
+| `10.200.x.0/24` (tunnel only) | VPN → Internal works, Internal → VPN fails |
+| `172.x.0.0/16` (VPC only) | Internal → VPN works, VPN → Internal fails |
+| `0.0.0.0/0` (any) | Routes **all** traffic through one tunnel — wrong tunnel selected for prod |
 
-**Symptom**: Traffic to prod AWS (172.17.x.x) was routed through dev tunnel (10.200.0.2):
+Symptom of the last one:
+
 ```
 $ traceroute 172.17.65.73
-1  _gateway (10.0.53.1)
-2  10.200.0.2          <-- WRONG! Should be prod tunnel
+ 1  _gateway (10.0.53.1)
+ 2  10.200.0.2          <-- WRONG! Should be prod tunnel
 ```
 
-### The Solution
+The fix I landed on is simple: **place the tunnel IPs inside each AWS VPC's CIDR block**, so one `AllowedIPs` entry covers both the tunnel and the VPC:
 
-**Place tunnel IPs inside the AWS VPC CIDR range.**
+| Env | Old tunnel IPs | Current tunnel IPs |
+|-----|----------------|---------------------|
+| Dev | 10.200.0.1 / 10.200.0.2 | **172.16.200.1** / **172.16.200.2** |
+| Prod | 10.200.1.1 / 10.200.1.2 | **172.17.200.1** / **172.17.200.2** |
 
-| Environment | Old Tunnel IPs | New Tunnel IPs |
-|-------------|----------------|----------------|
-| Dev | 10.200.0.1/2 | 172.16.200.1/2 |
-| Prod | 10.200.1.1/2 | 172.17.200.1/2 |
+With tunnel IPs inside the VPC CIDR:
+- Dev peer `AllowedIPs = 172.16.0.0/16` covers the tunnel (172.16.200.x) AND the VPC (172.16.x.x) in one entry.
+- Same pattern for prod.
+- No static routes needed — WireGuard's own routing handles it.
 
-Now **one AllowedIPs entry covers both tunnel AND VPC traffic**:
-- Dev peer: `172.16.0.0/16` covers tunnel (172.16.200.x) + VPC (172.16.x.x)
-- Prod peer: `172.17.0.0/16` covers tunnel (172.17.200.x) + VPC (172.17.x.x)
-
-**No static routes needed** - WireGuard handles routing automatically based on AllowedIPs.
-
----
-
-## ISP Router Configuration
-
-### Full Cone NAT (Important!)
-
-Change NAT type from "Port-restricted cone NAT" to **"Full cone NAT"** to prevent connection drops.
-
-### Port Forwarding
-
-**Not required** when behind CGNAT (most ISPs). ER605 initiates outbound connections and WireGuard's PersistentKeepalive (25 sec) maintains the NAT mapping.
-
-Port forwarding on your ISP router won't help with CGNAT anyway - the real NAT happens at ISP level before reaching your router.
-
-> **Note**: DMZ is also not needed. Both were tested during troubleshooting and confirmed unnecessary.
+It looks unconventional (tunnel IPs carved out of the VPC space), but for a router that can only hold one AllowedIPs per peer it's the cleanest way to make the routing work with zero extra config.
 
 ---
 
-## Keepalive Service (Systemd)
+## Why prod uses listen port 51830 (not 51820)
 
-The setup script creates this automatically. Manual creation:
+Both tunnels originally used UDP 51820 on the on-prem side. Dev worked, prod ran for 5 days with no handshake. `tcpdump` on the AWS EC2 showed AWS replying, but the replies never reached my router.
+
+Root cause was not anywhere in my setup — it was the ISP's **CGNAT** silently dropping return traffic on that specific UDP port for prod. Dev's port happened to be un-blocked. Full investigation in [`../../troubleshooting/network/4-wireguard-cgnat-port-blocking.md`](../../troubleshooting/network/4-wireguard-cgnat-port-blocking.md) (TS-NET-004).
+
+Fix: move prod's on-prem listen port to `51830`. AWS side stays on 51820 — it doesn't care, it responds to whatever source port the packet arrived from. The mismatch is purely on the on-prem egress side.
+
+---
+
+## Why I run a ping-based keepalive from AWS
+
+WireGuard already has a per-peer `PersistentKeepalive` (set to 25s on both sides). But even with that, during the TS-NET-004 and TS-NET-005 investigations I saw the tunnel silently drop handshake after periods of idle AWS → on-prem traffic. The pattern was always the same: my on-prem router kept sending outbound packets, AWS was ready to respond, but the ISP's NAT mapping for the return path had expired between handshakes.
+
+A WireGuard-level keepalive alone wasn't enough, because the keepalive from the on-prem side doesn't guarantee the AWS side is actively pushing traffic into the tunnel. So I added a second, application-layer keepalive **from AWS**: a systemd service that pings the on-prem tunnel IP every 5 seconds. That generates a steady trickle of real traffic through the tunnel in the AWS → on-prem direction, which is what refreshes the NAT mapping reliably.
+
+This is a workaround, not a fix for a bug. It exists specifically to keep the tunnel warm against my ISP's NAT timeout behaviour. It has no downside other than a handful of ICMP packets per minute.
+
+### Keepalive systemd service (created by `setup-wireguard.sh`)
+
+Manual creation:
 
 ```bash
 sudo tee /etc/systemd/system/wg-keepalive.service << 'EOF'
@@ -333,13 +250,35 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now wg-keepalive
 ```
 
-**Keepalive Targets:**
-- Dev: `172.16.200.1` (ER605 tunnel IP)
-- Prod: `172.17.200.1` (ER605 tunnel IP)
+**Keepalive targets:**
+- Dev EC2 → pings `172.16.200.1` (MikroTik dev tunnel IP)
+- Prod EC2 → pings `172.17.200.1` (MikroTik prod tunnel IP)
 
 ---
 
-## Monitoring Commands
+## On the AllowedIPs scope — accepted drift
+
+The per-peer `AllowedIPs` on the AWS side currently includes `10.0.5.0/24` (the shared management VLAN). Strictly, the only hosts I actually need reachable on VLAN 5 from AWS are the two Proxmox management IPs (`10.0.5.100`, `10.0.5.110`) and the NAS (`10.0.5.120`). A tighter config would list those as individual `/32` entries rather than the whole `/24`.
+
+I left it as `/24` on purpose for now:
+
+- The `/24` is not exposing anything harmful — only my own management network hosts live there.
+- Tightening on the AWS side **alone** doesn't actually enforce a security boundary — any traffic that reaches the tunnel is trusted at the WireGuard layer. The real enforcement needs to happen on the **router side** via firewall rules that gate which internal subnets the tunnel traffic can reach.
+- I plan to do both together: narrow the AllowedIPs to specific `/32`s here AND add matching MikroTik firewall rules that allow only `wg-peer → {specific-IPs}`. Doing one without the other is theatre.
+
+Captured as a known drift — will be revisited during the security-hardening pass after publish.
+
+---
+
+## ISP router (Full Cone NAT)
+
+Change NAT type from *Port-restricted cone* to **Full Cone NAT**. Port-restricted drops UDP mappings aggressively whenever incoming packet source ports change, which breaks WireGuard return traffic from AWS. Full Cone maintains the UDP mapping as long as any outbound traffic refreshes it, which (combined with the keepalive service above) is what actually keeps the tunnel up.
+
+Port forwarding and DMZ are **not needed** — both tested during TS-NET-005 and confirmed to make no difference when the issue is CGNAT-level. The on-prem router initiates outbound, and the keepalive service maintains the mapping.
+
+---
+
+## Monitoring commands
 
 ```bash
 # WireGuard status
@@ -365,91 +304,63 @@ sudo tcpdump -i enX0 udp port 51820 -n
 
 ## Troubleshooting
 
-### No Handshake
+### No handshake
+1. Check keys match on both sides.
+2. Verify UDP 51820 (or 51830 for prod) is allowed in the AWS security group.
+3. Verify the on-prem peer endpoint matches the current EC2 EIP.
+4. If prod only: re-check the ISP / CGNAT port block path — see TS-NET-004.
 
-1. Check keys match on both sides
-2. Verify UDP 51820 is allowed in security group
-3. Check ER605 endpoint is correct
-4. Verify ISP router port forward (if AWS initiates)
+### Connection drops after time
+1. Confirm ISP router is on Full Cone NAT.
+2. Lower keepalive to 5 seconds (already the default in the systemd service).
+3. Confirm `wg-keepalive.service` is active and pinging the correct tunnel IP.
 
-### Connection Drops After Time
+### Traffic goes through the wrong tunnel
+**Symptom:** `traceroute` shows prod-bound traffic leaving via the dev tunnel IP (or vice versa).
+**Cause:** `AllowedIPs` misconfigured, or tunnel IPs not placed inside the VPC range.
+**Fix:** ensure tunnel IPs live inside the VPC CIDR (Dev `172.16.200.x` inside `172.16.0.0/16`, Prod `172.17.200.x` inside `172.17.0.0/16`) and AllowedIPs uses the corresponding `/16`.
 
-1. Enable Full Cone NAT on ISP router
-2. Lower keepalive to 5 seconds
-3. Enable wg-keepalive systemd service
-
-### Traffic Goes Through Wrong Tunnel
-
-**Symptom**: traceroute shows traffic using wrong tunnel IP (e.g., dev tunnel for prod traffic)
-
-**Cause**: ER605 AllowedIPs misconfigured or tunnel IPs not in VPC range
-
-**Solution**: Ensure tunnel IPs are within VPC CIDR:
-- Dev: 172.16.200.x (within 172.16.0.0/16)
-- Prod: 172.17.200.x (within 172.17.0.0/16)
-
-### MTU Issues (Fragmentation)
-
+### MTU / fragmentation
 Test with different packet sizes:
 ```bash
 ping -s 1332 -M do 172.16.200.1   # 1420 MTU
 ping -s 1172 -M do 172.16.200.1   # 1200 MTU
 ```
+Set MTU on the MikroTik WireGuard interface to the working value (current: 1420).
 
-Set MTU in ER605 WireGuard interface to working value (current: 1420).
+### ISP / CGNAT port blocking
+Full case: [`../../troubleshooting/network/4-wireguard-cgnat-port-blocking.md`](../../troubleshooting/network/4-wireguard-cgnat-port-blocking.md) (TS-NET-004).
 
-### ISP/CGNAT Port Blocking
+Signs:
+- One tunnel works, the other doesn't, same setup.
+- AWS `tcpdump` shows bidirectional packets, but on-prem WireGuard shows RX: 0 B and no handshake.
+- ISP router routing table has addresses in `100.64.0.0/10` (CGNAT range).
 
-**Symptom**: One tunnel works (dev on 51820), other doesn't (prod). AWS tcpdump shows bidirectional packets, but ER605 shows RX: 0 bytes and no handshake.
+Fix: change the on-prem listen port to one that isn't being blocked by the ISP. AWS side doesn't need a change — it responds to whatever source port the packet arrived from.
 
-**How to identify CGNAT**: Check ISP router routing table for addresses in `100.64.0.0/10` range (e.g., `100.122.0.1`). This indicates Carrier-Grade NAT.
-
-**Diagnosis**:
-```bash
-# On AWS - shows packets going both ways
-sudo tcpdump -i enX0 udp port 51820 -n
-
-# But ER605 WireGuard status shows:
-# TX Bytes: increasing, RX Bytes: 0 B, Last Handshake: ---
-```
-
-**Why this happens**:
-- ISP blocks specific UDP ports at their CGNAT level
-- Port forwarding/DMZ on your ISP router won't help (NAT happens before your router)
-- Dev tunnel works because its port isn't blocked
-
-**Solution**: Change ER605 Listen Port to a different value:
-1. ER605 → VPN → WireGuard → Edit prod_tunnel
-2. Change Listen Port (e.g., 51821 → 51830)
-3. Save and verify handshake establishes
-
-> **Note**: AWS side doesn't need changes - it responds to whatever source port packets arrive from.
-
-**History**: Port 51821 was blocked by ISP, changed to 51830 (March 2026).
+History: prod was originally 51821, got blocked, moved to 51830 (March 2026).
 
 ---
 
-## Traffic Flow
+## Traffic flow
 
 ```
-ER605 (dev_tunnel)                    AWS Dev EC2
-  Port 51820        ───────────────►    Port 51820
-  172.16.200.1                          172.16.200.2
+MikroTik (dev_tunnel)               AWS Dev EC2
+  Port 51820         ───────────►   Port 51820
+  172.16.200.1                      172.16.200.2
 
-
-ER605 (prod_tunnel)                   AWS Prod EC2
-  Port 51830        ───────────────►    Port 51820
-  172.17.200.1                          172.17.200.2
+MikroTik (prod_tunnel)              AWS Prod EC2
+  Port 51830         ───────────►   Port 51820
+  172.17.200.1                      172.17.200.2
 ```
 
-Both AWS instances listen on port 51820 (they have different public IPs).
-ER605 uses different local ports (51820/51830) to route to the correct tunnel.
+Both AWS instances listen on port 51820 (they have different public IPs). The on-prem side uses different local listen ports (51820 / 51830) to dodge the CGNAT port block on prod.
 
 ---
 
-## Security Notes
+## Security notes
 
-- Only open UDP 51820 and TCP 22 in AWS security group
-- Restrict to your public IP only (use `var.allowed_ip` in Terraform)
-- Internal traffic passes through encrypted tunnel
-- All public IPs and keys are stored securely, not in documentation
+- AWS security group: only UDP 51820 (and 51830 for prod) + TCP 22, restricted to my public IP via `var.allowed_ip` in Terraform.
+- Internal traffic passes through the encrypted tunnel.
+- All public IPs, elastic IPs, and WireGuard keys are stored in AWS Secrets Manager or stay on the devices — never committed to this repo.
+- The AllowedIPs breadth is deliberately loose today (see "On the AllowedIPs scope" above). It will be tightened on both the AWS peer side AND the MikroTik firewall side in a later security-hardening pass.

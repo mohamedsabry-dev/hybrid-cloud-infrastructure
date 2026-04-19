@@ -1,3 +1,0 @@
-i may need to configure script to constently watch the temp and act if it reached 80 to notficatipon and perform, smooth shutdown 
-
-echo "$(($(cat /sys/class/thermal/thermal_zone0/temp) / 1000))°C"

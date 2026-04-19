@@ -1,5 +1,9 @@
 # Disaster Recovery Test Results
 
+Platform-wide chaos test plans and results across k8s, Vault, etcd, NFS, Nginx, and IPA — what I broke intentionally and what I learned from it. Test-driven content, not runbooks.
+
+> **Proxmox host-layer runbooks** (UPS monitor, thermal monitor, USB-Ethernet adapter replacement, full Proxmox reinstall from backup) live in [`../proxmox/disaster_recovery/`](../proxmox/disaster_recovery/). That folder is prevention + procedures for the hypervisor layer; this folder is testing + results for everything above it.
+
 ---
 
 ## Real Incidents Before DR Testing

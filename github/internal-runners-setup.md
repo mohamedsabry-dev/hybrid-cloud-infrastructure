@@ -1,22 +1,26 @@
 # GitHub Actions Self-Hosted Runner Setup Guide
 
-**Date:** 2026-02-28
 **Target:** LXC Container (Rocky Linux)
 
 ---
 
 ## Automated Setup (Recommended)
 
-Use the workflow `dev-svc-gh-local_runner.yml` to automatically set up the runner.
+Use the workflow `dev-local-runner-full-setup.yml` (or `prod-local-runner-full-setup.yml` for prod) to automatically set up the runner. See [`.github/workflows/`](../.github/workflows/) for the full workflow list.
 
 ### Prerequisites
 
-1. **Secret**: `DEV_GH_RUNNER_TOKEN` - Fresh token from Settings > Actions > Runners
+1. **Secret**: `DEV_GH_RUNNER_TOKEN` - Fresh token from Settings > Actions > Runners (expires in ~1 hour, generate immediately before running the workflow)
 2. **Variables**: `DEV_GH_RUNNER_NAME` = `dev-local-runner`, `DEV_GH_RUNNER_LABELS` = `dev-local-runner`
 
 ### Trigger
 
-Push to the workflow file or run manually via workflow_dispatch.
+Push to the workflow file or run manually via `workflow_dispatch`. The workflow has 3 jobs:
+1. Deploy Local Runner LXC (Terraform)
+2. Setup GitHub Actions Runner (registers the runner service)
+3. Install Runner Tools (AWS CLI, etc. — runs via Ansible)
+
+Open all three lock variables (`DEV_INFRA_LOCAL_RUNNER_LOCK`, `DEV_SVC_GH_RUNNER_LOCK`, `DEV_SVC_LOCAL_RUNNER_TOOLS_LOCK`) to run the full setup in one pass.
 
 ---
 

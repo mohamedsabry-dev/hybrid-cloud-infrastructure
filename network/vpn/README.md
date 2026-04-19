@@ -14,8 +14,8 @@ WireGuard VPN setup for hybrid cloud connectivity.
 
 | Tunnel | Local Endpoint | Remote Endpoint | Purpose |
 |--------|----------------|-----------------|---------|
-| dev_tunnel | 172.16.200.1 (ER605) | 172.16.200.2 (AWS) | On-prem ↔ AWS Dev VPC |
-| prod_tunnel | 172.17.200.1 (ER605) | 172.17.200.2 (AWS) | On-prem ↔ AWS Prod VPC |
+| dev_tunnel | 172.16.200.1 (MikroTik) | 172.16.200.2 (AWS) | On-prem ↔ AWS Dev VPC |
+| prod_tunnel | 172.17.200.1 (MikroTik) | 172.17.200.2 (AWS) | On-prem ↔ AWS Prod VPC |
 
 ## Network Routing
 

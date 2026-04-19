@@ -15,6 +15,38 @@ and DNS services for all infrastructure nodes.
 IMPORTANT: FreeIPA is the FIRST service to deploy. All other services (Vault, K8s)
 depend on FreeIPA for domain trust and DNS resolution.
 
+### Why FreeIPA comes first
+
+Everything else I deploy depends on identity and DNS being in place before it
+can come up. FreeIPA is the foundation — once it is running, every other
+service plugs into it:
+
+  - DNS for lab.local. Every host is addressed as <name>.lab.local, plus the
+    service VIPs (vault.lab.local, k8s.lab.local). Without FreeIPA's DNS I
+    would be stitching /etc/hosts files across the fleet by hand.
+
+  - Kerberos realm LAB.LOCAL. This is the auth layer super_bot uses to run
+    Ansible passwordlessly against domain-joined hosts. No Kerberos = back
+    to SSH-key juggling for every node.
+
+  - LDAP directory with HBAC and sudo rules. Defines who can SSH where and
+    what they can run. Replaces a mess of per-host /etc/sudoers files.
+
+  - Service principals and certificates. Vault pulls its TLS certs from
+    FreeIPA via ipa-getcert (automatic renewal, no manual cert management).
+
+If I deployed Vault before FreeIPA I would have to manually issue and rotate
+Vault's TLS certs. If I deployed Kubernetes before FreeIPA I would have no
+DNS for the API VIP and no clean keytab path for Flux automation. So the
+order is forced from below: identity first, then everything that leans on
+identity.
+
+The only things that come before FreeIPA are the AWS Secrets (because the
+FreeIPA workflow reads the admin/DM passwords from there) and the Ansible +
+Local Runner pair (because something has to actually run the FreeIPA
+playbook against the new VM — see ansible-runner-setup-guide.txt for that
+reasoning).
+
 ---
 
 ## Network Layout
@@ -179,10 +211,25 @@ SSH to FreeIPA server:
 IMPORTANT: FreeIPA is managed using ROOT access only.
 The super_bot service account is NOT authorized to manage FreeIPA itself.
 
-Why root for FreeIPA?
-- FreeIPA is the identity provider, not a client
-- Using IPA auth to manage IPA creates a dependency loop
-- If IPA breaks, you need root to fix it
+### Why I manage FreeIPA as root, not super_bot
+
+FreeIPA is the identity provider, not one of its own clients. It does not
+enroll itself into the realm it runs — the SSSD, HBAC, and sudo rules I set
+up for super_bot apply to FreeIPA clients, not to the FreeIPA server itself.
+
+If I managed FreeIPA using its own auth layer (super_bot + Kerberos), I would
+create a dependency loop: the moment FreeIPA breaks, the tool I need to fix
+it is also broken. That is the worst kind of outage — you stare at the
+machine that runs identity, with no way in because identity is down.
+
+So I kept the FreeIPA VM deliberately outside its own trust domain. Even in
+the main inventory.ini, the [freeipa] group is pinned to ansible_user=root
+(and the first_setup_inventory.ini already uses root everywhere). This way
+I always have a break-glass path to reach and repair the server, regardless
+of what state the directory or Kerberos is in.
+
+Same philosophy as why I kept first_setup_inventory.ini around as a fallback:
+never let a service be managed only by the thing it provides.
 
 For FreeIPA admin tasks, use:
 - Web UI with admin credentials
