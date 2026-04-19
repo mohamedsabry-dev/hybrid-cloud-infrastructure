@@ -146,7 +146,7 @@ ACL RULES:
                          7. RELATED FILES
 ================================================================================
 
-   |- vpn-setup/wireguard-setup.md  - Full setup guide with troubleshooting
+   |- vpn-setup/wireguard-setup-guide.txt  - Full setup guide with troubleshooting
    |- vpn-setup/setup-wireguard.sh  - Automated setup script for AWS EC2
    |- terraform/*/aws/compute/      - EC2 infrastructure (Terraform)
 

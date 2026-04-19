@@ -56,12 +56,16 @@ Configures Chrony time synchronization with different configs per node type:
 | `templates/chrony_vm.conf` | Chrony config for VMs |
 | `templates/chrony_lxc.conf` | Chrony config for LXC (not deployed - see note above) |
 
-## Usage
+## When these run
 
-```bash
-# Initial setup on fresh nodes
-ansible-playbook -i inventory/first_setup_inventory.ini playbooks/common/pre_setup.yml
+- `pre_setup.yml` — runs on fresh nodes BEFORE FreeIPA enrollment. Uses the
+  bootstrap inventory (IP + root + SSH key). Invoked as a preparatory step
+  by the full-setup workflows (`{env}-ansible-full-setup.yml`,
+  `{env}-freeipa-full-setup.yml`, etc.).
+- `ntp.yml` — runs AFTER FreeIPA enrollment. Uses the production inventory.
+  Run as part of the post-enrollment configuration pass or whenever the
+  chrony config changes.
+- `setup_breakglass.yml` — **TODO**, not yet implemented.
 
-# Configure NTP (after FreeIPA enrollment)
-ansible-playbook playbooks/common/ntp.yml
-```
+For the broader run order see [`../freeipa/freeipa-setup-guide.txt`](../freeipa/freeipa-setup-guide.txt)
+and the top-level sequenced guides under `deployment-docs/`.

@@ -7,7 +7,7 @@ WireGuard VPN setup for hybrid cloud connectivity.
 | Path | Description |
 |------|-------------|
 | `wireguard-config.txt` | VPN configuration summary |
-| `wireguard-setup.md` | Detailed setup guide |
+| `wireguard-setup-guide.txt` | Detailed setup guide |
 | `setup-wireguard.sh` | Setup automation script |
 
 ## Tunnel Overview

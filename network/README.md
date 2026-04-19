@@ -42,7 +42,7 @@ network/
 │
 └── vpn/
     ├── README.md                 # Summary of both tunnels + routing
-    ├── wireguard-setup.md        # Detailed setup guide with reasoning
+    ├── wireguard-setup-guide.txt        # Detailed setup guide with reasoning
     ├── wireguard-config.txt      # Quick tunnel reference
     └── setup-wireguard.sh        # Automation script for AWS EC2 side
 ```

@@ -1,0 +1,52 @@
+# LXC Golden Template — Finalize Guide
+
+After running `golden-lxc-setup.sh` inside the source LXC container,
+these are the Proxmox-host-side commands to turn it into a reusable
+template file on the NAS.
+
+This is the LXC equivalent of "convert to template" for VMs (which is
+done via the Proxmox UI). LXC templates are .tar.gz files, not
+container IDs — see the DESIGN story in
+`terraform/dev/proxmox/lxc/DESIGN.md` for the provider-limitation reason.
+
+---
+
+## Commands (run on the Proxmox host)
+
+  # 1. Stop the configured container (assumes CTID 9001)
+  pct stop 9001
+
+  # 2. Create a vzdump backup in template form
+  vzdump 9001 --compress gzip --storage local --mode stop
+
+  # 3. Move the backup to the template cache on the NAS
+  mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz \
+     /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
+
+  # 4. Verify the template is registered
+  pveam list nas-iso
+
+---
+
+## After this
+
+The template file is referenced by the per-container Terraform modules via:
+
+  operating_system {
+    template_file_id = "nas-iso:vztmpl/rocky-9-lxc-golden.tar.gz"
+    type             = "centos"
+  }
+
+See:
+  terraform/dev/proxmox/lxc/DESIGN.md
+  terraform/dev/proxmox/lxc/golden-template-operation-guide.txt
+
+---
+
+## Related
+
+- README.md                                              — folder scope + what the setup scripts do
+- DESIGN.md                                              — iteration history + package choices
+- golden-lxc-setup.sh                                    — runs inside the source container (pre-vzdump)
+- ../../terraform/dev/proxmox/lxc/DESIGN.md              — why template-file vs clone-from-ID
+- ../../terraform/dev/proxmox/lxc/golden-template-operation-guide.txt — fuller LXC template flow

@@ -1,0 +1,52 @@
+# FreeIPA Playbooks — Setup Guide (DEV)
+
+Run order + commands for the FreeIPA playbooks. The normal path is via the
+workflow `dev-freeipa-full-setup.yml`; manual runs are for emergencies or
+DR fallback.
+
+See README.md for scope + playbook descriptions.
+See `../../../../deployment-docs/freeipa-overview.md` for the identity-layer story.
+
+---
+
+## Run order (initial setup)
+
+  1. freeipa_setup.yml         Install FreeIPA server
+  2. add_hosts_to_ipa.yml      Join managed hosts to the domain
+  3. domain_config.yml         Create users, groups, HBAC, sudo rules
+  4. fix_lxc_krb5_keyring.yml  Fix Kerberos ccache on LXC containers
+  5. add_dns_records.yml       Register VIP A-records (vault, k8s) + per-app names
+  6. dns_fallback.yml          Node-side 8.8.8.8 fallback (IPA-down mitigation)
+
+---
+
+## Manual run (uses bootstrap inventory — IP + root + SSH key)
+
+  cd ansible/dev/
+
+  ansible-playbook -i inventory/first_setup_inventory.ini \
+    playbooks/freeipa/freeipa_setup.yml
+
+  ansible-playbook -i inventory/first_setup_inventory.ini \
+    playbooks/freeipa/add_hosts_to_ipa.yml
+
+---
+
+## Manual run (uses production inventory — super_bot + Kerberos)
+
+Requires prior `kinit super_bot` or `kinit admin`:
+
+  kinit admin
+  ansible-playbook playbooks/freeipa/domain_config.yml
+  ansible-playbook playbooks/freeipa/fix_lxc_krb5_keyring.yml
+  ansible-playbook playbooks/freeipa/add_dns_records.yml
+  ansible-playbook playbooks/freeipa/dns_fallback.yml
+
+---
+
+## Related
+
+- README.md                                              — playbook scope + descriptions
+- ../../operation_guide.txt                              — kinit + testing commands
+- ../../../../deployment-docs/freeipa-overview.md        — identity-layer system overview
+- ../../../../deployment-docs/freeipa-initial-setup-guide.txt — sequenced step-7 setup walkthrough

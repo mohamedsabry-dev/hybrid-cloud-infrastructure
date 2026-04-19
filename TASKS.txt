@@ -13,6 +13,8 @@ What Pending to publish:
     - etcd ↔ Vault ↔ AWS Integration
     - Remediation ↔ Vault ↔ Proxmo Integration
     - CoreDNS <> IPA
+    - Nginx internal / External Down <> Endpoints
+
 
 3- Readmes Across the Env 
     - Update Capacity planning File 
@@ -35,9 +37,5 @@ What Pending to publish:
         - master node 2 put of 3 not respinding reahcability ++ another second step verfication using something from kubelet logsfor disconenction error , and the trigger is somthing for somone to take action 
         i cant allow worker to direct talk with vault or prox api .. so it might call api to aws ? ,,, lok it we can make it a pod , and it surviced we can make it have the api already inside it during creation for proxmox api token , and it triger the node restart or stop and start 
         later we can see aws cloudwtch + in june in shaa allah 
-
-
-What to be moved After publish
-    - Check ROADMAP files 
 
 

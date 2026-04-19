@@ -1,0 +1,127 @@
+# Proxmox Full-Host Recovery Guide
+
+Complete reinstall + restore runbook. Use when a Proxmox host needs to be
+rebuilt from scratch — disk failure, hardware swap, corrupted install.
+
+Combines the config-tarball backup (from
+`../../backup/proxmox_backup/backup-proxmox-config.sh`) with the vzdump
+VM/LXC archives on the NAS to restore a host to its previous state on
+replacement hardware.
+
+---
+
+## When to use
+
+- Complete hardware failure requiring new machine
+- Corrupted Proxmox installation
+- Disk failure requiring full reinstall
+
+---
+
+## Prerequisites (before disaster)
+
+Make sure you have:
+
+- [ ] Config backup from `backup-proxmox-config.sh` on the NAS
+- [ ] VM / LXC backups (vzdump) on the NAS
+- [ ] Proxmox ISO on a USB drive
+- [ ] Network documentation (IPs, VLANs — see `network/ip-planning.txt`)
+- [ ] This guide accessible offline (printed or on another device)
+
+---
+
+## Step 1 — Fresh Proxmox install
+
+  # Boot from Proxmox ISO on replacement hardware
+  # Use the SAME hostname as the original (pve-dev or pve-prod)
+  # Configure basic network enough to reach the backup location (NAS)
+
+## Step 2 — Run bootstrap
+
+  # Copy bootstrap script to the new host
+  scp proxmox/bootstrap_proxmox/bootstrap.sh root@<new-proxmox>:/tmp/
+
+  # Run bootstrap
+  ssh root@<new-proxmox>
+  chmod +x /tmp/bootstrap.sh
+  /tmp/bootstrap.sh dev          # or: /tmp/bootstrap.sh prod
+
+## Step 3 — Restore config backup
+
+  # Pull the config tarball from the NAS (adjust path to actual mount)
+  scp nas:/backups/proxmox-config-<host>-*.tar.gz /tmp/
+
+  cd /tmp && tar -xzf proxmox-config-*.tar.gz
+  cd proxmox-config-*
+
+  # Stop Proxmox services before restoring /etc/pve
+  systemctl stop pvedaemon pveproxy pvestatd
+
+  # Restore configs (from the tarball's extracted layout)
+  cp -a pve/* /etc/pve/
+  cp network/interfaces /etc/network/interfaces
+  cp network/hosts /etc/hosts
+  cp storage/fstab /etc/fstab
+  cp boot/grub /etc/default/grub && update-grub
+  cp boot/modules /etc/modules
+  cp -a boot/modprobe.d/* /etc/modprobe.d/
+  cp -a boot/sysctl.d/* /etc/sysctl.d/
+  cp -a apt/sources.list* /etc/apt/
+  cp ssh/sshd_config /etc/ssh/
+  cp ssh/authorized_keys /root/.ssh/
+  crontab cron/root-crontab.txt
+  cp systemd/*.service /etc/systemd/system/ && systemctl daemon-reload
+
+  # Reboot to apply
+  reboot
+
+## Step 4 — Run network setup
+
+  /tmp/network-setup.sh dev     # or: /tmp/network-setup.sh prod
+  reboot
+
+## Step 5 — Restore storage configuration
+
+  # Verify storage mounts
+  cat /etc/fstab
+  mount -a
+
+  # Check Proxmox storage
+  pvesm status
+
+## Step 6 — Restore VMs + LXCs from backup
+
+  # List available backups on the NAS
+  ls /mnt/pve/nas-backups/dump/
+
+  # Restore a VM
+  qmrestore /mnt/pve/nas-backups/dump/vzdump-qemu-<vmid>-*.vma <new-vmid>
+
+  # Restore a container
+  pct restore <new-ctid> /mnt/pve/nas-backups/dump/vzdump-lxc-<ctid>-*.tar.gz
+
+## Step 7 — Verify
+
+  - [ ] Web UI accessible (https://<host>:8006)
+  - [ ] VMs/CTs start correctly
+  - [ ] Network connectivity (ping gateway 10.0.5.1, NAS 10.0.40.120)
+  - [ ] Storage accessible (pvesm status clean)
+  - [ ] Backups configured (cron + PVE backup jobs)
+
+---
+
+## Post-recovery notes
+
+- VM / CT IDs may need adjustment if conflicts exist with previously-running workloads
+- MAC addresses regenerate on fresh VMs — DHCP reservations may need update
+- Check `SYSTEM-INFO.txt` inside the backup tarball for original-host state reference
+- Re-run `mail-config.sh` if email notifications are needed
+
+---
+
+## Related
+
+- README.md                                       — scope + file listing
+- ../../backup/proxmox_backup/backup-proxmox-config.sh — the config backup script
+- ../../bootstrap_proxmox/                        — bootstrap + network-setup scripts
+- ../../backup/DESIGN.md                          — backup strategy (why config + vzdump split)

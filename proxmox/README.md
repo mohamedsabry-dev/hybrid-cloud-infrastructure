@@ -3,6 +3,8 @@
 On-prem hypervisor layer — two physical Proxmox hosts (dev + prod), a dedicated NAS, and a physical router. Provisioned by [`../terraform/*/proxmox/`](../terraform/), configured by [`../ansible/`](../ansible/).
 
 > **Design notes & reasoning** — for the iteration history behind this layout (why two physical hosts instead of one nested setup, why hardware NAS over TrueNAS VM, how the bootstrap scripts were built), see [`DESIGN.md`](DESIGN.md).
+>
+> **Capacity planning** — resource allocation (CPU / RAM / disk) across the VMs and LXCs that run on these hosts is in [`capacity-planning.md`](capacity-planning.md).
 
 ---
 
@@ -48,6 +50,7 @@ After bootstrap, create golden templates (VM and LXC) via `golden_templates/`, t
 ## Related
 
 - [`DESIGN.md`](DESIGN.md) — the story behind this layer (iteration history, decision trail, bootstrap-script origin)
+- [`capacity-planning.md`](capacity-planning.md) — resource allocation for VMs/LXCs running on these hosts
 - [`../terraform/*/proxmox/`](../terraform/) — Terraform resources provisioned on these hosts
 - [`../ansible/`](../ansible/) — configuration applied after provisioning
 - [`../network/README.md`](../network/README.md) — physical network these hosts connect into

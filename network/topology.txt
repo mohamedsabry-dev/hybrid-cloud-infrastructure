@@ -119,7 +119,7 @@ of switch/fs308gp/config.txt.
   ├── network/router/mikrotik/          - MikroTik router config + .rsc scripts
   ├── network/ap/ac750/config.txt       - Access point configuration
   ├── network/switch/fs308gp/config.txt - FS308GP switch (current + historical)
-  └── network/vpn/wireguard-setup.md    - WireGuard VPN setup + reasoning
+  └── network/vpn/wireguard-setup-guide.txt    - WireGuard VPN setup + reasoning
 
   Retired / historical reference:
   └── network/router/er605/             - Previous router, kept as archive

@@ -1,240 +1,61 @@
-# Mac Mini Workstation Setup
+# Mac Mini Workstation
 
 **Machine:** Mac Mini (Apple Silicon ARM64)
-**Role:** Self-hosted GitHub Actions runner + local development
+**Role:** Self-hosted GitHub Actions runner + local development + operator workstation for the hybrid-cloud platform.
+
+This folder holds everything specific to the Mac Mini's role in the platform:
+setup guides for the runner and the dev tooling, persistent-route configuration
+for reaching on-prem networks, and SSH config templates for VPN + GitHub.
 
 ---
 
-## Quick Reference
-
-| Component | Location/Command |
-|-----------|------------------|
-| GitHub Runner | `~/WorkSpace/actions-runner` |
-| Provider Mirror | `~/.terraform.d/providers-mirror` |
-| Route Service | `com.local.route10` |
-| SSH Config | `~/.ssh/config` |
-
----
-
-## 1. Install Dependencies
-
-```bash
-# Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Required tools
-brew install python node terraform ansible awscli sshpass
-brew install kubectl fluxcd/tap/flux kustomize kubeconform
-brew install --cask docker powershell
-```
-
-| Tool | Purpose |
-|------|---------|
-| Python | Automation scripts |
-| Docker | Container builds |
-| AWS CLI | AWS resource management |
-| Terraform | Infrastructure provisioning |
-| Ansible | Configuration management |
-| Node.js | GitHub Actions runner |
-| PowerShell | VMware/Windows automation |
-| sshpass | SSH password auth for LXC provisioning |
-| kubectl | Read cluster state from laptop |
-| flux CLI | `flux diff` pre-push validation + `flux get` status checks |
-| kustomize | Local `kustomize build` for offline manifest rendering |
-| kubeconform | Offline manifest schema validation (CRD-aware fallback when cluster unreachable) |
-
----
-
-## 2. GitHub Actions Runner
-
-### Install Runner
-
-```bash
-# Create runner directory
-mkdir -p ~/WorkSpace/actions-runner && cd ~/WorkSpace/actions-runner
-
-# Download latest runner (ARM64)
-curl -o actions-runner-osx-arm64.tar.gz -L \
-  https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-osx-arm64-2.331.0.tar.gz
-
-# Extract
-tar xzf ./actions-runner-osx-arm64.tar.gz
-```
-
-### Configure Runner
-
-```bash
-# Get token from: GitHub Repo > Settings > Actions > Runners > New self-hosted runner
-
-./config.sh --url https://github.com/<ORG>/<REPO> \
-  --token YOUR_RUNNER_TOKEN \
-  --labels self-hosted,macOS,ARM64,mac-mini \
-  --name Mac-Mini-Runner
-```
-
-### Setup Auto-Start Service
-
-```bash
-./svc.sh install
-./svc.sh start
-./svc.sh status
-```
-
-### Runner Labels
-
-| Label | Usage |
-|-------|-------|
-| `mac-mini` | `runs-on: mac-mini` (recommended) |
-| `self-hosted` | Identifies as self-hosted |
-| `macOS` | Operating system |
-| `ARM64` | CPU architecture |
-
----
-
-## 3. Terraform Provider Mirror
-
-Local cache speeds up `terraform init` (no internet download).
-
-```bash
-# Create mirror directory
-mkdir -p ~/.terraform.d/providers-mirror
-
-# Mirror required providers
-terraform providers mirror -platform=linux_amd64 ~/.terraform.d/providers-mirror
-terraform providers mirror -platform=darwin_arm64 ~/.terraform.d/providers-mirror
-```
-
-**Mirrored Providers:**
-- hashicorp/aws
-- bpg/proxmox
-- hashicorp/external
-
-**Usage in workflows:** Runner automatically uses mirror via `.terraformrc`
-
----
-
-## 4. SSH Configuration
-
-Copy template to `~/.ssh/config`:
-
-```bash
-cat ssh-wg/ssh-config-template >> ~/.ssh/config
-```
-
-**Template contents:**
-```
-Host wg-dev
-    HostName <DEV_EIP>
-    User ec2-user
-    IdentityFile ~/WorkSpace/vpn-key-pair-dev.pem
-
-Host wg-prod
-    HostName <PROD_EIP>
-    User ec2-user
-    IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
-
-Host github.com
-    Hostname ssh.github.com
-    Port 443
-    User git
-```
-
----
-
-## 5. Internal Network Route (10.x)
-
-Persistent route to reach on-premises 10.x networks via local gateway.
-
-> **Note:** The `10.0.0.0/8` route is now configured one hop up — at the ISP router level — pointing to the MikroTik router (previously the ER605). The custom route script below is no longer needed on the Mac Mini in the current setup, but is kept here as a reference or fallback for situations where the ISP router can't hold the route (e.g. emergency local runs, different ISP hardware, or when the MikroTik is being rebuilt).
-
-### Install
-
-```bash
-cd workstation/route-setup
-sudo ./install-route.sh
-```
-
-### What It Does
-
-1. Installs `/usr/local/bin/add-route.sh`
-2. Creates launchd service `com.local.route10`
-3. Adds route `10.0.0.0/8` via gateway on boot
-
-### Verify
-
-```bash
-# Check route exists
-netstat -rn | grep "^10"
-
-# Check service
-launchctl list | grep route10
-```
-
-### Uninstall
-
-```bash
-sudo launchctl unload /Library/LaunchDaemons/com.local.route10.plist
-sudo rm /Library/LaunchDaemons/com.local.route10.plist
-sudo rm /usr/local/bin/add-route.sh
-```
-
----
-
-## 6. Local kubectl + flux access (for pre-push validation)
-
-The Mac Mini also reaches the on-prem Kubernetes clusters directly over the `10.x` route, so I can run `kubectl`, `flux get`, and most importantly `flux diff` as part of my pre-push review loop — catching schema errors, accidental prunes, and misconfigurations *before* they hit the `dev` branch and trigger a Flux reconcile. This was adopted after reviewing the Flux apply flow during consolidation and tying the pattern back to two incidents the habit would have prevented (TS-K8S-019 restructure cascade, TS-K8S-042 retry storm).
-
-Full setup guide:
-- [`../kubernetes/docs/local-kubectl-flux-setup.md`](../kubernetes/docs/local-kubectl-flux-setup.md)
-
-Quick summary:
-
-```bash
-brew install kubectl fluxcd/tap/flux kustomize kubeconform
-
-# Pull kubeconfigs from masters (one per env):
-ssh super_bot@<dev-master-ip>  'sudo cat /etc/kubernetes/admin.conf' > ~/.kube/config-dev
-ssh super_bot@<prod-master-ip> 'sudo cat /etc/kubernetes/admin.conf' > ~/.kube/config-prod
-
-# Aliases in ~/.zshrc:
-alias kdev='export KUBECONFIG=~/.kube/config-dev'
-alias kprod='export KUBECONFIG=~/.kube/config-prod'
-
-# Pre-push validation workflow (dev-only, matches the terraform plan-from-dev pattern):
-kdev
-flux diff kustomization infrastructure --path ./kubernetes/dev/deployments/infrastructure
-```
-
-> **Acknowledged flaw:** this currently uses `admin.conf` on the laptop — an unrestricted superuser identity. Logged as a known gap; intent is to later replace with a read-only RBAC-governed user, with mutating operations confined to GitOps + CI. See the setup guide for the acknowledgement.
-
----
-
-## 7. Validation Checklist
-
-| Check | Command | Expected |
-|-------|---------|----------|
-| Runner Status | GitHub > Settings > Actions > Runners | "Idle" |
-| Service Running | `./svc.sh status` | "Running" |
-| Route Active | `netstat -rn \| grep "^10"` | Shows 10.0.0.0/8 |
-| SSH to WG | `ssh wg-dev` | Connects |
-| Terraform | `terraform version` | Shows version |
-| Docker | `docker ps` | No errors |
-| kubectl (dev) | `kdev && kubectl get nodes` | 6 nodes Ready |
-| flux CLI | `flux get kustomizations` | flux-system / infrastructure / apps all Ready: True |
-
----
-
-## Files in This Directory
+## Files in this folder
 
 ```
 workstation/
-├── README.md                            # This setup guide
-├── route-setup/                         # Persistent route to 10.0.0.0/8 (fallback — see §5)
-│   ├── README.md                        # Local overview
-│   ├── add-route.sh                     # Route add script (called by launchd)
-│   ├── install-route.sh                 # Installer for persistent route
-│   └── com.local.route10.plist          # launchd service definition
-└── ssh-wg/                              # SSH config templates for VPN hosts
-    ├── README.md                        # Local overview
-    └── ssh-config-template              # SSH config entries for wg-dev / wg-prod / GitHub:443
+├── README.md                                # This file — scope + navigation
+├── github-runner-setup-guide.txt            # Install + configure the self-hosted runner
+├── terraform-provider-mirror-guide.txt      # Local Terraform provider cache
+├── route-setup/                             # Persistent route to 10.0.0.0/8 (fallback)
+│   ├── README.md                            # Folder scope
+│   ├── route-setup-guide.txt                # Install / verify / uninstall commands
+│   ├── add-route.sh                         # Route add script (used by launchd)
+│   ├── install-route.sh                     # Installer for persistent route
+│   └── com.local.route10.plist              # launchd service definition
+└── ssh-wg/                                  # SSH config for VPN + GitHub
+    ├── README.md                            # Folder scope + usage
+    └── ssh-config-template                  # SSH config entries (append to ~/.ssh/config)
 ```
+
+---
+
+## What lives here (by concern)
+
+| Concern | File / folder |
+|---------|---------------|
+| GitHub Actions runner install | [`github-runner-setup-guide.txt`](github-runner-setup-guide.txt) |
+| Terraform provider mirror | [`terraform-provider-mirror-guide.txt`](terraform-provider-mirror-guide.txt) |
+| Persistent 10.x route (fallback) | [`route-setup/`](route-setup/) |
+| SSH config for VPN + GitHub | [`ssh-wg/`](ssh-wg/) |
+| Local `kubectl` / `flux diff` access | [`../kubernetes/docs/local-kubectl-flux-setup.md`](../kubernetes/docs/local-kubectl-flux-setup.md) |
+
+---
+
+## Core dependencies installed on this machine
+
+Tooling expected on the Mac Mini for the runner + operator workflows:
+
+- Terraform, Ansible, AWS CLI, Docker, Node.js, Python, PowerShell, sshpass
+- kubectl, flux, kustomize, kubeconform (for pre-push validation — see kubectl/flux guide)
+
+Installed via `brew`. The specific install line lives in each guide where needed.
+
+---
+
+## Related
+
+- [`../github/runner-mac-mini.md`](../github/runner-mac-mini.md) — why the runner is self-hosted on the Mac Mini; tool rationale
+- [`../github/variables-secrets.md`](../github/variables-secrets.md) — GitHub secrets + variables consumed by workflows
+- [`../deployment-docs/github-setup-guide.txt`](../deployment-docs/github-setup-guide.txt) — GitHub-side setup (OIDC, secrets, runner registration)
+- [`../deployment-docs/network-setup-guide.txt`](../deployment-docs/network-setup-guide.txt) — router-level network + routing
+- [`../kubernetes/docs/local-kubectl-flux-setup.md`](../kubernetes/docs/local-kubectl-flux-setup.md) — full kubectl + flux pre-push validation setup

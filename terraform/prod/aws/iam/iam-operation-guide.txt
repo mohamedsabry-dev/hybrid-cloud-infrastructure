@@ -1,0 +1,72 @@
+# AWS IAM Module — Operation Guide (PROD)
+
+Apply / update / historical state-migration commands for the IAM module.
+
+This module runs under `GitHubActions-TerraformAdmin-prod` (the privileged
+role from CloudFormation bootstrap), triggered by pushes to the
+`prod-security` branch. Manual runs are rarely needed — the workflow at
+`.github/workflows/prod-aws-iam.yml` is the standard path.
+
+---
+
+## Apply (manual — rarely used; prefer the workflow)
+
+  cd terraform/prod/aws/iam
+  terraform init
+  terraform plan -var="account_id=<aws-account-id>"
+  terraform apply -var="account_id=<aws-account-id>"
+
+---
+
+## After this runs, re-run the compute workflow
+
+If the IAM resources were recreated (naming change, etc.), the WireGuard
+EC2 loses its instance profile until the compute workflow runs again and
+reattaches. Order:
+
+  1. IAM workflow completes
+  2. Run compute workflow (prod-aws-compute.yml)
+
+The compute module pulls the instance profile name from IAM's remote state
+output, so compute apply is idempotent and reattaches the profile.
+
+---
+
+## Historical state migrations (for reference)
+
+These commands were run once and removed from the workflow. Kept here so
+future state rename operations can follow the same pattern.
+
+### 2026-03-21 — consolidation: prefix → suffix naming
+
+Terraform resource block names were renamed for dev/prod consistency
+(`dev_wireguard_ssm` → `wireguard_ssm`, etc.). Commands:
+
+  terraform state mv aws_iam_role.dev_wireguard_ssm \
+                     aws_iam_role.wireguard_ssm
+  terraform state mv aws_iam_role_policy_attachment.dev_wireguard_ssm_core \
+                     aws_iam_role_policy_attachment.wireguard_ssm_core
+  terraform state mv aws_iam_instance_profile.dev_wireguard_ssm \
+                     aws_iam_instance_profile.wireguard_ssm
+  terraform state mv aws_iam_policy.terraform_state_dev \
+                     aws_iam_policy.terraform_state
+  terraform state mv aws_iam_policy.security_boundary_dev \
+                     aws_iam_policy.security_boundary
+
+This also forced AWS-side resource name changes (which triggered
+replacement for those resources — accepted). New naming:
+
+  dev-wireguard-ssm-role     → wireguard-ssm-role-dev
+  dev-wireguard-ssm-profile  → wireguard-ssm-profile-dev
+  SecurityBoundary-Dev       → SecurityBoundary-dev
+  TerraformState-Dev         → TerraformState-dev
+
+---
+
+## Related
+
+- DESIGN.md                                             — module-local design (PowerUserAccess + SecurityBoundary, branch-level OIDC)
+- ../../../../aws/DESIGN.md                             — 2-tier IAM model + prod-security branch strategy
+- ../../../../aws/bootstrap.md                          — CloudFormation bootstrap (where TerraformAdmin comes from)
+- ../../../../.github/workflows/prod-aws-iam.yml         — the workflow that normally runs this module
+- ../../../../deployment-docs/aws-bootstrap-setup-guide.txt — AWS-side bootstrap
