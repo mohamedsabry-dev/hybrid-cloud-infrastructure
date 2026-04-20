@@ -23,10 +23,10 @@ spec:
         name: csi-driver-nfs
         namespace: flux-system
   values:
+    customLabels:
+      stack: nfs
     controller:
       replicas: 2
-      podLabels:
-        app: nfs-controller
       priorityClassName: system-cluster-critical
       affinity:
         nodeAffinity:
