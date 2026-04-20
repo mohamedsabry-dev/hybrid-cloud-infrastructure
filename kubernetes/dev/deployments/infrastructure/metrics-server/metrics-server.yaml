@@ -1,3 +1,14 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  interval: 1h
+  url: https://kubernetes-sigs.github.io/metrics-server/
+
+
+---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -16,6 +27,8 @@ spec:
   values:
     # HA setup - 2 replicas on different nodes
     replicas: 2
+    podLabels:
+      app: metrics-server
 
     # Args for metrics-server container
     args:

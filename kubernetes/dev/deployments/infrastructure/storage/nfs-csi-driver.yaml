@@ -25,6 +25,8 @@ spec:
   values:
     controller:
       replicas: 2
+      podLabels:
+        app: nfs-controller
       priorityClassName: system-cluster-critical
       affinity:
         nodeAffinity:

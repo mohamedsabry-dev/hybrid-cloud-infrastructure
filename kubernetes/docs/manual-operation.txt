@@ -56,6 +56,13 @@ Edit on ALL masters:
 Add this flag:
     - --unhealthy-zone-threshold=0.8
 
+
+Edit on ALL masters:
+/etc/kubernetes/manifests/kube-controller-manager.yaml
+
+Add this flag:
+    - --unhealthy-zone-threshold=0.8
+
 Static pod restarts automatically after file save.
 
 Verify:
