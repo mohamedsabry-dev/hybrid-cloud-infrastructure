@@ -298,6 +298,9 @@ Edit `/etc/kubernetes/manifests/kube-controller-manager.yaml` on ALL masters:
 - --unhealthy-zone-threshold=0.8
 ```
 
+Automated via Ansible playbook `ansible/<env>/playbooks/k8s/update_cluster_config.yml` to apply
+the config idempotently across all masters instead of manual per-node editing.
+
 **Status:** Applied and verified in DR Test 4.
 
 ### Part 3: Manual Emergency Command
