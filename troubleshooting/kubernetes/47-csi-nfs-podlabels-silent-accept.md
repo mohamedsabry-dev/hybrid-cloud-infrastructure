@@ -164,7 +164,129 @@ values:
     stack: nfs
 ```
 
-Verified: Pending push — diff confirms correct change
+Verified: Yes
+
+_____________________________________________________________________
+
+[Post-Push Observation — DaemonSet Full Restart]
+
+After pushing `customLabels: { stack: nfs }`, Flux reconciled and the rollout
+triggered. Expected only the csi-nfs-controller Deployment to restart. Instead,
+the ENTIRE CSI NFS stack restarted — both controller pods AND all csi-nfs-node
+DaemonSet pods across all 3 workers.
+
+Command: kubectl get pods -n kube-system | grep csi
+
+Output (during rollout):
+```
+csi-nfs-controller-56646d6c4-w56gq   5/5  Running            0  3s
+csi-nfs-controller-56646d6c4-x88tf   5/5  Running            0  3s
+csi-nfs-node-4bv68                    3/3  Running            0  4s
+csi-nfs-node-czdrh                    3/3  Running            27 (68m ago)  3d21h
+csi-nfs-node-hkshn                    0/3  ContainerCreating  0  1s
+```
+
+Output (settled):
+```
+csi-nfs-controller-56646d6c4-w56gq   5/5  Running  0  14s
+csi-nfs-controller-56646d6c4-x88tf   5/5  Running  0  14s
+csi-nfs-node-4bv68                    3/3  Running  0  15s
+csi-nfs-node-8ggcl                    3/3  Running  0  10s
+csi-nfs-node-hkshn                    3/3  Running  0  12s
+```
+
+This makes sense — `customLabels` is a top-level chart value, not scoped to
+controller or node. Helm re-renders all templates, both Deployment and DaemonSet
+get new pod specs, both roll.
+
+# Impact Assessment — Why No NFS Errors?
+
+This was the key question. The CSI NFS node pods restarted on every worker —
+that's the component responsible for mounting/unmounting PVCs. During the restart,
+the CSI plugin deregistered from kubelet for ~2 seconds per worker.
+
+## Timeline from kubelet logs (worker1):
+
+```
+21:10:42  Old csi-nfs-node sandbox shm mounts deactivated
+21:10:46  CSI NFS plugin DEREGISTERED from kubelet
+21:10:47  containerd creates new pod sandbox (RunPodSandbox)
+21:10:47  Flood of "ContainerStatus: not found" for old container IDs (normal cleanup)
+21:10:47  New "nfs" container created inside new sandbox
+21:10:47  Pod startup completed in ~2 seconds
+21:10:48  NFS CSI plugin re-registered with kubelet
+```
+
+## Two rollout waves observed:
+
+Wave 1 (~21:10): All 3 workers restarted csi-nfs-node within seconds
+Wave 2 (~21:26): Second restart wave — Flux was waiting for controller to report
+Ready before proceeding. Controller on worker2 showed podStartSLOduration=960s
+(16 minutes from creation to confirmed Running).
+
+## Why zero NFS impact:
+
+Checked all 3 workers. Results identical — completely clean:
+
+```
+worker1: nfsstat -c retrans = 0 out of 32,629 calls
+worker2: nfsstat -c retrans = 0
+worker3: nfsstat -c retrans = 0
+dmesg | grep "server not responding": nothing on any worker
+journalctl -k | grep oom: nothing on any worker
+```
+
+The reason: CSI driver is only involved at mount/unmount time. Once a PVC is
+mounted, the kernel NFS client handles all runtime I/O directly — it talks to
+the NAS (10.0.40.120) without going through the CSI plugin at all.
+
+```
+CSI driver role:
+  Mount time   → CSI needed  (NodePublishVolume)
+  Runtime I/O  → kernel NFS client handles directly, CSI NOT involved
+  Unmount time → CSI needed  (NodeUnpublishVolume)
+```
+
+During the ~2 second CSI restart window, the only risk was: if a NEW pod was
+being scheduled and needed to mount a PVC at that exact moment, it would have
+failed with a CSI attach error. But nothing was scheduling during that window.
+
+WordPress and MariaDB kept serving the whole time — confirmed by checking logs
+during the rollout window:
+
+Command: kubectl logs -l app=wordpress -n apps
+
+Output:
+```
+10.0.64.12 - [20/Apr/2026:19:11:59] "GET / HTTP/1.1" 200 15242
+10.0.64.11 - [20/Apr/2026:19:11:59] "GET / HTTP/1.1" 200 15242
+(continuous kube-probe 200s, no errors)
+```
+
+## Mount flags confirm soft mount protection:
+
+```
+nfsstat -m:
+  soft,timeo=30,retrans=3,vers=3,proto=tcp
+```
+
+Even if the NAS had gone down during this window, `soft` mount means the kernel
+returns an error after ~9 seconds (timeo=30 × retrans=3) instead of hanging
+forever.
+
+## Notable finding — worker2 has mixed NFS versions:
+
+```
+Prometheus PVC: vers=4.2, hard, timeo=600, retrans=5
+Other PVCs:     vers=3,   soft, timeo=30,  retrans=3
+```
+
+The Prometheus PVC uses `hard` mount. If the NAS went down, Prometheus on worker2
+would hang in uninterruptible D state while everything else would get I/O errors
+and move on. Worth noting for DR test planning.
+
+This finding triggered a deeper investigation into why Prometheus ended up on
+NFSv4.2 instead of v3 — root cause identified and documented in TS-K8S-048.
 
 _____________________________________________________________________
 
@@ -174,21 +296,34 @@ The silent accept was low risk (label just didn't appear). The near-miss with
 `app` key overwrite was HIGH risk — would have broken Deployment selector for
 the cluster's storage driver. Caught before push by checking matchLabels.
 
+Post-push rollout was clean — full DaemonSet restart with zero NFS impact due to
+kernel NFS client independence from CSI plugin at runtime.
+
 _____________________________________________________________________
 
 [References]
 - kubernetes/dev/deployments/infrastructure/storage/nfs-csi-driver.yaml
 - Chart source: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
 - TS-K8S-046 — related kustomization stale reference from same editing session
+- TS-K8S-015 — prior case where CSI NFS restart DID cause MariaDB crash (different
+  scenario: stale NFS handles after config change, not a label-only rollout)
 
 _____________________________________________________________________
 
 [Draft Notes]
-Lesson: Helm will eat any values you throw at it — silence doesn't mean success.
+Lesson 1: Helm will eat any values you throw at it — silence doesn't mean success.
 Always verify labels landed on the actual pods after a rollout. When in doubt,
 use `helm show values` to check the chart's actual schema before assuming value
 paths from other charts apply.
 
-Second lesson: when adding labels to pods that already have selector-critical
-labels (like `app`), check the Deployment matchLabels first. Overwriting a
-selector label is a silent cluster bomb.
+Lesson 2: When adding labels to pods that already have selector-critical labels
+(like `app`), check the Deployment matchLabels first. Overwriting a selector
+label is a silent cluster bomb.
+
+Lesson 3: `customLabels` is chart-wide — changing it restarts EVERYTHING the chart
+manages (Deployment + DaemonSet), not just the component you're thinking about.
+For CSI NFS, that means every worker's node plugin restarts. Safe in this case
+because kernel NFS client is independent, but be aware of the blast radius.
+
+Lesson 4: The worker2 hard-mount Prometheus PVC is a DR asymmetry — NAS failure
+would hit worker2 differently than the soft-mount workers. Good chaos test candidate.
