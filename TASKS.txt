@@ -1,57 +1,24 @@
-What Pending to publish: //// 5 Days. == 24/April 
+What Pending to publish: //// 6 Days. == 27/April 
 
 1- Complete DR Test 3 Tests 
     - Power Down 
     - Quorm lose 2 masters down 
     - Validte the priority class evection + load pressure + and trigger Conflic with app HBA targets
+    - +
 
 
 2- Conslidation and Documentation && Add Signal Flow
     - Grafana ↔ Prometheus ↔ Loki Integration 
     - etcd ↔ Vault ↔ AWS Integration
     - Remediation ↔ Vault ↔ Proxmo Integration
+    - Internal API Calls 
 
 
-3- Readmes Across the Env 
-    - Update Capacity planning File <> Add refrence the adaptation or add the final current state direct 
+4- Conslidate Kubernetes/env/deployment/apps && Add labels
+    :: 
+        - go through the prope readines and liveness before plan the evection test 
 
-4- Security Inspection in commit histories
-    - Done before, but do again before change repo to public
+5- Repo CleanUp on K8s//deployment-docs//troubleshooting//Desaster-recover//root levels + (Readme - Design - Notes)
 
-5- Cleanup Remain TS Cases structure <> 
-    - 1-10 k8s , 
-    - 31 - .. k8s , 
-    - proxmox folder 
-
-x- Check the drift config of remediation have its own ns inside its folder under app , while ns related to infra, search for best practice keep isolated or 
-move it to infra , and check the move sequence to avoid impact >> but disabel prune on app , comment it out and push 
-the resouce will remain exist but orphan , no impact, push again after add the ns to infra , the resource flag change double confirm the owner and diff 
-enable prune on app again 
-
-xc- Add label app: app_name for all deployment for easy refrence for log slections -l 
-
-xv- review docker images we chosed for both remeiation and etcd, but this task not critical, they already stable and no more requirment upfront for them 
-
-xb- in k8s we applied 2 manul edits one for coredns and one for cluster threshold, , first one i added the patch config update via flux 
-and second one need to be converted to ansible playbook and test , 
-then mirror the fixes to prod, they not applied there yet 
-
-xa- review the current DR fodler and clean the structure 
-
-xe- review the Document doc folder , ensure the scope not drifted and ensure the intgeration operation gudie is clean and smooth. 
-
-xy- rebo readme need to be created after finish all of this , the root level readme + note + design files on root 
-
-xz- do security review for password,token,keys,mac address,piublic ip. serial numbers
-
-xo- python script of remeiation, take a look if there time & if possible add 1 master recovery mechanism as well same pattern as worker nodes but only restart,start,reset , no restore opertation. 
-
-xp- go through the prope readines and liveness before plan the evection test 
-
-
-xk- Review infra folder and mirrro it to prod 
-
-
- the point is the considering the 5 days like run which need to finish as much before publish and in fact publish and project in cv doesnt make a big difference, the project progress almost keep same, mix itiration + learning + refine + document + conslidate + incidnet random + solving alarms of alert + integrate aws + rbac + network security , its long run anyway i need to add this as note for me in somewhere
-
- 
+6- Security Inspection in commit histories
+    - Done before, but do again before change repo to public (password,token,keys,mac address,piublic ip. serial numbers)
