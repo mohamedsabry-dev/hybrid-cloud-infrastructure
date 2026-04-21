@@ -10,73 +10,70 @@ The next phase is not about adding more — it is about going deeper on what alr
 
 ---
 
-## Deeper Ownership — Python and Automation
+## Phase 2
 
-The remediation system works. But working and owned are different things. The next step is to read, understand, and improve the Python script that drives the self-healing logic — not because it is broken, but because a system you cannot explain fully is a system you cannot trust fully.
-
-This means understanding every decision in the script, improving the VMID overwrite protection using Proxmox task verification rather than external locking, and extending the self-healing path to cover master node failures through a node-level detection mechanism that does not depend on the Kubernetes API server being available.
-
-Alongside this, Python scripting as a general skill needs dedicated practice — not tutorials, but real problems solved in the context of the existing infrastructure.
-
----
-
-## Monitoring Stack — From Deployed to Understood
+### 1. Observability Stack — From Deployed to Understood
 
 Prometheus, Grafana, Loki, and Alertmanager are running and alerting. The next step is owning them at the query level — writing PromQL for custom cluster health metrics, building Grafana dashboards that tell a story rather than just displaying numbers, tuning Alertmanager rules to reduce noise and improve signal, and learning LogQL well enough to investigate incidents through Loki without relying on kubectl logs.
 
 Observability is only useful when you can ask it questions and trust the answers. That level of ownership is the goal.
 
----
+### 2. Kubernetes RBAC + Networking + CNI
 
-## AWS Integration — Lambda and CloudWatch
+Least-privilege RBAC design is a gap worth closing — understanding ClusterRole versus Role, designing service account permissions from first principles, and being able to audit what a given identity can and cannot do in the cluster. NetworkPolicy for namespace isolation, traffic restriction between workloads, and DNS-aware policy rules. Calico CNI internals — understanding what happens at the network layer when a pod communicates across nodes, not just that it works.
+
+These are interview staples and real operational skills. The goal is to go deep, not wide.
+
+### 3. Python — Own the Automation Layer
+
+The remediation system works but it was not written from scratch and it is not fully owned. The next step is reading every line, understanding every decision, and rewriting it independently as the core learning exercise. Beyond remediation, Python scripting for Kubernetes API calls and Proxmox API calls specifically — the operations that Bash cannot handle cleanly. This is not a Python course. It is learning Python in the context of problems the infrastructure already has.
+
+### 4. AWS Integration — Lambda and CloudWatch
 
 The current self-healing architecture handles worker node failures through the remediation pod. The gap is master node failures — when the Kubernetes API server is unavailable, the remediation pod cannot act. The planned solution is a node-level detection mechanism on surviving workers that calls AWS API Gateway, which triggers a Lambda function holding Proxmox credentials, which restarts or restores the failed master VMs.
 
 CloudWatch integration for Proxmox host-level monitoring — CPU, memory, IO — adds a layer of visibility that sits outside the Kubernetes cluster and therefore survives cluster-level failures. SNS notification chains from CloudWatch complete the alerting coverage for the most severe failure scenarios.
 
----
+### 5. VM and LXC Hardening
 
-## Network Hardening
-
-The network architecture is solid — 14 VLANs, WireGuard tunnels, MikroTik routing. The gap is enforcement at the node level. The next step is reviewing and tightening firewall rules at the MikroTik level, adding node-level firewall rules on workers and masters, closing unnecessary ports, and documenting the security posture properly. This is not urgent but it is the difference between an infrastructure that is architecturally isolated and one that is genuinely hardened.
+The network architecture is solid — 14 VLANs, WireGuard tunnels, MikroTik routing. The gap is enforcement at the node level. Firewall rules on workers and masters, port closure, network isolation between LXC containers, and a documented security posture per machine type. This is not urgent but it is the difference between an infrastructure that is architecturally isolated and one that is genuinely hardened.
 
 ---
 
-## EKS — Managed Kubernetes as a Learning Environment
+## Ongoing — Throughout Phase 2
 
-Adding EKS as a second Kubernetes environment serves a specific learning goal — understanding the differences between self-managed kubeadm clusters and managed Kubernetes at the control plane level. The comparison between managing your own etcd, API server, and scheduler versus having AWS manage them is a gap in understanding that EKS would close directly.
-
-The cost consideration is real and EKS will be kept minimal — enough to learn from, not enough to run production workloads. Connecting EKS to the on-premises environment over WireGuard and running a workload that spans both clusters is the interesting experiment. Whether this stays long-term depends on what it teaches and what it costs.
-
----
-
-## CKA Certification
+### CKA Certification
 
 The CKA exam is already being prepared for as a side effect of the consolidation and DR testing work. The formal preparation phase — timed practice exams, focused review of weak areas, speed optimization — needs to happen before the voucher expires in October. The target is to sit the exam before end of September, which gives enough time for a retake if needed.
 
 The homelab is an advantage here. The exam is hands-on on a live cluster. Every DR test, every incident, every kubectl command run under pressure in this environment is exam preparation.
 
+### Disaster Recovery — Intentional Failure Iterations
+
+DR testing does not stop after the initial test phase. The next layer is intentional component-level failure — crashing the API server deliberately, taking down the controller manager, killing the scheduler, simulating etcd leader loss — and recording exactly what happens at each layer. The goal is not just recovery but understanding what the cluster does in the seconds and minutes between failure and recovery. These findings become incident documentation and interview material simultaneously.
+
+Each iteration either validates the design or reveals a gap worth fixing. Both outcomes are useful.
+
 ---
 
-## Disaster Recovery — Continued Expansion
+## GitOps Workflow — Feature Branch Approach
 
-The current DR test coverage is solid but not complete. The remaining scenarios — master quorum failure with remediation recovery, full electricity simulation with measured RTO, and two-worker failure with priority-based preemption validation — are in the test plan and will be executed and documented. Each completed scenario either validates the design or reveals a gap worth fixing. Both outcomes are useful.
+As established after the April 18th incident, the workflow going forward follows a feature branch pattern:
 
----
-
-## Clean Flow:
-
-As menitoend in TS before, the adoption of following with feature branches wul bethe core after publish >> So we need to make flux watch both dev + 1 fetutr branch "changable" so we keep work and commit free on it, and after stabilize and test, jsut squash it to dev >> Merge to Prod
+```
 feature/whatever branch
-  └─► you work here freely
-        └─► Flux watches this → reconciles your WIP immediately
-              └─► 10 commits, fixes, iterations, testing
-                    └─► environment stable and validated
-                          └─► squash merge to dev (1 clean commit)
-                                └─► Flux already in sync — no reconcile needed
-                                      └─► public GitHub shows 1 clean commit
-                                            └─► dev branch history stays professional
+  └─► work freely, commit freely
+        └─► Flux watches this branch → reconciles WIP immediately
+              └─► iterate, test, stabilize
+                    └─► squash merge to dev (1 clean commit)
+                          └─► Flux already in sync — no reconcile needed
+                                └─► public GitHub shows clean history
+                                      └─► dev branch stays professional
+```
 
+Flux watches both dev and the active feature branch. When feature work is complete and squash-merged, Flux switches back to dev. This keeps the public repo clean while allowing free iteration internally.
+
+---
 
 ## The Stadium Stays Open
 
