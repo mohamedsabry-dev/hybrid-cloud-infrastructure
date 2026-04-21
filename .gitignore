@@ -14,6 +14,12 @@ override.tf.json
 # Sensitive files
 *.tfvars
 !example.tfvars
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
 
 # IDE
 .idea/

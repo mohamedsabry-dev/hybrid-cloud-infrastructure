@@ -117,24 +117,24 @@ Current state has nfsvers=3. But current ≠ what it looked like on Apr 5.
 
 # Step 6 — Git history confirms root cause (Suspect A proven)
 
-Commit 9de364d (~Apr 02):
+Commit 86536ef (~Apr 02):
   Message: "started config without the nfsvers flag"
   StorageClass had: soft, timeo=30, retrans=3 — only 3 options.
   No nfsvers. No nolock.
 
-Commit 77c1b87 (~Apr 08):
+Commit 416be76 (~Apr 08):
   Message: "Add nfs-database StorageClass and troubleshooting cases 13-14"
   Added nfsvers=3 and nolock to nfs-retain.
 
 Timeline:
 ```
-Apr 02 — Commit 9de364d: nfs-retain has 3 options (no version pin)
+Apr 02 — Commit 86536ef: nfs-retain has 3 options (no version pin)
 Apr 05 — Prometheus PVC provisioned at 18:21 UTC
            → CSI driver read StorageClass at this moment
            → StorageClass had: soft, timeo=30, retrans=3
            → PV frozen with exactly these 3 options
            → Kernel auto-negotiated NFSv4.2
-Apr 08 — Commit 77c1b87: nfsvers=3 + nolock added
+Apr 08 — Commit 416be76: nfsvers=3 + nolock added
            → All NEW PVCs from this point get NFSv3
            → Prometheus PV already exists — Kubernetes never re-provisions
              or updates existing PVs when StorageClass changes
@@ -147,8 +147,8 @@ _____________________________________________________________________
 
 [Final Root Cause]
 The Prometheus PVC was provisioned on 2026-04-05 when the nfs-retain StorageClass
-contained only 3 mountOptions (soft, timeo=30, retrans=3), per commit 9de364d.
-The nfsvers=3 and nolock options were not added until 2026-04-08 in commit 77c1b87.
+contained only 3 mountOptions (soft, timeo=30, retrans=3), per commit 86536ef.
+The nfsvers=3 and nolock options were not added until 2026-04-08 in commit 416be76.
 
 Without nfsvers=3, the Linux NFS client auto-negotiated NFSv4.2 with the Synology
 NAS. The PV spec was frozen at provisioning time. Kubernetes does not retroactively
@@ -186,8 +186,8 @@ _____________________________________________________________________
 [References]
 - kubernetes/dev/deployments/infrastructure/storage/nfs-csi-driver.yaml
 - TS-K8S-047 — CSI podLabels silent accept (where this was discovered)
-- Git commit 9de364d — original StorageClass without nfsvers
-- Git commit 77c1b87 — nfsvers=3 added to StorageClass
+- Git commit 86536ef — original StorageClass without nfsvers
+- Git commit 416be76 — nfsvers=3 added to StorageClass
 
 _____________________________________________________________________
 

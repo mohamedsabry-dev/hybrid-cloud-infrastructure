@@ -2,10 +2,9 @@ What Pending to publish: //// 6 Days. == 27/April
 
 1- Complete DR Test 3 Tests 
     - Power Down 
-    - Quorm lose 2 masters down 
+    - Quorm lose 2 masters down  [DONE 2026-04-21] → disaster-recovery/partial-master-loss.md
     - Validte the priority class evection + load pressure + and trigger Conflic with app HBA targets
     - +
-
 
 2- Conslidation and Documentation && Add Signal Flow
     - Grafana ↔ Prometheus ↔ Loki Integration 
@@ -19,6 +18,3 @@ What Pending to publish: //// 6 Days. == 27/April
         - go through the prope readines and liveness before plan the evection test 
 
 5- Repo CleanUp on K8s//deployment-docs//troubleshooting//Desaster-recover//root levels + (Readme - Design - Notes)
-
-6- Security Inspection in commit histories
-    - Done before, but do again before change repo to public (password,token,keys,mac address,piublic ip. serial numbers)
