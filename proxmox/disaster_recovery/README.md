@@ -11,7 +11,7 @@ Host-layer operational runbooks and prevention scripts for the Proxmox hyperviso
 | Folder | Scenario | What it contains |
 |--------|----------|------------------|
 | [`power/`](power/) | Power / battery loss | UPS (laptop battery) monitor — graceful shutdown on sustained discharge |
-| [`thermal/`](thermal/) | CPU temperature | Temperature monitor — email at 73 °C, graceful shutdown at 78 °C |
+| [`thermal/`](thermal/) | CPU temperature | Temperature monitor — email at 75 °C, graceful shutdown at 80 °C |
 | [`hardware/`](hardware/) | Hardware failure | Runbook for USB-Ethernet adapter replacement (MAC mapping, safe order) |
 | [`recovery/`](recovery/) | Full host rebuild | Runbook for reinstalling Proxmox from scratch + restoring config + VMs |
 

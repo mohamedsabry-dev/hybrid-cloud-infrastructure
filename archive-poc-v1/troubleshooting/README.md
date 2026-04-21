@@ -1,486 +1,103 @@
-# Troubleshooting (PoC v1 — archived)
+# Troubleshooting (PoC v1 — Archived)
 
-> **Archived PoC v1 material.** These 31 cases document real incidents I hit
-> during the VMware-based PoC that was retired before the Kubernetes phase.
-> The infrastructure they refer to is no longer deployed. See
-> [`../README.md`](../README.md) for the retirement story.
+> **Archived PoC v1 material.** These cases document real incidents hit during the
+> VMware-based PoC that was retired before the Kubernetes phase. The infrastructure
+> they refer to is no longer deployed. See [`../README.md`](../README.md) for the
+> retirement story.
 >
 > Troubleshooting for the **current** project lives at
 > [`/troubleshooting/`](../../troubleshooting/) (repo root).
 
-**Cross-Cutting Concern - Common Issues, Solutions, and Lessons Learned**
-
-This section contains the troubleshooting record from the PoC v1 era — real
-incidents across vCenter, ESXi, Windows host, pfSense, Veeam, NAS, FreeIPA,
-and Prometheus. Kept as portfolio material.
+**Total: 23 issues + 8 reference guides across 4 categories**
 
 ---
 
-## Overview
+## Critical Incidents
 
-This troubleshooting guide covers:
-- Common issues by layer
-- Root cause analysis
-- Step-by-step solutions
-- Lessons learned from mistakes
-- Best practices to avoid issues
+Issues with system-wide blast radius, cascading failures, or data integrity risk.
 
----
-
-## Structure
-
-### Common Issues by Layer
-
-#### Layer 0: Infrastructure Foundation
-
-**vCenter Connectivity Problems:**
-- [01 - Installation Stage 2 Hang](platform/01-vcenter-installation-stage2-hang.md) - DNS resolution failure during installation
-- [02 - SSO Authentication Error](platform/02-vcenter-authentication-error-sso.md) - Alias whitelist configuration
-- [03 - Lifecycle Manager Depot Error](platform/03-vcenter-lifecycle-manager-depot-error.md) - Deprecated update URLs
-- [04 - Certificate Browser Errors](platform/04-vcenter-certificate-browser-error.md) - Cache and trust store issues
-- [05 - Certificate Manager Failures](platform/05-vcenter-certificate-manager-replace-failed.md) - Service health and disk space
-- [06 - API SSL Verification Errors](platform/06-vcenter-api-ssl-error-after-root-ca.md) - Python/PowerCLI/Ansible trust stores
-- [10 - vCenter 8 vApp Config Not Persisting](platform/10-vcenter8-vapp-config-not-persisting.md) - Database transaction commit bug, direct DB workaround
-
-**Windows Host Configuration Issues:**
-- [08 - Sleep Mode Network Failure](platform/08-windows-host-sleep-network-break.md) - ESXi uplink down after laptop sleep/wake
-- [09 - NAT vs Bridged Networking](platform/09-windows-host-nat-vs-bridge.md) - Architectural comparison and migration guide
-
-**Network Issues:**
-- [04 - Promiscuous Mode for Nested Virtualization](network/04-promiscuous-mode-nested.md) - Required for nested ESXi networking
-- [05 - Duplicate Packets from Network Loops](network/05-duplicate-packets-loop.md) - Uplink redundancy causing packet duplication
-- [06 - pfSense Power Off Issues](network/06-pfsense-poweroff.md) - pfSense VM shutdown problems
-- [07 - Windows IP Forwarding Loops](network/07-windows-host-network-loops.md) - Duplicate packets and ARP corruption
-- [08 - Static Route Loop SSH Disconnect](network/08-static-route-loop-ssh-disconnect.md) - Routing loops from duplicate static routes
-
-**Storage Performance Issues:**
-- [01 - VMDK Snapshot Corruption](storage/01-vmdk-snapshot-corruption.md) - Snapshot chain breakage and recovery
-- [02 - NAS Snapshot Sizing Failure](storage/02-nas-snapshot-sizing-failure.md) - Insufficient space for snapshots
-- [03 - Disk Race Condition Disaster](storage/03-disk-race-condition-disaster.md) - /dev/sdX vs UUID mounting issues
-- [04 - Thick to Thin Conversion](storage/04-thick-to-thin-conversion.md) - Converting provisioning types
-- [05 - NAS Memory Starvation](storage/05-nas-memory-starvation.md) - I/O performance degradation
-- [06 - NAS Backup Strategy Optimization](storage/06-nas-backup-strategy-optimization.md) - Backup job optimization
-- [07 - VMware Snapshot Chain Corruption](storage/07-vmware-snapshot-chain-corruption.md) - Parent VMDK link breakage
-- [08 - Thick Provisioned Snapshot Size](storage/08-thick-provisioned-snapshot-size.md) - Massive snapshots from thick disks
-- [09 - Application-Aware Backup Loop Device Errors](storage/09-application-aware-backup-loop-device-errors.md) - Veeam AAP causing I/O errors
-- [10 - Snapshot Chain Corruption from Sleep Mode](storage/10-snapshot-chain-corruption-sleep-mode.md) - Laptop sleep during I/O causing disk inflation
-
-#### Layer 1: Platform Services
-
-**FreeIPA Authentication Failures:**
-- [11 - Time Sync Clock Skew](platform/11-freeipa-time-sync-clock-skew.md) - Kerberos "Clock skew too great" from VMware Tools time sync conflicts
-- [12 - SSSD Cache Not Updating](platform/12-freeipa-sssd-cache-not-updating.md) - HBAC/sudo rule changes not reflecting due to SSSD caching
-
-**Other Platform Services:**
-- DNS resolution issues
-- NTP synchronization problems
-- Ansible connectivity issues
-- Keytab authentication failures
-
-#### Layer 2: Application Workloads
-- Kubernetes cluster issues
-- Pod scheduling failures
-- Storage mount issues
-- Jenkins pipeline failures
-- Grafana data source issues
-- Vault unsealing problems
-
-#### Layer 3: Cloud & Hybrid
-- VPN connectivity issues
-- AWS authentication failures
-- Terraform state corruption
-- Cross-cloud networking issues
-- Secret synchronization failures
+| Ticket | Category | What Happened | Blast Radius |
+|--------|----------|---------------|-------------|
+| [Storage-03](storage/03-disk-race-condition-disaster.md) | Storage | /dev/sdX names swapped on reboot — ALL VMs inaccessible, entire environment down | Full infrastructure |
+| [Storage-05](storage/05-nas-memory-starvation.md) | Storage | NAS RAM reduced 5→4GB while doubling VMs — kernel soft lockups, 31-47s CPU stalls, NFS cache starvation | Full infrastructure |
+| [Storage-07](storage/07-vmware-snapshot-chain-corruption.md) | Storage | Parent-child VMDK links broken from cross-drive snapshots — vdiskmanager + ESXi resignature recovery | Data integrity |
+| [Storage-10](storage/10-snapshot-chain-corruption-sleep-mode.md) | Storage | Laptop slept mid-Veeam backup — thin disk inflated 98GB → 1TB, snapshot metadata destroyed | Data integrity + storage |
+| [Platform-08](platform/08-windows-host-sleep-network-break.md) | Platform | ESXi uplink down after laptop sleep/wake — all VMs lose network, vCenter unresponsive | Full infrastructure |
+| [Platform-11](platform/11-freeipa-time-sync-clock-skew.md) | Platform | VMware Tools time sync fighting chrony — cascading Kerberos auth failures across all services | Full authentication |
 
 ---
 
-## Quick Reference
+## Cases by Category
 
-### "VM won't start"
-1. Check ESXi host resources
-2. Verify datastore connectivity
-3. Check VM hardware compatibility
-4. Review VM logs
+### Storage — 7 issues ([reference/](storage/reference/) has 3 guides)
 
-### "Can't SSH to VM"
-1. Check network connectivity
-2. Verify IPA authentication
-3. Check SSSD cache
-4. Verify HBAC rules
+**High:**
 
-### "DNS not resolving"
-1. Check IPA DNS service
-2. Verify /etc/resolv.conf
-3. Test with nslookup/dig
-4. Check firewall rules
-
-### "Time sync issues"
-1. Verify NTP hierarchy (Internet → IPA → VMs)
-2. Check chronyd status
-3. Force sync with `chronyc makestep`
-4. Disable VMware Tools time sync
-
-### "Ansible playbook fails"
-1. Check inventory connectivity
-2. Verify keytab authentication
-3. Test manual SSH connection
-4. Check sudo permissions
-
-### "Kubernetes pod not starting"
-1. Check node resources
-2. Verify image pull
-3. Review pod logs
-4. Check persistent volume claims
+| # | File | What Happened |
+|---|------|---------------|
+| 01 | [01-vmdk-snapshot-corruption](storage/01-vmdk-snapshot-corruption.md) | Snapshots on different partitions = broken chain |
+| 02 | [02-nas-snapshot-sizing](storage/02-nas-snapshot-sizing-failure.md) | 980GB disk, 450GB free — snapshot failed, VM entered maintenance mode |
+| 09 | [09-veeam-aap-loop-device](storage/09-application-aware-backup-loop-device-errors.md) | Loop device I/O errors during Veeam AAP — hidden resource costs |
 
 ---
 
-## Common Issues and Solutions
+### Platform — 13 issues ([reference/](platform/reference/) has 2 guides)
 
-### Issue: VMs showing as orphaned after host crash
+**High:**
 
-**Symptoms:**
-- VMs appear as "orphaned" in vCenter
-- Cannot power on VMs
-- vCenter shows invalid state
+| # | File | What Happened |
+|---|------|---------------|
+| 01 | [01-vcenter-install-hang](platform/01-vcenter-installation-stage2-hang.md) | vCenter installation stuck Stage 2 — DNS resolution failure |
+| 16 | [16-esxi-autoprotect](platform/16-esxi-master-autoprotect-snapshot-performance-degradation.md) | 12 accumulated snapshots — 6min of 1-8s disk latency, VMXNET3 driver errors |
+| 13 | [13-vcenter-backup-ip-change](platform/13-vcenter-backup-failure-after-ip-change.md) | Backup fails after IP/hostname change — chain metadata references old values |
 
-**Root Cause:**
-- ESXi host crashed/restarted unexpectedly
-- vCenter database sync issue
+**Medium:**
 
-**Solution:**
-1. Right-click orphaned VM
-2. Select "Remove from Inventory"
-3. Browse datastore
-4. Right-click .vmx file
-5. Select "Register VM"
-6. Verify VM configuration
-7. Power on VM
-
----
-
-### Issue: User can SSH but sudo doesn't work
-
-**Symptoms:**
-- User can authenticate via SSH
-- `sudo` command fails with permission denied
-- User is in correct IPA group
-
-**Root Cause:**
-- SSSD cache not updated
-- Sudo rules not properly configured in IPA
-
-**Solution:**
-1. Check sudo rules in IPA: `ipa sudorule-show <rule-name>`
-2. Verify user group membership: `id <username>`
-3. Clear SSSD cache: `sudo sssctl cache-expire -E`
-4. Restart SSSD: `sudo systemctl restart sssd`
-5. Test sudo again
+| # | File | What Happened |
+|---|------|---------------|
+| 02 | [02-vcenter-sso](platform/02-vcenter-authentication-error-sso.md) | SSO authentication failing — alias whitelist |
+| 03 | [03-lifecycle-manager](platform/03-vcenter-lifecycle-manager-depot-error.md) | Deprecated update repository URLs |
+| 05 | [05-cert-manager](platform/05-vcenter-certificate-manager-replace-failed.md) | Certificate replacement failed — service health issues |
+| 06 | [06-api-ssl](platform/06-vcenter-api-ssl-error-after-root-ca.md) | API SSL verification fails — trust store out of sync with new CA |
+| 10 | [10-vapp-config](platform/10-vcenter8-vapp-config-not-persisting.md) | vApp config resets on restart — database transaction bug |
+| 12 | [12-sssd-cache](platform/12-freeipa-sssd-cache-not-updating.md) | Sudo rule changes not reflecting in SSSD cache |
+| 14 | [14-lifecycle-plugin](platform/14-vsphere-lifecycle-manager-plugin-download-error.md) | Plugin download fails after IP/certificate change |
+| 15 | [15-firewall-interface](platform/15-vcenter-firewall-invalid-interface-error.md) | Firewall GUI fails on deleted NIC references |
 
 ---
 
-### Issue: Keytab authentication fails for Ansible
+### Network — 4 issues ([reference/](network/reference/) has 1 guide)
 
-**Symptoms:**
-- Ansible playbooks fail with authentication error
-- Manual kinit with keytab works
-- SSH with password works
+**Medium:**
 
-**Root Cause:**
-- Keytab file permissions
-- Keytab not in correct location
-- Principal not authorized in IPA
-
-**Solution:**
-1. Verify keytab permissions: `ls -la /path/to/keytab`
-2. Test keytab: `kinit -kt /path/to/keytab principal`
-3. Check ticket: `klist`
-4. Verify SSH config uses keytab
-5. Check IPA host entry
+| # | File | What Happened |
+|---|------|---------------|
+| 04 | [04-promiscuous-mode](network/04-promiscuous-mode-nested.md) | Nested VMs isolated — promiscuous mode not enabled |
+| 05 | [05-duplicate-packets](network/05-duplicate-packets-loop.md) | 3x duplicated pings — promiscuous mode + redundant uplinks |
+| 07 | [07-ip-forwarding-loops](network/07-windows-host-network-loops.md) | Packet duplication and ARP corruption from Windows IP forwarding |
+| 08 | [08-static-route-loop](network/08-static-route-loop-ssh-disconnect.md) | SSH hangs from routing loop — duplicate static routes |
 
 ---
 
-### Issue: IPA DNS not resolving external domains
+### Application — 1 issue
 
-**Symptoms:**
-- Internal .home.lab domains resolve
-- External domains (google.com) fail
-- VMs can't reach internet
+**Medium:**
 
-**Root Cause:**
-- DNS forwarders not configured in IPA
-- Firewall blocking DNS queries
-
-**Solution:**
-1. Check IPA DNS forwarders: `ipa dnsconfig-show`
-2. Add forwarders if missing: `ipa dnsconfig-mod --forwarder=10.0.20.170`
-3. Check pfSense DNS settings
-4. Test with: `dig @10.0.20.184 google.com`
+| # | File | What Happened |
+|---|------|---------------|
+| 01 | [01-prometheus-setup](application/01-prometheus-setup-issues.md) | Port conflict and YAML parsing errors during deployment |
 
 ---
 
-### Issue: vApp auto-shutdown not working
+## Incident Patterns
 
-**Symptoms:**
-- vApp shutdown initiated but VMs don't stop
-- VMs timeout during shutdown
-- Shutdown order not respected
+The storage incidents tell a progression — the same class of problem (snapshot management on constrained hardware) hit repeatedly, each time deeper:
 
-**Root Cause:**
-- VMware Tools not installed
-- Shutdown timeout too short
-- Dependencies not configured
-
-**Solution:**
-1. Verify VMware Tools installed and running
-2. Check vApp shutdown settings
-3. Increase shutdown timeout (default 120s → 300s)
-4. Verify shutdown order in vApp settings
-5. Test shutdown manually
-
----
-
-### Issue: Vault cluster won't unseal after restart
-
-**Symptoms:**
-- Vault sealed after restart
-- Unseal operation fails
-- Raft cluster out of sync
-
-**Root Cause:**
-- Majority of nodes offline
-- Storage backend issues
-- Raft consensus lost
-
-**Solution:**
-1. Check Vault service status on all nodes
-2. Verify storage backend connectivity
-3. Unseal with recovery keys (requires quorum)
-4. If quorum lost, restore from backup
-5. Check Raft peer list: `vault operator raft list-peers`
-
----
-
-## Lessons Learned
-
-### FreeIPA and Domain Users
-
-**Mistake:**
-Created domain user for Veeam backups, relying on IPA being always available.
-
-**Problem:**
-When IPA is down, domain users cached on some VMs but not others, causing inconsistent access.
-
-**Solution:**
-- Use local emergency users for critical operations
-- Configure SSSD offline cache with long timeout
-- Create emergency procedures for IPA outage
-- Consider local `veeam_emergency` user on critical VMs
-
-**Lesson:**
-Don't create single points of failure in authentication. Always have a break-glass procedure.
-
----
-
-### Backup User Authentication
-
-**Mistake:**
-Assuming all VMs would cache domain user credentials consistently.
-
-**Problem:**
-After testing IPA shutdown, user `admin2` worked on 1 VM but failed on 2 others, despite expired Kerberos tickets.
-
-**Root Cause:**
-SSSD caches users at different times based on when they first authenticate. VMs boot at different times, so cache timing varies.
-
-**Solution:**
-- Create local emergency users on all VMs
-- Use Ansible playbook to deploy emergency accounts
-- Document which operations require IPA vs local auth
-- Test recovery procedures regularly
-
-**Lesson:**
-Test failure scenarios. Cached authentication behavior is complex and not always predictable.
-
----
-
-### pfSense and Automation
-
-**Mistake:**
-Planning to manage pfSense with Ansible like other VMs.
-
-**Problem:**
-pfSense is critical network infrastructure. If Ansible VM or IPA is down, you lose access to pfSense if it requires domain authentication.
-
-**Solution:**
-- Create local root-privileged user on pfSense manually
-- Don't make pfSense dependent on IPA
-- Keep pfSense management separate from other automation
-- Document manual procedures for pfSense
-
-**Lesson:**
-Critical infrastructure (network, identity) should not depend on each other for access.
-
----
-
-### VMware Tools and Graceful Shutdown
-
-**Mistake:**
-Assuming VMs would shutdown gracefully without VMware Tools.
-
-**Problem:**
-vApp shutdown timeouts because VMs don't respond to soft shutdown signal.
-
-**Solution:**
-- Install VMware Tools on all VMs
-- Verify Tools service running
-- Test shutdown before relying on automation
-- Increase timeout for database VMs
-
-**Lesson:**
-Automation depends on proper tooling. Verify prerequisites before assuming functionality.
-
----
-
-### NTP and Time Drift
-
-**Mistake:**
-VMs syncing time from multiple sources (VMware Tools, public NTP, IPA).
-
-**Problem:**
-Inconsistent time causes Kerberos authentication to fail intermittently.
-
-**Solution:**
-- Single time source hierarchy: Internet → IPA → VMs
-- Disable VMware Tools time sync
-- Configure chronyd to only use IPA
-- Monitor time drift with Ansible playbook
-
-**Lesson:**
-Time synchronization must be hierarchical and consistent. Multiple sources cause drift.
-
----
-
-## Best Practices
-
-### Do's
-- Document everything as you build
-- Test disaster recovery procedures monthly
-- Use Infrastructure as Code (Ansible/Terraform)
-- Keep engineering logs of failures
-- Validate assumptions with tests
-- Create break-glass procedures
-
-### Don'ts
-- Don't skip backup validation
-- Don't create circular dependencies
-- Don't assume caching works consistently
-- Don't make critical services depend on each other
-- Don't ignore warning signs in logs
-- Don't skip testing shutdown/recovery
-
----
-
-## Diagnostic Commands
-
-### Network
-```bash
-# Test connectivity
-ping -c 4 10.0.20.184
-
-# Check DNS
-nslookup ipa.home.lab
-dig @10.0.20.184 ipa.home.lab
-
-# Check routes
-ip route show
+```
+Storage-01 (snapshot corruption)
+    → Storage-03 (disk race condition — full outage)
+        → Storage-07 (snapshot chain — major recovery)
+            → Storage-10 (sleep-mode corruption — catastrophic)
 ```
 
-### Authentication
-```bash
-# Check Kerberos ticket
-klist
-
-# Test IPA connection
-kinit admin
-ipa user-show admin
-
-# Check SSSD status
-sudo systemctl status sssd
-sudo sssctl cache-expire -E
-```
-
-### Storage
-```bash
-# Check NFS mounts
-df -h
-mount | grep nfs
-
-# Test NFS connectivity
-showmount -e 10.0.20.90
-```
-
-### Kubernetes
-```bash
-# Check cluster health
-kubectl get nodes
-kubectl get pods --all-namespaces
-
-# Check node resources
-kubectl top nodes
-kubectl describe node <node-name>
-```
-
----
-
-## When to Escalate
-
-Some issues require rebuilding or major intervention:
-- Corrupted vCenter database
-- Failed ESXi upgrade
-- Corrupted IPA database
-- Lost Vault unseal keys
-- Multiple simultaneous failures
-
-Document the issue, take snapshots if possible, and consider restore from backup.
-
----
-
-## Case File Index
-
-### Platform Cases (15 cases)
-- 01-06 - vCenter Issues (Installation, SSO, Lifecycle Manager, Certificates, SSL)
-- 08-09 - Windows Host Issues (Sleep/Wake, NAT vs Bridge)
-- 10 - vCenter 8 vApp Configuration Bug
-- 11-12 - FreeIPA Issues (Time Sync, SSSD Cache)
-- 13-16 - Additional vCenter/ESXi Issues (Backup, Plugin, Firewall, Snapshots)
-
-### Storage Cases (10 cases)
-- 01 - VMDK Snapshot Corruption
-- 02 - NAS Snapshot Sizing Failure
-- 03 - Disk Race Condition Disaster
-- 04 - Thick to Thin Conversion
-- 05 - NAS Memory Starvation
-- 06 - NAS Backup Strategy Optimization
-- 07 - VMware Snapshot Chain Corruption
-- 08 - Thick Provisioned Snapshot Size
-- 09 - Application-Aware Backup Loop Device Errors
-- 10 - Snapshot Chain Corruption from Sleep Mode
-
-### Network Cases (5 cases)
-- 04 - Promiscuous Mode for Nested Virtualization
-- 05 - Duplicate Packets from Network Loops
-- 06 - pfSense Power Off Issues
-- 07 - Windows IP Forwarding Loops
-- 08 - Static Route Loop SSH Disconnect
-
-### Application Cases (1 case)
-- 01 - Prometheus Setup Issues
-
-**Total Cases:** 31 documented troubleshooting scenarios
-
----
-
-## References
-
-- Main Documentation: [../docs/](../docs/)
-- Automation: [../automation/](../automation/)
+Each failure led to architectural hardening that carried forward into the current Proxmox iteration.
