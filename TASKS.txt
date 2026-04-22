@@ -1,10 +1,8 @@
 What Pending to publish: //// 6 Days. == 27/April 
 
 1- Complete DR Test 3 Tests 
-    - Power Down 
     - Quorm lose 2 masters down  [DONE 2026-04-21] → disaster-recovery/partial-master-loss.md
     - Validte the priority class evection + load pressure + and trigger Conflic with app HBA targets
-    - +
 
 2- Conslidation and Documentation && Add Signal Flow
     - Grafana ↔ Prometheus ↔ Loki Integration 
