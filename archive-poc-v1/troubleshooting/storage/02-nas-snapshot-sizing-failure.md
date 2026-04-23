@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE #02: NAS VM SNAPSHOT SIZING FAILURE
 
 Category: Storage / Resource Allocation
 Severity: Critical
+Incident: Yes
 Environment: ESXi Master → NAS VM
 Source: Draft for Resource Allocation (Lines 347-371)
 

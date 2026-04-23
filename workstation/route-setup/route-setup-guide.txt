@@ -58,5 +58,5 @@ com.local.route10, and adds the route on boot.
 
 - workstation/README.md                       — parent scope
 - workstation/route-setup/README.md           — this folder's file listing
-- deployment-docs/network-setup-guide.txt     — network + routing at the router level
+- deployment-docs/00-network-setup-guide.md     — network + routing at the router level
 - network/DESIGN.md                           — MikroTik vs ER605 migration reasoning

@@ -51,7 +51,7 @@ that nobody reads.
 
 - [`DESIGN.md`](DESIGN.md) — why STS over long-lived keys, why not IRSA, the assume-role chain rationale
 - [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md) — "AWS Secrets Engine for etcd-backup" design call
-- [`../../../../deployment-docs/k8s-etcd-vault-aws-integration.txt`](../../../../deployment-docs/k8s-etcd-vault-aws-integration.txt) — full integration walkthrough
+- [`../../../../deployment-docs/12-etcd-backup-integration-guide.md`](../../../../deployment-docs/12-etcd-backup-integration-guide.md) — full integration walkthrough
 - [`../../../../ansible/prod/playbooks/vault/vault-trust-aws.yml`](../../../../ansible/prod/playbooks/vault/vault-trust-aws.yml) — Ansible side that configures Vault to use this
 - [`../../../../.github/workflows/prod-aws-vault-trust.yml`](../../../../.github/workflows/prod-aws-vault-trust.yml) — apply workflow (runs on `prod-security` branch)
 - [`../kms-vault-unseal/`](../kms-vault-unseal/) — the OTHER Vault-AWS integration (auto-unseal)

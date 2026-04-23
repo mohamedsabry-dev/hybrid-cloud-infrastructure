@@ -265,7 +265,8 @@ Keepalive Targets:
 - MikroTik peers have persistent-keepalive=10s
 - Full Cone NAT recommended on ISP router (if configurable)
 
-See troubleshooting Case 5 for NAT timeout and tunnel stability details.
+See TS-NET-005 (troubleshooting/network/5-wireguard-tunnel-stability-investigation.md)
+for NAT timeout and tunnel stability details.
 
 ---
 
@@ -345,7 +346,7 @@ One AllowedIPs entry covers both tunnel AND VPC traffic:
 - dev peer: 172.16.0.0/16 routes tunnel (172.16.200.x) + VPC (172.16.x.x)
 - prod peer: 172.17.0.0/16 routes tunnel (172.17.200.x) + VPC (172.17.x.x)
 
-See troubleshooting Case 5 for the routing issue this solves.
+See TS-NET-005 for the routing issue this solves.
 
 ---
 
@@ -417,17 +418,7 @@ console after `dev-aws-compute` / `prod-aws-compute` workflows complete.
 
 ## Deployment Order
 
-Complete deployment order:
-
-0. Network Setup (see network-setup-guide.txt)
-1. Proxmox Setup (see proxmox-setup-guide.txt)
-2. AWS Bootstrap (see aws-bootstrap-setup-guide.txt)
-3. GitHub Setup (see github-setup-guide.txt)
-4. AWS Secrets (see aws-secrets-setup-guide.txt)
-5. AWS Network → AWS Compute → VPN Setup (this guide)
-6. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-7. FreeIPA (see freeipa-initial-setup-guide.txt)
-8. Vault (see vault-initial-setup-guide.txt)
-9. Kubernetes (see k8s-initial-setup-guide.txt)
+VPN is step 5 — after AWS secrets, before Ansible/runner setup. For the
+full 0–15 sequence, see [README.md](README.md).
 
 ---

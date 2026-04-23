@@ -243,7 +243,7 @@ Investigation timeline:
   +45 min  Found missing client_max_body_size in external nginx
   +50 min  Applied fix, tested upload — SUCCESS
 
-Key lessons:
+Notes:
   1. 413 can come from any proxy layer — check ALL proxies in the request path
   2. If no logs in K8s during a request, the block is upstream of Kubernetes
   3. Nginx default body size is 1m — always set client_max_body_size explicitly

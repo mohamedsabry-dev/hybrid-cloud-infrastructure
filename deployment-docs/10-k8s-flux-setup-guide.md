@@ -1,7 +1,7 @@
 # Flux Bootstrap + App/Infra Loop — Setup Guide (DEV)
 
-Note: Runs after the Kubernetes cluster is up (k8s-initial-setup-guide.txt) and
-before Vault-K8s integration (vault-k8s-integration-guide.txt). Flux is what
+Note: Runs after the Kubernetes cluster is up (09-k8s-setup-guide.md) and
+before Vault-K8s integration (11-vault-k8s-integration-guide.md). Flux is what
 reconciles both the infrastructure Helm releases (Vault injector, ingress-nginx,
 storage, monitoring, etc.) and the apps.
 
@@ -47,7 +47,7 @@ silently, app crashes minutes later with no secrets" failure mode.
 
 ## Prerequisites
 
-- Kubernetes cluster running (see k8s-initial-setup-guide.txt). kubectl works
+- Kubernetes cluster running (see 09-k8s-setup-guide.md). kubectl works
   from master1.
 - FreeIPA domain up (Ansible inventory resolves k8s-master1.lab.local).
 - GitHub repo accessible. Flux bootstraps against the `dev` branch (or `prod`
@@ -258,13 +258,13 @@ Most-used commands:
 
 In deployment-docs/README.md sequence:
 
-   9   Kubernetes cluster             k8s-initial-setup-guide.txt
-  10   Flux bootstrap (THIS GUIDE)    k8s-flux-setup-guide.txt
-  11   Vault-K8s integration          vault-k8s-integration-guide.txt
+   9   Kubernetes cluster             09-k8s-setup-guide.md
+  10   Flux bootstrap (THIS GUIDE)    10-k8s-flux-setup-guide.md
+  11   Vault-K8s integration          11-vault-k8s-integration-guide.md
         (Vault injector HelmRelease is part of infrastructure/, Flux reconciles it)
-  12   etcd backup → Vault → S3       k8s-etcd-vault-aws-integration.txt
-  13   Endpoint DNS + ingress         enpoint-dns-ingress-exnginx-setup-guide.txt
-  14   Remediation                    remediation-integration-guide.txt
+  12   etcd backup → Vault → S3       12-etcd-backup-integration-guide.md
+  13   Endpoint DNS + ingress         13-endpoint-dns-ingress-setup-guide.md
+  14   Remediation                    14-remediation-integration-guide.md
 
 Flux bootstrap runs immediately after the K8s cluster is up because almost
 everything in steps 11–14 is reconciled BY Flux — Vault's Helm chart, ingress-nginx,

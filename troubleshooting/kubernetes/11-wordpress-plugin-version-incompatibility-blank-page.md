@@ -237,7 +237,7 @@ Disable plugin by renaming folder (no DB required):
     mv /var/www/html/wp-content/plugins/wordpress-seo \
        /var/www/html/wp-content/plugins/wordpress-seo.disabled
 
-Key lessons:
+Notes:
   1. Check application logs first — they contain the exact error
   2. curl vs browser blank = partial render / PHP fatal error
   3. Plugin updates can silently break older WordPress versions

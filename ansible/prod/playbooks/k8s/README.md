@@ -7,7 +7,7 @@ Flux takes over and reconciles everything else from git.
 
 For the Flux app/infra loop reasoning see [`../../../../kubernetes/prod/flux/DESIGN.md`](../../../../kubernetes/prod/flux/DESIGN.md).
 For the Vault-K8s integration story see [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md).
-For sequenced deploy steps see [`../../../../deployment-docs/k8s-initial-setup-guide.txt`](../../../../deployment-docs/k8s-initial-setup-guide.txt) and [`../../../../deployment-docs/k8s-flux-setup-guide.txt`](../../../../deployment-docs/k8s-flux-setup-guide.txt).
+For sequenced deploy steps see [`../../../../deployment-docs/09-k8s-setup-guide.md`](../../../../deployment-docs/09-k8s-setup-guide.md) and [`../../../../deployment-docs/10-k8s-flux-setup-guide.md`](../../../../deployment-docs/10-k8s-flux-setup-guide.md).
 
 ---
 
@@ -33,13 +33,13 @@ For sequenced deploy steps see [`../../../../deployment-docs/k8s-initial-setup-g
 ## When these run
 
 - `k8s_setup.yml` + `k8s_init.yml` — invoked by `prod-k8s-full-setup.yml` workflow
-- `flux_setup.yml` — invoked by `prod-k8s-full-setup.yml` at the end, or manually. One-time per cluster (see `deployment-docs/k8s-flux-setup-guide.txt` for the GitHub PAT prerequisites)
+- `flux_setup.yml` — invoked by `prod-k8s-full-setup.yml` at the end, or manually. One-time per cluster (see `deployment-docs/10-k8s-flux-setup-guide.md` for the GitHub PAT prerequisites)
 - `integration-vault-k8s-trust.yml` — invoked manually after Vault is initialized AND the K8s cluster is up; part of the step-11 Vault-K8s integration in deployment-docs sequence
 
 ## Related
 
 - [`../../../../kubernetes/prod/flux/DESIGN.md`](../../../../kubernetes/prod/flux/DESIGN.md) — Flux app/infra split reasoning, healthCheck pattern, TS-K8S-012/019/042
-- [`../../../../deployment-docs/k8s-initial-setup-guide.txt`](../../../../deployment-docs/k8s-initial-setup-guide.txt) — step-9 K8s cluster setup walkthrough
-- [`../../../../deployment-docs/k8s-flux-setup-guide.txt`](../../../../deployment-docs/k8s-flux-setup-guide.txt) — step-10 Flux bootstrap walkthrough
-- [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt) — step-11 Vault-K8s trust walkthrough
-- [`../../../../deployment-docs/k8s-etcd-vault-aws-integration.txt`](../../../../deployment-docs/k8s-etcd-vault-aws-integration.txt) — step-12 etcd-backup via Vault AWS SE
+- [`../../../../deployment-docs/09-k8s-setup-guide.md`](../../../../deployment-docs/09-k8s-setup-guide.md) — step-9 K8s cluster setup walkthrough
+- [`../../../../deployment-docs/10-k8s-flux-setup-guide.md`](../../../../deployment-docs/10-k8s-flux-setup-guide.md) — step-10 Flux bootstrap walkthrough
+- [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md) — step-11 Vault-K8s trust walkthrough
+- [`../../../../deployment-docs/12-etcd-backup-integration-guide.md`](../../../../deployment-docs/12-etcd-backup-integration-guide.md) — step-12 etcd-backup via Vault AWS SE

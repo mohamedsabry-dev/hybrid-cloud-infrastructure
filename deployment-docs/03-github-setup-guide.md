@@ -2,9 +2,9 @@
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
-Relevant folders: troubleshooting/github-actions/
+Relevant folders: troubleshooting/github/
 
-For more details, see: github/ folder documentation
+For more details, see: github/README.md
 
 ---
 
@@ -77,8 +77,6 @@ Location: GitHub repo → Settings → Secrets and variables → Actions → Sec
 | HOME_PUBLIC_IP          | Home IP for AWS security groups        |
 | VPN_PUBLIC_KEY_DEV      | Dev VPN EC2 SSH key                    |
 | VPN_PUBLIC_KEY_PROD     | Prod VPN EC2 SSH key                   |
-| WG_VPN_EIP_DEV          | AWS Elastic IP for dev VPN             |
-| WG_VPN_EIP_PROD         | AWS Elastic IP for prod VPN            |
 | GH_ADMIN_PAT_FLUX       | GitHub PAT for FluxCD                  |
 | GH_USERNAME             | GitHub username for Flux               |
 
@@ -112,7 +110,11 @@ Location: GitHub repo → Settings → Secrets and variables → Actions → Var
 
 ### Lock Pattern
 
-Pattern: {ENV}_INFRA_{NAME}_LOCK or {ENV}_SVC_{NAME}_LOCK
+Pattern: {ENV}_INFRA_{NAME}_LOCK or {ENV}_SVC_{NAME}[_LOCK]
+
+Note: naming is inconsistent — older SVC vars (FREEIPA_SETUP, VAULT_SETUP,
+K8S_CLUSTER_SETUP) never got the _LOCK suffix. Newer ones have it. Both
+work the same way.
 
 | Value   | Behavior                    |
 |---------|-----------------------------|
@@ -354,18 +356,6 @@ With folder isolation: Work stays isolated until explicitly copied to prod.
 
 ---
 
-## Deployment Order Reference
-
-0. AWS Bootstrap (see aws-bootstrap-setup-guide.txt)
-1. GitHub Setup (this guide)
-2. AWS Secrets (see aws-secrets-setup-guide.txt)
-3. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-4. FreeIPA (see freeipa-initial-setup-guide.txt)
-5. Vault (see vault-initial-setup-guide.txt)
-6. Kubernetes (see k8s-initial-setup-guide.txt)
-
----
-
 ## Troubleshooting
 
 | Issue                           | Solution                                    |
@@ -378,5 +368,25 @@ With folder isolation: Work stays isolated until explicitly copied to prod.
 | Workflow not triggering         | Check lock variable is set to "false"       |
 
 For more troubleshooting, see: github/internal-runners-setup.md
+
+---
+
+## Troubleshooting Reference
+
+Key GitHub troubleshooting cases, all under troubleshooting/github/:
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-GH-001 | 1-github-runner-stuck-job.md | Runner not starting after reboot — service not installed as persistent daemon |
+| TS-GH-002 | 2-workflow-lock-flag-pattern.md | Terraform workflows triggered on push destroy resources — drove the lock flag pattern |
+| TS-GH-005 | 5-runner-clock-skew-auth-failure.md | Runner offline with "registration deleted" — clock skew from broken DNS/NTP |
+| TS-GH-007 | 7-concurrent-terraform-workflow-lxc-reboot.md | Vault workflow exit 255 — concurrent Terraform workflows rebooted LXCs |
+
+---
+
+## Deployment Order
+
+GitHub setup is step 3 — after network, Proxmox, and AWS bootstrap. For the
+full 0–15 sequence, see [README.md](README.md).
 
 ---

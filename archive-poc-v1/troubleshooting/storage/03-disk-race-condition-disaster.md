@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE #03: DISK RACE CONDITION DISASTER (/dev/sdX SWAP)
 
 Category: Storage / Linux System Configuration
 Severity: CRITICAL
+Incident: Yes
 Environment: NAS VM (Linux)
 Source: Draft for Storage (Lines 543-626)
 

@@ -2,14 +2,14 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**99 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
+**100 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 41 cases, 8 reference guides
+├── kubernetes/                  # 42 cases, 8 reference guides
 ├── proxmox/                     # 16 cases, 1 reference guide
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)
@@ -25,12 +25,13 @@ Each subfolder has its own README with a case index. Reference guides live in `r
 
 ---
 
-## Critical Incidents (15)
+## Critical Incidents (16)
 
 Cascading failures, data loss risk, or full-service outages.
 
 | Ticket | Category | What Happened |
 |--------|----------|---------------|
+| [TS-K8S-049](kubernetes/49-git-history-rewrite-flux-prune-cascade.md) | Kubernetes | Git history rewrite force-pushed from stale local → origin lost 70 commits → Flux pruned CoreDNS ConfigMap → cluster DNS dead → apps all down, Flux self-locked |
 | [TS-K8S-019](kubernetes/19-flux-kustomization-restructure-cascade-failure.md) | Kubernetes | Kustomization rename with prune:true deleted ALL HelmReleases including Vault — complete cluster deadlock |
 | [TS-K8S-042](kubernetes/42-flux-retry-storm-cluster-outage.md) | Kubernetes | Grafana anti-affinity → Helm timeout → Flux retry loop → etcd leader election failure → API servers down |
 | [TS-K8S-022](kubernetes/22-worker-node-failure-cascading-pod-failures.md) | Kubernetes | Worker2 failure cascaded into StatefulSet split-brain, Vault injector race, CSI mount failures |
@@ -49,7 +50,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Kubernetes — 41 cases
+## Kubernetes — 42 cases
 
 [reference/](kubernetes/reference/) has 8 guides
 
@@ -96,6 +97,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 46 | [kustomization-stale-ref](kubernetes/46-kustomization-stale-resource-reference.md) | Flux broke after file consolidation |
 | 47 | [csi-nfs-podlabels](kubernetes/47-csi-nfs-podlabels-silent-accept.md) | Helm silently accepted unsupported chart values |
 | 48 | [prometheus-pvc-nfs](kubernetes/48-prometheus-pvc-nfsv4-version-mismatch.md) | NFS version drift after StorageClass update |
+| 49 | [git-history-rewrite-flux-prune](kubernetes/49-git-history-rewrite-flux-prune-cascade.md) | Force-push from stale local orphaned 70 commits → Flux pruned CoreDNS ConfigMap → cluster DNS dead, apps cascade down |
 
 ---
 

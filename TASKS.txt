@@ -1,14 +1,12 @@
 What Pending to publish: //// 3 Days. == 26/April 
 
-2- Conslidation and Documentation && Add Signal Flow
-    - Grafana ↔ Prometheus ↔ Loki Integration 
-    - etcd ↔ Vault ↔ AWS Integration
-    - Remediation ↔ Vault ↔ Proxmo Integration
-    - Internal API Calls 
-
-
-4- Conslidate Kubernetes/env/deployment/apps && Add labels
-    :: 
-        - go through the prope readines and liveness before plan the evection test 
-
-5- Repo CleanUp on K8s//deployment-docs//root levels + (Readme - Design - Notes)
+deplymetn docs 10 to 15 manual redo 
+++ signal flow of intgration 
+++ SIgnla flow of internal k8s components 
+++ Mirror dev app to prod 
+++ Review the prope rediness and livense behaviour and solidate it 
+++ Add labels if needed for apps 
+++ Fix auto alarm fake ones issue , with temp silent and make the case workaround and keep it open 
+++ Clean Kubernetes sub folders and doc one by one 
+++ Final Review + Readme + Notes + Design of root level 
++ UpdateCV and write linked in post 

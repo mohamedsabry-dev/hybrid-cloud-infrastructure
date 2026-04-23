@@ -1,4 +1,4 @@
-# TS-PVE-014 | 2026-04-11 | RESOLVED (2026-04-13)
+# TS-PVE-014 | 2026-04-11 | RESOLVED (2026-04-13) | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -101,7 +101,7 @@ Reboot triggered by `k8s-pve@pve` (remediation service account), NOT Proxmox aut
 19:48:43     VM 1022 Reboot by k8s-pve@pve
 ```
 
-Three contributing factors:
+What went wrong:
 1. Proxmox `up_delay` misunderstanding -- delays NEXT VM, not current
 2. Remediation CHECK_INTERVAL too short (120s) -- catches workers during boot
 3. No boot protection -- no initial grace period after remediation pod starts

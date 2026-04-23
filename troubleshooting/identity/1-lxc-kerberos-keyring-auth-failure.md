@@ -176,7 +176,7 @@ Impact:
   k8s-worker*.lab.local        VM   Not affected
 
 
-Key lessons:
+Notes:
   - PAM "System error" = infrastructure failure, not auth/authz issue — check SSSD logs next
   - LXC has kernel-level differences from VMs: keyrings, cgroups, UID namespaces
   - GSSAPI and password auth take completely different code paths

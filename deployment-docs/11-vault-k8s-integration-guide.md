@@ -1,7 +1,7 @@
 # Vault - Kubernetes Integration Guide (DEV)
 
 Note: This guide runs after both Vault and Kubernetes are fully deployed and operational.
-See: vault-initial-setup-guide.txt and k8s-initial-setup-guide.txt
+See: 08-vault-setup-guide.md and 09-k8s-setup-guide.md
 
 If you face issues during this integration, check: troubleshooting/vault/
 

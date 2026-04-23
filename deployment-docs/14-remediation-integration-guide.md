@@ -43,7 +43,7 @@ Before starting this integration:
 
 - FreeIPA deployed and running. All nodes DNS-resolvable, SSH-reachable as super_bot.
 - Vault cluster up + unsealed. K8s auth method configured.
-  See: vault-k8s-integration-guide.txt
+  See: 11-vault-k8s-integration-guide.md
 - Kubernetes cluster running (3 masters + 3 workers).
   Dev node-to-VMID map:  k8s-worker1 → 1020, k8s-worker2 → 1021, k8s-worker3 → 1022
 - Flux reconciling kubernetes/dev/deployments/apps/ and infrastructure/.
@@ -319,7 +319,7 @@ Remediation is last because every dependency above it must be up:
 | Monitoring stack (Alertmanager)    | kubernetes/dev/deployments/apps/monitoring/helm-release.yaml        |
 | MikroTik firewall config           | network/router/mikrotik/phase2-dev-services.rsc                     |
 | Helper script (Vault policy/role)  | kubernetes/docs/vault-pod-setup.sh                                  |
-| Vault injection pattern            | vault-k8s-integration-guide.txt                                     |
+| Vault injection pattern            | 11-vault-k8s-integration-guide.md                                     |
 | Vault overview (layer map)         | vault-overview.md                                                   |
 | DR test for this system            | disaster-recovery/worker-2of3-down.md                               |
 | TS case — vault injection ns issue | troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md |

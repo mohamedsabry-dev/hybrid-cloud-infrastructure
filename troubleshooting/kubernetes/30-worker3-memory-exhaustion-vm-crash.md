@@ -194,7 +194,7 @@ Evidence summary:
   Prometheus             691MB (27%)               primary memory consumer
   Swap                   0B                        no safety buffer
 
-Key lessons:
+Notes:
   1. No swap = dangerous — instant crash with no warning, no OOM evidence
   2. OOM logs don't appear when VM crashes at hypervisor level
   3. Remediation pod worked correctly — detected and recovered node automatically

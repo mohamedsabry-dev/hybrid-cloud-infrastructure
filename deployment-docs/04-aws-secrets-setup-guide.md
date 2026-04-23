@@ -1,8 +1,8 @@
-# AWS Secrets Manager - Initial Setup Guide (DEV)
+# AWS Secrets Manager - Setup Guide (DEV)
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section.
-Relevant folders: troubleshooting/aws/, troubleshooting/github-actions/
+Relevant folders: troubleshooting/aws/, troubleshooting/github/
 
 ---
 
@@ -13,7 +13,7 @@ by ALL GitHub workflows. These secrets store credentials, API tokens, passwords,
 and keys that are fetched at runtime during infrastructure deployments.
 
 IMPORTANT: This runs AFTER the one-time AWS CloudFormation bootstrap
-(see aws-bootstrap-setup-guide.txt) but BEFORE any other infrastructure
+(see 02-aws-bootstrap-setup-guide.md) but BEFORE any other infrastructure
 deployment. All subsequent workflows depend on these secrets existing AND
 being populated with real values.
 
@@ -47,7 +47,7 @@ Before deploying secrets:
 
 1. **AWS CloudFormation bootstrap completed** — OIDC provider, state backend,
    TerraformAdmin role, and PermissionsBoundary all in place. See
-   `aws-bootstrap-setup-guide.txt` + the "Why this architecture" reasoning
+   `02-aws-bootstrap-setup-guide.md` + the "Why this architecture" reasoning
    in `aws/DESIGN.md`.
 2. **IAM role** `GitHubActions-Infrastructure-dev` exists with Secrets Manager
    permissions (created by the `aws-iam` workflow on `dev-security` branch —
@@ -221,11 +221,7 @@ GitHub Secrets also required:
 
 ## Deployment Order
 
-0. AWS Secrets (this guide) - VERY FIRST
-1. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-2. FreeIPA (see freeipa-initial-setup-guide.txt)
-3. AWS KMS Vault Unseal (before Vault deployment)
-4. Vault (see vault-initial-setup-guide.txt)
-5. Kubernetes (see k8s-initial-setup-guide.txt)
+AWS Secrets is step 4 — after network, Proxmox, AWS bootstrap, and GitHub
+setup. For the full 0–15 sequence, see [README.md](README.md).
 
 ---

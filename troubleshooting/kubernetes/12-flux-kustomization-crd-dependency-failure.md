@@ -162,7 +162,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. CRDs must be deployed before resources that depend on them
   2. Flux applies all resources in a Kustomization simultaneously — no built-in ordering
   3. dependsOn is essential for enforcing deployment order between Kustomizations

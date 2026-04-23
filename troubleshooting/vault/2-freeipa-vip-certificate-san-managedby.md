@@ -216,7 +216,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. FreeIPA cert SAN permissions require BOTH host AND service managedby
   2. ipa service-add-managedby does not exist — use service-mod --addattr
   3. ipa host-add-managedby does not accept comma-separated — separate calls per host

@@ -9,7 +9,7 @@ CA secrets), GitHub Actions (keytab-driven automation), Troubleshooting, Disaste
 Recovery, and the Network layer. This file is the map that ties them together.
 
 For operational setup, use the sequenced guide:
-- `freeipa-initial-setup-guide.txt` (step 7) — the 7-phase install walkthrough
+- `07-freeipa-setup-guide.md` (step 7) — the 7-phase install walkthrough
 
 This overview sits above that guide — what FreeIPA is, the key design calls,
 and where every related file lives in the repo.
@@ -198,8 +198,8 @@ Mitigation pattern came from the IPA-down DR test — `TS-K8S-033`, `TS-K8S-034`
 
 | File | Purpose |
 |------|---------|
-| `deployment-docs/freeipa-initial-setup-guide.txt` | Full 7-phase walkthrough (step 7 in sequence) |
-| `deployment-docs/aws-secrets-setup-guide.txt` | Prereq — AWS SM entries for IPA admin passwords + super_bot keytab |
+| `deployment-docs/07-freeipa-setup-guide.md` | Full 7-phase walkthrough (step 7 in sequence) |
+| `deployment-docs/04-aws-secrets-setup-guide.md` | Prereq — AWS SM entries for IPA admin passwords + super_bot keytab |
 
 ---
 
@@ -255,6 +255,6 @@ thing that's hardest to reconstruct later from TS cases alone. This overview
 is the single place that ties together what IPA is, what touches it, and
 what happens when it isn't there.
 
-The setup guide (`freeipa-initial-setup-guide.txt`) covers HOW to deploy.
+The setup guide (`07-freeipa-setup-guide.md`) covers HOW to deploy.
 The TS cases cover WHAT went wrong when. This file covers WHAT IT IS and
 WHERE IT LIVES — the missing layer.

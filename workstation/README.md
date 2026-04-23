@@ -56,6 +56,6 @@ Installed via `brew`. The specific install line lives in each guide where needed
 
 - [`../github/runner-mac-mini.md`](../github/runner-mac-mini.md) — why the runner is self-hosted on the Mac Mini; tool rationale
 - [`../github/variables-secrets.md`](../github/variables-secrets.md) — GitHub secrets + variables consumed by workflows
-- [`../deployment-docs/github-setup-guide.txt`](../deployment-docs/github-setup-guide.txt) — GitHub-side setup (OIDC, secrets, runner registration)
-- [`../deployment-docs/network-setup-guide.txt`](../deployment-docs/network-setup-guide.txt) — router-level network + routing
+- [`../deployment-docs/03-github-setup-guide.md`](../deployment-docs/03-github-setup-guide.md) — GitHub-side setup (OIDC, secrets, runner registration)
+- [`../deployment-docs/00-network-setup-guide.md`](../deployment-docs/00-network-setup-guide.md) — router-level network + routing
 - [`../kubernetes/docs/local-kubectl-flux-setup.md`](../kubernetes/docs/local-kubectl-flux-setup.md) — full kubectl + flux pre-push validation setup

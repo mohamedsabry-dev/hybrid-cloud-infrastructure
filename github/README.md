@@ -37,7 +37,7 @@ GitHub Actions
 infrastructure-related runs on one of the two self-hosted paths. The reason
 for the split — mac-mini for outside-in work, local-runner for inside-out
 work — is documented in [`runner-mac-mini.md`](runner-mac-mini.md) and
-[`../deployment-docs/ansible-runner-setup-guide.txt`](../deployment-docs/ansible-runner-setup-guide.txt).
+[`../deployment-docs/06-ansible-runner-setup-guide.md`](../deployment-docs/06-ansible-runner-setup-guide.md).
 
 ### Runner reference
 

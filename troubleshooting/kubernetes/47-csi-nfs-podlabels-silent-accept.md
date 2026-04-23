@@ -126,7 +126,7 @@ customLabels: { app: nfs-controller }
 # Decision: Stop, Use Safe Label
 
 Instead of going down the path of editing matchLabels, Services, anti-affinity
-selectors — which touches too many things with real blast radius on storage —
+selectors — which touches too many things and risks breaking storage —
 I chose a different label key entirely: `stack: nfs`.
 
 This is a non-conflicting key that:
@@ -317,12 +317,12 @@ paths from other charts apply.
 
 Lesson 2: When adding labels to pods that already have selector-critical labels
 (like `app`), check the Deployment matchLabels first. Overwriting a selector
-label is a silent cluster bomb.
+label will break the cluster silently.
 
 Lesson 3: `customLabels` is chart-wide — changing it restarts EVERYTHING the chart
 manages (Deployment + DaemonSet), not just the component you're thinking about.
 For CSI NFS, that means every worker's node plugin restarts. Safe in this case
-because kernel NFS client is independent, but be aware of the blast radius.
+because kernel NFS client is independent, but know that everything restarts.
 
 Lesson 4: The worker2 hard-mount Prometheus PVC is a DR asymmetry — NAS failure
 would hit worker2 differently than the soft-mount workers. Good chaos test candidate.

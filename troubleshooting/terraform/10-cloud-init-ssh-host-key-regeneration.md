@@ -1,4 +1,4 @@
-# TS-TF-010 | 2026-03-27 | RESOLVED
+# TS-TF-010 | 2026-03-27 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -169,7 +169,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. Cloud-init re-runs on configuration change — SSH key regeneration is default
   2. FreeIPA/SSSD KnownHostsCommand requires host keys to match stored values exactly
   3. Always backup SSH host keys before any cloud-init changes

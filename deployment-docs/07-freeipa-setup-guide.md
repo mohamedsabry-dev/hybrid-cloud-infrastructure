@@ -1,4 +1,4 @@
-# FreeIPA Server - Initial Setup Guide (DEV)
+# FreeIPA Server - Setup Guide (DEV)
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
@@ -44,7 +44,7 @@ identity.
 The only things that come before FreeIPA are the AWS Secrets (because the
 FreeIPA workflow reads the admin/DM passwords from there) and the Ansible +
 Local Runner pair (because something has to actually run the FreeIPA
-playbook against the new VM — see ansible-runner-setup-guide.txt for that
+playbook against the new VM — see 06-ansible-runner-setup-guide.md for that
 reasoning).
 
 ---
@@ -69,7 +69,7 @@ reasoning).
 All GitHub workflows depend on secrets stored in AWS Secrets Manager.
 These must be created and populated BEFORE any infrastructure deployment.
 
-See: aws-secrets-setup-guide.txt
+See: 04-aws-secrets-setup-guide.md
 
 Required secrets for FreeIPA:
 - dev/proxmox/terraform-token
@@ -83,7 +83,7 @@ Required secrets for FreeIPA:
 Ansible LXC and Local Runner must be deployed BEFORE FreeIPA.
 All workflows depend on these nodes for playbook execution.
 
-See: ansible-runner-setup-guide.txt
+See: 06-ansible-runner-setup-guide.md
 
 ### Golden VM Template
 
@@ -461,21 +461,22 @@ Note: Decrypt with ansible-vault or use vault password file configured in ansibl
 
 ---
 
-## Deployment Order Reference
+## Troubleshooting Reference
 
-Complete deployment order:
+Key FreeIPA/identity troubleshooting cases, all under troubleshooting/identity/:
 
-0. AWS Secrets (see aws-secrets-setup-guide.txt) - VERY FIRST
-1. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-2. FreeIPA (this guide)
-3. Vault (see vault-initial-setup-guide.txt)
-4. Kubernetes (see k8s-initial-setup-guide.txt)
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-IDN-001 | 1-lxc-kerberos-keyring-auth-failure.md | LXC Kerberos keyring auth failure — drove fix_lxc_krb5_keyring.yml |
+| TS-IDN-002 | 2-freeipa-dns-configuration-issues.md | FreeIPA DNS configuration issues during initial setup |
+| TS-IDN-006 | 6-freeipa-lxc-uid-range-investigation.md | LXC UID range investigation — drove ID range 60001-65500 |
+| TS-IDN-008 | 8-keytab-preauthentication-failed.md | Keytab preauthentication failure after domain config changes |
 
-Each subsequent service follows the pattern:
-1. Deploy infrastructure (Terraform)
-2. Join domain (add_hosts_to_ipa.yml)
-3. Fix LXC keyring if needed (fix_lxc_krb5_keyring.yml)
-4. Add DNS records (add_dns_records.yml)
-5. Setup service (service-specific playbooks)
+---
+
+## Deployment Order
+
+FreeIPA is step 7 — after Ansible/runner setup. For the full 0–15
+sequence, see [README.md](README.md).
 
 ---

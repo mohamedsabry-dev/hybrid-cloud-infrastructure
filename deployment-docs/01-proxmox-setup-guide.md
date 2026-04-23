@@ -1,4 +1,4 @@
-# Proxmox VE - Initial Setup Guide
+# Proxmox VE - Setup Guide
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
@@ -261,7 +261,7 @@ Create subdirectories for workload separation:
 
 - NFS CSI Driver: kubernetes/dev/deployments/infrastructure/storage/
 - StorageClass: nfs-csi (dynamic provisioning)
-- Troubleshooting: troubleshooting/kubernetes/6-nfs-storage-complete-guide-static-to-dynamic.md
+- Troubleshooting: troubleshooting/kubernetes/reference/6-nfs-storage-complete-guide-static-to-dynamic.md
 
 ---
 
@@ -297,7 +297,8 @@ Create subdirectories for workload separation:
 | NAS Terraform (Dev)      | terraform/dev/proxmox/storage/nas/                |
 | NAS Terraform (Prod)     | terraform/prod/proxmox/storage/nas/               |
 | Storage Workflow         | .github/workflows/dev-proxmox-storage.yml         |
-| K8s PV Definitions       | kubernetes/dev/deployments/infrastructure/storage/pv.yaml |
+| K8s NFS CSI Driver       | kubernetes/dev/deployments/infrastructure/storage/nfs-csi-driver.yaml |
+| K8s StorageClass         | kubernetes/dev/deployments/infrastructure/storage/storageclass.yaml |
 
 ---
 
@@ -321,20 +322,30 @@ The following are optional enhancements, not required for initial setup:
 
 - **Email Notifications**: Configure backup email alerts via proxmox/bootstrap_proxmox/mail-config.sh
 - **UPS/Power Monitoring**: Laptop battery DR monitoring via proxmox/disaster_recovery/power/dr_ups_monitor.sh
-- **Hardware Failure DR**: USB-Ethernet adapter replacement procedure in proxmox/disaster_recovery/hardware/usb-ethernet-adapter-replacement.md
+- **Hardware Failure DR**: USB-Ethernet adapter replacement procedure in proxmox/disaster_recovery/hardware/usb-ethernet-adapter-replacement-guide.txt
 - **Proxmox Config Backup**: Automated config backup script in proxmox/backup/
+
+---
+
+## Troubleshooting Reference
+
+Key Proxmox troubleshooting cases, all under troubleshooting/proxmox/:
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-PVE-005 | 5-proxmox-backup-missed-not-retried.md | Missed backup not retried after host sleep — drove `repeat-missed=1` in vzdump config |
+| TS-PVE-008 | 8-lvm-thin-pool-resize-overcommit.md | LVM thin pool ran out of space from over-provisioned VMs |
+| TS-PVE-009 | 9-nfs-shutdown-hang-stor0-hotswap.md | Shutdown hangs when NFS mounts are active and USB-Ethernet stor0 is disconnected |
+| TS-PVE-011 | 11-vmbr1-storage-network-for-k8s-workers.md | Adding vmbr1 (VLAN 40) second NIC to K8s worker VMs for direct NAS access |
+| TS-PVE-012 | 12-vm-autostart-timeout-nfs-disk-not-ready.md | VMs fail autostart after reboot because NFS storage isn't ready yet |
+
+Storage-related K8s cases (NFS PV issues) are under troubleshooting/kubernetes/.
 
 ---
 
 ## Deployment Order
 
-0. Proxmox Setup (this guide) - VERY FIRST
-1. AWS Bootstrap (see aws-bootstrap-setup-guide.txt)
-2. GitHub Setup (see github-setup-guide.txt)
-3. AWS Secrets (see aws-secrets-setup-guide.txt) - store Proxmox API token here
-4. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-5. FreeIPA (see freeipa-initial-setup-guide.txt)
-6. Vault (see vault-initial-setup-guide.txt)
-7. Kubernetes (see k8s-initial-setup-guide.txt)
+Proxmox is step 1 — right after the physical network. For the full 0–15
+sequence, see [README.md](README.md).
 
 ---

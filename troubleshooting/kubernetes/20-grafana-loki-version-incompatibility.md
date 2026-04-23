@@ -133,7 +133,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. loki-stack is deprecated — use separate loki + promtail charts going forward
   2. Check version compatibility matrix before upgrading Grafana ecosystem tools
   3. Always verify datasource health checks after any Grafana/Loki upgrades

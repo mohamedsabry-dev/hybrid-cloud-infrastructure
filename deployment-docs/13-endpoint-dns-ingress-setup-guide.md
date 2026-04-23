@@ -53,8 +53,8 @@ Full step-by-step request trace:
 
 ## Prerequisites
 
-- FreeIPA running (freeipa-initial-setup-guide.txt).
-- K8s cluster running (k8s-initial-setup-guide.txt). Masters + workers Ready.
+- FreeIPA running (07-freeipa-setup-guide.md).
+- K8s cluster running (09-k8s-setup-guide.md). Masters + workers Ready.
 - Flux reconciling kubernetes/dev/deployments/infrastructure/ + apps/.
 - VPN tunnel to AWS with 10.0.0.0/16 routed.
 - AWS Route53 Private Zone (lab.local) associated with VPC.
@@ -219,7 +219,7 @@ Important:
     cluster is the ingress-nginx controller Service. If any older app manifest
     still has NodePort, remove it.
   - Apps that need Vault-injected secrets follow the standard pattern — see
-    vault-k8s-integration-guide.txt for the annotation template.
+    11-vault-k8s-integration-guide.md for the annotation template.
 
 ---
 
@@ -330,7 +330,7 @@ decision is in the Ingress CRD.
 | AWS Route53 workflow             | .github/workflows/dev-aws-network.yml                                   |
 | Signal flow (detailed trace)     | deployment-docs/signal-flows/ingress-nginx.txt                          |
 | FreeIPA overview (DNS + deps)    | freeipa-overview.md                                                     |
-| Vault injection pattern          | vault-k8s-integration-guide.txt                                         |
+| Vault injection pattern          | 11-vault-k8s-integration-guide.md                                         |
 | Vault overview (layer map)       | vault-overview.md                                                       |
 | DR test (IPA-down DNS cascade)   | disaster-recovery/network-ipa-dns-outage.md                             |
 

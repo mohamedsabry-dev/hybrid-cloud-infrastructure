@@ -62,5 +62,5 @@ Then:
 
 - workstation/README.md                    — scope + file listing
 - github/runner-mac-mini.md                — why self-hosted + tool rationale
-- deployment-docs/github-setup-guide.txt   — GitHub-side setup (secrets, vars, OIDC)
+- deployment-docs/03-github-setup-guide.md   — GitHub-side setup (secrets, vars, OIDC)
 - github/variables-secrets.md              — runner token + secret reference

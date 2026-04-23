@@ -1,4 +1,4 @@
-# TS-K8S-042 | 2026-04-18 | RESOLVED
+# TS-K8S-042 | 2026-04-18 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -244,7 +244,7 @@ _____________________________________________________________________
 
 A single misconfigured anti-affinity value + Flux's default retry behavior
 took down the entire cluster for 45 minutes. The fix is simple (preferred
-instead of required), but the blast radius of getting it wrong is total.
+instead of required), but getting it wrong takes down the whole cluster.
 
 _____________________________________________________________________
 

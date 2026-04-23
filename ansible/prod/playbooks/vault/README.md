@@ -56,7 +56,7 @@ See `troubleshooting/vault/` (repo root):
 
 - [`vault-setup-guide.txt`](vault-setup-guide.txt) — setup + init + config + token revocation commands
 - [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md) — system overview (cluster, KMS, VIP, cert cascade, etcd backup)
-- [`../../../../deployment-docs/vault-initial-setup-guide.txt`](../../../../deployment-docs/vault-initial-setup-guide.txt) — sequenced step-8 guide in the deployment flow
+- [`../../../../deployment-docs/08-vault-setup-guide.md`](../../../../deployment-docs/08-vault-setup-guide.md) — sequenced step-8 guide in the deployment flow
 - [`../freeipa/`](../freeipa/) — IPA setup that must run first (Vault cert + DNS prerequisites)
 - [`../../../../terraform/prod/aws/kms-vault-unseal/`](../../../../terraform/prod/aws/kms-vault-unseal/) — AWS-side KMS resources
 - [`../../../../terraform/prod/aws/vault-trust/`](../../../../terraform/prod/aws/vault-trust/) — AWS Secrets Engine for etcd backup

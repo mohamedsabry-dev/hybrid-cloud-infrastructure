@@ -1,4 +1,4 @@
-# TS-VLT-003 | 2026-03-29 | RESOLVED
+# TS-VLT-003 | 2026-03-29 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -85,7 +85,7 @@ from Ansible control node. vault_aws_access_key_id and vault_aws_secret_access_k
 were undefined — template rendered empty values and silently overwrote valid
 credentials. No safeguard existed to prevent overwriting when variables are empty.
 
-Three contributing factors:
+What went wrong:
   1. Missing safeguard — no condition to skip credential deployment when vars empty
   2. Execution context — playbook run manually instead of via workflow
   3. Silent overwrite — template task completed successfully despite empty values
@@ -177,7 +177,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. Never run credential-deploying playbooks manually when credentials come
      from external secret managers — execution context changes everything
   2. Always add when conditions to prevent overwriting critical files with empty values

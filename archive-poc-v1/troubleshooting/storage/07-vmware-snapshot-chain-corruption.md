@@ -3,6 +3,7 @@ CASE: VMware Snapshot Chain Corruption - Parent VMDK Link Broken
 ================================================================================
 Category: Storage - VMware Workstation Snapshots
 Severity: Critical (Data Loss Risk)
+Incident: Yes
 Date: Snapshot Deletion Operation
 Environment: VMware Workstation, ESXi Master with Multiple Datastores
 Error: "Parent virtual disk has been modified"

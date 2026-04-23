@@ -1,8 +1,8 @@
-# AWS Bootstrap & IAM - Initial Setup Guide
+# AWS Bootstrap & IAM - Setup Guide
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
-Relevant folders: troubleshooting/aws/, troubleshooting/github-actions/
+Relevant folders: troubleshooting/aws/, troubleshooting/github/
 
 ---
 
@@ -261,6 +261,7 @@ The TerraformPermissionsBoundary (created by bootstrap) prevents ANY role from m
 | Prod Bootstrap Template  | aws/deployment-stacks/bootstrap-prod.yaml         |
 | Bootstrap Documentation  | aws/bootstrap.md                                  |
 | AWS Quick Reference      | aws/README.md                                     |
+| AWS DESIGN               | aws/DESIGN.md                                     |
 | Dev IAM Terraform        | terraform/dev/aws/iam/                            |
 | Prod IAM Terraform       | terraform/prod/aws/iam/                           |
 | Dev IAM Workflow         | .github/workflows/dev-aws-iam.yml                 |
@@ -305,14 +306,17 @@ The TerraformPermissionsBoundary (created by bootstrap) prevents ANY role from m
 
 ---
 
+## Troubleshooting Reference
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-AWS-001 | troubleshooting/aws/1-cloudformation-iam-policy-replacement-failure.md | CloudFormation IAM policy replacement failure during bootstrap stack update |
+
+---
+
 ## Deployment Order
 
-0. AWS Bootstrap (this guide) - VERY FIRST
-1. AWS IAM Roles (via dev-security branch)
-2. AWS Secrets (see aws-secrets-setup-guide.txt)
-3. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-4. FreeIPA (see freeipa-initial-setup-guide.txt)
-5. Vault (see vault-initial-setup-guide.txt)
-6. Kubernetes (see k8s-initial-setup-guide.txt)
+AWS Bootstrap is step 2 — after network and Proxmox. For the full 0–15
+sequence, see [README.md](README.md).
 
 ---

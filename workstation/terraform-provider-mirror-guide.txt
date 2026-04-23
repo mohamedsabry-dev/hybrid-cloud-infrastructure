@@ -52,4 +52,4 @@ mirror commands above.
 
 - workstation/README.md                — scope + file listing
 - terraform/DESIGN.md                  — why 2 state backends + provider strategy
-- deployment-docs/aws-bootstrap-setup-guide.txt — AWS-side bootstrap
+- deployment-docs/02-aws-bootstrap-setup-guide.md — AWS-side bootstrap

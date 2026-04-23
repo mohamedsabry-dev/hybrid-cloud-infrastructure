@@ -3,6 +3,7 @@ CASE: FreeIPA Kerberos Clock Skew - Time Synchronization Issues
 ================================================================================
 Category: Platform - FreeIPA / Kerberos / NTP
 Severity: High
+Incident: Yes
 Date: Post-IPA Installation / Runtime
 Environment: FreeIPA Server, Multiple VMs, VMware Tools
 Error: "Clock skew too great" / Kerberos authentication fails

@@ -51,4 +51,4 @@ Full reasoning for why this replaces PBS is in [`DESIGN.md`](DESIGN.md).
 
 ## Notes on filenames
 
-Naming across this folder is inconsistent — `backup_config_guide.txt` uses underscores while everything else uses hyphens, and the two performance-test files aren't clearly paired by name. Kept as-is to avoid breaking a reference in `deployment-docs/proxmox-setup-guide.txt`. Safe to normalise in a later pass if desired.
+Naming across this folder is inconsistent — `backup_config_guide.txt` uses underscores while everything else uses hyphens, and the two performance-test files aren't clearly paired by name. Kept as-is to avoid breaking a reference in `deployment-docs/01-proxmox-setup-guide.md`. Safe to normalise in a later pass if desired.

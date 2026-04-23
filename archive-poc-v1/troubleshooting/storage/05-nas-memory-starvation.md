@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE #07: NAS VM MEMORY STARVATION & I/O STORM
 
 Category: Storage / Resource Allocation / Performance
 Severity: CRITICAL
+Incident: Yes
 Environment: NAS VM (NFS Server)
 Impact: Complete environment instability, kernel soft lockups
 

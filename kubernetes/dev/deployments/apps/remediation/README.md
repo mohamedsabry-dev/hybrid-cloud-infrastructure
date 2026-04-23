@@ -27,7 +27,7 @@ Single-replica Deployment on a K8s master that watches worker node Ready status 
 
 ## Related folders
 
-- [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt) — the Vault injection pattern this Deployment follows
+- [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md) — the Vault injection pattern this Deployment follows
 - [`../../../../disaster-recovery/README.md`](../../../../disaster-recovery/README.md) — DR hub (partial-worker-loss test validates this system)
 - [`../../../../docker-images/remediation/`](../../../../docker-images/remediation/) — the container image (includes ps/netcat/dig/etc. for debugging)
 - [`../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md`](../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md) — the injection-namespace TS case that drove the dedicated `remediation` namespace

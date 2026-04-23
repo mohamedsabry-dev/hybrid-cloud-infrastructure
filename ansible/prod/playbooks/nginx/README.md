@@ -7,7 +7,7 @@ ingress-nginx controller inside K8s does the real host-based routing.
 
 For the broader ingress architecture (why two layers, ingress-nginx controller,
 per-app Ingress CRDs, DNS fallback story) see
-[`../../../../deployment-docs/enpoint-dns-ingress-exnginx-setup-guide.txt`](../../../../deployment-docs/enpoint-dns-ingress-exnginx-setup-guide.txt).
+[`../../../../deployment-docs/13-endpoint-dns-ingress-setup-guide.md`](../../../../deployment-docs/13-endpoint-dns-ingress-setup-guide.md).
 
 ---
 
@@ -45,7 +45,7 @@ per-app Ingress CRDs, DNS fallback story) see
 
 ## Related
 
-- [`../../../../deployment-docs/enpoint-dns-ingress-exnginx-setup-guide.txt`](../../../../deployment-docs/enpoint-dns-ingress-exnginx-setup-guide.txt) — full ingress story (2-layer architecture, per-app Ingress CRDs, DNS)
+- [`../../../../deployment-docs/13-endpoint-dns-ingress-setup-guide.md`](../../../../deployment-docs/13-endpoint-dns-ingress-setup-guide.md) — full ingress story (2-layer architecture, per-app Ingress CRDs, DNS)
 - [`../../../../deployment-docs/signal-flows/ingress-nginx.txt`](../../../../deployment-docs/signal-flows/ingress-nginx.txt) — request trace from external client through ex-nginx + ingress controller to the app pod
 - [`../../../../kubernetes/prod/deployments/infrastructure/ingress/`](../../../../kubernetes/prod/deployments/infrastructure/ingress/) — ingress-nginx controller HelmRelease
 - [`../../../../troubleshooting/nginx/`](../../../../troubleshooting/nginx/) — nginx-specific TS cases

@@ -214,6 +214,20 @@ For AP configuration, see: network/ap/ac750/config.txt
 - Cross-environment traffic blocked at router firewall
 - Each environment has its own FreeIPA DNS server
 
+### Firewall Policy
+
+I keep the router ACLs light on purpose. Most of the real access control
+happens at the app layer — Vault tokens, Kerberos principals, K8s RBAC —
+so I only enforce what the app layer can't:
+
+- Dev ↔ Prod: hard blocked, no exceptions
+- Planes (svc ↔ mgmt ↔ storage): blocked between each other
+- Within each env, service VLANs can talk to each other
+- One exception: K8s masters → Proxmox API on the mgmt plane, so the
+  remediation pod can restart crashed workers (see 14-remediation-integration-guide.md)
+
+The full reasoning and the ACL diagram are in network/DESIGN.md.
+
 ### Storage Isolation
 
 - VLAN 40 is L2-isolated on the switch (no router routing)
@@ -284,6 +298,10 @@ CGNAT workaround, AllowedIPs reasoning, TS references) is documented in:
 
     network/vpn/wireguard-setup-guide.txt
 
+The sequenced deployment guide for VPN (step 5 in the build order) is:
+
+    05-vpn-setup-guide.md
+
 The per-device configs live in:
 
     network/vpn/                   (AWS side + setup-wireguard.sh)
@@ -296,6 +314,7 @@ The per-device configs live in:
 | Component                | Path                                    |
 |--------------------------|-----------------------------------------|
 | Network README           | network/README.md                       |
+| Network DESIGN           | network/DESIGN.md                       |
 | IP Planning              | network/ip-planning.txt                 |
 | Topology                 | network/topology.txt                    |
 | Router Config            | network/router/mikrotik/                |
@@ -325,16 +344,7 @@ The ER605 → MikroTik migration story is in network/README.md.
 
 ## Deployment Order
 
-Network setup is typically done first, before any other infrastructure:
-
-0. Network Setup (this guide) - Physical network configuration
-1. Proxmox Setup (see proxmox-setup-guide.txt)
-2. AWS Bootstrap (see aws-bootstrap-setup-guide.txt)
-3. GitHub Setup (see github-setup-guide.txt)
-4. AWS Secrets (see aws-secrets-setup-guide.txt)
-5. Ansible + Local Runner (see ansible-runner-setup-guide.txt)
-6. FreeIPA (see freeipa-initial-setup-guide.txt)
-7. Vault (see vault-initial-setup-guide.txt)
-8. Kubernetes (see k8s-initial-setup-guide.txt)
+Network setup is step 0 — the first thing deployed. For the full 0–15
+sequence, see [README.md](README.md).
 
 ---

@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE: SNAPSHOT CHAIN CORRUPTION FROM LAPTOP SLEEP MODE
 
 Category: Storage / VMware Workstation / Power Management / Snapshot Corruption
 Severity: CRITICAL
+Incident: Yes
 Environment: VMware Workstation, Nested ESXi, NAS VM
 Impact: System-wide instability, data accessibility loss, 1TB storage inflation
 Status: Resolved

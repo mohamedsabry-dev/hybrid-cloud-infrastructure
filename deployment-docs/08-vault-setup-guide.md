@@ -1,4 +1,4 @@
-# HashiCorp Vault HA Cluster - Initial Setup Guide (DEV)
+# HashiCorp Vault HA Cluster - Setup Guide (DEV)
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
@@ -21,7 +21,7 @@ Before starting Vault deployment:
 All GitHub workflows depend on secrets stored in AWS Secrets Manager.
 These must be created and populated BEFORE any infrastructure deployment.
 
-See: aws-secrets-setup-guide.txt
+See: 04-aws-secrets-setup-guide.md
 
 Required secrets for Vault:
 - dev/proxmox/terraform-token
@@ -32,7 +32,7 @@ Required secrets for Vault:
 
 ### Other Prerequisites
 
-1. FreeIPA must be running and functional (see freeipa-initial-setup-guide.txt)
+1. FreeIPA must be running and functional (see 07-freeipa-setup-guide.md)
 2. super_bot keytab must exist in AWS Secrets Manager (dev/super_bot/keytab)
 3. AWS KMS must be deployed first (Phase 4 can be done before Phase 1-3)
 
@@ -312,5 +312,25 @@ Location: ansible/dev/inventory/group_vars/vault_cluster.yml
 | vault_keepalived_auth_pass   | Keepalived authentication password   |
 
 Note: Decrypt with ansible-vault or use vault password file configured in ansible.cfg
+
+---
+
+## Troubleshooting Reference
+
+Key Vault troubleshooting cases, all under troubleshooting/vault/:
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-VLT-001 | 1-vault-cluster-initial-setup-investigation.md | Vault cluster initial setup issues — Raft join, TLS, KMS unseal debugging |
+| TS-VLT-002 | 2-freeipa-vip-certificate-san-managedby.md | VIP certificate SAN and FreeIPA managedBy — TLS errors on VIP connections |
+| TS-VLT-003 | 3-vault-kms-credentials-overwrite-empty-vars.md | KMS credentials overwritten with empty vars — drove vault.env credential injection |
+| TS-VLT-005 | 5-vault-node-recovery-stale-raft-data.md | Vault node recovery from stale Raft data after outage |
+
+---
+
+## Deployment Order
+
+Vault is step 8 — after FreeIPA, before Kubernetes. For the full 0–15
+sequence, see [README.md](README.md).
 
 ---

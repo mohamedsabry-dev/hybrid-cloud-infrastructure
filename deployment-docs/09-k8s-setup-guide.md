@@ -1,4 +1,4 @@
-# Kubernetes HA Cluster - Initial Setup Guide (DEV)
+# Kubernetes HA Cluster - Setup Guide (DEV)
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
@@ -21,7 +21,7 @@ Before starting K8s deployment:
 All GitHub workflows depend on secrets stored in AWS Secrets Manager.
 These must be created and populated BEFORE any infrastructure deployment.
 
-See: aws-secrets-setup-guide.txt
+See: 04-aws-secrets-setup-guide.md
 
 Required secrets for Kubernetes:
 - dev/proxmox/terraform-token
@@ -35,7 +35,7 @@ GitHub Secrets also required:
 
 ### Other Prerequisites
 
-1. FreeIPA must be running and functional (see freeipa-initial-setup-guide.txt)
+1. FreeIPA must be running and functional (see 07-freeipa-setup-guide.md)
 2. super_bot keytab must exist in AWS Secrets Manager (dev/super_bot/keytab)
 
 ---
@@ -337,5 +337,25 @@ Note: Decrypt with ansible-vault or use vault password file configured in ansibl
 | API Port        | 6443                           |
 | SELinux         | Permissive                     |
 | Firewalld       | Disabled                       |
+
+---
+
+## Troubleshooting Reference
+
+Key K8s setup troubleshooting cases, all under troubleshooting/kubernetes/:
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-K8S-001 | 1-k8s-pod-eviction-race-condition-router-outage.md | Pod eviction race condition during router outage |
+| TS-K8S-002 | 2-calico-bgp-wrong-interface-multi-nic.md | Calico BGP peering on wrong interface — drove IP autodetection config for dual-NIC workers |
+| TS-K8S-013 | 13-k8s-master-node-resource-exhaustion.md | Master node resource exhaustion — OOM on control plane |
+| TS-K8S-022 | 22-worker-node-failure-cascading-pod-failures.md | Worker node failure cascading pod failures |
+
+---
+
+## Deployment Order
+
+Kubernetes is step 9 — after Vault, before Flux bootstrap. For the full
+0–15 sequence, see [README.md](README.md).
 
 ---

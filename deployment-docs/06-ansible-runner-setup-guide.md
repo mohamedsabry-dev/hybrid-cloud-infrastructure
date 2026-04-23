@@ -1,8 +1,8 @@
-# Ansible & Local Runner - Initial Setup Guide (DEV)
+# Ansible & Local Runner - Setup Guide (DEV)
 
 Note: If you face issues during deployment, check the troubleshooting/ folder
 for the related technology section. Most common issues have been documented there.
-Relevant folders: troubleshooting/github-actions/, troubleshooting/linux/
+Relevant folders: troubleshooting/github/, troubleshooting/linux/
 
 For manual setup reference: github/internal-runners-setup.md
 
@@ -121,7 +121,7 @@ node via SSH. Responsibilities by node:
 All GitHub workflows depend on secrets stored in AWS Secrets Manager.
 These must be created and populated BEFORE deployment.
 
-See: aws-secrets-setup-guide.txt
+See: 04-aws-secrets-setup-guide.md
 
 Required secrets for Ansible/Runner:
 - dev/proxmox/terraform-token
@@ -369,14 +369,19 @@ Set lock to 'true' to skip, 'false' or unset to run.
 
 ---
 
+## Troubleshooting Reference
+
+| TS case | File | Summary |
+|---------|------|---------|
+| TS-GH-001 | troubleshooting/github/1-github-runner-stuck-job.md | Runner not starting after reboot — service not installed as persistent daemon |
+| TS-GH-005 | troubleshooting/github/5-runner-clock-skew-auth-failure.md | Runner offline "registration deleted" — clock skew from broken DNS/NTP |
+| TS-GH-007 | troubleshooting/github/7-concurrent-terraform-workflow-lxc-reboot.md | Vault workflow exit 255 — concurrent Terraform workflows rebooted LXCs |
+
+---
+
 ## Deployment Order
 
-Complete deployment order:
-
-0. AWS Secrets (see aws-secrets-setup-guide.txt)
-1. Ansible + Local Runner (this guide)
-2. FreeIPA (see freeipa-initial-setup-guide.txt)
-3. Vault (see vault-initial-setup-guide.txt)
-4. Kubernetes (see k8s-initial-setup-guide.txt)
+Ansible & Local Runner is step 6 — after VPN, before FreeIPA. For the
+full 0–15 sequence, see [README.md](README.md).
 
 ---

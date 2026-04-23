@@ -171,7 +171,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. Always provision adequate resources for control plane nodes — 2GB minimum,
      4GB recommended when running Flux controllers alongside control plane
   2. Memory pressure on masters affects entire cluster availability immediately

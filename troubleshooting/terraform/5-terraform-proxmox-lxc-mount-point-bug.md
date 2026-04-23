@@ -187,7 +187,7 @@ Provider version history for mount_point:
   0.94.0    FIXED — PR #2529 merged
   0.96.0    current stable, confirmed working
 
-Key lessons:
+Notes:
   1. Provider bugs happen — always check GitHub issues when Terraform behaves
      unexpectedly and silently (apply succeeds but change does not take effect)
   2. Version matters — 0.93.x had broken mount_point, fixed in 0.94.0+
