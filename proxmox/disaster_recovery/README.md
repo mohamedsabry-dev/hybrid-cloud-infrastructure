@@ -23,7 +23,7 @@ Host-layer operational runbooks and prevention scripts for the Proxmox hyperviso
 | VM / LXC backups | Proxmox `vzdump` job | Scheduled backups to NAS — see [`../backup/`](../backup/) |
 | Spare adapters | Physical | Keep spare USB-Ethernet adapters ready |
 | UPS monitor | [`power/dr_ups_monitor.sh`](power/dr_ups_monitor.sh) | Auto graceful shutdown on battery discharge |
-| Temperature monitor | [`thermal/temperature_monitor.sh`](thermal/temperature_monitor.sh) | Auto graceful shutdown on CPU overheat |
+| Temperature monitor | [`thermal/draft-temperature_monitor.sh`](thermal/draft-temperature_monitor.sh) | Draft — known bugs, see [`thermal/TODO.md`](thermal/TODO.md) |
 
 ## Not here
 

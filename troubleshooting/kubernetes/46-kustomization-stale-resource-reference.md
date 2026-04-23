@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author: Sabry
 Domain: Kubernetes / FluxCD / Kustomize
 Sub-techs: Flux Kustomization, kustomize build, prune, HelmRepository,
            HelmRelease, file consolidation, GitHub dev mode (VSCode web)

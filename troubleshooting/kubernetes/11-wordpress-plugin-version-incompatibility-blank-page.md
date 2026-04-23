@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / WordPress
 Sub-techs: WordPress plugin compatibility, MariaDB, PHP fatal error, OPcache,
            Vault Agent Injector, Nginx Ingress sticky sessions

@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox
 Sub-techs: Terraform bpg/proxmox provider, VM disk management, hotplug,
            disk removal, orphaned disks, Proxmox qm

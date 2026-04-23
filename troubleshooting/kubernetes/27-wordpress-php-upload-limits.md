@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / WordPress
 Sub-techs: PHP configuration, WordPress upload limits, ConfigMap, volumeMount,
            MIME type whitelist, NFS storage

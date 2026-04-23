@@ -191,7 +191,7 @@ Mitigation pattern came from the IPA-down DR test — `TS-K8S-033`, `TS-K8S-034`
 
 | File | Covers |
 |------|--------|
-| `disaster-recovery/ipa-domain-down-dr-test.md` | **The foundational DR test** — drove every mitigation above |
+| `disaster-recovery/network-ipa-dns-outage.md` | **The foundational DR test** — drove every mitigation above |
 | `disaster-recovery/README.md` | Known SPOFs list (FreeIPA explicit) |
 
 ### Deployment docs

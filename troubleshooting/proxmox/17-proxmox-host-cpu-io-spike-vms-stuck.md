@@ -1,42 +1,38 @@
-# Issue: Proxmox Host CPU/IO Spike - VMs Stuck at Boot
+# TS-PVE-017 | 2026-04-19 | WORKAROUND APPLIED
+_____________________________________________________________________
 
-**Status:** WORKAROUND APPLIED (Reboot Proxmox host)
-**Date Discovered:** 2026-04-19
-**Severity:** Critical
-**Root Cause:** NOT IDENTIFIED
+[Info]
+Domain: Proxmox VE / Host Stability
+Sub-techs: QEMU, KVM, qemu-ga, IO wait, VM boot hang
+Environment: DEV Proxmox server (pve-dev)
+Re-opened: No
 
----
+_____________________________________________________________________
 
-## Summary
+[Issue Description]
+Proxmox host hit a severe CPU and IO spike — all VMs became unresponsive.
+VMs stuck at "Booting Rocky Linux" screen, unable to progress past kernel load.
+Multiple K8s masters showed segfaults before going completely stuck.
 
-Proxmox host experienced severe CPU and IO spike causing all VMs to become unresponsive. VMs stuck at kernel boot screen, unable to progress. Multiple K8s masters showed segfaults before becoming completely stuck.
+Symptoms:
+```
+1010 (master1) - 99.0% CPU
+1011 (master2) - 98.7% CPU
+```
 
----
+```
+rs:main Q:Reg[1192]: segfault at 0 ip 0000560a9e7b60ab sp 00007f6785596b470 error 4 in rsyslogd
+```
 
-## Symptoms
+```
+haproxy[1218]: backend k8s_masters has no server available!
+```
 
-1. **All VMs unresponsive** - couldn't SSH, API server down
-2. **VMs stuck at boot** - "Booting Rocky Linux" screen, no progress
-3. **Proxmox host metrics:**
-   - CPU spike to abnormal levels
-   - IO wait above 50%
-4. **VM processes showing high CPU:**
-   ```
-   1010 (master1) - 99.0% CPU
-   1011 (master2) - 98.7% CPU
-   ```
-5. **Segfault observed in VM console:**
-   ```
-   rs:main Q:Reg[1192]: segfault at 0 ip 0000560a9e7b60ab sp 00007f6785596b470 error 4 in rsyslogd
-   ```
-6. **HAProxy reporting no backend servers:**
-   ```
-   haproxy[1218]: backend k8s_masters has no server available!
-   ```
+_____________________________________________________________________
 
----
+[Analysis]
 
-## Timeline
+# Step 1: Timeline
 
 | Time | Event |
 |------|-------|
@@ -45,99 +41,81 @@ Proxmox host experienced severe CPU and IO spike causing all VMs to become unres
 | 2026-04-19 ~00:50 | Noticed API server issues on master1 |
 | 2026-04-19 ~00:55 | API server crash loop, "no relationship found" errors |
 | 2026-04-19 ~01:00 | HAProxy reporting no masters available |
-| 2026-04-19 ~01:05 | Attempted VM resets - VMs stuck at boot |
+| 2026-04-19 ~01:05 | Attempted VM resets — VMs stuck at boot |
 | 2026-04-19 ~01:10 | Identified Proxmox host CPU/IO spike |
 | 2026-04-19 ~01:15 | Rebooted Proxmox host |
 
----
+This happened right after extended DR testing — multiple shutdown/start cycles
+over 2 days.
 
-## Root Cause Investigation
+# Step 2: Host-level evidence
 
-### Suspected Contributing Factors
-
-1. **Extended DR testing** - Multiple shutdown/start cycles over 2 days
-2. **qemu-ga EAGAIN busy loop** - Multiple occurrences documented (issue #38)
-3. **High VM churn** - Frequent pod evictions, restarts, scheduling
-4. **Possible resource exhaustion** on Proxmox host
-
-### Evidence Collected
-
-**VM CPU from Proxmox:**
-```
+```bash
 ps aux | grep qemu
 1010 (master1) - 99.0% CPU
 1011 (master2) - 98.7% CPU
 1012 (master3) - 54.6% CPU
 ```
 
-**qemu-ga not responding:**
-```
+qemu-ga not responding on any VM:
+```bash
 qm guest cmd 1010 ping
 QEMU guest agent is not running
 ```
 
-### What We Don't Know
+IO wait was above 50% on the host.
 
-- Exact trigger for Proxmox host instability
+# Step 3: Suspected contributing factors
+
+1. Extended DR testing — multiple shutdown/start cycles stressed the host
+2. qemu-ga EAGAIN busy loop — multiple occurrences documented (TS-K8S-038)
+3. High VM churn — frequent pod evictions, restarts, scheduling
+4. Possible resource exhaustion on Proxmox host
+
+# Step 4: What I don't know
+
+- Exact trigger for the host instability
 - Whether qemu-ga loops caused cascading host issues
-- If there was memory exhaustion on host
-- If NFS storage had issues
+- If there was memory exhaustion on the host
+- If NFS storage contributed
 
----
+_____________________________________________________________________
 
-## Workaround Applied
+[Final Root Cause]
+NOT IDENTIFIED. Proxmox host experienced CPU/IO exhaustion after extended DR
+testing. The qemu-ga EAGAIN busy loop (TS-K8S-038) may have been a contributing
+factor, but the exact trigger is unknown.
 
-**Rebooted Proxmox host**
+_____________________________________________________________________
 
+[Final Solution]
+
+Rebooted Proxmox host:
 ```bash
-# On Proxmox host
 reboot
 ```
 
-After reboot:
-- All VMs started normally
-- K8s cluster recovered
-- No further issues observed
+After reboot all VMs started normally, K8s cluster recovered, no further issues.
 
----
+Next occurrence — collect these before rebooting:
+```bash
+journalctl -u pvedaemon --since "1 hour ago"
+journalctl -u pveproxy --since "1 hour ago"
+dmesg | grep -iE "error|fail|oom"
+```
 
-## Prevention
+Verified: Yes — all VMs recovered after host reboot.
 
-1. **Monitor Proxmox host resources** during DR testing
-2. **Limit consecutive DR tests** - allow host to stabilize between tests
-3. **Consider disabling qemu-ga** on K8s masters (see issue #38)
-4. **Add Proxmox host monitoring alerts** for:
-   - CPU > 90% sustained
-   - IO wait > 40%
-   - Memory exhaustion
+_____________________________________________________________________
 
----
+[Risk Level] MEDIUM
 
-## Related Issues
+Root cause unknown. Could recur during heavy DR testing or if qemu-ga busy loop
+triggers again.
 
-- `troubleshooting/kubernetes/38-qemu-guest-agent-cpu-loop.md` - qemu-ga busy loop
-- `troubleshooting/kubernetes/43-noexecute-taint-not-applied.md` - DR testing that preceded this
-- `troubleshooting/proxmox/15-proxmox-crash-during-backup-unknown-cause.md` - Similar unknown crash
+_____________________________________________________________________
 
----
-
-## Next Steps
-
-1. Monitor for recurrence
-2. Check Proxmox logs after next occurrence:
-   ```bash
-   journalctl -u pvedaemon --since "1 hour ago"
-   journalctl -u pveproxy --since "1 hour ago"
-   dmesg | grep -iE "error|fail|oom"
-   ```
-3. Consider reducing DR test intensity
-4. Review qemu-ga mitigation options
-
----
-
-## Lessons Learned
-
-- Proxmox host stability is critical for K8s cluster recovery
-- Multiple rapid VM operations can destabilize the host
-- Always have Proxmox console access as fallback
-- Host reboot is a valid recovery option when VMs are stuck
+[References]
+- TS-K8S-038 — qemu-ga EAGAIN busy loop (likely related)
+- TS-K8S-043 — DR testing that preceded this incident
+- TS-PVE-015 — similar unknown Proxmox crash during backup

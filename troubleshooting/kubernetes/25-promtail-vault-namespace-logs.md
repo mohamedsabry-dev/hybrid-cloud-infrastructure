@@ -4,7 +4,6 @@
 _____________________________________________________________________
 
 [Info]
-Author: Sabry
 Domain: Kubernetes / Monitoring
 Sub-techs: Promtail, Loki, Vault namespace, log collection, DaemonSet,
            kubernetes_sd_configs, kube-proxy, CoreDNS
@@ -121,7 +120,7 @@ stack — must fall back to kubectl logs. Same blind spot for kube-proxy and Cor
 _____________________________________________________________________
 
 [References]
-- disaster-recovery/pod-kill-tests.md (where issue was first observed)
+- disaster-recovery/app-pod-kill-wordpress-mariadb-injector.md (where issue was first observed)
 - TS-K8S-047 — CSI rollout that restarted Promtail and briefly showed vault logs
 
 _____________________________________________________________________

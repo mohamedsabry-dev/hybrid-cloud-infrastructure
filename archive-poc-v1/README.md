@@ -25,6 +25,19 @@ got built up to that decision point.
 
 ---
 
+## Numbers
+
+| | Count |
+|--|-------|
+| Troubleshooting cases | 25 |
+| Reference guides | 6 |
+| Critical incidents | 7 |
+| Documentation files (under docs/) | 27 |
+| Ansible playbooks | 18 |
+| Scripts (PowerShell + Bash) | 9 |
+
+---
+
 ## What was in the PoC
 
 | Category | Tech |
@@ -67,18 +80,18 @@ archive-poc-v1/
 │       ├── bash/               # Emergency user creation, pfSense commands, SSH cleanup
 │       └── powershell/         # DR automation — battery monitor, emergency shutdown, Veeam kill scripts
 │
-└── troubleshooting/            # 31 real incidents from the PoC era
-    ├── platform/               # 15 cases — vCenter, ESXi, FreeIPA, Windows host
-    ├── storage/                # 10 cases — VMDK snapshots, NAS, corruption
-    ├── network/                # 5 cases  — pfSense, network loops, routing
-    └── application/            # 1 case   — Prometheus setup
+└── troubleshooting/            # 25 cases + 6 reference guides
+    ├── platform/               # 13 cases, 2 reference guides — vCenter, ESXi, FreeIPA, Windows host
+    ├── storage/                # 7 cases, 3 reference guides — VMDK snapshots, NAS, corruption
+    ├── network/                # 4 cases, 1 reference guide — pfSense, network loops, routing
+    └── application/            # 1 case — Prometheus setup
 ```
 
 ---
 
 ## Why this is kept in the repo (not deleted)
 
-1. **31 real troubleshooting cases with root-cause analysis.** Each one is a
+1. **25 troubleshooting cases (7 critical) with root-cause analysis.** Each one is a
    real incident I worked through — snapshot chain corruption, disk race
    condition on `/dev/sdX` vs UUID, Kerberos clock skew from VMware Tools
    time sync, Veeam application-aware backup triggering I/O errors,
@@ -97,14 +110,14 @@ archive-poc-v1/
 
 ## Troubleshooting — read this folder
 
-The 31 incidents under [`troubleshooting/`](troubleshooting/) are the most portfolio-relevant thing in this archive. Each case has a full root-cause analysis written at the time, covering the kind of enterprise-tech surprises I hit with vCenter, ESXi, pfSense, Veeam, NAS, FreeIPA, and Windows hosting a nested lab. Good to skim — a lot of these issues show up in real production environments too, even though the underlying stack here is retired.
+The 25 cases under [`troubleshooting/`](troubleshooting/) are the most portfolio-relevant thing in this archive. Each case has a full root-cause analysis written at the time, covering the kind of enterprise-tech surprises I hit with vCenter, ESXi, pfSense, Veeam, NAS, FreeIPA, and Windows hosting a nested lab. Good to skim — a lot of these issues show up in real production environments too, even though the underlying stack here is retired.
 
-| Subfolder | Cases | Area |
-|-----------|-------|------|
-| [`troubleshooting/platform/`](troubleshooting/platform/) | 15 | vCenter, ESXi, FreeIPA, Windows host |
-| [`troubleshooting/storage/`](troubleshooting/storage/) | 10 | VMDK snapshots, NAS, corruption |
-| [`troubleshooting/network/`](troubleshooting/network/) | 5 | pfSense, loops, routing |
-| [`troubleshooting/application/`](troubleshooting/application/) | 1 | Prometheus setup |
+| Subfolder | Cases | Refs | Area |
+|-----------|-------|------|------|
+| [`troubleshooting/platform/`](troubleshooting/platform/) | 13 | 2 | vCenter, ESXi, FreeIPA, Windows host |
+| [`troubleshooting/storage/`](troubleshooting/storage/) | 7 | 3 | VMDK snapshots, NAS, corruption |
+| [`troubleshooting/network/`](troubleshooting/network/) | 4 | 1 | pfSense, loops, routing |
+| [`troubleshooting/application/`](troubleshooting/application/) | 1 | — | Prometheus setup |
 
 ### If you only read five
 

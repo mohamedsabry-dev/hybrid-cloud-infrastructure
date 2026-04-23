@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Nginx
 Sub-techs: External nginx proxy, nginx-ingress, client_max_body_size, 413,
            WordPress upload, proxy_read_timeout, Ansible nginx template

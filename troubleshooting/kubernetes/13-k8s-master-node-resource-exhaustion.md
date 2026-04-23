@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes
 Sub-techs: Kubernetes control plane, kubelet, containerd, etcd, memory exhaustion,
            Flux controllers, NFS storage, Terraform VM resources

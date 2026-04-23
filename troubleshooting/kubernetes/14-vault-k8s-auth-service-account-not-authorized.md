@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Vault
 Sub-techs: Vault Agent Injector, Kubernetes auth, ServiceAccount, HelmRelease,
            kube-prometheus-stack, Grafana, Flux

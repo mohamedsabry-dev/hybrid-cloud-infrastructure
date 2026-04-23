@@ -9,7 +9,7 @@ Documentation of issues encountered on macOS workstation used for development an
 | # | File | Issue | Root Cause |
 |---|------|-------|------------|
 | 1 | [macos-local-network-permission](1-macos-local-network-permission.md) | Third-party apps can't reach local network | macOS Local Network privacy permission |
-| 2 | [macos-persistent-route](2-macos-persistent-route.md) | Routes lost after reboot | Need LaunchDaemon for persistent routes |
+| 2 | [macos-persistent-route](reference/2-macos-persistent-route.md) | Routes lost after reboot | Need LaunchDaemon for persistent routes |
 
 ---
 

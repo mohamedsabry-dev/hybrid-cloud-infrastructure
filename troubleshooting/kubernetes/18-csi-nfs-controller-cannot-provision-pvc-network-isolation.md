@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Storage
 Sub-techs: CSI NFS driver, PVC provisioning, node affinity, network segmentation,
            StorageClass, NFSv3, Flux HelmRelease

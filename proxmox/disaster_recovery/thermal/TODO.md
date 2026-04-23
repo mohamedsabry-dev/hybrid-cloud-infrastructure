@@ -1,6 +1,6 @@
 # Thermal Monitor — To Fix Later
 
-Issues found in `temperature_monitor.sh` (2026-04-21):
+Issues found in `draft-temperature_monitor.sh` (2026-04-21):
 
 ## Bugs
 1. **`EIL_TO=` typo** (line 5) — variable referenced as `$EMAIL_TO` is empty. Emails only land because postfix aliases root mail.

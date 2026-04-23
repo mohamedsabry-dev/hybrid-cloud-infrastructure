@@ -338,7 +338,7 @@ Signs:
 
 Fix: change the on-prem listen port to one that isn't being blocked by the ISP. AWS side doesn't need a change — it responds to whatever source port the packet arrived from.
 
-History: prod was originally 51821, got blocked, moved to 51830 (March 2026).
+History: prod was originally 51820, got blocked, moved to 51830 (March 2026).
 
 ---
 

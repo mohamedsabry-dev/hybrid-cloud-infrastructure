@@ -131,14 +131,14 @@ NetworkManager, not cloud-init.
 
 _____________________________________________________________________
 
-[Suspected Root Cause]
+[Final Root Cause]
 Cloud-init owns /etc/hosts with `manage_etc_hosts: True`. On every boot, cloud-init
 regenerates the file from `/etc/cloud/templates/hosts.redhat.tmpl`, wiping any
 changes made by Ansible.
 
 _____________________________________________________________________
 
-[Potential Solutions]
+[Final Solution]
 
 Option A: Disable cloud-init /etc/hosts management
   - Set `manage_etc_hosts: False` in cloud-config
@@ -164,7 +164,7 @@ Option D: Accept current behavior (Recommended for now)
 
 _____________________________________________________________________
 
-[Risk Assessment]
+[Risk Level]
 
 Impact if /etc/hosts fallback missing during IPA outage:
   - SSH by hostname fails (use IP instead) — LOW
@@ -176,34 +176,8 @@ Overall Risk: LOW — workaround available (use IPs or re-run playbook)
 
 _____________________________________________________________________
 
-[Related Cases]
-- TS-LNX-003: Linux nodes DNS fallback (zzz-ipa.conf) — RESOLVED, survives reboot
-- TS-K8S-033: Vault Agent DNS failure — RESOLVED via CoreDNS hosts plugin
-- disaster-recovery/ipa-domain-down-dr-test.md — DR test documentation
-
-_____________________________________________________________________
-
 [References]
+- TS-LNX-003 — Linux nodes DNS fallback (zzz-ipa.conf survives reboot)
+- TS-K8S-033 — Vault Agent DNS failure (CoreDNS hosts plugin fix)
 - ansible/dev/playbooks/k8s/k8s_hosts_fallback.yml
 - /etc/cloud/templates/hosts.redhat.tmpl
-- /etc/cloud/cloud.cfg
-
-_____________________________________________________________________
-
-[Draft Notes]
-
-Status: PENDING — Decision deferred, low priority, workaround available
-
-Key insight:
-  - cloud-init manages /etc/hosts (regenerates on boot)
-  - NetworkManager manages /etc/resolv.conf (persists via zzz-ipa.conf)
-  - Different ownership models, different persistence behavior
-
-Future consideration:
-  - If Terraform re-provisions VMs, cloud-init will reset /etc/hosts
-  - May want to add hosts entries to cloud-init user-data in Terraform
-  - For now, accept that /etc/hosts entries need re-applying after reboot
-
-Workaround:
-  - After node reboot, run: ansible-playbook playbooks/k8s/k8s_hosts_fallback.yml
-  - Or just use IP addresses for SSH during IPA outage

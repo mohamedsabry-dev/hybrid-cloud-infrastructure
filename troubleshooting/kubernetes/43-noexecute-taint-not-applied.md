@@ -1,345 +1,211 @@
-# Issue: NoExecute Taint Not Applied Automatically to Unreachable Nodes
+# TS-K8S-043 | 2026-04-18 | RESOLVED
+_____________________________________________________________________
 
-**Status:** RESOLVED
-**Date Discovered:** 2026-04-18
-**Severity:** CRITICAL
-**Discovered During:** DR Test 2 - Total Worker Loss
+[Info]
+Domain: Kubernetes / Node Lifecycle / Taint-based Eviction
+Sub-techs: NoExecute vs NoSchedule taint, PartialDisruption mode,
+           unhealthy-zone-threshold, kube-controller-manager, self-healing
+Environment: DEV k8s cluster | 3 masters + 3 workers | kubeadm v1.35.3
+Severity: CRITICAL
+Discovered during: DR Test 2 — Total Worker Loss
+Related: TS-K8S-044 (CoreDNS HA — prerequisite fix for DNS stability),
+         disaster-recovery/worker-2of3-down.md
+Re-opened: No
 
----
+_____________________________________________________________________
 
-## Summary
+[Issue Description]
+When nodes become unreachable (NotReady), K8s applied `NoSchedule` taint instead
+of `NoExecute`. This prevented automatic pod eviction from failed nodes, breaking
+the entire self-healing chain.
 
-When nodes become unreachable (NotReady), Kubernetes applies `NoSchedule` taint instead of `NoExecute`. This prevents automatic pod eviction from failed nodes.
-
----
-
-## Symptoms
-
-```bash
-kubectl describe node k8s-master3.lab.local | grep -A 5 Taints
-```
-
-**Expected:**
+Expected:
 ```
 Taints:  node.kubernetes.io/unreachable:NoExecute
 ```
 
-**Actual:**
+Actual:
 ```
 Taints:  node.kubernetes.io/unreachable:NoSchedule   ← WRONG!
 ```
 
----
+_____________________________________________________________________
 
-## Impact
+[Analysis]
 
-- Pods on unreachable nodes stay "Running" (stale status)
-- ReplicaSets don't create replacement pods
-- Self-healing systems fail
-- Manual intervention required to recover
-
----
-
-## Evidence
-
-### DR Test 2 - Inconsistent Behavior
+# DR Test 2 — inconsistent taint behavior
 
 | Node | NoExecute | NoSchedule |
 |------|-----------|------------|
-| master3 | ❌ NO | ✅ Yes |
-| worker1 | ❌ NO | ✅ Yes |
-| worker2 | ✅ YES | ✅ Yes |
-| worker3 | ❌ NO | ✅ Yes |
+| master3 | NO | Yes |
+| worker1 | NO | Yes |
+| worker2 | YES | Yes |
+| worker3 | NO | Yes |
 
-Only worker2 got `NoExecute` taint.
+Only worker2 got `NoExecute`. All others got `NoSchedule` only.
 
-### DR Test 3 - Same Pattern (after CoreDNS fix)
+Controller-manager had leader election issues during the test:
+```
+E0418 19:44:19 "Error retrieving lease lock" err="context deadline exceeded"
+E0418 19:45:15 "Error retrieving lease lock" err="connection refused"
+```
+
+This may have contributed to improper taint application.
+
+# DR Test 3 — same pattern (after CoreDNS fix)
+
+Shutdown master2 + all 3 workers (4 of 6 nodes = 66%):
 
 | Node | NoExecute | NoSchedule |
 |------|-----------|------------|
-| master2 | ❌ NO | ✅ Yes |
-| worker1 | ✅ YES | ✅ Yes |
-| worker2 | ❌ NO | ✅ Yes |
-| worker3 | ❌ NO | ✅ Yes |
+| master2 | NO | Yes |
+| worker1 | YES | Yes |
+| worker2 | NO | Yes |
+| worker3 | NO | Yes |
 
-Only worker1 got `NoExecute` taint. **Pattern confirms PartialDisruption rate-limiting.**
+Only worker1 got `NoExecute`. Pattern confirmed — PartialDisruption rate-limiting.
 
-### DR Test 4 - After Fix (--unhealthy-zone-threshold=0.8)
+# Controller-manager logs — found the root cause
 
-| Node | NoExecute | NoSchedule | Status |
-|------|-----------|------------|--------|
-| master1 | - | Yes | UP |
-| master2 | ✅ YES | Yes | DOWN |
-| master3 | - | Yes | UP |
-| worker1 | ✅ YES | Yes | DOWN |
-| worker2 | ✅ YES | Yes | DOWN |
-| worker3 | ✅ YES | Yes | DOWN |
-
-**ALL down nodes got NoExecute!** Fix confirmed working.
-
-### DR Test 4 - Full Recovery Evidence
-
-**1. Taints applied correctly:**
 ```
-NAME                    TAINTS
-k8s-master2.lab.local   NoSchedule,NoSchedule,NoExecute
-k8s-worker1.lab.local   NoSchedule,NoExecute
-k8s-worker2.lab.local   NoSchedule,NoExecute
-k8s-worker3.lab.local   NoSchedule,NoExecute
+I0418 21:42:08 node_lifecycle_controller.go:460] "Starting node controller"
+I0418 21:42:08 taint_eviction.go:283] "Starting" controller="taint-eviction-controller"
+I0418 21:43:01 node_lifecycle_controller.go:1080] "Controller detected that zone is now in new state"
+  zone="" newState="PartialDisruption"
 ```
 
-**2. Remediation evicted and rescheduled:**
+When too many nodes fail simultaneously (>55% by default), K8s enters
+PartialDisruption mode and rate-limits `NoExecute` taint application to prevent
+cascading failures.
+
+Default threshold: `--unhealthy-zone-threshold=0.55` (55%)
+
+| Nodes Down | Percentage | Mode | Behavior |
+|------------|------------|------|----------|
+| 3/6 | 50% | Normal | All get NoExecute immediately |
+| 4/6 | 66% | PartialDisruption | Rate-limited, only 1 gets NoExecute |
+
+5 minutes after entering PartialDisruption, only worker1 pods got evicted:
 ```
-remediation     Normal    TaintManagerEviction    pod/remediation-774679955-mlgxs    Marking for deletion Pod remediation/remediation-774679955-mlgxs
-remediation     Normal    SuccessfulCreate        replicaset/remediation-774679955   Created pod: remediation-774679955-2bjsh
-remediation     Normal    Scheduled               pod/remediation-774679955-2bjsh    Successfully assigned remediation/remediation-774679955-2bjsh to k8s-master3.lab.local
+I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="monitoring/prometheus-kube-prometheus-stack-prometheus-0"
+I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="kube-system/csi-nfs-controller-64ff9db975-vhqxb"
 ```
 
-**3. Remediation detected unhealthy workers:**
+All from worker1 (the only node with NoExecute). Other nodes' pods NOT evicted.
+
+# Why this breaks self-healing
+
+```
+Scenario: master2 (has remediation) + all workers down
+
+master2 → Only NoSchedule → Remediation NOT evicted
+worker1 → NoExecute → Pods evicted, but nowhere to go
+worker2 → Only NoSchedule → Pods NOT evicted
+worker3 → Only NoSchedule → Pods NOT evicted
+
+Result: Remediation stuck on master2, can't reschedule to master1/master3.
+        Workers never recover. CLUSTER STUCK.
+```
+
+# Why CoreDNS fix alone didn't solve it
+
+TS-K8S-044 (CoreDNS HA) ensures controller-manager keeps leadership. But
+PartialDisruption mode is independent of DNS — it triggers based on percentage
+of unhealthy nodes. Even with DNS working perfectly, 4/6 nodes down = 66% >
+55% threshold = PartialDisruption = rate-limited eviction.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+K8s `--unhealthy-zone-threshold` defaults to 0.55 (55%). When 4+ of 6 nodes
+fail (66%), controller-manager enters PartialDisruption mode and rate-limits
+`NoExecute` taint application. Only ~1 node gets `NoExecute`, the rest get only
+`NoSchedule`. This prevents pod eviction from most failed nodes, breaking
+self-healing.
+
+_____________________________________________________________________
+
+[Final Solution]
+
+# Fix: Raise unhealthy-zone-threshold to 0.8
+
+Edited `/etc/kubernetes/manifests/kube-controller-manager.yaml` on ALL masters:
+```yaml
+- --unhealthy-zone-threshold=0.8
+```
+
+With 0.8 threshold:
+| Nodes Down | Percentage | Mode | Behavior |
+|------------|------------|------|----------|
+| 4/6 | 66% < 80% | Normal | All get NoExecute immediately |
+| 5/6 | 83% > 80% | PartialDisruption | Rate-limited (acceptable) |
+
+Automated via Ansible: `ansible/<env>/playbooks/k8s/update_cluster_config.yml`
+
+# DR Test 4 — verified fix
+
+| Node | NoExecute | Status |
+|------|-----------|--------|
+| master1 | - | UP |
+| master2 | YES | DOWN |
+| master3 | - | UP |
+| worker1 | YES | DOWN |
+| worker2 | YES | DOWN |
+| worker3 | YES | DOWN |
+
+ALL down nodes got `NoExecute`. Full self-healing chain worked:
+
+Remediation evicted from master2, rescheduled to master3:
+```
+remediation  Normal  TaintManagerEviction  pod/remediation-774679955-mlgxs  Marking for deletion
+remediation  Normal  SuccessfulCreate      replicaset/remediation-774679955  Created pod: remediation-774679955-2bjsh
+remediation  Normal  Scheduled             pod/remediation-774679955-2bjsh  Assigned to k8s-master3.lab.local
+```
+
+Remediation detected and recovered workers:
 ```
 k8s-worker1.lab.local: UNHEALTHY! (Node NotReady)
 k8s-worker2.lab.local: UNHEALTHY! (Node NotReady)
 k8s-worker3.lab.local: UNHEALTHY! (Node NotReady)
-
 --- Remediating 3 unhealthy node(s) ---
-[Attempt 1] Remediating k8s-worker1.lab.local (VM 1020)
-  -> VM 1020 is stopped, starting instead of rebooting
-  -> Starting VM 1020
-[Attempt 1] Remediating k8s-worker2.lab.local (VM 1021)
-  -> VM 1021 is stopped, starting instead of rebooting
-  -> Starting VM 1021
-[Attempt 1] Remediating k8s-worker3.lab.local (VM 1022)
-  -> VM 1022 is stopped, starting instead of rebooting
-  -> Starting VM 1022
+[Attempt 1] Remediating k8s-worker1.lab.local (VM 1020) -> Starting VM 1020
+[Attempt 1] Remediating k8s-worker2.lab.local (VM 1021) -> Starting VM 1021
+[Attempt 1] Remediating k8s-worker3.lab.local (VM 1022) -> Starting VM 1022
 ```
 
-**4. CoreDNS stayed up (on masters):**
+CoreDNS stayed up on masters:
 ```
 coredns-74b76c898f-mwjq6   Running   k8s-master1.lab.local
 coredns-74b76c898f-rr6s9   Running   k8s-master3.lab.local
 coredns-74b76c898f-94k7p   Terminating   k8s-master2.lab.local  # evicted correctly
 ```
 
-**5. Apps recovered after DNS stabilized:**
-```
-# Initial DNS timeout (CoreDNS on master2 terminating)
-[ERROR] agent.auth.handler: error authenticating: dial tcp: lookup vault.lab.local: i/o timeout
+Apps recovered after workers came up (brief DNS hiccup during CoreDNS eviction
+from master2 is expected — pods retried and succeeded).
 
-# DNS working via master1/master3 CoreDNS
-kubectl exec vault-agent-injector -- nslookup vault.lab.local
-Name:    vault.lab.local
-Address: 10.0.62.100
+# Manual emergency command
 
-# Apps recovered
-wordpress-6d4f6bbd46-ghspb   2/2     Running
-wordpress-6d4f6bbd46-mmq2q   2/2     Running
-```
-
-**Note:** Brief DNS hiccup during CoreDNS pod eviction from master2 is expected. Pods retried and succeeded once CoreDNS endpoints updated to master1/master3.
-
-### kube-controller-manager Logs
-
-During test, controller-manager had leader election issues:
-```
-E0418 19:44:19 "Error retrieving lease lock" err="context deadline exceeded"
-E0418 19:45:15 "Error retrieving lease lock" err="connection refused"
-```
-
-This may have prevented proper taint application.
-
----
-
-## Manual Workaround
-
-Adding `NoExecute` taint manually triggers eviction:
-
+If NoExecute taint is still not applied automatically:
 ```bash
-kubectl taint nodes <node-name> node.kubernetes.io/unreachable:NoExecute
-```
-
-**Result:** Pod eviction worked within tolerationSeconds (300s).
-
----
-
-## Root Cause - IDENTIFIED
-
-### Confirmed Root Cause: PartialDisruption Mode Rate-Limiting
-
-When too many nodes fail simultaneously (>55% by default), Kubernetes enters **PartialDisruption** mode and rate-limits NoExecute taint application to prevent cascading failures.
-
-### Evidence from DR Test 3 (2026-04-18 ~23:42)
-
-**Test scenario:** Shutdown master2 + all 3 workers (4 of 6 nodes = 66%)
-
-**Taints observed after shutdown:**
-
-| Node | NoExecute | NoSchedule | Comment |
-|------|-----------|------------|---------|
-| master1 | - | Yes (control-plane) | UP |
-| master2 | NO | Yes,Yes | DOWN - only NoSchedule! |
-| master3 | - | Yes (control-plane) | UP |
-| worker1 | YES | Yes | DOWN - got NoExecute |
-| worker2 | NO | Yes | DOWN - only NoSchedule! |
-| worker3 | NO | Yes | DOWN - only NoSchedule! |
-
-**Only worker1 got NoExecute.** Same pattern as Test 2 (where only worker2 got NoExecute).
-
-### Controller-Manager Logs (Evidence)
-
-```
-I0418 21:42:08 node_lifecycle_controller.go:460] "Starting node controller"
-I0418 21:42:08 taint_eviction.go:283] "Starting" controller="taint-eviction-controller"
-I0418 21:43:01 node_lifecycle_controller.go:1080] "Controller detected that zone is now in new state" zone="" newState="PartialDisruption"
-```
-
-**Key line:** `newState="PartialDisruption"` - Controller entered rate-limiting mode.
-
-**5 minutes later, only worker1 pods evicted:**
-```
-I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="monitoring/prometheus-kube-prometheus-stack-prometheus-0"
-I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="kube-system/metrics-server-84f68d86c5-wqsmt"
-I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="kube-system/csi-nfs-controller-64ff9db975-vhqxb"
-I0418 21:47:59 taint_eviction.go:111] "Deleting pod" pod="monitoring/kube-prometheus-stack-grafana-7bc777d646-w6pzq"
-```
-
-All evicted pods were from worker1 (the only node with NoExecute). Other nodes' pods NOT evicted.
-
-### Why This Breaks Self-Healing
-
-```
-Scenario: master2 (has remediation) + all workers down
-
-Current behavior:
-├── master2 → Only NoSchedule → Remediation NOT evicted
-├── worker1 → NoExecute → Pods evicted, but nowhere to go (all workers down)
-├── worker2 → Only NoSchedule → Pods NOT evicted
-├── worker3 → Only NoSchedule → Pods NOT evicted
-│
-└── Result: Remediation stuck on master2
-             Cannot reschedule to master1 or master3
-             Workers never recover
-             CLUSTER STUCK
-```
-
-### Kubernetes PartialDisruption Behavior
-
-**Default threshold:** `--unhealthy-zone-threshold=0.55` (55%)
-
-| Nodes Down | Percentage | Mode | Behavior |
-|------------|------------|------|----------|
-| 3/6 | 50% | Normal | All get NoExecute immediately |
-| 4/6 | 66% | PartialDisruption | Rate-limited, only 1 gets NoExecute |
-| 5/6 | 83% | PartialDisruption | Rate-limited |
-
-**Current config (no override):**
-```yaml
-- command:
-  - kube-controller-manager
-  - --controllers=*,bootstrapsigner,tokencleaner
-  # --unhealthy-zone-threshold not set, defaults to 0.55
-```
-
-### Why DNS Fix Alone Didn't Solve It
-
-CoreDNS HA fix (issue #44) ensures controller-manager keeps leadership. But PartialDisruption mode is independent of DNS - it triggers based on percentage of unhealthy nodes.
-
-Even with DNS working perfectly, 4/6 nodes down = PartialDisruption = rate-limited eviction.
-
-### Proposed Fix (Pending Test)
-
-Raise threshold so PartialDisruption triggers later:
-
-```yaml
-# /etc/kubernetes/manifests/kube-controller-manager.yaml
-- command:
-  - kube-controller-manager
-  - --allocate-node-cidrs=true
-  - --authentication-kubeconfig=/etc/kubernetes/controller-manager.conf
-  - --authorization-kubeconfig=/etc/kubernetes/controller-manager.conf
-  - --bind-address=127.0.0.1
-  - --client-ca-file=/etc/kubernetes/pki/ca.crt
-  - --cluster-cidr=10.244.0.0/16
-  - --cluster-name=kubernetes
-  - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
-  - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-  - --controllers=*,bootstrapsigner,tokencleaner
-  - --kubeconfig=/etc/kubernetes/controller-manager.conf
-  - --leader-elect=true
-  - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-  - --root-ca-file=/etc/kubernetes/pki/ca.crt
-  - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
-  - --service-cluster-ip-range=10.96.0.0/12
-  - --use-service-account-credentials=true
-  - --unhealthy-zone-threshold=0.8    # ADD THIS LINE
-```
-
-**With threshold 0.8:**
-| Nodes Down | Percentage | Mode | Behavior |
-|------------|------------|------|----------|
-| 4/6 | 66% < 80% | Normal | All get NoExecute immediately |
-| 5/6 | 83% > 80% | PartialDisruption | Rate-limited (acceptable) |
-
-**Apply to ALL masters** - each has its own controller-manager static pod.
-
----
-
-## Solution
-
-### Part 1: DNS HA (APPLIED)
-
-CoreDNS fix ensures controller-manager maintains leadership. See issue #44.
-**Status:** Applied and verified.
-
-### Part 2: Raise Unhealthy Zone Threshold (APPLIED & VERIFIED)
-
-Edit `/etc/kubernetes/manifests/kube-controller-manager.yaml` on ALL masters:
-
-```yaml
-- --unhealthy-zone-threshold=0.8
-```
-
-Automated via Ansible playbook `ansible/<env>/playbooks/k8s/update_cluster_config.yml` to apply
-the config idempotently across all masters instead of manual per-node editing.
-
-**Status:** Applied and verified in DR Test 4.
-
-### Part 3: Manual Emergency Command
-
-If NoExecute taint is not applied automatically:
-```bash
-# Apply to all NotReady nodes at once
 for node in $(kubectl get nodes -o jsonpath='{.items[?(@.status.conditions[?(@.type=="Ready")].status=="Unknown")].metadata.name}'); do
   kubectl taint nodes $node node.kubernetes.io/unreachable:NoExecute --overwrite 2>/dev/null
 done
 ```
 
----
+Verified: Yes — DR Test 4 confirmed all down nodes get NoExecute, full
+self-healing chain works end to end.
 
-## Related
+_____________________________________________________________________
 
-- `disaster-recovery/tmp-partial-worker-loss.md` - DR Test where issue was discovered
-- `troubleshooting/kubernetes/44-coredns-ha-masters.md` - DNS HA fix (may resolve this)
+[Risk Level] CRITICAL
 
----
+Without `NoExecute`, pods don't get evicted from failed nodes. ReplicaSets don't
+create replacements. Self-healing systems can't reschedule. Manual intervention
+required for every node failure.
 
-## Timeline
+_____________________________________________________________________
 
-| Time | Event |
-|------|-------|
-| 2026-04-18 20:25 | DR Test 2 started |
-| 2026-04-18 20:30 | Noticed pods not evicting |
-| 2026-04-18 21:00 | Identified NoSchedule instead of NoExecute |
-| 2026-04-18 22:30 | Confirmed manual NoExecute taint works |
-| 2026-04-18 22:35 | Eviction successful with manual taint |
-| 2026-04-18 ~23:30 | CoreDNS HA fix applied (issue #44) |
-| 2026-04-18 ~23:42 | DR Test 3 started (master2 + all workers) |
-| 2026-04-18 ~23:44 | Only worker1 got NoExecute, others NoSchedule only |
-| 2026-04-18 ~23:50 | Identified PartialDisruption mode as root cause |
-| 2026-04-18 ~23:55 | Identified fix: --unhealthy-zone-threshold=0.8 |
-| 2026-04-19 ~00:05 | Applied fix to all 3 masters |
-| 2026-04-19 ~00:09 | DR Test 4: ALL nodes got NoExecute |
-| 2026-04-19 ~00:10 | Remediation evicted from master2, rescheduled to master3 |
-| 2026-04-19 ~00:15 | Remediation detected 3 unhealthy workers |
-| 2026-04-19 ~00:15 | Workers started automatically |
-| 2026-04-19 ~00:20 | All apps recovered (MariaDB, WordPress) |
-| 2026-04-19 | **RESOLVED** |
+[References]
+- TS-K8S-044 — CoreDNS HA on masters (prerequisite DNS fix)
+- disaster-recovery/worker-2of3-down.md — DR test where issue was discovered
+- ansible/<env>/playbooks/k8s/update_cluster_config.yml — Ansible automation

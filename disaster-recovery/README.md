@@ -34,43 +34,34 @@ Before the planned DR test phase even began, real production incidents occurred 
 | Test | Domain | Result | Key Finding |
 |------|--------|--------|-------------|
 | [proxmox-vzdump-backup](proxmox-vzdump-backup.md) | Backup | PASS | Live backups non-disruptive to pods |
-| [etcd-backup-s3](etcd-backup-s3.md) | Backup | PASS | Manual + automated S3 backup working |
-| [etcd-s3-backup-validation](etcd-s3-backup-validation.md) | Backup | PASS | Snapshot integrity verified |
-| [etcd-single-node-failure](etcd-single-node-failure.md) | etcd | PASS | Quorum maintained, auto-recovery works |
-| [pod-kill-tests](pod-kill-tests.md) | Compute | PARTIAL | Race condition found → 2 replicas fix |
-| [mid-upload-scale-zero](mid-upload-scale-zero.md) | Compute | PASS | InnoDB rollback works, no corruption |
-| [single-worker-nfs-down](single-worker-nfs-down.md) | Storage | PASS | NFS readiness probe fix applied |
-| [vault-single-node-down](vault-single-node-down.md) | Vault | Reference | Real incident validated HA |
-| [vault-quorum-loss](vault-quorum-loss.md) | Vault | PASS | 2/3 down recovery documented |
-| [vault-aws-kms-dependency](vault-aws-kms-dependency.md) | Vault | PASS | Auto-unseal failure handling verified |
-
----
-
-## Pending Tests
-
-| Test | Domain | Priority | Notes |
-|------|--------|----------|-------|
-| [tmp-full-nas-shutdown](tmp-full-nas-shutdown.md) | Storage | CRITICAL | Most realistic disaster scenario |
-| [tmp-etcd-full-cluster-restore](tmp-etcd-full-cluster-restore.md) | etcd | CRITICAL | Validate S3 backup restore path |
-| [tmp-external-nginx-down](tmp-external-nginx-down.md) | Network | CRITICAL | SPOF confirmation |
-| [tmp-ingress-nginx-kill](tmp-ingress-nginx-kill.md) | Network | HIGH | Combine with external nginx test |
-| [tmp-partial-worker-loss](tmp-partial-worker-loss.md) | Compute | HIGH | 2/3 workers down + remediation |
-| [tmp-partial-master-loss](tmp-partial-master-loss.md) | Control Plane | HIGH | 2/3 masters, API server behavior |
-| [tmp-ipa-domain-down](tmp-ipa-domain-down.md) | Identity | HIGH | Trace DNS/auth dependencies |
-| [tmp-pod-creation-during-nfs-outage](tmp-pod-creation-during-nfs-outage.md) | Storage | MEDIUM | Run during NAS shutdown test |
-| [tmp-graceful-power-down](tmp-graceful-power-down.md) | Power | MEDIUM | Document shutdown order |
-| [tmp-recovery-boot-sequence](tmp-recovery-boot-sequence.md) | Power | MEDIUM | Document startup order |
+| [etcd-backup-s3-validation](etcd-backup-s3-validation.md) | Backup | PASS | Backup + S3 download + integrity verified |
+| [etcd-single-node-recovery](etcd-single-node-recovery.md) | etcd | PASS | Quorum maintained, cluster sync recovery |
+| [master-2of3-down](master-2of3-down.md) | Control Plane | PASS | CoreDNS is the hidden SPOF, not etcd |
+| [worker-2of3-down](worker-2of3-down.md) | Compute | PASS | NoExecute taint bug, remediation auto-recovery |
+| [app-pod-kill-wordpress-mariadb-injector](app-pod-kill-wordpress-mariadb-injector.md) | Application | PASS | Vault injector race condition → 2 replicas fix |
+| [app-upload-during-outage](app-upload-during-outage.md) | Application | PASS | InnoDB rollback works, wpdb rejects at connection init |
+| [app-ingress-nginx-failover](app-ingress-nginx-failover.md) | Network | PASS | Lua backend routing, endpoint removal on node loss |
+| [network-external-nginx-failure](network-external-nginx-failure.md) | Network | PASS | LXC SPOF confirmed, Lambda auto-recovery planned |
+| [network-ipa-dns-outage](network-ipa-dns-outage.md) | DNS | PASS | FreeIPA is DNS SPOF, 4 fixes applied |
+| [storage-full-nas-shutdown](storage-full-nas-shutdown.md) | Storage | PASS | Soft vs hard mount validated, probe design correct |
+| [storage-single-worker-nfs-down](storage-single-worker-nfs-down.md) | Storage | PASS | Readiness probe fix + Grafana HA fix |
+| [vault-single-node-down](vault-single-node-down.md) | Vault | PASS | Real incident + deliberate test validated HA |
+| [vault-raft-quorum-loss](vault-raft-quorum-loss.md) | Vault | PASS | Raft redirect behavior, new pods blocked |
+| [vault-aws-kms-credential-loss](vault-aws-kms-credential-loss.md) | Vault | PASS | No credentials = hard failure, not sealed |
 
 ---
 
 ## Key Fixes Applied During Testing
 
-| Fix | File | Issue |
-|-----|------|-------|
-| vault-agent-injector 2 replicas | helm-release.yaml | Race condition on simultaneous restart |
-| WordPress NFS readiness probe | deployment.yaml | Traffic routed to broken NFS pod |
-| Grafana 3 replicas + RWX | helm-release.yaml | Single replica SPOF |
-| Remediation VM status check | configmap.yaml | Couldn't handle stopped VMs |
+| Fix | Source Test | Issue |
+|-----|------------|-------|
+| vault-agent-injector 2 replicas | app-pod-kill | Race condition on simultaneous restart |
+| WordPress NFS readiness probe | storage-single-worker-nfs | Traffic routed to broken NFS pod |
+| Grafana 3 replicas + RWX | storage-single-worker-nfs | Single replica SPOF |
+| CoreDNS hosts plugin | network-ipa-dns | Pods can't resolve vault.lab.local during IPA outage |
+| Node DNS fallback (8.8.8.8) | network-ipa-dns | External DNS dead when IPA down |
+| Ansible KnownHostsCommand=none | network-ipa-dns | 34s → 3s during IPA outage |
+| Remediation VM status check | worker-2of3-down | Couldn't handle stopped VMs |
 
 ---
 

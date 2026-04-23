@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Vault
 Sub-techs: Vault Agent Injector, admission webhook, Kubernetes namespaces,
            ReplicaSet, Flux GitOps

@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox
 Sub-techs: Terraform bpg/proxmox provider, disk removal, orphaned disks,
            NFS storage, pvesm, qm, storage audit

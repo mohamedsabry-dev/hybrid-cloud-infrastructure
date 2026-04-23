@@ -76,54 +76,15 @@ Storage Traffic:
      across both the ER605 era and the MikroTik era.
 
 ================================================================================
-                         VLAN SUMMARY
-================================================================================
-
-  VLAN 5      │ Management      │ Mgmt plane on MikroTik + Lab WiFi (AC750)
-  VLAN 40     │ Storage         │ Switch-isolated; NAS, Proxmox stor0, k8s workers
-  VLAN 50-55  │ Prod Services   │ Production workloads (trunked via MikroTik)
-  VLAN 60-65  │ Dev Services    │ Development workloads (trunked via MikroTik)
-  VLAN 99     │ Dump / Isolation│ Native PVID on trunk ports (unused traffic)
-
-================================================================================
                          HISTORICAL NOTE
 ================================================================================
 
-Two things have changed since the original topology was laid out:
+Two changes since the original topology:
+  1. Router replaced: ER605 -> MikroTik (TS-NET-003/004/005).
+  2. Service-VLAN path: rewired from switch to direct Proxmox->MikroTik.
+Full reasoning in DESIGN.md. Old configs in router/er605/ and
+switch/fs308gp/config.txt (historical section).
 
-  1. Router. Originally a TP-Link ER605 (Port 3 = AC750 AP, Port 4 = Dev
-     SVC uplink to switch, Port 5 = Prod SVC uplink to switch). Replaced
-     by the MikroTik L009UiGS-RM after a stack of VPN and debug-tooling
-     issues documented in TS-NET-003 / 004 / 005.
+VLAN breakdown and all IPs: ip-planning.txt
 
-  2. Service-VLAN path. Originally service VLANs (50-55 and 60-65) ran
-     from the Proxmox servers through the FS308GP switch, then out to the
-     router. After TS-NET-003 revealed the real root cause of the Dev
-     network flapping was the Proxmox USB-ethernet adapter (NOT a router
-     port or the switch, though both had been suspected at different
-     phases), I rewired the service trunks to go DIRECTLY from each
-     Proxmox host's svc0 to a dedicated router port. The FS308GP is kept,
-     but only for the storage VLAN now.
-
-Both the old ER605 config and the original "service VLAN through the
-switch" setup are documented in the retired sections of the relevant
-per-device files — see router/er605/README.md and the HISTORICAL parts
-of switch/fs308gp/config.txt.
-
-================================================================================
-                         RELATED DOCUMENTATION
-================================================================================
-
-  Configuration guides (current):
-  ├── network/ip-planning.txt           - IP allocations, VLANs, VIPs
-  ├── network/router/mikrotik/          - MikroTik router config + .rsc scripts
-  ├── network/ap/ac750/config.txt       - Access point configuration
-  ├── network/switch/fs308gp/config.txt - FS308GP switch (current + historical)
-  └── network/vpn/wireguard-setup-guide.txt    - WireGuard VPN setup + reasoning
-
-  Retired / historical reference:
-  └── network/router/er605/             - Previous router, kept as archive
-
-  Domain: lab.local
-  DNS:    FreeIPA (one per environment)
 ================================================================================

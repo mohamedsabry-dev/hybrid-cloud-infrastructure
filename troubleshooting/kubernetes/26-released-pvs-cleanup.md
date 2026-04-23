@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Storage
 Sub-techs: PersistentVolume, PersistentVolumeClaim, NFS CSI driver, reclaimPolicy Retain,
            Released PV cleanup, NAS storage

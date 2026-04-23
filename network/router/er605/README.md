@@ -42,16 +42,6 @@ This folder records the previous router state — kept as reference, not as some
 
 ---
 
-## Backup naming convention
-
-`backup-ER605_UN_<version>-<date>-<description>.bin`
-
-Example: `backup-ER605_UN_v2.20-2026-03-22-After-Port4-defect-mirror-to-port2.bin`
-
----
-
-## Why this folder is still here
-
-1. The three TS cases that drove the migration (`TS-NET-003 / 004 / 005`) reference the ER605 by name — readers checking those incidents should be able to land here to see the device context.
-2. The "Port 4 defect" backup in particular documents a workaround I applied based on a theory that was later disproven. It's a useful record of how a false lead shaped a config before the real root cause was found.
-3. Comparing the ER605 `config.txt` against the current MikroTik `.rsc` scripts gives a clear before/after for anyone reviewing how the network stack was rebuilt.
+This folder is kept because TS-NET-003/004/005 reference the ER605 by
+name — readers checking those incidents need the device context.
+See [`../../DESIGN.md`](../../DESIGN.md) for the full migration story.

@@ -5,6 +5,9 @@ Terraform creates the secret resources with placeholder values; the actual
 secret values are populated out-of-band (AWS CLI or console) — see the
 setup guide in deployment-docs.
 
+For the "why" — create/populate split, lifecycle ignore_changes, single
+module — see [`DESIGN.md`](DESIGN.md).
+
 ---
 
 ## Secrets created
@@ -43,6 +46,7 @@ reference.
 
 ## Related
 
+- [`DESIGN.md`](DESIGN.md) — why Terraform creates but doesn't populate, lifecycle pattern
 - [`../../../../deployment-docs/aws-secrets-setup-guide.txt`](../../../../deployment-docs/aws-secrets-setup-guide.txt) — value-population commands
 - [`../../../../.github/workflows/prod-aws-secrets.yml`](../../../../.github/workflows/prod-aws-secrets.yml) — apply workflow
 - [`../../../../github/variables-secrets.md`](../../../../github/variables-secrets.md) — which GitHub workflows consume which secret

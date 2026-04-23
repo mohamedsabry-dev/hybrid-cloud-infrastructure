@@ -3,7 +3,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Proxmox
 Sub-techs: Remediation pod, proxmoxer Python library, Proxmox API, VM status,
            CrashLoopBackOff, self-healing, exception handling

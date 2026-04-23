@@ -9,7 +9,7 @@ For the dev/prod split rationale see [`../README.md`](../README.md).
 For day-to-day ops (keytab setup, git workflow, utility commands) see
 [`operation_guide.txt`](operation_guide.txt).
 For the Ansible Vault (encryption at rest) commands see
-[`ansible-vault-guide.txt`](ansible-vault-guide.txt).
+[`../ansible-vault-guide.txt`](../ansible-vault-guide.txt).
 
 ---
 
@@ -20,7 +20,6 @@ ansible/prod/
 ├── README.md                        # this file — scope + navigation
 ├── ansible.cfg                      # default inventory + vault password file path
 ├── operation_guide.txt              # day-to-day ops (kinit, SSH cleanup, testing)
-├── ansible-vault-guide.txt          # encrypt/view/edit/rekey commands
 ├── inventory/
 │   ├── inventory.ini                # Production inventory (FQDN, Kerberos, super_bot)
 │   ├── first_setup_inventory.ini    # Bootstrap inventory (IP, root + SSH key)
@@ -29,7 +28,6 @@ ansible/prod/
 │       ├── freeipa.yml              # FreeIPA host groups + bot/admin users + encrypted passwords
 │       ├── vault_cluster.yml        # AWS KMS creds + bindpass (env-var lookup OR ansible-vault)
 │       └── k8s_masters.yml          # k8s master-specific vars
-├── examples/                        # manual ops + usage examples (e.g., vault/usage.md)
 └── playbooks/
     ├── ansible/                     # set up the Ansible control node
     ├── common/                      # cross-platform tasks (pre_setup, ntp)
@@ -85,7 +83,7 @@ Each has its own README:
 - **Ansible Vault** — encrypted values in `group_vars/` (`ipaadmin_password`, `default_admin_user_password`, `default_bot_user_password`, `vault_aws_*_key` fallback). Used at bootstrap time before HashiCorp Vault is running.
 - **AWS Secrets Manager** — runtime creds fetched by GitHub workflows (Proxmox tokens, Vault KMS unseal keys, super_bot keytab).
 
-Encrypt/view/edit commands: see [`ansible-vault-guide.txt`](ansible-vault-guide.txt).
+Encrypt/view/edit commands: see [`../ansible-vault-guide.txt`](../ansible-vault-guide.txt).
 
 ## VLAN reference
 
@@ -103,7 +101,7 @@ Dev equivalents are in VLANs 60-65. Full plan: [`../../network/ip-planning.txt`]
 ## Related
 
 - [`operation_guide.txt`](operation_guide.txt) — day-to-day (kinit, testing, SSH known_hosts cleanup)
-- [`ansible-vault-guide.txt`](ansible-vault-guide.txt) — ansible-vault CLI commands
+- [`../ansible-vault-guide.txt`](../ansible-vault-guide.txt) — ansible-vault CLI commands
 - [`../README.md`](../README.md) — Ansible parent scope (both envs)
 - [`../../deployment-docs/freeipa-overview.md`](../../deployment-docs/freeipa-overview.md) — full identity-layer story
 - [`../../deployment-docs/vault-overview.md`](../../deployment-docs/vault-overview.md) — full Vault system story

@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Proxmox
 Sub-techs: Worker node memory exhaustion, VM crash, Prometheus memory, no swap,
            Terraform rolling update, remediation pod, OOM, Proxmox task log

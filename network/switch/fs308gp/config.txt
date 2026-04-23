@@ -1,229 +1,92 @@
 ================================================================================
-                         FS308GP CONFIGURATION GUIDE
+                         FS308GP CONFIGURATION
 ================================================================================
 
 Device: Festa FS308GP
 Role: L2 Switch, PoE, VLAN Switching
 Controller: Festa Cloud
 Management IP: 192.168.100.185/24 (static)
-Gateway: 192.168.100.1
-DNS: 192.168.100.1 (primary), 8.8.8.8 (secondary)
 
 ================================================================================
-                         !! READ FIRST !! STATE OF THIS FILE
+                         CURRENT STATE
 ================================================================================
 
-This file documents the ORIGINAL switch design, where the FS308GP carried
-BOTH the service VLAN trunks (Ports 2-5) AND the storage VLAN (Ports 6-8).
+After TS-NET-003, service VLAN trunks were rewired directly from each
+Proxmox host to a dedicated MikroTik port (bypassing the switch). The
+FS308GP now carries ONLY storage traffic.
 
-THAT IS NO LONGER THE CURRENT WIRING.
+   Port  | Profile  | Description
+   ------|----------|--------------------------------------------
+   Port1 | LAN      | ISP Uplink (Cloud Mgmt)
+   Port2 | UNUSED   | (was: Prod SVC uplink to router)
+   Port3 | UNUSED   | (was: Dev SVC uplink to router)
+   Port4 | UNUSED   | (was: Dev svc0 trunk)
+   Port5 | UNUSED   | (was: Prod svc0 trunk)
+   Port6 | Storage  | NAS (LAN 1)
+   Port7 | Storage  | Dev Server (stor0)
+   Port8 | Storage  | Prod Server (stor0)
 
-After the investigation in
-  /troubleshooting/network/3-svc-network-instability-investigation.md
-(TS-NET-003) found the real root cause — USB-ethernet adapter instability
-on the Proxmox servers, not the switch or the router — I simplified the
-wiring:
+Active VLANs:
+  - VLAN 1  — management interface (192.168.100.185)
+  - VLAN 40 — storage (only workload VLAN on this switch)
+  - VLAN 99 — native PVID on unused trunk ports
 
-  - Each Proxmox server's svc0 now connects DIRECTLY to a router port
-    (bypassing the switch entirely for service VLANs).
-  - The FS308GP keeps only the storage VLAN (VLAN 40) role.
-  - Switch ports 2-5 are unused.
+Service VLANs (50-55, 60-65) are still defined on the switch for
+consistency but no traffic for them flows through it anymore.
 
-I am keeping the sections below because the original design was useful
-reference material and someone reading this (including future-me) should
-be able to see what the "full" switch-based VLAN layout looked like. Think
-of the Port Assignments, VLAN Networks, and Port Profiles sections as the
-HISTORICAL design. The summary right below this block is what is actually
-deployed TODAY.
-
-Also note: references to "ER605 Port 4 / Port 5" in the historical port
-table are the OLD on-prem router. That router has since been replaced by a
-MikroTik L009UiGS-RM — see /network/README.md for the full story.
-
-================================================================================
-                         CURRENT STATE (TODAY)
-================================================================================
-
-Wiring actually in place now:
-
-   ┌───────┬─────────────┬───────────────────────────────────┐
-   │ Port  │ Profile     │ Description                       │
-   ├───────┼─────────────┼───────────────────────────────────┤
-   │ Port1 │ LAN         │ ISP Uplink (Cloud Mgmt)           │
-   │ Port2 │ UNUSED      │ -- (historical: Prod SVC uplink) --│
-   │ Port3 │ UNUSED      │ -- (historical: Dev SVC uplink) -- │
-   │ Port4 │ UNUSED      │ -- (historical: Dev svc0 trunk) -- │
-   │ Port5 │ UNUSED      │ -- (historical: Prod svc0 trunk) --│
-   │ Port6 │ Storage     │ NAS (LAN 1)                       │
-   │ Port7 │ Storage     │ Dev Server (stor0)                │
-   │ Port8 │ Storage     │ Prod Server (stor0)               │
-   └───────┴─────────────┴───────────────────────────────────┘
-
-VLANs actually switching today:
-  - VLAN 1  (management interface — static 192.168.100.185)
-  - VLAN 40 (storage — the only workload VLAN still on this switch)
-  - VLAN 99 (native/dump — native PVID on the unused trunk ports)
-
-Service VLANs (50-55 Prod, 60-65 Dev) are still DEFINED on the switch
-for cleanliness and so the VLAN table matches the rest of the repo, but
-no traffic for those VLANs flows through the switch anymore. It all goes
-Proxmox svc0 -> router directly.
-
-For the router side of this story see /network/router/mikrotik/ and
-/deployment-docs/network-setup-guide.txt.
+ACL status: not configured. No longer needed on the switch — service
+VLAN isolation is enforced at the MikroTik router layer. The only
+potential future use is restricting management access to the switch
+itself.
 
 ================================================================================
-                         HISTORICAL DESIGN (FOR REFERENCE)
+                         HISTORICAL DESIGN (REFERENCE)
 ================================================================================
 
-The sections below describe the switch as it was originally configured
-when service VLAN trunks ran through it. Kept as reference — no longer
-the deployed wiring.
+The sections below describe the switch when service VLAN trunks ran
+through it. No longer deployed — kept as reference.
 
-================================================================================
-                         1. INITIAL SETUP (Festa Cloud)
-================================================================================
+PORT ASSIGNMENTS (ORIGINAL)
+-------------------------------------------------------------------------------
 
-   ├── Connect switch to ISP (initially DHCP, changed to static 192.168.100.185)
-   ├── Login to Festa Cloud Controller
-   ├── Adopt device using Serial Number (SN)
-   └── Configure VLANs and port profiles
+   Port  | Profile      | Description                    | PoE | LoopDet
+   ------|--------------|--------------------------------|-----|--------
+   Port1 | LAN          | ISP Uplink (Cloud Mgmt)        | On  | Yes
+   Port2 | Prod_SVC_All | Prod Uplink (to router)        | Off | No
+   Port3 | Dev_SVC_All  | Dev Uplink (to router)         | Off | No
+   Port4 | Dev_SVC_All  | Dev Server Trunk (svc0)        | Off | No
+   Port5 | Prod_SVC_All | Prod Server Trunk (svc0)       | On  | No
+   Port6 | Storage      | NAS (LAN 1)                    | On  | Yes
+   Port7 | Storage      | Dev Server (stor0)             | On  | Yes
+   Port8 | Storage      | Prod Server (stor0)            | On  | Yes
 
-================================================================================
-                         2. PORT ASSIGNMENTS   [HISTORICAL]
-================================================================================
+PORT PROFILES
+-------------------------------------------------------------------------------
 
-   [!] This table reflects the ORIGINAL wiring. Ports 2-5 are now UNUSED.
-       See "CURRENT STATE" section near the top for today's layout.
-       ER605 references are the old on-prem router (now MikroTik).
+   Profile      | Native (PVID) | Tagged VLANs
+   -------------|---------------|----------------------------
+   LAN          | VLAN 1        | -
+   DUMP_VLAN    | VLAN 99       | -
+   Storage      | VLAN 99       | 40
+   Prod_SVC_All | VLAN 99       | 50,51,52,53,54,55
+   Dev_SVC_All  | VLAN 99       | 60,61,62,63,64,65
 
-   ┌───────┬─────────────┬───────────────────────────────────┬─────┬───────────┐
-   │ Port  │ Profile     │ Description                       │ PoE │ LoopDet   │
-   ├───────┼─────────────┼───────────────────────────────────┼─────┼───────────┤
-   │ Port1 │ LAN         │ ISP Uplink (Cloud Mgmt)           │ On  │ Yes       │
-   │ Port2 │ Prod_SVC_All│ Prod Uplink (to ER605 Port4)      │ Off │ No        │
-   │ Port3 │ Dev_SVC_All │ Dev Uplink (to ER605 Port5)       │ Off │ No        │
-   │ Port4 │ Dev_SVC_All │ Dev Server Trunk (svc0)           │ Off │ No        │
-   │ Port5 │ Prod_SVC_All│ Prod Server Trunk (svc0)          │ On  │ No        │
-   │ Port6 │ Storage     │ NAS (LAN 1)                       │ On  │ Yes       │
-   │ Port7 │ Storage     │ Dev Server (stor0)                │ On  │ Yes       │
-   │ Port8 │ Storage     │ Prod Server (stor0)               │ On  │ Yes       │
-   └───────┴─────────────┴───────────────────────────────────┴─────┴───────────┘
+   PVID 99 (DUMP_VLAN) used as native for all trunk ports.
 
-   NOTE: PoE disabled on uplink ports (2,3,4) to prevent power feedback.
-         Loopback detection enabled on LAN and Storage ports.
+CLI REFERENCE (for the historical trunk ports)
+-------------------------------------------------------------------------------
 
-================================================================================
-                         3. VLAN NETWORKS
-================================================================================
-
-   ┌──────────────────┬─────────┬──────┬───────────────────────────────────────┐
-   │ Name             │ Purpose │ VLAN │ Notes                                 │
-   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
-   │ LAN              │Interface│ 1    │ Static 192.168.100.185 - Cloud Mgmt   │
-   │ DUMP_VLAN        │ VLAN    │ 99   │ Unused/Isolation                      │
-   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
-   │ NAS_Storage_VLAN │ VLAN    │ 40   │ Storage Network                       │
-   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
-   │ Prod_SVC_50      │ VLAN    │ 50   │ Prod Identity (FreeIPA)               │
-   │ Prod_SVC_51      │ VLAN    │ 51   │ Prod K8s Masters                      │
-   │ Prod_SVC_52      │ VLAN    │ 52   │ Prod Vault                            │
-   │ Prod_SVC_53      │ VLAN    │ 53   │ Prod Mgmt                             │
-   │ Prod_SVC_54      │ VLAN    │ 54   │ Prod K8s Workers                      │
-   │ Prod_SVC_55      │ VLAN    │ 55   │ Prod DMZ                              │
-   ├──────────────────┼─────────┼──────┼───────────────────────────────────────┤
-   │ Dev_SVC_VLAN_60  │ VLAN    │ 60   │ Dev Identity (FreeIPA)                │
-   │ Dev_SVC_VLAN_61  │ VLAN    │ 61   │ Dev K8s Masters                       │
-   │ Dev_SVC_VLAN_62  │ VLAN    │ 62   │ Dev Vault                             │
-   │ Dev_SVC_VLAN_63  │ VLAN    │ 63   │ Dev Mgmt                              │
-   │ Dev_SVC_VLAN_64  │ VLAN    │ 64   │ Dev K8s Workers                       │
-   │ Dev_SVC_VLAN_65  │ VLAN    │ 65   │ Dev DMZ                               │
-   └──────────────────┴─────────┴──────┴───────────────────────────────────────┘
-
-================================================================================
-                         4. PORT PROFILES   [HISTORICAL — Prod_SVC_All and
-                                              Dev_SVC_All no longer applied
-                                              to any port; kept for reference]
-================================================================================
-
-   ┌─────────────┬────────────────┬───────────┬───────────────────────┐
-   │ Profile     │ Native (PVID)  │ Isolation │ Tagged VLANs          │
-   ├─────────────┼────────────────┼───────────┼───────────────────────┤
-   │ LAN         │ VLAN 1         │ Off       │ -                     │
-   │ DUMP_VLAN   │ VLAN 99        │ Off       │ -                     │
-   │ Storage     │ VLAN 99        │ Off       │ 40                    │
-   │ Prod_SVC_All│ VLAN 99        │ Off       │ 50,51,52,53,54,55     │
-   │ Dev_SVC_All │ VLAN 99        │ Off       │ 60,61,62,63,64,65     │
-   └─────────────┴────────────────┴───────────┴───────────────────────┘
-
-   NOTE: Only VLAN 1 (LAN) has Interface mode enabled (IP: 192.168.100.185).
-         All other VLANs operate in L2 switching mode.
-         PVID 99 (DUMP_VLAN) used as native for all trunk ports.
-
-================================================================================
-                         5. CLI CONFIG REFERENCE   [HISTORICAL
-                                                    for the Port2/Port3 trunks]
-================================================================================
-
-   Exported from: network/backups/switchCfg.cfg
-
-   # VLANs
-   vlan 40                    # Storage
-   vlan 50-55                 # Prod Services
-   vlan 60-65                 # Dev Services
-   vlan 99                    # Dump/Isolation
-
-   # Management Interface
-   interface vlan 1
-     ip address 192.168.100.185 255.255.255.0 gateway 192.168.100.1
-
-   # Example Trunk Port (Port2 - Prod)
+   # Example Trunk Port (Prod)
    interface gigabitEthernet 1/0/2
      switchport general allowed vlan 99 untagged
      switchport general allowed vlan 50-55 tagged
      switchport pvid 99
-     no switchport general allowed vlan 1
-     power inline supply disable
 
-   # Example Trunk Port (Port3 - Dev)
-   interface gigabitEthernet 1/0/3
-     switchport general allowed vlan 99 untagged
-     switchport general allowed vlan 60-65 tagged
-     switchport pvid 99
-     no switchport general allowed vlan 1
-     power inline supply disable
-
-   # Example Storage Port (Port6)
+   # Example Storage Port
    interface gigabitEthernet 1/0/6
      switchport general allowed vlan 99 untagged
      switchport general allowed vlan 40 tagged
      switchport pvid 99
      loopback-detection config process-mode port-based recovery-mode auto
-     loopback-detection
-
-================================================================================
-                         6. ACL (Future)
-================================================================================
-
-   STATUS: Not configured yet.
-
-   NOTE: the original plan here was switch-level ACLs to block inter-VLAN
-   traffic as a defense-in-depth layer alongside the ER605 firewall. Two
-   things have changed since that plan was written:
-
-     1. The switch no longer carries the service VLANs at all (the whole
-        point of the post-TS-NET-003 simplification). So inter-VLAN traffic
-        between service VLANs never even touches this switch anymore — it
-        is all enforced one hop up, at the router.
-     2. The router is now MikroTik, not ER605 — which gives me a much
-        richer firewall-rules surface to do this kind of enforcement
-        cleanly at the router layer rather than pushing it down to the
-        switch.
-
-   So "switch-level ACLs for service VLAN isolation" is effectively no
-   longer a goal. What is still potentially useful on the FS308GP:
-     ├── Restrict management access (to the switch itself) to specific IPs
-     └── Storage VLAN hardening if ever needed (currently overkill for a
-         single-NAS setup)
 
 ================================================================================

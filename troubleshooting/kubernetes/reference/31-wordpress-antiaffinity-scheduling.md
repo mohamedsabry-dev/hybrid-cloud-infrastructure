@@ -138,7 +138,7 @@ Note: No action taken. Current soft anti-affinity behaviour is acceptable.
 _____________________________________________________________________
 
 [References]
-- disaster-recovery/tmp-ipa-domain-down-part2.md
+- disaster-recovery/network-ipa-dns-outage.md
 
 _____________________________________________________________________
 

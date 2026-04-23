@@ -187,7 +187,7 @@ For NFS-backed applications:
 _____________________________________________________________________
 
 [Related Cases]
-- disaster-recovery/full-nas-shutdown.md - Full DR test documentation
+- disaster-recovery/storage-full-nas-shutdown.md - Full DR test documentation
 - TS-K8S-029 - WordPress readiness probe NFS detection
 - TS-K8S-015 - CSI-NFS restart stale mount MariaDB crash
 - TS-K8S-003 - NFS hard mount pod unresponsiveness

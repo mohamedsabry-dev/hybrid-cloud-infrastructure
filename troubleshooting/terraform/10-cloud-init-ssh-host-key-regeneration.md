@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Terraform / Proxmox / Identity
 Sub-techs: cloud-init, SSH host keys, FreeIPA/SSSD KnownHostsCommand,
            Proxmox backup restore, K8s worker recovery

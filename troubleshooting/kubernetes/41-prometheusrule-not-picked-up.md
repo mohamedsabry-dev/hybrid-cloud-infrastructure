@@ -1,32 +1,30 @@
-# Issue: Custom PrometheusRule Not Picked Up by Prometheus
+# TS-K8S-041 | 2026-04-18 | RESOLVED
+_____________________________________________________________________
 
-**Status:** RESOLVED
-**Date Discovered:** 2026-04-18
-**Resolution:** Added missing `release: kube-prometheus-stack` label
+[Info]
+Domain: Kubernetes / Monitoring / Prometheus
+Sub-techs: PrometheusRule CRD, Prometheus Operator, ruleSelector,
+           kube-prometheus-stack, custom alerts, label matching
+Environment: DEV k8s cluster | kube-prometheus-stack
+Discovered during: Testing custom ExternalNodeDown alert
+Related: TS-K8S-042 (discovered during same session)
+Re-opened: No
 
----
+_____________________________________________________________________
 
-## Summary
+[Issue Description]
+Custom PrometheusRule CRD (`custom-alerts`) was applied to cluster but Prometheus
+wasn't evaluating the rules. I shut down an external node to test — received the
+generic built-in `TargetDown` alert instead of my custom `ExternalNodeDown` alert.
 
-Custom PrometheusRule CRD (`custom-alerts`) was applied to cluster but Prometheus was not evaluating the rules. Built-in `TargetDown` alert fired instead of custom `ExternalNodeDown` alert.
-
----
-
-## Symptoms
-
-- Applied `custom-alerts` PrometheusRule 13 hours ago
-- Shut down external node to test
-- Received generic `TargetDown` alert (built-in) instead of custom `ExternalNodeDown`
-- Custom alert has specific labels (`instance`, `role`) that weren't appearing
-
-**Built-in alert received:**
+Built-in alert received:
 ```
 alertname = TargetDown
 job = external-nodes
 description = 14.29% of the external-nodes/ targets in namespace are down.
 ```
 
-**Expected custom alert:**
+Expected custom alert:
 ```
 alertname = ExternalNodeDown
 instance = local-runner.lab.local
@@ -34,20 +32,22 @@ role = automation
 description = automation node unreachable for 2 minutes
 ```
 
----
+_____________________________________________________________________
 
-## Root Cause
+[Analysis]
 
-kube-prometheus-stack's Prometheus has a `ruleSelector` that filters which PrometheusRule CRDs it loads:
+# Step 1: Checked Prometheus ruleSelector
 
-```bash
+```
 kubectl get prometheus -n monitoring -o jsonpath='{.items[0].spec.ruleSelector}'
-# Output: {"matchLabels":{"release":"kube-prometheus-stack"}}
+# {"matchLabels":{"release":"kube-prometheus-stack"}}
 ```
 
-The custom-alerts PrometheusRule was missing this label:
+Prometheus only loads PrometheusRule CRDs that match this label selector.
 
-**Before (not working):**
+# Step 2: Checked custom-alerts labels — missing required label
+
+Before (not working):
 ```yaml
 metadata:
   name: custom-alerts
@@ -57,7 +57,22 @@ metadata:
     environment: dev
 ```
 
-**After (working):**
+Missing `release: kube-prometheus-stack` label. Prometheus Operator filters by
+this label and ignores any PrometheusRule without it.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Custom PrometheusRule was missing the `release: kube-prometheus-stack` label.
+kube-prometheus-stack's Prometheus has a `ruleSelector` that requires this label
+on all PrometheusRule CRDs. Without it, the Operator ignores the rule entirely.
+
+_____________________________________________________________________
+
+[Final Solution]
+
+Added the missing label:
+
 ```yaml
 metadata:
   name: custom-alerts
@@ -68,107 +83,41 @@ metadata:
     environment: dev
 ```
 
----
+After re-applying, both alerts fire:
 
-## How PrometheusRule Works
-
-```
-PrometheusRule CRD applied to cluster
-    ↓
-Prometheus Operator watches for PrometheusRule resources
-    ↓
-Filters by ruleSelector (requires matching labels)
-    ↓
-Generates prometheus config and reloads Prometheus
-    ↓
-Prometheus evaluates rules in groups
-```
-
-**Alert evaluation flow:**
-```
-expr: up{job="external-nodes"} == 0
-    ↓
-Prometheus scrapes target every 30s
-    ↓
-If scrape fails, up metric = 0
-    ↓
-Alert enters PENDING state, starts "for" timer (2m)
-    ↓
-After 2m still true → FIRING
-    ↓
-Labels from metric ($labels.instance, $labels.role) injected into annotations
-    ↓
-Sent to Alertmanager → email/slack/etc
-```
-
----
-
-## Solution Verified - Evidence
-
-After adding `release: kube-prometheus-stack` label and re-applying, **both alerts now fire**:
-
-**Custom ExternalNodeDown (working):**
+Custom ExternalNodeDown:
 ```
 alertname = ExternalNodeDown
-instance = local-runner.lab.local        ← Custom label from scrape config
+instance = local-runner.lab.local
 job = external-nodes
-prometheus = monitoring/kube-prometheus-stack-prometheus
-role = automation                        ← Custom label from scrape config
+role = automation
 severity = critical
-
-Annotations:
-  description = automation node unreachable for 2 minutes
-  summary = local-runner.lab.local is down
+description = automation node unreachable for 2 minutes
+summary = local-runner.lab.local is down
 ```
 
-**Built-in TargetDown (also fires):**
+Built-in TargetDown (also fires):
 ```
 alertname = TargetDown
 job = external-nodes
-prometheus = monitoring/kube-prometheus-stack-prometheus
 severity = warning
-
-Annotations:
-  description = 14.29% of the external-nodes/ targets in namespace are down.
-  summary = One or more targets are unreachable.
+description = 14.29% of the external-nodes/ targets in namespace are down.
 ```
 
-**Key difference:**
-- `ExternalNodeDown` has specific `instance` and `role` labels from the scrape config
-- `TargetDown` is generic percentage-based alert from kube-prometheus-stack
-- Both are useful: custom for specific node identification, built-in for overall health
+Both are useful — custom for specific node identification, built-in for overall
+health.
 
----
+File modified: `kubernetes/dev/deployments/apps/monitoring/custom-alerts.yaml`
 
-## Verification Commands
+Verified: Yes — custom PrometheusRule loaded, alerts firing correctly.
 
-```bash
-# Check PrometheusRule exists with correct labels
-kubectl get prometheusrule custom-alerts -n monitoring -o yaml | grep -A5 labels
+_____________________________________________________________________
 
-# Check rules loaded in Prometheus
-kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring
-# Visit http://localhost:9090/rules → search for "ExternalNodeDown"
+[Risk Level] LOW
 
-# Check alerts firing
-kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring
-# Visit http://localhost:9090/alerts
-```
+Label-only change, no impact on running resources.
 
----
+_____________________________________________________________________
 
-## Files Modified
-
-- `kubernetes/dev/deployments/apps/monitoring/custom-alerts.yaml` - Added `release: kube-prometheus-stack` label
-
----
-
-## Lesson Learned
-
-When creating custom PrometheusRule CRDs for kube-prometheus-stack, always include:
-```yaml
-labels:
-  release: kube-prometheus-stack
-```
-
-This label is required for the Prometheus Operator to pick up the rules.
+[References]
+- TS-K8S-042 — Flux retry storm (discovered during same session)

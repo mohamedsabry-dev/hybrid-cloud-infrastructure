@@ -22,8 +22,9 @@ be configured via [`../../bootstrap_proxmox/mail-config-guide.txt`](../../bootst
 
 | File | Purpose |
 |------|---------|
-| `temperature_monitor.sh` | The monitor script |
-| `thermal-monitor-setup-guide.txt` | Install, cron schedule, manual check |
+| `draft-temperature_monitor.sh` | Draft monitor script — has known bugs, see `TODO.md` |
+| `TODO.md` | Bug list and recommended rewrite direction |
+| `thermal-monitor-setup-guide.txt` | Install, cron schedule, manual check (apply after script is fixed) |
 
 ## Related
 

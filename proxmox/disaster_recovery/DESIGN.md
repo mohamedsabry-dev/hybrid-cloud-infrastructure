@@ -21,7 +21,7 @@ Proxmox runs bare-metal on **laptops**. The built-in battery acts as an involunt
 
 ### `thermal/` — CPU temperature monitoring
 
-Same reasoning as `power/`: laptops are not built for sustained server workload, and CPU temperature under k8s + VM load can creep toward throttling. [`thermal/temperature_monitor.sh`](thermal/temperature_monitor.sh) samples `thermal_zone0` every 5 minutes, emails at 73 °C, triggers a graceful shutdown at 78 °C. Same "environmental safeguard for laptop-Proxmox" pattern as the UPS monitor.
+Same reasoning as `power/`: laptops are not built for sustained server workload, and CPU temperature under k8s + VM load can creep toward throttling. [`thermal/draft-temperature_monitor.sh`](thermal/draft-temperature_monitor.sh) is the current draft — has known bugs documented in [`thermal/TODO.md`](thermal/TODO.md) (wrong sensor, no debounce, syntax errors). Needs a rewrite before deployment. Same "environmental safeguard for laptop-Proxmox" pattern as the UPS monitor.
 
 ### `hardware/` — physical component replacement runbook
 

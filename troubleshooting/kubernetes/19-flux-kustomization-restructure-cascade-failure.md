@@ -4,7 +4,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / FluxCD
 Sub-techs: Flux Kustomization, prune, dependsOn, healthCheck, HelmRelease,
            Vault Agent Injector, ServiceAccount token, K8s 1.24+ SA tokens,

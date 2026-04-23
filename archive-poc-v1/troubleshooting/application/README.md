@@ -1,12 +1,12 @@
-# Application Troubleshooting
+# Application — 1 case
 
-Application-level issues.
+Application-level issues from the PoC v1 era.
 
-## Cases (1)
+| # | File | What Happened |
+|---|------|---------------|
+| 01 | [prometheus-setup](01-prometheus-setup-issues.md) | Port conflict and YAML parsing errors during deployment |
 
-| Case | Issue | Root Cause |
-|------|-------|------------|
-| 01 | Prometheus Setup Issues | Configuration and scrape targets |
+---
 
 ## Related
 

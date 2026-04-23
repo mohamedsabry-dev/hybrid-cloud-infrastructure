@@ -355,8 +355,7 @@ Vault running = safe. Vault restart during IPA outage = stays sealed.
 _____________________________________________________________________
 
 [References]
-- disaster-recovery/tmp-ipa-domain-down-part1.md
-- disaster-recovery/tmp-ipa-domain-down-part2.md
+- disaster-recovery/network-ipa-dns-outage.md
 - troubleshooting/kubernetes/33-vault-agent-dns-failure-new-pod-blocking.md (TS-K8S-033)
 - troubleshooting/kubernetes/34-wordpress-external-dns-slowness.md (TS-K8S-034)
 

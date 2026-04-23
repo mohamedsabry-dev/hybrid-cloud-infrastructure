@@ -75,7 +75,7 @@ Ansible playbook into `/etc/vault.d/vault.env` as systemd EnvironmentFile.
 Recovery keys (Shamir master) also stored in AWS Secrets Manager at
 `<env>/vault/unseal-keys` for the break-glass case where KMS itself is
 unreachable. This introduces a deliberate AWS dependency — validated by
-the DR test at `disaster-recovery/vault-aws-kms-dependency.md`.
+the DR test at `disaster-recovery/vault-aws-kms-credential-loss.md`.
 
 ### AWS Secrets Engine for etcd-backup, not long-lived keys
 
@@ -162,10 +162,10 @@ in its own `remediation` namespace.
 | File | Covers |
 |------|--------|
 | `disaster-recovery/vault-single-node-down.md` | Single-node failure — quorum maintained, auto-recovery |
-| `disaster-recovery/vault-quorum-loss.md` | 2-of-3 down — recovery path via recovery keys |
-| `disaster-recovery/vault-aws-kms-dependency.md` | AWS KMS unreachable — manual-unseal fallback with recovery keys |
-| `disaster-recovery/etcd-backup-s3.md` | End-to-end test — AWS Secrets Engine → STS → S3 upload path |
-| `disaster-recovery/ipa-domain-down-dr-test.md` | FreeIPA down cascade affecting Vault (DNS, certs, service principals) |
+| `disaster-recovery/vault-raft-quorum-loss.md` | 2-of-3 down — recovery path via recovery keys |
+| `disaster-recovery/vault-aws-kms-credential-loss.md` | AWS KMS unreachable — manual-unseal fallback with recovery keys |
+| `disaster-recovery/etcd-backup-s3-validation.md` | End-to-end test — AWS Secrets Engine → STS → S3 upload path |
+| `disaster-recovery/network-ipa-dns-outage.md` | FreeIPA down cascade affecting Vault (DNS, certs, service principals) |
 
 ### Deployment docs
 

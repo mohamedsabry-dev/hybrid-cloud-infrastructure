@@ -70,16 +70,23 @@ used to mint short-lived credentials for ONE specific role. The
 permission-bearing identity (etcd-backup) has no long-lived credentials of
 its own.
 
-## Why the etcd-backup role has only `s3:PutObject`
+## Why the etcd-backup role has four S3 actions, not just PutObject
 
-Narrowest viable permission. The etcd-backup CronJob needs to upload
-snapshots — it doesn't need to list the bucket, doesn't need to read
-objects, doesn't need to delete objects. `PutObject` on the specific
-backup bucket is all it gets.
+The CronJob today only uploads snapshots (`PutObject`), but I gave the
+role a slightly broader set upfront:
 
-Lifecycle rules on the bucket (retention / versioning / eventual object
-expiration) are separate and don't require any additional IAM permissions
-on the writer.
+- `ListBucket` — validate that the backup landed (the CronJob checks
+  existence after upload)
+- `GetObject` — needed if I later add a download step to the etcd job
+  (pull a snapshot for local restore), or if I need to grab a snapshot
+  manually via CLI during a recovery
+- `DeleteObject` — cleanup of old snapshots if I add retention logic
+  inside the job instead of relying solely on S3 lifecycle rules
+
+I'd rather set these once now than circle back to reconfigure IAM
+mid-incident when I actually need to download a backup. The blast radius
+is still narrow — all four actions are scoped to this one bucket only,
+and the role is only assumable by `vault_trust`.
 
 ## Why the bucket lives in this module and not in network/
 

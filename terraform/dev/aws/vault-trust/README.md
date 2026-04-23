@@ -37,12 +37,10 @@ available on self-managed k8s — see [`DESIGN.md`](DESIGN.md).
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `vault_trust_user_arn` | ARN of the vault_trust IAM user |
-| `etcd_backup_role_arn` | ARN of the etcd-backup assumable role |
-| `etcd_backup_bucket` | S3 bucket name for etcd snapshots |
-| `credentials_secret_arn` | ARN of the Secrets Manager entry |
+No outputs exported yet — nothing currently consumes this module via
+remote state. I'll add `outputs.tf` when another module or workflow
+actually needs to reference these resources; no point wiring up exports
+that nobody reads.
 
 ## Dependencies
 

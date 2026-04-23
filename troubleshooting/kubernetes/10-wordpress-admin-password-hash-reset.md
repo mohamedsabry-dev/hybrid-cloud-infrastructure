@@ -4,7 +4,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / WordPress
 Sub-techs: WordPress authentication, MariaDB, wp_users, wp-config.php, AUTH_KEY/SALT,
            bcrypt/phpass, NFS PVC

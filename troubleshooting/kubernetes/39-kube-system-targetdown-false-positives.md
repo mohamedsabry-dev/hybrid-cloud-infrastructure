@@ -1,19 +1,22 @@
-# Issue: kube-system TargetDown Alerts - False Positives
+# TS-K8S-039 | 2026-04-18 | SUSPENDED
+_____________________________________________________________________
 
-**Status:** SUSPENDED
-**Date Discovered:** 2026-04-18
-**Severity:** Low (false positives, not actual failures)
-**Reason Suspended:** Fix requires modifying kubeadm manifests on all 3 masters via Ansible - deferred for later
+[Info]
+Domain: Kubernetes / Monitoring / Prometheus
+Sub-techs: kube-prometheus-stack, ServiceMonitor, kubeadm manifests,
+           TargetDown alerts, etcd metrics, control plane scraping
+Environment: DEV k8s cluster | 3 masters (kubeadm) + 3 workers
+Reason suspended: Fix requires modifying kubeadm manifests on all 3 masters
+                  via Ansible — deferred for later
+Discovered during: Post-cluster-outage recovery (2026-04-18)
+Re-opened: No
 
----
+_____________________________________________________________________
 
-## Summary
-
-Prometheus firing TargetDown and etcd alerts for kube-system components despite all pods being healthy. These are false positives because kubeadm-deployed control plane components don't expose metrics by default.
-
----
-
-## Alerts Firing
+[Issue Description]
+Prometheus firing TargetDown and etcd alerts for kube-system components despite
+all pods being healthy. False positives — kubeadm-deployed control plane
+components don't expose metrics by default.
 
 ```
 alertname = TargetDown
@@ -39,56 +42,54 @@ alertname = etcdInsufficientMembers
 description = etcd cluster "kube-etcd": insufficient members (0).
 ```
 
----
+_____________________________________________________________________
 
-## Evidence - Cluster Actually Healthy
+[Analysis]
 
-```bash
+# Step 1: Confirmed cluster is actually healthy
+
+```
 kubectl get pods -n kube-system | grep -E "etcd|controller|scheduler|proxy"
-```
-```
 etcd-k8s-master1.lab.local                      1/1     Running   36   22d
 etcd-k8s-master2.lab.local                      1/1     Running   35   22d
 etcd-k8s-master3.lab.local                      1/1     Running   8    22d
-kube-apiserver-k8s-master1.lab.local            1/1     Running   51   22d
-kube-apiserver-k8s-master2.lab.local            1/1     Running   45   22d
-kube-apiserver-k8s-master3.lab.local            1/1     Running   55   22d
 kube-controller-manager-k8s-master1.lab.local   1/1     Running   51   22d
 kube-controller-manager-k8s-master2.lab.local   1/1     Running   58   22d
 kube-controller-manager-k8s-master3.lab.local   1/1     Running   50   22d
 kube-proxy-6c4z6                                1/1     Running   36   22d
 kube-proxy-7sx59                                1/1     Running   41   22d
-... (all Running)
 kube-scheduler-k8s-master1.lab.local            1/1     Running   46   22d
 kube-scheduler-k8s-master2.lab.local            1/1     Running   53   22d
 kube-scheduler-k8s-master3.lab.local            1/1     Running   51   22d
 ```
 
-All pods 1/1 Running - this is a scraping issue, not a health issue.
+All pods 1/1 Running. This is a scraping issue, not a health issue.
 
----
+_____________________________________________________________________
 
-## Root Cause
+[Final Root Cause]
+kubeadm-deployed control plane components don't expose metrics endpoints by
+default:
 
-kubeadm-deployed control plane components don't expose metrics endpoints by default:
+| Component | Expected Endpoint | kubeadm Default |
+|-----------|-------------------|-----------------|
+| kube-controller-manager | 10.0.61.x:10257 | Binds to 127.0.0.1 only |
+| kube-scheduler | 10.0.61.x:10259 | Binds to 127.0.0.1 only |
+| kube-proxy | 10.0.6x.x:10249 | May not be exposed |
+| etcd | 10.0.61.x:2379 | Requires client certs, localhost only |
 
-| Component | Expected Metrics Endpoint | kubeadm Default |
-|-----------|---------------------------|-----------------|
-| kube-controller-manager | 10.0.61.x:10257/metrics | Binds to 127.0.0.1 only |
-| kube-scheduler | 10.0.61.x:10259/metrics | Binds to 127.0.0.1 only |
-| kube-proxy | 10.0.6x.x:10249/metrics | May not be exposed |
-| etcd | 10.0.61.x:2379/metrics | Requires client certs, localhost only |
+kube-prometheus-stack creates ServiceMonitors expecting these endpoints to be
+reachable from the Prometheus pod, but they're not.
 
-kube-prometheus-stack creates ServiceMonitors expecting these endpoints to be reachable from Prometheus pod, but they're not.
+These alerts were firing BEFORE the 2026-04-18 cluster outage but went unnoticed.
 
----
+_____________________________________________________________________
 
-## Solution Options
+[Final Solution]
 
-### Option 1: Disable ServiceMonitors (Quick Fix)
+SUSPENDED — two options identified:
 
-Add to `helm-release.yaml` under `values:`:
-
+Option 1 (quick): Disable ServiceMonitors in helm-release.yaml:
 ```yaml
 kubeControllerManager:
   enabled: false
@@ -99,48 +100,29 @@ kubeProxy:
 kubeEtcd:
   enabled: false
 ```
+Stops false positives but loses control plane monitoring.
 
-**Pros:** Stops false positives immediately
-**Cons:** Loses control plane monitoring
-
-### Option 2: Expose Metrics (Proper Fix)
-
-Modify kubeadm component configs to bind metrics to 0.0.0.0:
-
-**kube-controller-manager** (`/etc/kubernetes/manifests/kube-controller-manager.yaml`):
+Option 2 (proper): Expose metrics by modifying kubeadm manifests on all 3
+masters to add `--bind-address=0.0.0.0`:
 ```yaml
-spec:
-  containers:
-  - command:
-    - kube-controller-manager
-    - --bind-address=0.0.0.0  # Add this
+# /etc/kubernetes/manifests/kube-controller-manager.yaml
+- --bind-address=0.0.0.0
+
+# /etc/kubernetes/manifests/kube-scheduler.yaml
+- --bind-address=0.0.0.0
 ```
 
-**kube-scheduler** (`/etc/kubernetes/manifests/kube-scheduler.yaml`):
-```yaml
-spec:
-  containers:
-  - command:
-    - kube-scheduler
-    - --bind-address=0.0.0.0  # Add this
+kube-proxy via ConfigMap:
 ```
-
-**kube-proxy** (via ConfigMap):
-```bash
 kubectl edit configmap kube-proxy -n kube-system
 # Set metricsBindAddress: 0.0.0.0:10249
 kubectl rollout restart daemonset kube-proxy -n kube-system
 ```
 
-**etcd** - More complex, requires exposing metrics endpoint with proper certs.
+etcd is more complex — requires exposing metrics endpoint with proper certs.
 
-**Pros:** Full control plane monitoring
-**Cons:** More complex, requires manifest changes on all masters
-
-### Option 3: Use kube-prometheus-stack kubeadm-specific config
-
-Some versions of kube-prometheus-stack have kubeadm-specific ServiceMonitor configs that scrape via localhost. Check if available:
-
+Option 3: Use kube-prometheus-stack kubeadm-specific ServiceMonitor config with
+explicit master endpoints:
 ```yaml
 kubeControllerManager:
   endpoints:
@@ -153,19 +135,15 @@ kubeControllerManager:
     targetPort: 10257
 ```
 
----
+TODO: decide approach and implement via Ansible across all 3 masters.
 
-## TODO
+_____________________________________________________________________
 
-- [ ] Decide: disable ServiceMonitors or expose metrics
-- [ ] If exposing metrics, update manifests on all 3 masters
-- [ ] Test Prometheus can scrape after changes
-- [ ] Verify alerts resolve
+[Risk Level] LOW
 
----
+False positives only — no actual impact on cluster health or functionality.
 
-## Related
+_____________________________________________________________________
 
-- Discovered after 2026-04-18 cluster outage recovery
-- These alerts were firing BEFORE the incident but went unnoticed
-- The incident caused additional PodCrashLooping alerts which have since resolved
+[References]
+- Discovered after 2026-04-18 cluster outage recovery (TS-K8S-042)

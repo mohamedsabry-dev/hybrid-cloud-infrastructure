@@ -99,10 +99,10 @@ Real operational incidents I've hit around GitHub Actions, runners, and git hist
 |---|------|------|
 | 1 | `1-github-runner-stuck-job.md` | Runner stuck mid-job, how to safely recover |
 | 2 | `2-workflow-lock-flag-pattern.md` | The lock-variable pattern used across all `{env}-*-full-setup.yml` |
-| 3 | `3-delete-workflow-logs-secrets.md` | How to delete workflow logs that captured secrets |
-| 4 | `4-git-history-secrets-cleanup.md` | Scrubbing secrets from git history cleanly |
+| 3 | `reference/3-delete-workflow-logs-secrets.md` | How to delete workflow logs that captured secrets |
+| 4 | `reference/4-git-history-secrets-cleanup.md` | Scrubbing secrets from git history cleanly |
 | 5 | `5-runner-clock-skew-auth-failure.md` | GH runner auth failing because of host clock skew |
-| 6 | `6-mac-address-deep-inspection-cleanup.md` | MAC-address-based GH session conflict cleanup |
+| 6 | `reference/6-mac-address-deep-inspection-cleanup.md` | MAC-address-based GH session conflict cleanup |
 | 7 | `7-concurrent-terraform-workflow-lxc-reboot.md` | Two Terraform workflows racing on the same LXC |
 | 8 | `8-git-branch-merge-conflicts-flux-gitops.md` | Merge conflict patterns in a Flux/GitOps setup |
 | 9 | `9-commit-attributed-to-wrong-user.md` | Commits landing under the wrong Git identity |

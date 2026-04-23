@@ -425,7 +425,7 @@ For vault-agent restart solution, see: **TS-K8S-033** (`troubleshooting/kubernet
 |------|-------------|
 | `troubleshooting/kubernetes/33-vault-agent-dns-failure-new-pod-blocking.md` | TS-K8S-033: Vault Agent DNS failure and solution |
 | `troubleshooting/kubernetes/34-wordpress-external-dns-slowness.md` | TS-K8S-034: WordPress external DNS timeouts |
-| `disaster-recovery/tmp-ipa-domain-down-part2.md` | Part 2 DR test documentation |
+| `disaster-recovery/network-ipa-dns-outage.md` | DR test — IPA down DNS cascade |
 
 ---
 

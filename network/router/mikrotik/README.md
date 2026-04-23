@@ -39,19 +39,9 @@ Further phases (prod services trunk on the other uplink, WireGuard tunnels, fire
 
 ---
 
-## Why MikroTik specifically
-
-Short version (full version in the root `network/README.md`):
-
-- The ER605 had too many accumulated pain points — VPN instability, suspected port defect (later proved not a defect), and a thin CLI that made every debug session a fight.
-- **The biggest single driver** was diagnostic capability. ER605 had no packet sniff, no port-level traffic inspection, no granular interface stats. Every TS case I worked through the ER606 I was debugging blind. MikroTik gives me `/tool sniffer`, `/interface ethernet monitor`, per-port counters, real logs — a real toolbox. For a project I'm learning from, that was decisive.
-- A MikroTik-managed stack also gives me RouterOS scripting, so network config can live in git like everything else does.
-
----
-
 ## Related
 
-- [`../../README.md`](../../README.md) — full network topology + the evolution story
+- [`../../DESIGN.md`](../../DESIGN.md) — why MikroTik replaced the ER605
 - [`../er605/`](../er605/) — retired router, kept as historical archive
 - [`../../vpn/`](../../vpn/) — WireGuard setup (tunnels terminate on this MikroTik)
 - [`../../../troubleshooting/network/`](../../../troubleshooting/network/) — TS-NET-003 / 004 / 005 (the incidents that drove this migration)

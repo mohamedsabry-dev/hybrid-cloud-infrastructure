@@ -37,6 +37,23 @@ Stacking those three cases, the real reasons were:
 
 ---
 
+## Why service VLANs bypass the switch
+
+Originally, all traffic — storage and service VLANs — ran through the FS308GP switch on the way to the router. After TS-NET-003 found the real root cause of the Dev network flapping (USB-ethernet adapter instability on the Proxmox host, not the switch or router), I rewired the service trunks to go directly from each Proxmox server's `svc0` into a dedicated MikroTik port.
+
+The switch itself was never the problem — but the investigation showed me the path had too many hops and too many suspects. Every trunk port, every cable, every VLAN tag along the way was a variable I had to rule out during six days of debugging. Simplifying the path removed variables I'd never need to debug again.
+
+What changed:
+- **Service VLANs (50-55, 60-65):** Proxmox `svc0` → direct to MikroTik port (one hop, one cable)
+- **Storage VLAN (40):** Still on the switch — intentionally. Storage is L2-isolated and never routes through the router. The switch is the right place for it: NAS, Proxmox `stor0`, and k8s worker NICs all talk directly over L2 on VLAN 40 with no router hop.
+- **Switch role now:** Storage VLAN only. Ports 2-5 unused. VLANs 50-65 still defined for consistency but no traffic flows through them.
+
+The trade-off is more cables (one per Proxmox host into the router instead of one trunk into the switch), but the simplification was worth it — fewer variables to debug, cleaner failure isolation, and each environment's trunk is physically separate.
+
+See [`topology.txt`](topology.txt) for the current wiring diagram and [`switch/fs308gp/config.txt`](switch/fs308gp/config.txt) for the before/after port layout.
+
+---
+
 ## Why VLANs and 802.1Q tagging everywhere, even though most of them can talk to each other
 
 A reviewer looking at my VLAN plan will spot something fast: I split the lab across 13 VLANs (mgmt, storage, and 6 service VLANs per env) — but the router's default routing lets most of them talk to each other anyway. The ACLs I actually enforce are fairly light (covered below). So at first glance the VLAN layer looks like over-engineering.

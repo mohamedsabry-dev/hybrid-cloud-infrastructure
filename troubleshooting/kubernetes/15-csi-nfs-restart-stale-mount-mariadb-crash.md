@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Storage
 Sub-techs: CSI NFS driver, MariaDB, InnoDB, NFS stale handle, soft/hard mount,
            StatefulSet, DaemonSet rollout, Flux GitOps, StorageClass

@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / FluxCD
 Sub-techs: Flux Kustomization, test resource cleanup, GitOps hygiene
 Environment: PROD production cluster | testing namespace

@@ -45,152 +45,78 @@ NAS                     | 10.0.40.120   | NFS server (storage interface, no host
 
 Notes:
   - Storage traffic is L2-isolated on the FS308GP switch — it does NOT route
-    through the router (same for both the old ER605 and the current MikroTik).
-  - Proxmox hosts expose a `stor0.40` tagged VLAN subinterface for NFS.
-  - K8s worker VMs each have a SECOND NIC on VLAN 40 (added after initial
-    setup, when CSI-NFS was introduced so pods on workers could mount NFS
-    PVs directly without proxying through the Proxmox host).
-  - Address range convention on VLAN 40:
+    through the router.
+  - Proxmox hosts expose a stor0.40 tagged VLAN subinterface for NFS.
+  - K8s worker VMs each have a SECOND NIC on VLAN 40 for CSI-NFS PV access.
+  - Address range convention:
       .100-.103  -> Prod (host + 3 workers)
       .110       -> Dev Proxmox host
       .120       -> NAS
-      .201-.203  -> Dev workers (separated from .101-.103 to avoid any
-                    accidental collision with Prod worker IPs)
+      .201-.203  -> Dev workers (separated from .101-.103 to avoid collision)
   - No DNS hostnames for storage-plane interfaces — IP only.
 
 ================================================================================
-                         PRODUCTION SERVICE PLANE
+                         SERVICE PLANE (PROD 50-55 / DEV 60-65)
 ================================================================================
 
-VLAN 50 - Identity (10.0.50.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.50.1     | -                           | MikroTik
-FreeIPA             | 10.0.50.10    | freeipa.lab.local           | VM
+Prod and dev use identical structure — prod at 10.0.5X, dev at 10.0.6X.
 
-VLAN 51 - K8s Control Plane (10.0.51.0/24)
+Identity (VLAN 50 / 60)
 -------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.51.1     | -                           | MikroTik
-K8s Master 1        | 10.0.51.10    | k8s-master1.lab.local       | VM
-K8s Master 2        | 10.0.51.11    | k8s-master2.lab.local       | VM
-K8s Master 3        | 10.0.51.12    | k8s-master3.lab.local       | VM
-K8s API VIP         | 10.0.51.100   | k8s-api.lab.local           | VIP
+Role                | Prod IP       | Dev IP        | Hostname          | Type
+--------------------|---------------|---------------|-------------------|------
+Gateway             | 10.0.50.1     | 10.0.60.1     | -                 | MikroTik
+FreeIPA             | 10.0.50.10    | 10.0.60.10    | freeipa.lab.local | VM
 
-VLAN 52 - Vault (10.0.52.0/24)
+K8s Control Plane (VLAN 51 / 61)
 -------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.52.1     | -                           | MikroTik
-Vault Node 1        | 10.0.52.10    | vault1.lab.local            | LXC
-Vault Node 2        | 10.0.52.11    | vault2.lab.local            | LXC
-Vault Node 3        | 10.0.52.12    | vault3.lab.local            | LXC
-Vault VIP           | 10.0.52.100   | vault.lab.local             | VIP
+Role                | Prod IP       | Dev IP        | Hostname              | Type
+--------------------|---------------|---------------|-----------------------|------
+Gateway             | 10.0.51.1     | 10.0.61.1     | -                     | MikroTik
+K8s Master 1        | 10.0.51.10    | 10.0.61.10    | k8s-master1.lab.local | VM
+K8s Master 2        | 10.0.51.11    | 10.0.61.11    | k8s-master2.lab.local | VM
+K8s Master 3        | 10.0.51.12    | 10.0.61.12    | k8s-master3.lab.local | VM
+K8s API VIP         | 10.0.51.100   | 10.0.61.100   | k8s-api.lab.local     | VIP
 
-VLAN 53 - Management (10.0.53.0/24)
+Vault (VLAN 52 / 62)
 -------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.53.1     | -                           | MikroTik
-Ansible             | 10.0.53.10    | ansible.lab.local           | LXC
-Local Runner        | 10.0.53.20    | local-runner.lab.local      | LXC
+Role                | Prod IP       | Dev IP        | Hostname              | Type
+--------------------|---------------|---------------|-----------------------|------
+Gateway             | 10.0.52.1     | 10.0.62.1     | -                     | MikroTik
+Vault Node 1        | 10.0.52.10    | 10.0.62.10    | vault1.lab.local      | LXC
+Vault Node 2        | 10.0.52.11    | 10.0.62.11    | vault2.lab.local      | LXC
+Vault Node 3        | 10.0.52.12    | 10.0.62.12    | vault3.lab.local      | LXC
+Vault VIP           | 10.0.52.100   | 10.0.62.100   | vault.lab.local       | VIP
 
-Note: Prometheus, Grafana, Loki, FluxCD run as pods on K8s workers (VLAN 54).
-
-VLAN 54 - K8s Data Plane (10.0.54.0/24)
+Management (VLAN 53 / 63)
 -------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.54.1     | -                           | MikroTik
-K8s Worker 1        | 10.0.54.10    | k8s-worker1.lab.local       | VM
-K8s Worker 2        | 10.0.54.11    | k8s-worker2.lab.local       | VM
-K8s Worker 3        | 10.0.54.12    | k8s-worker3.lab.local       | VM
+Role                | Prod IP       | Dev IP        | Hostname                | Type
+--------------------|---------------|---------------|-------------------------|------
+Gateway             | 10.0.53.1     | 10.0.63.1     | -                       | MikroTik
+Ansible             | 10.0.53.10    | 10.0.63.10    | ansible.lab.local       | LXC
+Local Runner        | 10.0.53.20    | 10.0.63.20    | local-runner.lab.local  | LXC
+
+Note: Prometheus, Grafana, Loki, FluxCD run as pods on K8s workers (VLAN 54/64).
+
+K8s Data Plane (VLAN 54 / 64)
+-------------------------------------------------------------------------------
+Role                | Prod IP       | Dev IP        | Hostname               | Type
+--------------------|---------------|---------------|------------------------|------
+Gateway             | 10.0.54.1     | 10.0.64.1     | -                      | MikroTik
+K8s Worker 1        | 10.0.54.10    | 10.0.64.10    | k8s-worker1.lab.local  | VM
+K8s Worker 2        | 10.0.54.11    | 10.0.64.11    | k8s-worker2.lab.local  | VM
+K8s Worker 3        | 10.0.54.12    | 10.0.64.12    | k8s-worker3.lab.local  | VM
 
 Each worker also has a second NIC on VLAN 40 for NFS/CSI access:
-  Worker 1  <->  10.0.40.101   (storage plane)
-  Worker 2  <->  10.0.40.102   (storage plane)
-  Worker 3  <->  10.0.40.103   (storage plane)
+  Prod:  10.0.40.101 / .102 / .103
+  Dev:   10.0.40.201 / .202 / .203
 
-Pods running on workers:
-- Worker 1: Prometheus, Grafana
-- Worker 2: NGINX Ingress, Loki
-- Worker 3: Helm, FluxCD
-
-VLAN 55 - DMZ (10.0.55.0/24)
+DMZ (VLAN 55 / 65)
 -------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.55.1     | -                           | MikroTik
-NGINX               | 10.0.55.10    | ex-nginx.lab.local          | LXC
-
-================================================================================
-                         DEVELOPMENT SERVICE PLANE
-================================================================================
-
-VLAN 60 - Identity (10.0.60.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.60.1     | -                           | MikroTik
-FreeIPA             | 10.0.60.10    | freeipa.lab.local           | VM
-
-VLAN 61 - K8s Control Plane (10.0.61.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.61.1     | -                           | MikroTik
-K8s Master 1        | 10.0.61.10    | k8s-master1.lab.local       | VM
-K8s Master 2        | 10.0.61.11    | k8s-master2.lab.local       | VM
-K8s Master 3        | 10.0.61.12    | k8s-master3.lab.local       | VM
-K8s API VIP         | 10.0.61.100   | k8s-api.lab.local           | VIP
-
-VLAN 62 - Vault (10.0.62.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.62.1     | -                           | MikroTik
-Vault Node 1        | 10.0.62.10    | vault1.lab.local            | LXC
-Vault Node 2        | 10.0.62.11    | vault2.lab.local            | LXC
-Vault Node 3        | 10.0.62.12    | vault3.lab.local            | LXC
-Vault VIP           | 10.0.62.100   | vault.lab.local             | VIP
-
-VLAN 63 - Management (10.0.63.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.63.1     | -                           | MikroTik
-Ansible             | 10.0.63.10    | ansible.lab.local           | LXC
-Local Runner        | 10.0.63.20    | local-runner.lab.local      | LXC
-
-Note: Prometheus, Grafana, Loki, FluxCD run as pods on K8s workers (VLAN 64).
-
-VLAN 64 - K8s Data Plane (10.0.64.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.64.1     | -                           | MikroTik
-K8s Worker 1        | 10.0.64.10    | k8s-worker1.lab.local       | VM
-K8s Worker 2        | 10.0.64.11    | k8s-worker2.lab.local       | VM
-K8s Worker 3        | 10.0.64.12    | k8s-worker3.lab.local       | VM
-
-Each worker also has a second NIC on VLAN 40 for NFS/CSI access:
-  Worker 1  <->  10.0.40.201   (storage plane)
-  Worker 2  <->  10.0.40.202   (storage plane)
-  Worker 3  <->  10.0.40.203   (storage plane)
-
-Pods running on workers:
-- Worker 1: Prometheus, Grafana
-- Worker 2: NGINX Ingress, Loki
-- Worker 3: Helm, FluxCD
-
-VLAN 65 - DMZ (10.0.65.0/24)
--------------------------------------------------------------------------------
-Role                | IP Address    | Hostname                    | Type
---------------------|---------------|-----------------------------|-----------
-Gateway             | 10.0.65.1     | -                           | MikroTik
-NGINX               | 10.0.65.10    | ex-nginx.lab.local          | LXC
+Role                | Prod IP       | Dev IP        | Hostname              | Type
+--------------------|---------------|---------------|-----------------------|------
+Gateway             | 10.0.55.1     | 10.0.65.1     | -                     | MikroTik
+NGINX               | 10.0.55.10    | 10.0.65.10    | ex-nginx.lab.local    | LXC
 
 ================================================================================
                               IP ALLOCATION SUMMARY
@@ -200,20 +126,11 @@ Range           | Purpose                     | Environment
 ----------------|-----------------------------|---------------------------------
 10.0.5.0/24     | Management (WiFi)           | Shared (not in IPA domain)
 10.0.40.0/24    | Storage (isolated L2)       | Shared (no hostnames)
-----------------|-----------------------------|---------------------------------
-10.0.50.0/24    | Identity (FreeIPA)          | PROD
-10.0.51.0/24    | K8s Control Plane           | PROD
-10.0.52.0/24    | Secrets (Vault)             | PROD
-10.0.53.0/24    | Management (Ansible, CI/CD) | PROD
-10.0.54.0/24    | K8s Data Plane              | PROD
-10.0.55.0/24    | DMZ (NGINX)                 | PROD
-----------------|-----------------------------|---------------------------------
-10.0.60.0/24    | Identity (FreeIPA)          | DEV
-10.0.61.0/24    | K8s Control Plane           | DEV
-10.0.62.0/24    | Secrets (Vault)             | DEV
-10.0.63.0/24    | Management (Ansible, CI/CD) | DEV
-10.0.64.0/24    | K8s Data Plane              | DEV
-10.0.65.0/24    | DMZ (NGINX)                 | DEV
+10.0.50-55.0/24 | Service Plane               | PROD
+10.0.60-65.0/24 | Service Plane               | DEV
+
+Per-env VLAN breakdown: X0=Identity, X1=K8s Control, X2=Vault,
+X3=Management, X4=K8s Data, X5=DMZ
 
 ================================================================================
                               RESOURCE TYPES
@@ -231,11 +148,8 @@ LXCs (on Proxmox):
 - NGINX reverse proxy
 
 Pods (on K8s Workers):
-- Prometheus (metrics)
-- Grafana (dashboards)
-- Loki (log aggregation)
-- FluxCD (GitOps CD)
-- Helm (package management)
+- Prometheus, Grafana, Loki (monitoring)
+- FluxCD (GitOps), Helm (packages)
 - NGINX Ingress (K8s ingress controller)
 
 ================================================================================

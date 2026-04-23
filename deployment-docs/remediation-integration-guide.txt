@@ -321,7 +321,7 @@ Remediation is last because every dependency above it must be up:
 | Helper script (Vault policy/role)  | kubernetes/docs/vault-pod-setup.sh                                  |
 | Vault injection pattern            | vault-k8s-integration-guide.txt                                     |
 | Vault overview (layer map)         | vault-overview.md                                                   |
-| DR test for this system            | disaster-recovery/tmp-partial-worker-loss.md                        |
+| DR test for this system            | disaster-recovery/worker-2of3-down.md                               |
 | TS case — vault injection ns issue | troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md |
 
 Prod mirror: same paths under kubernetes/prod/, ansible/prod/.

@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / FluxCD
 Sub-techs: FluxCD Kustomization, HelmRelease, CRD ordering, ServiceMonitor,
            kube-prometheus-stack, dependsOn, GitOps

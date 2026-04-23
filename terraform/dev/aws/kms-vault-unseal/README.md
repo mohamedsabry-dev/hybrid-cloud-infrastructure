@@ -4,6 +4,9 @@ Provisions the AWS-side pieces Vault needs for auto-unseal: the KMS key,
 a dedicated IAM user, and two Secrets Manager entries holding the IAM
 credentials and the Vault recovery keys.
 
+For the "why" — KMS vs Shamir, dedicated user, key policy tiers, recovery
+key storage — see [`DESIGN.md`](DESIGN.md).
+
 ---
 
 ## Resources
@@ -39,6 +42,7 @@ by `vault operator init` must be stored here. Procedure + commands:
 
 ## Related
 
+- [`DESIGN.md`](DESIGN.md) — KMS auto-unseal rationale, key policy tiers, recovery key storage
 - [`../vault-trust/`](../vault-trust/) — the OTHER Vault-AWS integration (AWS Secrets Engine for etcd-backup)
 - [`../../../../.github/workflows/dev-aws-kms-vault-unseal.yml`](../../../../.github/workflows/dev-aws-kms-vault-unseal.yml) — apply workflow (runs on `dev-security` branch, elevated privileges)
 - [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md) — how Vault consumes this

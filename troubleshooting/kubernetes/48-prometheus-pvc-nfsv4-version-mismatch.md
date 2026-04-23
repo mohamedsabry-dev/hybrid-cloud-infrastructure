@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author: Sabry
 Domain: Kubernetes / Storage / NFS
 Sub-techs: CSI NFS driver, StorageClass mountOptions, PV immutability,
            NFS version auto-negotiation, NFSv3 vs NFSv4.2, Prometheus TSDB,

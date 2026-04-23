@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes
 Sub-techs: Pod priority classes, preemption, eviction order, DR readiness,
            Vault Injector, Ingress NGINX, Flux, MariaDB, WordPress

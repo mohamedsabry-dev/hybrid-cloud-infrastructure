@@ -332,7 +332,7 @@ decision is in the Ingress CRD.
 | FreeIPA overview (DNS + deps)    | freeipa-overview.md                                                     |
 | Vault injection pattern          | vault-k8s-integration-guide.txt                                         |
 | Vault overview (layer map)       | vault-overview.md                                                       |
-| DR test (IPA-down DNS cascade)   | disaster-recovery/ipa-domain-down-dr-test.md                            |
+| DR test (IPA-down DNS cascade)   | disaster-recovery/network-ipa-dns-outage.md                             |
 
 Prod mirror: same paths under ansible/prod/, kubernetes/prod/, terraform/prod/.
 
@@ -375,4 +375,4 @@ Short version (full detail in freeipa-overview.md):
            dns_fallback.yml has been applied
   - external clients → *.lab.local fails (no fallback answers the zone)
 
-See: disaster-recovery/ipa-domain-down-dr-test.md, TS-K8S-033, TS-K8S-034, TS-LNX-003.
+See: disaster-recovery/network-ipa-dns-outage.md, TS-K8S-033, TS-K8S-034, TS-LNX-003.

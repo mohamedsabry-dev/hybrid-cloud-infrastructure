@@ -1,6 +1,4 @@
 # TS-IDN-009 | 2026-04-15 | RESOLVED
-# NOTE: Duplicate ID — this ticket conflicts with TS-IDN-009 (2026-03-20 keytab case).
-# Needs renumbering before filing.
 _____________________________________________________________________
 
 [Info]
@@ -194,4 +192,4 @@ Related files:
   /etc/ssh/ssh_config.d/04-ipa.conf
   /usr/bin/sss_ssh_knownhosts
   ansible/dev/inventory/first_setup_inventory.ini
-  disaster-recovery/tmp-ipa-domain-down-part1.md
+  disaster-recovery/network-ipa-dns-outage.md

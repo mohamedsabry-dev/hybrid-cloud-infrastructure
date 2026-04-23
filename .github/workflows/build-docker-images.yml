@@ -1,6 +1,6 @@
 # Builds & pushes Docker images to GHCR on changes under kubernetes/docker-images/
 # each image has its own job, only triggers if its directory changed (or manual dispatch)
-# Images are generic, After push i set it as public from gh.
+# Images are generic and contain no sensitive data — set to public on GHCR after push.
 # related images: kubernetes/docker-images/remediation/ | kubernetes/docker-images/etcd-backup/
 name: Build Docker Images
 

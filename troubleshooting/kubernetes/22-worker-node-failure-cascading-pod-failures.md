@@ -3,7 +3,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes
 Sub-techs: Worker node failure, StatefulSet recovery, Vault Agent Injector race condition,
            CSI-NFS transient failure, force delete, PodDisruptionBudget, nodeSelector

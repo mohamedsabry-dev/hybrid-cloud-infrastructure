@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Networking / VPN
 Sub-techs: WireGuard, CGNAT, AWS EIP, NAT timeout, tunnel routing, AllowedIPs,
            ER605, MikroTik, AWS EC2, keepalive service, systemd

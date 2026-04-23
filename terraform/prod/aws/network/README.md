@@ -4,6 +4,9 @@ Provisions the core AWS networking for the hybrid-cloud environment: VPC,
 Internet Gateway, public subnet (VPN-facing), management subnet, and the
 public route table.
 
+For the "why" — VPC CIDR scheme, subnet split, Route53 private zone — see
+[`DESIGN.md`](DESIGN.md).
+
 ---
 
 ## Resources
@@ -48,5 +51,6 @@ public route table.
 
 ## Related
 
+- [`DESIGN.md`](DESIGN.md) — VPC CIDR scheme, subnet split, Route53 private zone reasoning
 - [`../../../../.github/workflows/prod-aws-network.yml`](../../../../.github/workflows/prod-aws-network.yml) — apply workflow
 - [`../../../../deployment-docs/network-setup-guide.txt`](../../../../deployment-docs/network-setup-guide.txt) — broader network setup (on-prem + AWS)

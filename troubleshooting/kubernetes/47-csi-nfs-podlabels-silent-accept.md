@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author: Sabry
 Domain: Kubernetes / Helm / FluxCD
 Sub-techs: HelmRelease values, Helm chart values schema, podLabels vs customLabels,
            Deployment matchLabels, label selector dependency chain, rolling restart

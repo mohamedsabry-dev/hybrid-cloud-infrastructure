@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Monitoring
 Sub-techs: Grafana, Loki, Promtail, kube-prometheus-stack, loki-stack,
            HelmRelease, datasource health check, version compatibility

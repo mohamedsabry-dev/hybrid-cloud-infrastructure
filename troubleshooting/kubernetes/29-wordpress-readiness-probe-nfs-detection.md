@@ -2,7 +2,6 @@
 _____________________________________________________________________
 
 [Info]
-Author:
 Domain: Kubernetes / Storage
 Sub-techs: Readiness probe, Liveness probe, NFS storage failure detection,
            WordPress deployment, Service endpoints, Ingress NGINX
