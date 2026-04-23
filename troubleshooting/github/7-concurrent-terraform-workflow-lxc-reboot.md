@@ -1,140 +1,181 @@
 # TS-GH-007 | 2026-03-20 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: GitHub Actions workflows + Terraform + Proxmox LXC
-- Environment: Prod (pve-prod, CT 2001/2002/2003)
-- Related components: Vault setup workflow, Ansible/Local Runner deploy workflows
+[Info]
+Domain: GitHub Actions / Terraform
+Sub-techs: Terraform LXC mount points, GitHub Actions concurrency, SSH disconnect, Proxmox API
+Environment: Prod | pve-prod | CT 2001/2002/2003
+Re-opened: No
 
-## 2. Issue
-- Symptom: Vault setup workflow failed with `exit code 255` (SSH connection closed). Interactive SSH sessions also disconnecting unexpectedly.
-- Error:
-```
-TASK [Install Vault] ***********************************************************
-Connection to 10.0.53.10 closed by remote host.
-Error: Process completed with exit code 255.
-```
+_____________________________________________________________________
 
-```
-[root@ansible prod]# Connection to ansible-prod closed by remote host.
-Connection to ansible-prod closed.
-```
+[Issue Description]
+Vault setup workflow failed with exit code 255 — SSH connection closed mid-playbook.
+Interactive SSH sessions to ansible-prod also disconnecting unexpectedly at same time.
 
-## 3. Analysis
+  TASK [Install Vault]
+  Connection to 10.0.53.10 closed by remote host.
+  Error: Process completed with exit code 255.
 
-**Check 1: SSH server config (timeout?)**
-```bash
-grep -E "ClientAlive|TCPKeepAlive" /etc/ssh/sshd_config
-```
-Finding: All settings commented out (defaults). Not the cause.
+_____________________________________________________________________
 
-**Check 2: SSH disconnect logs**
-```bash
-tail -100 /var/log/secure | grep -i "closed\|disconnect\|timeout"
-```
-```
-Mar 20 17:45:27 ansible sshd-session[290]: Received disconnect from 192.168.100.223 port 58886:11: disconnected by user
-Mar 20 17:45:27 ansible sshd-session[290]: Disconnected from user root 192.168.100.223 port 58886
-```
-Finding: Disconnect code 11 = `SSH_DISCONNECT_BY_APPLICATION`. Client side closed, not server timeout.
+[Analysis]
 
-**Check 3: System journal for boot events**
-```bash
-journalctl --since "1 hour ago" | grep -i ansible
-```
-```
-Mar 20 17:45:14 ansible systemd-journald[124]: Journal started
-Mar 20 17:45:15 ansible systemd[1]: Startup finished in 1.073s.
-```
-Finding: The ansible LXC **rebooted** at 17:45:14.
+# Initial Check Notes:
+First checked SSH server config for timeout settings — ruled out server-side disconnect.
 
-**Check 4: Reboot history**
-```bash
-last reboot
-```
-```
-reboot   system boot  6.17.9-1-pve     Fri Mar 20 17:45   still running
-reboot   system boot  6.17.9-1-pve     Fri Mar 20 17:14 - 17:45  (00:30)
-```
-Finding: LXC ran only 30 minutes before rebooting.
+Command:
+  grep -E "ClientAlive|TCPKeepAlive" /etc/ssh/sshd_config
 
-**Check 5: Proxmox task log**
+Output:
+  All settings commented out (defaults). Not the cause.
 
-| Time | Node | User | Description | Status |
-|------|------|------|-------------|--------|
-| Mar 20 17:45:11 - 17:45:14 | pve-prod | tf_prod@pve | CT 2001 - Reboot | OK |
-| Mar 20 17:52:47 - 17:52:50 | pve-prod | tf_prod@pve | CT 2002 - Reboot | OK |
-| Mar 20 17:56:56 - 17:56:59 | pve-prod | tf_prod@pve | CT 2003 - Reboot | OK |
+Checked SSH logs for disconnect reason:
 
-Finding: User `tf_prod@pve` = Terraform API token. **Terraform triggered the reboots.**
+Command:
+  tail -100 /var/log/secure | grep -i "closed|disconnect|timeout"
 
-## 4. Root Cause
-> Multiple GitHub workflows ran concurrently. Terraform workflows applied `backup = true` mount point changes to LXCs, which requires container restart. The ansible LXC reboot at 17:45 killed the SSH session running the vault playbook, causing exit code 255.
+Output:
+  Received disconnect from 192.168.100.223 port 58886:11: disconnected by user
+  Disconnect code 11 = SSH_DISCONNECT_BY_APPLICATION — client side closed, not server timeout.
 
-**Why Terraform rebooted LXCs:**
-```hcl
-mount_point {
-  path   = "/srv/repo"
-  volume = "local-lvm:vm-2001-repo"
-  backup = true  # ← This change requires LXC restart
-}
-```
+Checked system journal for what happened at disconnect time:
 
-## 5. Solution
-> Wait for infrastructure workflows to complete before running service deployments. Use concurrency controls.
+Command:
+  journalctl --since "1 hour ago" | grep -i ansible
 
-**Immediate fix:**
-1. Wait for all mount point update workflows to complete
-2. Re-run vault setup workflow (idempotent)
+Output:
+  Mar 20 17:45:14 ansible systemd-journald[124]: Journal started
+  Mar 20 17:45:15 ansible systemd[1]: Startup finished in 1.073s.
 
-**Prevention - Option 1: Workflow concurrency**
-```yaml
-concurrency:
-  group: prod-infrastructure
-  cancel-in-progress: false
-```
+The ansible LXC rebooted at 17:45:14 — right when the SSH session dropped.
 
-**Prevention - Option 2: Repository lock variables**
-Use existing lock pattern (`DEV_INFRA_*_LOCK`) to prevent concurrent infrastructure changes.
+Confirmed reboot timing:
 
-**Prevention - Option 3: Operational awareness**
-Before running service workflows, check if infrastructure workflows are pending/running.
+Command:
+  last reboot
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Concurrency controls may queue workflows longer
+Output:
+  reboot  system boot  6.17.9-1-pve  Fri Mar 20 17:45  still running
+  reboot  system boot  6.17.9-1-pve  Fri Mar 20 17:14 - 17:45  (00:30)
 
-## 7. Impact After Fix
-- Observed: Vault setup workflow succeeded on re-run
-- No concurrent infrastructure changes during service deployments
+LXC had only been running 30 minutes before it rebooted.
 
-## 8. Notes
 
-**Investigation flow for "Connection Closed" errors:**
-```
-1. Exit code 255? → SSH connection issue
-        ↓
-2. Check /var/log/secure → "disconnected by user" code 11?
-        ↓
-   Yes → Client side closed (not server timeout)
-        ↓
-3. Check journalctl → "Journal started" recently?
-        ↓
-   Yes → System rebooted!
-        ↓
-4. Check `last reboot` → Confirm timing
-        ↓
-5. Check Proxmox Tasks → WHO triggered reboot?
-        ↓
-   tf_*@pve → Terraform did it
-        ↓
-6. Check GitHub Actions → Which workflow ran terraform apply?
-```
+# Suspected Root Cause
+Something triggered a reboot of the ansible LXC at exactly the time the vault
+playbook was running. Needed to identify what triggered the reboot.
 
-**Key learnings:**
-1. Terraform LXC modifications (mount points, memory, CPU) trigger reboots
-2. Exit code 255 = SSH connection closed - look for what killed it
-3. `tf_*@pve` user = Terraform action
-4. `last reboot` is fastest way to confirm container restart
 
-## 9. Workaround (if any)
-> Re-run failed workflow after infrastructure changes complete. Vault/Ansible playbooks are idempotent.
+# More Checks Notes:
+Checked Proxmox task log to find who triggered the reboot.
+
+Output:
+  Mar 20 17:45:11 - 17:45:14  pve-prod  tf_prod@pve  CT 2001 - Reboot  OK
+  Mar 20 17:52:47 - 17:52:50  pve-prod  tf_prod@pve  CT 2002 - Reboot  OK
+  Mar 20 17:56:56 - 17:56:59  pve-prod  tf_prod@pve  CT 2003 - Reboot  OK
+
+User tf_prod@pve = Terraform API token. Terraform triggered all three reboots.
+
+Terraform was applying a mount point change with backup = true:
+  mount_point {
+    path   = "/srv/repo"
+    volume = "local-lvm:vm-2001-repo"
+    backup = true   ← this change requires LXC restart
+  }
+
+Multiple GitHub workflows ran concurrently — Terraform infrastructure workflow
+applied mount point changes while vault setup workflow was mid-execution over SSH.
+Terraform reboot killed the SSH session.
+
+
+# Suspected Root Cause
+Concurrent GitHub workflows. Terraform applied backup = true mount point changes
+to LXCs — this requires a container restart. The reboot killed the active SSH
+session running the vault playbook. Exit code 255 = SSH connection lost.
+
+
+# More Checks Notes:
+Confirmed which GitHub workflow triggered the Terraform apply by cross-referencing
+workflow run timestamps with Proxmox task log timestamps.
+
+Output:
+  Timestamps matched — Terraform infrastructure workflow ran concurrently with
+  vault setup workflow, no concurrency controls in place.
+
+
+# Suspected Solution
+Wait for all infrastructure workflows to complete before running service deployments.
+Re-run vault setup workflow — playbook is idempotent.
+
+
+# Test
+Waited for mount point update workflows to finish, re-ran vault setup workflow.
+
+Result: PASS — vault setup completed successfully with no SSH disconnects.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Multiple GitHub workflows ran concurrently without concurrency controls. Terraform
+infrastructure workflow applied backup = true to LXC mount points, which requires
+container restart. The ansible LXC (CT 2001) rebooted at 17:45:14 while the vault
+setup playbook was actively running over SSH. The reboot closed the SSH connection
+mid-task — exit code 255.
+
+_____________________________________________________________________
+
+[Final Solution]
+Immediate: waited for infrastructure workflows to complete, re-ran vault setup.
+Playbooks are idempotent — safe to re-run.
+
+Prevention options:
+
+  Option 1: Workflow concurrency groups
+    concurrency:
+      group: prod-infrastructure
+      cancel-in-progress: false
+    (queues workflows instead of running in parallel)
+
+  Option 2: Repository lock variables
+    Use existing lock pattern (DEV_INFRA_*_LOCK) to prevent concurrent
+    infrastructure changes during service deployments.
+
+  Option 3: Operational awareness
+    Before running service workflows, confirm no infrastructure workflows
+    are pending or running.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Concurrency controls may queue workflows longer but prevent mid-run
+infrastructure changes from killing active SSH sessions.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Terraform LXC changes that trigger reboots:
+  - mount_point backup = true/false changes
+  - Memory or CPU changes
+  - Other resource modifications depending on Proxmox provider behavior
+
+Investigation flow for exit code 255 / connection closed errors:
+  1. Exit code 255         → SSH connection dropped, not a task failure
+  2. /var/log/secure       → disconnect code 11 = client side closed
+  3. journalctl            → "Journal started" recently = system rebooted
+  4. last reboot           → confirm timing matches disconnect
+  5. Proxmox task log      → who triggered the reboot
+  6. tf_*@pve user         → Terraform did it
+  7. GitHub Actions runs   → which workflow ran terraform apply concurrently
+
+Key: tf_*@pve in Proxmox task log = Terraform API token action.
+     last reboot is the fastest way to confirm container restart.

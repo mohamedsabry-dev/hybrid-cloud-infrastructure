@@ -1,38 +1,30 @@
 # Proxmox Disaster Recovery
 
-Guides and scripts for disaster recovery scenarios.
+Host-layer operational runbooks and prevention scripts for the Proxmox hypervisors. Specific to failures at the laptop / hardware / electricity / thermal / reinstall level — the foundation everything else sits on.
 
-## Categories
+> **Design notes & reasoning** — for the scope boundary between this folder and the repo-level [`/disaster-recovery/`](../../disaster-recovery/) (platform-wide chaos test plans + results), and why each subfolder is here, see [`DESIGN.md`](DESIGN.md).
 
-| Folder | Scenario | Description |
-|--------|----------|-------------|
-| [power/](power/) | Power Outage | UPS monitoring, auto-shutdown on battery |
-| [hardware/](hardware/) | Hardware Failure | Replace failed adapters, disks, components |
-| [recovery/](recovery/) | Full Recovery | Reinstall Proxmox, restore config, import VMs |
+---
 
-## Quick Links
+## Subfolders
 
-### Power Outage
-- [UPS Monitor Script](power/dr_ups_monitor.sh) - Auto-shutdown when battery low
-- [UPS Setup Guide](power/README.md) - Installation and configuration
+| Folder | Scenario | What it contains |
+|--------|----------|------------------|
+| [`power/`](power/) | Power / battery loss | UPS (laptop battery) monitor — graceful shutdown on sustained discharge |
+| [`thermal/`](thermal/) | CPU temperature | Temperature monitor — email at 75 °C, graceful shutdown at 80 °C |
+| [`hardware/`](hardware/) | Hardware failure | Runbook for USB-Ethernet adapter replacement (MAC mapping, safe order) |
+| [`recovery/`](recovery/) | Full host rebuild | Runbook for reinstalling Proxmox from scratch + restoring config + VMs |
 
-### Hardware Failure
-- [USB-Ethernet Adapter Replacement](hardware/usb-ethernet-adapter-replacement.md) - Replace failed network adapters
-
-### Full System Recovery
-- [Recovery Guide](recovery/README.md) - Complete Proxmox reinstall and restore
-
-## Prevention
+## Prevention (what's already running)
 
 | Item | Location | Purpose |
 |------|----------|---------|
-| Config backup | `proxmox/backup/backup-proxmox-config.sh` | Backup Proxmox config to NAS |
-| VM backups | Proxmox vzdump | Scheduled VM/CT backups |
+| Config backup | [`../backup/proxmox_backup/backup-proxmox-config.sh`](../backup/proxmox_backup/backup-proxmox-config.sh) | Tarball of `/etc/pve` + essentials, pushed to NAS |
+| VM / LXC backups | Proxmox `vzdump` job | Scheduled backups to NAS — see [`../backup/`](../backup/) |
 | Spare adapters | Physical | Keep spare USB-Ethernet adapters ready |
+| UPS monitor | [`power/dr_ups_monitor.sh`](power/dr_ups_monitor.sh) | Auto graceful shutdown on battery discharge |
+| Temperature monitor | [`thermal/draft-temperature_monitor.sh`](thermal/draft-temperature_monitor.sh) | Draft — known bugs, see [`thermal/TODO.md`](thermal/TODO.md) |
 
-## Emergency Contacts
+## Not here
 
-Update with your relevant contacts:
-- Network admin: -
-- Storage admin: -
-- Cloud (AWS): -
+Platform-wide chaos test plans and results (k8s, Vault, etcd, NFS, Nginx, IPA, etc.) live in [`/disaster-recovery/`](../../disaster-recovery/). See [`DESIGN.md`](DESIGN.md) for the exact boundary.

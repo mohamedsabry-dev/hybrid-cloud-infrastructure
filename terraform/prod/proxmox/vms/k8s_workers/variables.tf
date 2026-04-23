@@ -45,7 +45,7 @@ variable "k8s_worker1" {
     ip2            = "10.0.40.101/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
-    startup_delay  = 60      # Wait 60s after masters boot to ensure control plane is ready
+    startup_delay  = 0       # All workers start together (60s delay is on master3)
     shutdown_delay = 60
     startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true

@@ -1,220 +1,188 @@
 # TS-TF-010 | 2026-03-27 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform with bpg/proxmox provider, cloud-init
-- Environment: Dev/Prod (pve-dev, pve-prod), FreeIPA with SSSD
-- Related components: K8s workers (1020, 1021, 1022), SSH host keys, FreeIPA/SSSD
+[Info]
+Domain: Terraform / Proxmox / Identity
+Sub-techs: cloud-init, SSH host keys, FreeIPA/SSSD KnownHostsCommand,
+           Proxmox backup restore, K8s worker recovery
+Environment: DEV & PROD | pve-dev, pve-prod | K8s workers (VM 1020, 1021, 1022)
+Re-opened: No
 
-## 2. Issue
-- Symptom: After updating K8s worker VMs via Terraform (adding second network interface and ip_config as per TS-TF-009), SSH connections to workers fail
-- Error:
-```
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
-...
-Offending ED25519 key in KnownHostsCommand-HOSTNAME:3
-Host key for k8s-worker1 has changed and you have requested strict checking.
-Host key verification failed.
-```
+_____________________________________________________________________
 
-**Affected Systems:**
-- Ansible automation (SSH to workers)
-- FreeIPA/SSSD host key verification
-- Any system with stored known_hosts for workers
-- Domain user SSH access (super_bot, etc.)
+[Issue Description]
+After updating K8s worker VMs via Terraform (adding second network interface and
+ip_config per TS-TF-009), SSH connections to all workers fail.
 
-## 3. Analysis
+  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+  Offending ED25519 key in KnownHostsCommand-HOSTNAME:3
+  Host key for k8s-worker1 has changed and you have requested strict checking.
+  Host key verification failed.
 
-**What Happened:**
-1. Terraform updated cloud-init configuration (added second `ip_config` for storage network)
-2. Cloud-init detected configuration change and re-ran initialization
-3. By default, cloud-init regenerates SSH host keys on each run
-4. New SSH host keys were generated, overwriting the original keys
-5. FreeIPA/SSSD still had old host keys stored
-6. SSH connections failed with "REMOTE HOST IDENTIFICATION HAS CHANGED" error
+Affected systems:
+  Ansible automation (SSH to workers)
+  FreeIPA/SSSD host key verification
+  Any system with stored known_hosts for workers
+  Domain user SSH access (super_bot etc.)
 
-**Terraform Configuration (initialization block):**
-```hcl
-initialization {
-  datastore_id = var.disks.os_disk.datastore_id
+_____________________________________________________________________
 
-  user_account {
-    keys     = [var.ansible_ssh_public_key]
-    username = "root"
-    password = var.vm_root_password
-  }
+[Analysis]
 
-  ip_config {
-    ipv4 {
-      address = var.k8s_worker1.ip
-      gateway = var.k8s_worker1.gateway
-    }
-  }
+# Initial Check Notes:
+Traced what changed after the Terraform apply from TS-TF-009.
 
-  ip_config {      # <-- This was added, triggering cloud-init re-run
+Sequence of events:
+  1. Terraform added second ip_config block to cloud-init initialization
+  2. Cloud-init detected configuration change and re-ran initialization on restart
+  3. By default, cloud-init regenerates SSH host keys on each run
+  4. New SSH host keys generated, overwriting original keys
+  5. FreeIPA/SSSD still had old host keys stored via KnownHostsCommand
+  6. SSH connections fail — host key does not match stored value
+
+The initialization block change that triggered this:
+  ip_config {     ← this was added (TS-TF-009)
     ipv4 {
       address = var.k8s_worker1.ip2
     }
   }
 
-  dns {
-    servers = var.dns_servers
-    domain  = var.search_domain
-  }
-}
-```
+Any change to the cloud-init initialization block causes cloud-init to re-run
+on next boot — including the SSH key regeneration step.
 
-## 4. Root Cause
-> Cloud-init re-runs when configuration changes and by default regenerates SSH host keys. After adding second `ip_config`, cloud-init detected the change and regenerated all SSH host keys, breaking authentication for clients that had the original keys stored.
 
-## 5. Solution
-> Restore original SSH keys from backup OR update FreeIPA with new keys.
+# Suspected Root Cause
+Cloud-init re-runs when its configuration changes and by default regenerates
+SSH host keys on each run. Adding the second ip_config triggered a re-run
+on VM restart, generating new host keys and invalidating all stored known_hosts
+entries on FreeIPA/SSSD and Ansible.
 
-### Option A: Update FreeIPA with New Keys (Quick Fix)
 
-If many systems depend on the keys, update the new keys everywhere:
+# More Checks Notes:
+Temporary SSH access during incident (bypasses host key check):
+  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker1
+  scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@ansible:/tmp/ssh_host_* /etc/ssh/
+  Or: Proxmox noVNC console with root password.
 
-```bash
-# On each worker (after kinit)
-ipa host-mod k8s-worker1.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
-ipa host-mod k8s-worker2.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
-ipa host-mod k8s-worker3.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+Two recovery options identified:
+  Option A: update FreeIPA with new keys (quick, but requires updating all dependents)
+  Option B: restore original keys from backup (preferred — no downstream updates needed)
 
-# Clear SSSD cache on clients
-sss_cache -E
-```
 
-### Option B: Restore Original Keys from Backup (Preferred)
+# Suspected Solution
+Restore original SSH host keys from Proxmox VM backup. One worker at a time
+to maintain K8s pod availability.
 
-Rollback to original keys so no downstream updates needed.
 
-**Procedure (per worker, one at a time to maintain pod availability):**
+# Test
+Restored original SSH keys on all 3 workers from NAS backup.
+Restarted sshd on each worker after key restoration.
 
-**1. Shutdown the affected K8s worker VM** (avoid network conflict)
-```bash
-qm stop 1020  # worker1
-```
+Command:
+  ssh root@k8s-worker1  (normal, no workaround flags)
 
-**2. Restore latest backup from NAS to new temporary VM ID**
-- Proxmox GUI: Backup → Restore to different VMID
+Result: PASS — SSH working normally on all workers, Ansible automation functional,
+FreeIPA/SSSD host key verification passing.
 
-**3. Start temporary VM, SCP the SSH host keys to ansible**
-```bash
-# From ansible or any accessible host
-scp root@<temp-vm-ip>:/etc/ssh/ssh_host_* /tmp/worker1_ssh_keys/
-```
+_____________________________________________________________________
 
-**4. Shutdown the temporary restored VM**
-```bash
-qm stop <temp-vmid>
-```
+[Final Root Cause]
+Cloud-init re-runs when its configuration changes. Default cloud-init behaviour
+includes SSH host key regeneration on each run. Adding a second ip_config block
+in the Terraform initialization block triggered a re-run on VM restart, generating
+new SSH host keys and breaking all clients that had the original keys stored via
+FreeIPA/SSSD KnownHostsCommand.
 
-**5. Start the real K8s worker**
-```bash
-qm start 1020
-```
+_____________________________________________________________________
 
-**6. Access worker with workaround and restore keys**
-```bash
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker1
+[Final Solution]
 
-# Backup current (broken) keys
-mkdir -p /root/ssh_keys_broken_backup
-mv /etc/ssh/ssh_host_* /root/ssh_keys_broken_backup/
+Option A — Update FreeIPA with new keys (quick fix, more dependencies):
+  ipa host-mod k8s-worker1.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+  ipa host-mod k8s-worker2.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+  ipa host-mod k8s-worker3.lab.local --sshpubkey="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
+  sss_cache -E   (on all clients to clear SSSD cache)
 
-# Copy original keys from ansible
-scp root@ansible:/tmp/worker1_ssh_keys/ssh_host_* /etc/ssh/
+Option B — Restore original keys from backup (preferred, used):
+  Do one worker at a time to maintain K8s pod availability.
 
-# Verify permissions (should be preserved from backup)
-ls -la /etc/ssh/ssh_host_*
+  Per worker procedure:
+    1. Shutdown affected K8s worker:
+       qm stop 1020
 
-# Restart SSH service
-systemctl restart sshd
-```
+    2. Restore latest NAS backup to a temporary VM ID:
+       Proxmox GUI → Backup → Restore → use different VMID
 
-**7. Verify normal SSH works**
-```bash
-# From ansible
-ssh root@k8s-worker1  # Should work without workaround
-```
+    3. Start temporary VM, SCP original SSH keys to ansible:
+       scp root@<temp-vm-ip>:/etc/ssh/ssh_host_* /tmp/worker1_ssh_keys/
 
-**8. Delete temporary VM**
-```bash
-qm destroy <temp-vmid>
-```
+    4. Shutdown temporary VM:
+       qm stop <temp-vmid>
 
-**9. Repeat for worker2 and worker3**
+    5. Start real K8s worker:
+       qm start 1020
 
-**10. Repeat for production environment**
+    6. Access worker using workaround flags, restore original keys:
+       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker1
+       mkdir -p /root/ssh_keys_broken_backup
+       mv /etc/ssh/ssh_host_* /root/ssh_keys_broken_backup/
+       scp root@ansible:/tmp/worker1_ssh_keys/ssh_host_* /etc/ssh/
+       systemctl restart sshd
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: VM downtime during key restoration (one worker at a time maintains K8s availability)
+    7. Verify normal SSH works (no workaround flags):
+       ssh root@k8s-worker1
 
-## 7. Impact After Fix
-- Observed: SSH connections to workers restored
-- FreeIPA/SSSD host key verification working
-- Ansible automation functional again
+    8. Delete temporary VM:
+       qm destroy <temp-vmid>
 
-## 8. Notes
+    9. Repeat for worker2 and worker3.
+    10. Repeat for production environment.
 
-### Temporary Access Workaround
+Prevention — configure golden image to preserve SSH keys:
+  Added to proxmox/golden_templates/golden-vm-setup.sh:
+    cat > /etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg << EOF
+    ssh_deletekeys: false
+    ssh_genkeytypes: []
+    EOF
 
-To access VMs while keys are mismatched:
-```bash
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker1
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker2
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@k8s-worker3
-```
+  All VMs cloned from this golden image will preserve SSH host keys across
+  cloud-init re-runs.
 
-To SCP files while keys are mismatched:
-```bash
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@ansible:/tmp/ssh_host_* /etc/ssh/
-```
+Verified: Yes
 
-Or via Proxmox console (noVNC) with root password.
+_____________________________________________________________________
 
-### Prevention Measures
+[Risk Level] LOW
+Note: VM downtime during key restoration is brief (one worker at a time).
+K8s pod availability maintained throughout.
 
-**1. Configure Golden Image to Preserve SSH Keys (Recommended)**
+_____________________________________________________________________
 
-Add to golden image template before converting to template:
-```bash
-cat > /etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg << EOF
-ssh_deletekeys: false
-ssh_genkeytypes: []
-EOF
-```
+[References]
+- TS-TF-009 — cloud-init update behaviour (change that triggered this incident)
+- /etc/ssh/ssh_config.d/04-ipa.conf — FreeIPA SSH known hosts config
+- proxmox/golden_templates/golden-vm-setup.sh — golden image with SSH key preservation
 
-This is configured in `proxmox/golden_templates/golden-vm-setup.sh`.
-All VMs cloned from this template will preserve their SSH host keys.
+_____________________________________________________________________
 
-**2. Backup SSH Keys Before Terraform Changes**
-```bash
-# Before applying cloud-init changes
-ssh root@k8s-worker1 "tar czf /tmp/ssh_host_keys.tar.gz /etc/ssh/ssh_host_*"
-scp root@k8s-worker1:/tmp/ssh_host_keys.tar.gz ./backup/worker1_ssh_keys.tar.gz
-```
+[Draft Notes]
 
-### Lessons Learned
+Key lessons:
+  1. Cloud-init re-runs on configuration change — SSH key regeneration is default
+  2. FreeIPA/SSSD KnownHostsCommand requires host keys to match stored values exactly
+  3. Always backup SSH host keys before any cloud-init changes
+  4. Test cloud-init changes on non-critical VMs before workers
+  5. Restore from backup is preferred over updating keys everywhere — fewer dependencies
+  6. Do one worker at a time to maintain K8s pod availability
+  7. Configure golden image with ssh_deletekeys: false before deploying new VMs
 
-1. Cloud-init re-runs when configuration changes, regenerating SSH host keys by default
-2. FreeIPA/SSSD KnownHostsCommand requires host keys to match stored values
-3. Always have recent backups before making cloud-init changes
-4. Test cloud-init changes on non-critical VMs first
-5. Consider disabling SSH key regeneration in cloud-init config
-6. Restore from backup is preferred over updating keys everywhere (fewer dependencies)
-7. Do one worker at a time to maintain K8s pod availability
+Backup SSH keys before Terraform cloud-init changes:
+  ssh root@k8s-worker1 "tar czf /tmp/ssh_host_keys.tar.gz /etc/ssh/ssh_host_*"
+  scp root@k8s-worker1:/tmp/ssh_host_keys.tar.gz ./backup/worker1_ssh_keys.tar.gz
 
-**Related:** TS-TF-009 (cloud-init update behavior) - the change that triggered this incident
-
-## 9. Workaround (if any)
-> Temporary SSH access: Use `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` flags, or access via Proxmox noVNC console.
-
-## Related Files
-- `terraform/dev/proxmox/vms/k8s_workers/main.tf` - Terraform VM config
-- `/etc/ssh/ssh_config.d/04-ipa.conf` - FreeIPA SSH known hosts config
-- `/etc/ssh/ssh_host_*` - SSH host key files
-- `proxmox/golden_templates/golden-vm-setup.sh` - Golden image setup with SSH key preservation
+Related files:
+  terraform/dev/proxmox/vms/k8s_workers/main.tf
+  /etc/ssh/ssh_host_*
+  proxmox/golden_templates/golden-vm-setup.sh

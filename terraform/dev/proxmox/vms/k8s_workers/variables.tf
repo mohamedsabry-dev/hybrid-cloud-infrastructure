@@ -37,7 +37,7 @@ variable "k8s_worker1" {
     vmid           = 1020
     name           = "k8s-worker1"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.10/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -45,7 +45,7 @@ variable "k8s_worker1" {
     ip2            = "10.0.40.201/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
-    startup_delay  = 60      # Wait 60s after masters boot to ensure control plane is ready
+    startup_delay  = 0       # All workers start together (60s delay is on master3)
     shutdown_delay = 60
     startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
@@ -83,7 +83,7 @@ variable "k8s_worker2" {
     vmid           = 1021
     name           = "k8s-worker2"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.11/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -129,7 +129,7 @@ variable "k8s_worker3" {
     vmid           = 1022
     name           = "k8s-worker3"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 3328  # 3.25GB
     ip             = "10.0.64.12/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"

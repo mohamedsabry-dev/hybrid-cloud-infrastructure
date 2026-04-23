@@ -95,6 +95,11 @@ Run:
   kubectl get pod -n etcd-backup -w
   kubectl logs -n etcd-backup -l app=etcd-backup -f
 ```
+etcd-20260410-170134.snap
+snap
+April 10, 2026, 19:01:36 (UTC+02:00)
+34.9 MB
+Standard
 
 # =============================================================================
 # LAYER 1: TERRAFORM (AWS Resources)

@@ -10,7 +10,7 @@ data:
     from proxmoxer import ProxmoxAPI
 
     # Configuration
-    CHECK_INTERVAL = 120        # 2 minutes between checks
+    CHECK_INTERVAL = 300        # 5 minutes between checks (prevents race during boot)
     REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
     PROXMOX_NODE = "pve-prod"
     NFS_STORAGE = "nas-prod-data"
@@ -119,10 +119,42 @@ data:
 
         return True, "OK"
 
+    def get_vm_status(proxmox, vmid):
+        """Get current VM status from Proxmox API."""
+        try:
+            status = proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.current.get()
+            return status.get("status", "unknown")
+        except Exception as e:
+            print(f"  -> Failed to get VM {vmid} status: {e}")
+            return "unknown"
+
+    def start_vm(proxmox, vmid):
+        """Start a stopped VM."""
+        print(f"  -> Starting VM {vmid}")
+        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.start.post()
+
     def reboot_vm(proxmox, vmid):
-        """Soft reboot via ACPI."""
-        print(f"  -> Rebooting VM {vmid}")
-        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reboot.post()
+        """Soft reboot via ACPI - checks status first."""
+        vm_status = get_vm_status(proxmox, vmid)
+        print(f"  -> VM {vmid} status: {vm_status}")
+
+        if vm_status == "stopped":
+            print(f"  -> VM {vmid} is stopped, starting instead of rebooting")
+            start_vm(proxmox, vmid)
+        elif vm_status == "running":
+            print(f"  -> Rebooting VM {vmid}")
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reboot.post()
+        elif vm_status == "paused":
+            print(f"  -> VM {vmid} is paused, resuming first")
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.resume.post()
+            time.sleep(5)
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reboot.post()
+        else:
+            print(f"  -> VM {vmid} in unknown state '{vm_status}', attempting start")
+            try:
+                start_vm(proxmox, vmid)
+            except Exception as e:
+                print(f"  -> Start failed: {e}")
 
     def reset_vm(proxmox, vmid):
         """Hard reset."""
@@ -226,6 +258,10 @@ data:
         print(f"Monitoring nodes: {list(NODE_MAP.keys())}")
         print(f"Check interval: {CHECK_INTERVAL}s")
         print(f"Pod failure threshold: {POD_FAILURE_THRESHOLD*100:.0f}%")
+
+        # Startup delay: wait before first health check to avoid race during cluster boot
+        print(f"Waiting {CHECK_INTERVAL}s before first health check (cluster stabilization)...")
+        time.sleep(CHECK_INTERVAL)
 
         while True:
             print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")

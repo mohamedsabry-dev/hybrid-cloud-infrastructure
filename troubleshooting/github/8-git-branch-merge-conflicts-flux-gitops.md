@@ -1,185 +1,169 @@
 # TS-GH-008 | 2026-03-28 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Git branching / GitHub repository
-- Environment: Multi-environment setup (dev/prod branches for separate AWS accounts)
-- Related components: Flux CD GitOps, GitHub Actions, Kubernetes manifests
+[Info]
+Domain: GitHub Actions / Git
+Sub-techs: Git branching strategy, Flux CD bootstrap, merge conflicts, GitOps, Kustomize
+Environment: Multi-environment (dev/prod branches, separate AWS accounts)
+Re-opened: No
 
-## 2. Issue
-- Symptom: After Flux bootstrap on prod cluster, merging prod→dev caused cascading merge conflicts. Git history became "spaghetti tree" with constant conflicts.
-- Error:
-```
-# Kustomize build errors
-yaml: line 6: could not find expected ':'
+_____________________________________________________________________
 
-# Conflict markers left in YAML files
-<<<<<<< HEAD
-=======
->>>>>>>
-```
+[Issue Description]
+After Flux bootstrap on prod cluster, merging prod→dev caused cascading merge
+conflicts. Git history became a spaghetti tree with constant conflicts. Flux
+failing to reconcile due to broken YAML — conflict markers accidentally left
+in committed files.
 
-**Observed behavior:**
-- 50+ files showing as changed in PRs
-- Complex merge graph with many parallel lines
-- Flux failing to reconcile due to broken YAML
-- Conflict markers accidentally committed to files
+  50+ files showing as changed in PRs
+  Complex merge graph with many parallel lines
+  Kustomize build errors: yaml: line 6: could not find expected ':'
+  Conflict markers (<<<<<<, ======, >>>>>>) committed into YAML files
 
-## 3. Analysis
+_____________________________________________________________________
 
-**Check 1: What triggered the problem?**
-```
-1. Flux bootstrap on prod cluster creates commits directly to prod branch
-2. To get Flux manifests into dev for editing/testing, merged prod → dev
-3. This created two-way merge flow
-```
-Finding: Wrong merge direction started the conflict cascade.
+[Analysis]
 
-**Check 2: Why do conflicts keep appearing?**
-```
-dev ◄──────────────────► prod
-      TWO-WAY MERGE
-      = CONFLICTS
+# Initial Check Notes:
+Traced what triggered the conflict cascade.
 
-Both branches have:
-- Same folder structure (kubernetes/*/deployments/)
-- Different content (dev IPs vs prod IPs)
-- Independent commits on both branches
-```
-Finding: Merging in BOTH directions causes Git to repeatedly reconcile intentionally different files.
+Flux bootstrap on prod cluster creates commits directly to the prod branch.
+To get Flux manifests into dev for editing, merged prod → dev.
+This started a two-way merge flow between branches that have intentionally
+different content (dev IPs vs prod IPs, dev paths vs prod paths).
 
-**Check 3: Find conflict markers left in files**
-```bash
-grep -r "<<<<<<" kubernetes/ terraform/ ansible/
-grep -r "======" kubernetes/ terraform/ ansible/
-grep -r ">>>>>>" kubernetes/ terraform/ ansible/
-```
-Finding: Conflict markers left in multiple YAML files breaking Kustomize builds.
+Two-way merging means:
+  dev ◄──────────────────► prod
+  Both branches have same folder structure, different content.
+  Git repeatedly tries to reconcile files that are intentionally different.
+  Every merge in either direction produces conflicts.
 
-## 4. Root Cause
-> Two-way merging between environment branches that contain environment-specific content. When merging in both directions, Git repeatedly tries to reconcile files that are intentionally different (dev IPs vs prod IPs).
+Searched for conflict markers left in committed files:
 
-## 5. Solution
-> Establish one-way merge flow: dev → prod only. Never merge prod → dev.
+Command:
+  grep -r "<<<<<<" kubernetes/ terraform/ ansible/
+  grep -r "======" kubernetes/ terraform/ ansible/
+  grep -r ">>>>>>" kubernetes/ terraform/ ansible/
 
-**Immediate Fix: Reset prod to match dev**
-```bash
-# Disable branch protection first
-git checkout prod
-git reset --hard origin/dev
-git push origin prod --force
-# Re-enable branch protection
-# Then reapply prod-specific changes
-```
+Output:
+  Conflict markers found in multiple YAML files — Kustomize cannot parse them.
 
-**Correct Workflow:**
-```
-dev ══════════════════════════════════► prod
-              ONE WAY (PR)
-              NEVER MERGE BACK
-```
 
-**Golden Rules:**
-1. **Never merge prod → dev** - Even if prod has changes you need
-2. **Manually recreate** - If prod has something dev needs, recreate it in dev
-3. **Bootstrap on dev first** - Then copy to prod folders
+# Suspected Root Cause
+Two-way merging between environment branches that hold environment-specific content.
+Merging in both directions forces Git to repeatedly reconcile files that are
+intentionally different by design. Conflict markers left in files broke Kustomize builds.
 
-**Flux Bootstrap Procedure (Correct Way):**
-```bash
-# Bootstrap Flux on dev cluster, pointing to dev branch
-flux bootstrap github \
-  --owner=mohamedsabry-dev \
-  --repository=hybrid-cloud-infrastructure \
-  --branch=dev \
-  --path=kubernetes/dev/flux
 
-# Copy flux manifests to prod folder
-cp -r kubernetes/dev/flux kubernetes/prod/flux
+# More Checks Notes:
+Confirmed the merge direction history — prod→dev merge was the starting point
+that created the two-way flow. All subsequent conflicts traced back to that
+initial wrong-direction merge.
 
-# Update prod flux configs (branch, paths)
-# Push to dev, PR to prod
-```
 
-**If already bootstrapped on prod (don't merge!):**
-```bash
-# On dev branch - manually copy structure
-mkdir -p kubernetes/dev/flux
-# Recreate the flux structure based on prod, with dev values
-```
+# Suspected Solution
+Establish one-way merge flow: dev→prod only, never prod→dev.
+Reset prod branch to match dev, reapply prod-specific changes manually.
+Fix YAML files with conflict markers before re-running Flux.
 
-## 6. Solution Risk
-- Risk level: HIGH (force push to prod)
-- Potential impact: Force push rewrites history - coordinate with team, disable branch protection temporarily
 
-## 7. Impact After Fix
-- Observed: Clean merge history, no more conflicts
-- PRs show only actual changes
-- Flux reconciliation works correctly
+# Test
+Reset prod to dev, reapplied prod-specific values, ran Flux reconciliation.
 
-## 8. Notes
+Command:
+  grep -r "<<<<<<" kubernetes/ terraform/ ansible/
+  flux reconcile kustomization flux-system
 
-**⚠️ WARNING: Do NOT use Squash or Rebase Merge**
+Result: PASS — no conflict markers, Flux reconciling cleanly, PRs showing only
+actual changes.
 
-Using "Squash and merge" or "Rebase and merge" for long-lived branches (dev/prod) will cause recurring conflicts. See **TS-GH-010** for details.
+_____________________________________________________________________
 
-| Merge Type | Effect | Use For |
-|------------|--------|---------|
-| Merge commit | Preserves hashes, Git tracks what's merged | ✅ Long-lived branches (dev/prod) |
-| Squash merge | Creates new hashes, Git loses merge tracking | ❌ Only short-lived feature branches |
-| Rebase merge | Rewrites hashes, same problem as squash | ❌ Only short-lived feature branches |
+[Final Root Cause]
+Flux bootstrap on prod created commits directly on the prod branch. To get those
+manifests into dev, prod was merged into dev — creating a two-way merge flow.
+Both branches share the same folder structure but have intentionally different
+content (different IPs, paths, environments). Merging in both directions forces
+Git to repeatedly reconcile files that should never be reconciled. Conflict markers
+were left in YAML files and accidentally committed, breaking Kustomize builds.
 
-**Repo Settings Required:**
-- ✅ Allow merge commits: ON
-- ❌ Allow squash merging: OFF (or don't use for dev→prod)
-- ❌ Allow rebase merging: OFF (or don't use for dev→prod)
+_____________________________________________________________________
 
-**Workflow Diagram:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    CORRECT WORKFLOW                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   DEV BRANCH (Source of Truth)                              │
-│   │                                                          │
-│   ├── 1. Create new feature in terraform/dev/               │
-│   ├── 2. Test on dev environment                            │
-│   ├── 3. Copy to terraform/prod/ with prod values           │
-│   ├── 4. Commit both changes                                │
-│   └── 5. Push to dev branch                                 │
-│           │                                                  │
-│           ▼                                                  │
-│   ┌───────────────┐                                         │
-│   │  Pull Request │ (dev → prod)                            │
-│   │  Review & Test│                                         │
-│   └───────────────┘                                         │
-│           │                                                  │
-│           ▼                                                  │
-│   PROD BRANCH (Receives from dev only)                      │
-│   │                                                          │
-│   └── GitHub Actions → AWS Prod Account                     │
-│                                                              │
-│   ═══════════════════════════════════════════════════════   │
-│   ██ NEVER: prod → dev merge ██                             │
-│   ═══════════════════════════════════════════════════════   │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+[Final Solution]
+Immediate fix — reset prod to match dev, reapply prod-specific changes:
 
-**Commit message style when copying dev→prod:**
-```
-Mirror ansible/dev/playbooks/k8s/worker-nfs-mount.yml to prod
+  # Disable branch protection first
+  git checkout prod
+  git reset --hard origin/dev
+  git push origin prod --force
+  # Re-enable branch protection
+  # Manually reapply prod-specific values
 
-- Copied from dev branch
-- Updated IPs for prod environment
-- Updated mount path to /volume1/k8s-prod
-```
+One-way merge rule going forward:
+  dev ══════════════════════════════════► prod
+  ONE WAY via PR only — NEVER merge prod → dev
 
-**Lessons learned:**
-1. Design branching strategy BEFORE starting
-2. One-way flow for environment branches
-3. Bootstrap GitOps tools on source branch first
-4. Conflict markers break YAML - always verify merge results
-5. Branch protection prevents accidents
-6. Git reflog can recover from mistakes
+Golden rules:
+  1. Never merge prod → dev under any circumstance
+  2. If prod has something dev needs, recreate it manually in dev
+  3. Bootstrap Flux on dev first, then copy manifests to prod folder
 
-## 9. Workaround (if any)
-> If minor conflicts occur, carefully resolve in favor of the correct environment values. Use `git mergetool` or resolve manually, then verify with `grep -r "<<<<<<" .` before pushing.
+Correct Flux bootstrap procedure:
+  # Bootstrap on dev cluster pointing to dev branch
+  flux bootstrap github \
+    --owner=<owner> \
+    --repository=hybrid-cloud-infrastructure \
+    --branch=dev \
+    --path=kubernetes/dev/flux
+
+  # Copy to prod folder manually
+  cp -r kubernetes/dev/flux kubernetes/prod/flux
+  # Update prod configs (branch, paths, IPs) then PR to prod
+
+IMPORTANT — merge type matters for long-lived branches:
+  Merge commit   → preserves hashes, Git tracks what is merged  ← USE THIS
+  Squash merge   → creates new hashes, Git loses merge tracking  ← DO NOT USE
+  Rebase merge   → rewrites hashes, same problem as squash       ← DO NOT USE
+
+Repo settings required:
+  Allow merge commits: ON
+  Allow squash merging: OFF for dev→prod PRs
+  Allow rebase merging: OFF for dev→prod PRs
+
+See TS-GH-010 for details on squash/rebase merge issues with long-lived branches.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] HIGH
+Note: Force push to prod rewrites history. Disable branch protection before
+running, coordinate with team, re-enable after.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Lessons learned:
+  - Design branching strategy before starting, not after
+  - One-way flow is mandatory for environment branches with different content
+  - Bootstrap GitOps tools on source branch first, copy to others manually
+  - Conflict markers in YAML are silent until Kustomize tries to build
+  - Always grep for conflict markers before pushing: grep -r "<<<<<<" .
+  - Git reflog can recover from mistakes if force push goes wrong
+
+Commit message style when copying dev→prod:
+  Mirror ansible/dev/playbooks/k8s/worker-nfs-mount.yml to prod
+  - Copied from dev branch
+  - Updated IPs for prod environment
+  - Updated mount path to /volume1/k8s-prod
+
+Minor conflict workaround:
+  Resolve manually in favor of correct environment values.
+  Verify with grep -r "<<<<<<" . before pushing.

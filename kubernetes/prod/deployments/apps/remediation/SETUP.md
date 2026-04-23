@@ -48,7 +48,6 @@ WHAT WAS ACCOMPLISHED
      - k8s-worker1.lab.local → 1020
      - k8s-worker2.lab.local → 1021
      - k8s-worker3.lab.local → 1022
-   - Dump VMIDs: 5020, 5021, 5022
    - Proxmox node: pve-dev
    - NFS storage: nas-dev-data
    - Target storage: local-lvm
@@ -56,11 +55,10 @@ WHAT WAS ACCOMPLISHED
    Recovery sequence:
    - Attempt 1: Soft reboot (ACPI)
    - Attempt 2: Hard reset
-   - Attempt 3: Clone to dump VMID → Restore latest backup → Start
+   - Attempt 3: Restore latest backup → Start
 
    Detection:
    - Node NotReady status
-   - Pod health (80%+ in CrashLoopBackOff/Error triggers remediation)
 
 
 ISSUES ENCOUNTERED & SOLUTIONS

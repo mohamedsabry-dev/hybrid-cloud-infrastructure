@@ -186,7 +186,11 @@ jobs:
         id: apply
         run: terraform apply -auto-approve tfplan
 
-# Setup Cluster K8s on all nodes
+  # ---------------------------------------------------------------------------
+  # Job 3: Setup K8s Cluster
+  # Installs and configures Kubernetes cluster via Ansible
+  # Lock: DEV_SVC_K8S_CLUSTER_SETUP
+  # ---------------------------------------------------------------------------
   deploy-k8s-cluster:
     name: "3. Setup K8s Cluster"
     runs-on: dev-local-runner
@@ -237,7 +241,8 @@ jobs:
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_setup.yml && \
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_init.yml && \
             ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_important_tools.yml && \
-            ansible-playbook -i inventory/inventory.ini playbooks/k8s/flux_setup.yml"
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/flux_setup.yml && \
+            ansible-playbook -i inventory/inventory.ini playbooks/k8s/k8s_hosts_fallback.yml"
             
       - name: Cleanup Kerberos ticket
         if: always()

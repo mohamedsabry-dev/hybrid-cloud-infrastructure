@@ -20,6 +20,11 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 10 | [TS-PVE-010](10-vm-restore-hang-concurrent-nfs-operations.md) | 2026-03-26 | VM restore stuck at 100% | Too many concurrent NFS operations |
 | 11 | [TS-PVE-011](11-vmbr1-storage-network-for-k8s-workers.md) | 2026-03-27 | VMs can't reach storage VLAN | No bridge for VLAN 40, GUI can't do atomic changes |
 | 12 | [TS-PVE-012](12-vm-autostart-timeout-nfs-disk-not-ready.md) | 2026-04-06 | VM autostart timeout after reboot | NFS mount not ready when autostart begins |
+| 13 | [TS-PVE-013](13-ups-monitor-cronjob-misconfiguration.md) | 2026-04-07 | UPS monitor cronjob misconfiguration | Wrong cron syntax |
+| 14 | [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) | 2026-04-11 | Worker VM crash on autostart — 3-part investigation | Remediation pod triggered reboot during boot |
+| 15 | [TS-PVE-015](15-proxmox-crash-during-backup-unknown-cause.md) | 2026-04-11 | Proxmox crash during backup mid-write | **UNDETERMINED** - Silent crash, no logs |
+| 16 | [TS-PVE-016](reference/16-proxmox-memory-metrics-misleading.md) | 2026-04-11 | Proxmox shows 97% memory but actual is 54% | Linux cache counted as "used" — normal behavior |
+| 17 | [TS-PVE-017](17-proxmox-host-cpu-io-spike-vms-stuck.md) | 2026-04-19 | CPU/IO spike during DR testing — all VMs hung | Unknown — rebooted host to recover |
 
 ---
 
@@ -54,6 +59,9 @@ Related cases covering NFS timing issues:
 ### Networking
 - **Case 11:** VMs can't reach VLAN → Create VLAN-aware bridge, edit /etc/network/interfaces directly
 
+### Monitoring & Metrics
+- **Case 16:** Memory shows 97% → Linux cache counted as used — use Prometheus `MemAvailable`, NOT Proxmox metrics for CloudWatch integration
+
 ---
 
 ## Related Cases in Other Folders
@@ -75,15 +83,3 @@ Related cases covering NFS timing issues:
 
 ---
 
-## Best Practices (from lessons learned)
-
-1. **Stop pve-cluster before hostname changes** - Cluster filesystem requires hostname match
-2. **Update /etc/hosts before certificate regeneration** - Certificate reads IP from hosts file
-3. **Use local-lvm for volumes needing snapshots** - NFS doesn't support snapshots
-4. **Enable `repeat-missed` on laptop nodes** - Backups run when node comes online
-5. **Set `backup = true` explicitly in Terraform** - Provider defaults to false
-6. **Enable LVM auto-extend** - Prevents thin pool exhaustion
-7. **Lazy unmount before NFS adapter hot-swap** - Prevents shutdown hang
-8. **Restore VMs sequentially from NFS** - Max 2-3 concurrent operations
-9. **Use `crontab -e` or append syntax** - `crontab -` replaces entire file
-10. **Increase startup delay for NFS-backed VMs** - Allow mount to initialize

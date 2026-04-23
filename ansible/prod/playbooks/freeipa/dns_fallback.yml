@@ -1,0 +1,16 @@
+---
+- name: Add DNS fallback to all IPA clients
+  hosts: all:!freeipa
+  become: yes
+  tasks:
+    - name: Add fallback DNS to zzz-ipa.conf
+      lineinfile:
+        path: /etc/NetworkManager/conf.d/zzz-ipa.conf
+        regexp: '^servers='
+        line: 'servers=10.0.50.10,8.8.8.8'
+        backup: yes
+
+    - name: Restart NetworkManager
+      service:
+        name: NetworkManager
+        state: restarted

@@ -1,0 +1,55 @@
+# Mac Mini — Terraform Provider Mirror Setup
+
+Local provider cache for `terraform init`. Avoids downloading providers over
+the internet on every init (speeds up workflow runs, survives transient
+provider-registry outages).
+
+Mirrored providers:
+  hashicorp/aws
+  bpg/proxmox
+  hashicorp/external
+
+---
+
+## 1. Create the mirror directory
+
+  mkdir -p ~/.terraform.d/providers-mirror
+
+---
+
+## 2. Populate for both platforms
+
+The runner itself is macOS ARM64, but workflows sometimes target linux_amd64
+runners. Mirror both to cover all paths.
+
+  terraform providers mirror -platform=linux_amd64  ~/.terraform.d/providers-mirror
+  terraform providers mirror -platform=darwin_arm64 ~/.terraform.d/providers-mirror
+
+---
+
+## 3. .terraformrc configuration
+
+The runner's ~/.terraformrc (on the Mac Mini itself) points at the mirror so
+every `terraform init` uses it automatically. Example:
+
+  provider_installation {
+    filesystem_mirror {
+      path    = "/Users/<user>/.terraform.d/providers-mirror"
+      include = ["*/*"]
+    }
+  }
+
+---
+
+## 4. When to re-populate
+
+Whenever a Terraform module bumps its provider version constraints. Re-run the
+mirror commands above.
+
+---
+
+## Related
+
+- workstation/README.md                — scope + file listing
+- terraform/DESIGN.md                  — why 2 state backends + provider strategy
+- deployment-docs/aws-bootstrap-setup-guide.txt — AWS-side bootstrap

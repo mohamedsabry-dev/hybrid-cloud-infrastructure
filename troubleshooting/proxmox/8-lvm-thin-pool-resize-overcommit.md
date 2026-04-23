@@ -1,13 +1,17 @@
 # TS-PVE-008 | 2026-03-23 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Proxmox VE LVM thin provisioning
-- Environment: pve-dev (also applicable to pve-prod)
-- Related components: pve/data thin pool, local-lvm storage, vzdump backups
+[Info]
+Domain: Proxmox VE LVM thin provisioning
+Sub-techs: pve/data thin pool, local-lvm storage, vzdump backups
+Environment: pve-dev (also applicable to pve-prod)
+Re-opened: No
 
-## 2. Issue
-- Symptom: LVM warnings during snapshot creation, Proxmox UI shows 97% assigned (red warning)
-- Error:
+_____________________________________________________________________
+
+[Issue Description]
+LVM warnings during snapshot creation, Proxmox UI shows 97% assigned (red warning).
+
 ```
 Logical volume "snap_vm-2006-disk-0_Before_Vault" created.
 WARNING: You have not turned on protection against thin pools running out of space.
@@ -16,14 +20,15 @@ Logical volume "snap_vm-2006-disk-1_Before_Vault" created.
 WARNING: Sum of all thin volume sizes (<350.03 GiB) exceeds the size of thin pool pve/data and the amount of free space in volume group (16.00 GiB).
 ```
 
-## 3. Analysis
+_____________________________________________________________________
 
-### Understanding the Two Views
+[Analysis]
+# Step 1: Understand the two views
 
 | View | What It Shows | Value |
 |------|---------------|-------|
-| **LVM (VG level)** | All logical volumes including thin pool itself | 97% assigned |
-| **LVM-Thin (pool level)** | Actual data written inside thin pool | 12% used |
+| LVM (VG level) | All logical volumes including thin pool itself | 97% assigned |
+| LVM-Thin (pool level) | Actual data written inside thin pool | 12% used |
 
 The 97% "assigned" includes:
 ```
@@ -34,85 +39,52 @@ Volume Group (pve):     511 GB total
 └── Free in VG:         17 GB
 ```
 
-### Thin Provisioning Explained
+# Step 2: Thin provisioning math
 
 | Term | Meaning | Our Value |
 |------|---------|-----------|
-| **Allocated** | Sum of all thin volume sizes | ~350 GB |
-| **Pool Size** | Actual thin pool capacity | 374 GB |
-| **Actual Usage** | Data really written to disk | 46 GB (12%) |
+| Allocated | Sum of all thin volume sizes | ~350 GB |
+| Pool Size | Actual thin pool capacity | 374 GB |
+| Actual Usage | Data really written to disk | 46 GB (12%) |
 
-Thin provisioning allows overcommit - allocating more than physical capacity. This is normal and expected.
+Thin provisioning allows overcommit -- allocating more than physical capacity. This is normal.
 
-### The Real Risk
-
-Unlike VMware (which pauses VMs gracefully), LVM thin pools can cause:
-- I/O errors
-- Data corruption
-- VM freezes
-
-...if actual usage fills the pool completely with no auto-extend configured.
-
-### Investigation
-
+# Step 3: Check actual usage
 ```bash
 root@pve-dev:~# lvs -o lv_name,lv_size,data_percent pve/data
   LV   LSize    Data%
   data <348.82g 12.42
 ```
+Only 12.42% actual usage -- plenty of space. The warnings are about allocation, not actual usage.
 
-Result: Only 12.42% actual usage - plenty of space. The warnings are about allocation, not actual usage.
+# Step 4: Assess real risk
+Unlike VMware (which pauses VMs gracefully), LVM thin pools can cause I/O errors, data corruption, and VM freezes if actual usage fills the pool with no auto-extend configured.
 
-## 4. Root Cause
-> No auto-extend configured for thin pool. Warnings appear because sum of allocated thin volumes exceeds pool size + VG free space. While actual usage (12%) is safe, running out of space with no auto-extend would cause I/O errors.
+_____________________________________________________________________
 
-## 5. Solution
-> Resize thin pool smaller and enable auto-extend. This provides headroom in VG for auto-extend operations.
+[Final Root Cause]
+No auto-extend configured for thin pool. Warnings appear because sum of allocated thin volumes exceeds pool size + VG free space. While actual usage (12%) is safe, running out of space with no auto-extend would cause I/O errors.
 
-### Option A: Enable Auto-Extend Only (Quick Fix)
+_____________________________________________________________________
 
+[Final Solution]
+I chose Option B: Delete and recreate thin pool at smaller size, then enable auto-extend. This reclaims space at VG level for better auto-extend headroom.
+
+Procedure:
+
+1. Shutdown everything (graceful)
 ```bash
-# Edit /etc/lvm/lvm.conf
-nano /etc/lvm/lvm.conf
-
-# Find and set:
-thin_pool_autoextend_threshold = 80
-thin_pool_autoextend_percent = 10
-
-# Restart monitor
-systemctl restart lvm2-monitor
-```
-
-### Option B: Delete and Recreate Thin Pool (Full Solution - Selected)
-
-Based on Proxmox forum solution. This reclaims space at VG level for better auto-extend headroom.
-
-#### Prerequisites
-- [ ] Backup task updated to include golden images and templates
-- [ ] All backups stored on NAS (not local storage)
-- [ ] Sufficient NAS space for full backup
-- [ ] Verified all disks and mount points included
-
-#### Procedure
-
-**1. Shutdown Everything (Graceful)**
-```bash
-# Graceful shutdown all VMs
 qm list | awk 'NR>1 {print $1}' | xargs -I {} qm shutdown {}
-
-# Graceful shutdown all LXCs
 pct list | awk 'NR>1 {print $1}' | xargs -I {} pct shutdown {}
-
-# Wait for all to stop
 watch -n 5 'qm list; echo "---"; pct list'
 ```
 
-**2. Run Full Backup**
+2. Run full backup
 ```bash
 vzdump --all --storage nas-dev-data --mode stop --compress zstd
 ```
 
-**3. Save Current LVM Config**
+3. Save current LVM config
 ```bash
 mkdir -p /root/lvm-backup-$(date +%Y%m%d)
 lvs -a -o +devices > /root/lvm-backup-$(date +%Y%m%d)/lvs-full.txt
@@ -120,40 +92,35 @@ vgs -o +devices > /root/lvm-backup-$(date +%Y%m%d)/vgs-full.txt
 cat /etc/lvm/lvm.conf > /root/lvm-backup-$(date +%Y%m%d)/lvm.conf.bak
 ```
 
-**4. Delete Thin Pool**
+4. Delete thin pool
 ```bash
 lvremove pve/data
 ```
 
-**5. Remove Orphan VM/LXC Configs**
+5. Remove orphan VM/LXC configs
 ```bash
-# Remove VM configs
 rm /etc/pve/qemu-server/*.conf
-
-# Remove LXC configs
 rm /etc/pve/lxc/*.conf
 ```
 
-**6. Recreate at Smaller Size**
+6. Recreate at smaller size
 ```bash
-# Create new thin pool at 250 GB (5x current usage)
 lvcreate -L 250G -T /dev/pve/data
 ```
 
-**7. Verify New Allocation**
+7. Verify new allocation
 ```bash
 vgs pve  # Should show ~140 GB free now
 lvs /dev/pve/data
 ```
 
-**8. Restore from Backup**
+8. Restore from backup
 ```bash
-# Via UI or CLI
 qmrestore /mnt/pve/nas-dev-data/dump/vzdump-qemu-XXX.vma.zst VMID --storage local-lvm
 pct restore CTID /mnt/pve/nas-dev-data/dump/vzdump-lxc-XXX.tar.zst --storage local-lvm
 ```
 
-**9. Enable Auto-Extend**
+9. Enable auto-extend
 ```bash
 nano /etc/lvm/lvm.conf
 # Set:
@@ -163,17 +130,9 @@ nano /etc/lvm/lvm.conf
 systemctl restart lvm2-monitor
 ```
 
-**10. Start VMs/LXCs**
+10. Start VMs/LXCs
 
-## 6. Solution Risk
-- Risk level: HIGH
-- Potential impact: All VMs/LXCs must be stopped and restored from backup. Snapshots are NOT included in vzdump - they will be lost.
-
-## 7. Impact After Fix
-- Observed: Thin pool resized from 374 GB to 250 GB
-- VG free space increased from 17 GB to ~140 GB
-- Auto-extend enabled at 80% threshold
-- Warnings still appear (normal for thin provisioning) but system is protected
+After resize, warnings still appear during snapshot operations -- this is normal. The warning is about allocation, not actual usage.
 
 | Metric | Before | After |
 |--------|--------|-------|
@@ -182,57 +141,21 @@ systemctl restart lvm2-monitor
 | Auto-extend | Disabled | 80% threshold, 10% growth |
 | Actual Usage | 12% (~46 GB) | ~18% (~46 GB) |
 
-## 8. Notes
-
-### Warning After Fix is Normal
-
-After resize, you will **still see warnings** during snapshot operations:
-
-```
-WARNING: Sum of all thin volume sizes (423.49 GiB) exceeds the size of thin pool pve/data
-  and the amount of free space in volume group (<121.69 GiB).
-TASK OK
-```
-
-**This is normal.** The warning is about **allocation** (423 GB), not **actual usage** (15%).
-
-### Monitoring Commands
-
+Monitoring commands:
 ```bash
-# Check thin pool actual usage
 lvs -o lv_name,lv_size,data_percent pve/data
-
-# Check VG free space
 vgs pve -o vg_name,vg_size,vg_free
 ```
 
-### Auto-Extend Behavior
+Same procedure applies to pve-prod (swap `nas-dev-data` for `nas-prod-data`).
 
-With settings `threshold=80`, `percent=10`:
+Verified: Yes -- thin pool resized, auto-extend enabled, all VMs/LXCs restored.
 
-| Event | Action |
-|-------|--------|
-| Usage hits 80% (200 GB) | Auto-extend by 10% (25 GB) |
-| New pool size | 275 GB |
-| Can repeat | Until VG free space exhausted |
+_____________________________________________________________________
 
-### Prevention
+[Risk Level] HIGH -- all VMs/LXCs must be stopped and restored from backup. Snapshots are NOT included in vzdump and will be lost.
 
-1. **Size thin pools appropriately** - 2-5x expected actual usage
-2. **Always enable auto-extend** on new Proxmox installations
-3. **Use NAS for data disks** - reduces local-lvm pressure
-4. **Clean up old snapshots** regularly
-5. **Monitor actual usage**, not allocated space
+_____________________________________________________________________
 
-### Prod Environment
-
-Same procedure applies to pve-prod:
-- SSH target: `pve-dev` → `pve-prod`
-- Backup storage: `nas-dev-data` → `nas-prod-data`
-- LVM paths are identical (Proxmox defaults)
-
-## 9. Workaround (if any)
-> If you don't want to delete/recreate: Just enable auto-extend (Option A). Warnings will continue but system is protected from running out of space.
-
-## References
+[References]
 - Proxmox Forum: https://forum.proxmox.com/threads/resizing-pve-data.30506/

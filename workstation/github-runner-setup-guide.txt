@@ -1,0 +1,66 @@
+# Mac Mini — GitHub Actions Self-Hosted Runner Setup
+
+One-time setup for the self-hosted GitHub Actions runner on the Mac Mini.
+Used by workflows that need AWS + Proxmox + GitHub reachable from outside the
+on-prem network (primarily Terraform).
+
+See workstation/README.md for the broader Mac Mini scope.
+See github/runner-mac-mini.md for the reasoning (why self-hosted, tooling).
+
+---
+
+## 1. Install the runner binary
+
+  mkdir -p ~/WorkSpace/actions-runner && cd ~/WorkSpace/actions-runner
+
+  curl -o actions-runner-osx-arm64.tar.gz -L \
+    https://github.com/actions/runner/releases/download/v2.331.0/actions-runner-osx-arm64-2.331.0.tar.gz
+
+  tar xzf ./actions-runner-osx-arm64.tar.gz
+
+---
+
+## 2. Configure (token expires ~1 hour — get fresh)
+
+Generate a fresh token:
+  GitHub Repo > Settings > Actions > Runners > New self-hosted runner
+
+Then:
+
+  ./config.sh --url https://github.com/<ORG>/<REPO> \
+    --token YOUR_RUNNER_TOKEN \
+    --labels self-hosted,macOS,ARM64,mac-mini \
+    --name Mac-Mini-Runner
+
+---
+
+## 3. Install as auto-start service
+
+  ./svc.sh install
+  ./svc.sh start
+  ./svc.sh status
+
+---
+
+## 4. Labels reference
+
+  mac-mini       Primary selector in workflows: `runs-on: mac-mini`
+  self-hosted    Identifies as self-hosted (GitHub convention)
+  macOS          Operating system label
+  ARM64          CPU architecture label
+
+---
+
+## 5. Verify
+
+  # GitHub UI: Settings > Actions > Runners -> runner shows "Idle"
+  ./svc.sh status      # -> "Running"
+
+---
+
+## Related
+
+- workstation/README.md                    — scope + file listing
+- github/runner-mac-mini.md                — why self-hosted + tool rationale
+- deployment-docs/github-setup-guide.txt   — GitHub-side setup (secrets, vars, OIDC)
+- github/variables-secrets.md              — runner token + secret reference

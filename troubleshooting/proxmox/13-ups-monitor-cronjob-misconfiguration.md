@@ -1,17 +1,18 @@
 # TS-PVE-013 | 2026-04-09 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Proxmox VE / UPS Monitoring / Cron
-- Environment: PROD (pve-prod)
-- Related components: NUT UPS monitor, dr_ups_monitor.sh script
-- Discovered during: Real power outage incident (unplanned)
+[Info]
+Domain: Proxmox VE / UPS Monitoring / Cron
+Sub-techs: NUT UPS monitor, dr_ups_monitor.sh script
+Environment: PROD (pve-prod)
+Re-opened: No
 
-## 2. Issue
-- Symptom: UPS monitor script did not trigger automatic shutdown on prod during power outage
-- Error: Script ran manually at 41% battery instead of automatically at 55% threshold
-- Impact: Risk of unclean shutdown if battery depleted before manual intervention
+_____________________________________________________________________
 
-**Observation:**
+[Issue Description]
+REAL INCIDENT -- occurred during unplanned power outage, not planned DR testing.
+
+UPS monitor script did not trigger automatic shutdown on prod during a power outage. I had to run the script manually at 41% battery instead of it running automatically at the 55% threshold.
 
 Dev server (correct):
 ```bash
@@ -27,9 +28,10 @@ root@pve-prod:~# crontab -l
 0 4 * * 0 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log
 ```
 
-## 3. Analysis
+_____________________________________________________________________
 
-**Check 1: Compare Crontab Entries**
+[Analysis]
+# Step 1: Compare crontab entries
 ```bash
 # Dev - UPS runs every 5 minutes
 */5 * * * * /root/scripts/dr_ups_monitor.sh
@@ -37,36 +39,33 @@ root@pve-prod:~# crontab -l
 # Prod - UPS runs only at 21:00 on Thu/Sat (wrong!)
 0 21 * * 4,6 /root/scripts/dr_ups_monitor.sh
 ```
-Finding: Prod crontab has wrong schedule - UPS monitor only runs twice per week at 21:00 instead of every 5 minutes.
+Prod crontab has wrong schedule -- UPS monitor only runs twice per week at 21:00 instead of every 5 minutes.
 
----
-
-**Check 2: Verify Script Not Running**
+# Step 2: Verify script not running during outage
 ```bash
 root@pve-prod:~# ps | grep ups
 root@pve-prod:~#
 ```
-Finding: No UPS monitor process running on prod during outage.
+No UPS monitor process running on prod during outage.
 
----
-
-**Check 3: Timeline**
-```
+# Step 3: Timeline
 - Power outage occurred
-- Dev server: Script detected battery at 55%, triggered graceful shutdown automatically
-- Prod server: Script never ran (wrong cron schedule)
-- Manual intervention: Ran script manually at 41% battery
+- Dev server: script detected battery at 55%, triggered graceful shutdown automatically
+- Prod server: script never ran (wrong cron schedule)
+- I ran the script manually at 41% battery
 - Script triggered shutdown at 41%
 - Electricity recovered after 3 hours
-```
 
-## 4. Root Cause
-> Copy-paste error during initial setup. The crontab entries for UPS monitor and backup script were swapped on prod server. UPS monitor was given the weekly backup schedule instead of the 5-minute interval.
+_____________________________________________________________________
 
-## 5. Solution
-> Update prod crontab to match dev configuration.
+[Final Root Cause]
+Copy-paste error during initial setup. The crontab entries for UPS monitor and backup script were swapped on prod server. UPS monitor was given the weekly backup schedule instead of the 5-minute interval.
 
-**Fix:**
+_____________________________________________________________________
+
+[Final Solution]
+Updated prod crontab to match dev configuration.
+
 ```bash
 crontab -e
 # Change from:
@@ -76,35 +75,24 @@ crontab -e
 */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
 ```
 
-**Verification:**
+Verification:
 ```bash
 root@pve-prod:~# crontab -l | grep ups
 */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
 ```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - only affects monitoring frequency
-
-## 7. Impact After Fix
-- UPS monitor now runs every 5 minutes on both dev and prod
-- Automatic shutdown will trigger at 55% battery threshold
-
-## 8. Notes
-
-**Prevention:**
-- Always diff crontabs between dev and prod after setup
-- Use Ansible to manage crontabs for consistency
-- Add monitoring alert for UPS script not running
-
-**Verification Command:**
+To catch this in the future:
 ```bash
-# Compare dev and prod crontabs
 diff <(ssh pve-dev crontab -l) <(ssh pve-prod crontab -l)
 ```
 
-**Related:**
-- TS-PVE-012: VM Autostart Timeout NFS Disk Not Ready (also encountered during this incident)
+Verified: Yes -- UPS monitor now runs every 5 minutes on both dev and prod.
 
-## 9. Workaround (if any)
-> Manual script execution: `/root/scripts/dr_ups_monitor.sh`
+_____________________________________________________________________
+
+[Risk Level] LOW
+
+_____________________________________________________________________
+
+[References]
+- Related: TS-PVE-012 (VM Autostart Timeout NFS Disk Not Ready) -- also encountered during this incident

@@ -19,6 +19,19 @@ spec:
     # Grafana
     # ---------------------------------------------------------------------------
     grafana:
+      # Single replica - SQLite DB corrupts with multiple writers on NFS (RWX)
+      # See: disaster-recovery/issues/grafana-dashboards-missing.md
+      # For HA, would need external PostgreSQL/MySQL database
+      replicas: 1
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: grafana
+              topologyKey: kubernetes.io/hostname
+
       serviceAccount:
         create: false
         name: grafana-sa
@@ -53,6 +66,8 @@ spec:
       persistence:
         enabled: true
         storageClassName: nfs-retain
+        accessModes:
+          - ReadWriteMany  # RWX required for multiple replicas
         size: 10Gi
 
       ingress:

@@ -1,6 +1,10 @@
-# OS Services - System Maintenance Playbooks
+# OS Services - System Maintenance Playbooks (PoC v1 — archived)
 
-This directory contains Ansible playbooks for routine system monitoring, health checks, and emergency user management.
+> **Archived PoC v1 material.** See [`../../../README.md`](../../../README.md) for the
+> retirement story. In the current project, routine maintenance lives in
+> k8s CronJobs and GitHub Actions workflows, not host-level cron + Ansible.
+
+This directory contains Ansible playbooks for routine system monitoring, health checks, and emergency user management (PoC v1 era).
 
 **NOTE:** System updates are intentionally NOT automated to prevent unintended risks from kernel version changes, dependency conflicts, or application-specific package requirements. Updates should be manually planned and tested.
 
@@ -107,15 +111,18 @@ ansible-playbook -i inventory 02-disk-space-check.yml
 ansible-playbook -i inventory 01-emergency-user.yml
 ```
 
-## Cron Automation Examples
+## Cron Automation Examples (PoC v1 — paths outdated)
 
-Add to your Ansible control node or use cron on individual servers:
+These cron examples reference the PoC v1 working path (`/opt/workspace/DC-K8s/
+03-AUTOMATION/`) which no longer exists. Kept verbatim for historical
+accuracy — in the current project, scheduled maintenance runs via GitHub
+Actions workflows and k8s CronJobs, not host-level cron.
 
 ```bash
-# Daily health check at 2 AM
+# Daily health check at 2 AM  (PoC v1 path shown as-was)
 0 2 * * * cd /opt/workspace/DC-K8s/03-AUTOMATION/ansible-playbooks/os-services && ansible-playbook -i inventory 04-combined-health-maintenance.yml >> /var/log/ansible-health.log 2>&1
 
-# Weekly disk check on Sundays at 3 AM
+# Weekly disk check on Sundays at 3 AM  (PoC v1 path shown as-was)
 0 3 * * 0 cd /opt/workspace/DC-K8s/03-AUTOMATION/ansible-playbooks/os-services && ansible-playbook -i inventory 02-disk-space-check.yml >> /var/log/ansible-disk.log 2>&1
 ```
 

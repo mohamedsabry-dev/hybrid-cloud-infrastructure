@@ -1,88 +1,64 @@
-# Proxmox Storage
+# Proxmox Storage — PROD
 
-This directory contains Terraform modules for provisioning NFS storage mounts on Proxmox.
+Terraform module for provisioning NFS storage mounts on the Proxmox host.
+Connects the hypervisor to the Synology NAS (10.0.40.120) for shared ISOs,
+env-specific VM/LXC data, and centralized backups.
+
+---
 
 ## Modules
 
 | Module | Description |
 |--------|-------------|
-| `nas` | NFS storage mounts for ISO images, VM/LXC data, and backups |
+| `nas` | NFS mounts: shared ISOs, `nas-prod-data`, `nas-backups` |
 
-## Storage Architecture
+## Storage layout on the NAS
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Synology NAS (10.0.40.120)                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  /volume1/shared-iso     → nas-iso (shared dev+prod)            │
-│  ├── ISO images                                                 │
-│  └── LXC templates (.tar.gz)                                    │
-│                                                                 │
-│  /volume1/dev-storage    → nas-dev-data                         │
-│  ├── VM disk images                                             │
-│  └── LXC rootfs                                                 │
-│                                                                 │
-│  /volume1/prod-storage   → nas-prod-data                        │
-│  ├── VM disk images                                             │
-│  └── LXC rootfs                                                 │
-│                                                                 │
-│  /volume1/Backups        → nas-backups (shared dev+prod)        │
-│  └── vzdump backups                                             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Synology NAS (10.0.40.120)
+│
+├── /volume1/shared-iso      → nas-iso         (shared dev + prod)
+│   ├── ISO images
+│   └── LXC templates (.tar.gz)
+│
+├── /volume1/dev-storage     → nas-dev-data    (dev only)
+│   ├── VM disk images
+│   └── LXC rootfs
+│
+├── /volume1/prod-storage    → nas-prod-data   (prod only)
+│   ├── VM disk images
+│   └── LXC rootfs
+│
+└── /volume1/Backups         → nas-backups     (shared dev + prod)
+    └── vzdump backups
 ```
 
-## Storage Types
+## Storage IDs + content
 
-| Storage ID | Content Types | Purpose |
+| Storage ID | Content types | Purpose |
 |------------|---------------|---------|
-| `nas-iso` | `iso`, `vztmpl` | ISO images for VM installation, LXC container templates |
-| `nas-dev-data` / `nas-prod-data` | `images`, `rootdir`, `backup` | VM disk images, LXC rootfs, environment-specific backups |
-| `nas-backups` | `backup`, `rootdir` | Centralized vzdump backups for disaster recovery |
+| `nas-iso` | `iso`, `vztmpl` | ISO images + LXC container templates |
+| `nas-prod-data` | `images`, `rootdir`, `backup` | VM disks, LXC rootfs, env backups |
+| `nas-backups` | `backup`, `rootdir` | Centralized vzdump backups |
 
-## Backup Retention
+## Backup retention (`keep_last`)
 
-| Storage | `keep_last` | Purpose |
-|---------|-------------|---------|
-| `nas-data` | 2 | Quick rollback for recent changes |
+| Storage | `keep_last` | Why |
+|---------|-------------|-----|
+| `nas-prod-data` backup content | 2 | Quick rollback for recent changes |
 | `nas-backups` | 5 | Longer retention for disaster recovery |
 
-## Variable Structure
-
-Each storage mount uses the object pattern:
-
-```hcl
-variable "nas_iso" {
-  type = object({
-    id      = string       # Proxmox storage ID
-    server  = string       # NFS server IP
-    export  = string       # NFS export path
-    nodes   = list(string) # Proxmox nodes to mount on
-    content = list(string) # Content types (iso, vztmpl, images, rootdir, backup)
-  })
-}
-
-# For data/backup storage, includes retention:
-variable "nas_data" {
-  type = object({
-    # ... same as above ...
-    keep_last = number     # Backup retention count
-  })
-}
-```
-
-## Module Outputs
+## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `nas_iso_id` | Storage ID for ISO images and container templates |
-| `nas_data_id` | Storage ID for VM images and container rootfs |
+| `nas_iso_id` | Storage ID for ISOs + container templates |
+| `nas_data_id` | Storage ID for VM images + container rootfs |
 | `backups_id` | Storage ID for vzdump backups |
 
-## Environment Differences
+## Environment differences (dev vs prod)
 
-Only `variables.tf` differs between dev and prod:
+Only `variables.tf` differs:
 
 | Variable | Dev | Prod |
 |----------|-----|------|
@@ -93,8 +69,12 @@ Only `variables.tf` differs between dev and prod:
 | `backups.nodes` | `["pve-dev"]` | `["pve-prod"]` |
 | `proxmox_api_url` | `https://pve-dev.lab.local:8006` | `https://pve-prod.lab.local:8006` |
 
-## Shared Storage
+## Shared storage (same mount on both envs)
 
-The following storage is shared across environments:
-- **nas-iso**: Same NFS export mounted on both dev and prod nodes
-- **nas-backups**: Centralized backup storage accessible from both environments
+- `nas-iso` — same NFS export mounted on both dev and prod Proxmox nodes
+- `nas-backups` — centralized backup storage accessible from both environments
+
+## Related
+
+- [`../../../../proxmox/storage/`](../../../../proxmox/storage/) — NAS config on the Proxmox side (design + ops)
+- [`../../../../.github/workflows/prod-proxmox-storage.yml`](../../../../.github/workflows/prod-proxmox-storage.yml) — apply workflow

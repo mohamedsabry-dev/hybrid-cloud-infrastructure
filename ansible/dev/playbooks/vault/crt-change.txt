@@ -10,6 +10,7 @@ Then run vault_setup.yml between step 2 and 3 to request new certs.
 # 3. Restart vault service (after running vault_setup.yml to get new certs)
 ansible vault_cluster -i inventory/inventory.ini -m systemd -a "name=vault state=restarted" -b
 
-## We changed after Need for vault.lab.local for vip 
+## We changed after Need for vault.lab.local for vip
+## REF: /troubleshooting/vault/2-freeipa-vip-certificate-san-managedby.md
 >> ansible-playbook -i inventory/inventory.ini playbooks/freeipa/add_dns_records.yml
 >> ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_vip.yml

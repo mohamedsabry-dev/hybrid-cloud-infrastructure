@@ -23,12 +23,10 @@ Playbooks for configuring the Ansible control node itself.
 - `community.crypto` - Cryptographic operations
 - `ansible.posix` - POSIX-specific functionality
 
-## Usage
+## When these run
 
-These playbooks are run automatically by the `ansible-full-setup` workflow after the Ansible node is provisioned.
-
-```bash
-# Manual run (from ansible node)
-ansible-playbook playbooks/ansible/ansible_setup.yml
-ansible-playbook playbooks/ansible/test.yml
-```
+- Both playbooks run automatically by the `{env}-ansible-full-setup.yml`
+  workflow after the Ansible LXC is provisioned.
+- Manual re-run (from the Ansible node itself): `ansible_setup.yml` if the
+  Galaxy requirements change; `test.yml` any time to validate connectivity
+  to the fleet.

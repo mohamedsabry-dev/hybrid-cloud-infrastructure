@@ -1,3 +1,10 @@
+# ============================================================================
+# ADD_HOSTS_TO_IPA.YML - Join Hosts to FreeIPA Domain
+# ============================================================================
+# PURPOSE: Enroll all managed hosts as FreeIPA clients
+# USAGE: ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml
+# PREREQ: FreeIPA server must be running (freeipa_setup.yml completed)
+# ============================================================================
 ---
 - name: Join hosts to FreeIPA domain
   hosts: all:!freeipa

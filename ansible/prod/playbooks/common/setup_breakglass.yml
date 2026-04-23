@@ -1,61 +1,14 @@
 # ============================================================================
 # SETUP_BREAKGLASS.YML - Emergency Access User Setup
 # ============================================================================
-# PURPOSE: Create break-glass user with randomly generated password
-# STATUS: TODO - To be implemented
-# USAGE: ansible-playbook playbooks/common/setup_breakglass.yml
+# PURPOSE: Setup break-glass emergency access user on all managed hosts
+# STATUS: TODO - To be implemented later
+#
+# PLANNED FUNCTIONALITY:
+# - Generate random password for break-glass user
+# - Set password on all managed hosts
+# - Store password securely in AWS Secrets Manager
+# - Encrypt password locally with Ansible Vault
 # ============================================================================
 ---
-- name: Setup break-glass user password
-  hosts: managed_hosts
-  become: yes
-  gather_facts: no
-
-  vars:
-      breakglass_user: gandalf
-
-  tasks:
-      # Run once - generate password on localhost
-      - name: Generate random password
-        ansible.builtin.set_fact:
-          breakglass_password: "{{ lookup('password', '/dev/null length=24 chars=ascii_letters,digits') }}"
-        delegate_to: localhost
-        run_once: true
-
-      # Set password on all hosts
-      - name: Set break-glass user password
-        ansible.builtin.user:
-          name: "{{ breakglass_user }}"
-          password: "{{ breakglass_password | password_hash('sha512') }}"
-          update_password: always
-
-      # Save to vault file (run once)
-      - name: Save password to vault file
-        ansible.builtin.lineinfile:
-          path: /srv/repo/ansible/prod/inventory/group_vars/vault.yml
-          regexp: '^breakglass_password:'
-          line: "breakglass_password: {{ breakglass_password }}"
-          create: yes
-          mode: '0600'
-        delegate_to: localhost
-        run_once: true
-
-      - name: Encrypt vault file
-        ansible.builtin.command:
-          cmd: ansible-vault encrypt /srv/repo/ansible/prod/inventory/group_vars/vault.yml
-        delegate_to: localhost
-        run_once: true
-        ignore_errors: yes  # Ignore if already encrypted
-
-      - name: Display for manual AWS backup
-        ansible.builtin.debug:
-          msg: |
-            ==========================================
-            SAVE THIS TO AWS MANUALLY:
-
-            aws secretsmanager put-secret-value \
-              --secret-id prod/vm/break-glass-password \
-              --secret-string '{{ breakglass_password }}'
-            ==========================================
-        delegate_to: localhost
-        run_once: true
+# TODO: Implement break-glass user setup

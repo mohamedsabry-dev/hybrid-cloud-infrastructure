@@ -33,7 +33,7 @@ variable "k8s_master1" {
   default = {
     vmid           = 1010
     name           = "k8s-master1"
-    cores          = 2
+    cores          = 4
     memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.10/24"
     gateway        = "10.0.61.1"
@@ -73,7 +73,7 @@ variable "k8s_master2" {
   default = {
     vmid           = 1011
     name           = "k8s-master2"
-    cores          = 2
+    cores          = 4
     memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.11/24"
     gateway        = "10.0.61.1"
@@ -113,13 +113,13 @@ variable "k8s_master3" {
   default = {
     vmid           = 1012
     name           = "k8s-master3"
-    cores          = 2
+    cores          = 4
     memory         = 2560  # Increased from 2048 to prevent control plane memory exhaustion.
     ip             = "10.0.61.12/24"
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
     vlan_id        = 61
-    startup_delay  = 0       # All masters start together (parallel boot)
+    startup_delay  = 60      # Wait 60s after masters before starting workers (order 9)
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
     started        = true

@@ -1,375 +1,286 @@
 # TS-TF-004 | 2026-03 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform 1.14.3, bpg/proxmox provider
-- Environment: Dev (pve-dev), FreeIPA VM (ID 1001) cloned from golden-image (ID 9000)
-- Related components: Disk state tracking, clone operations, hot-resize, UUID-based mounting
+[Info]
+Domain: Terraform / Proxmox
+Sub-techs: Terraform bpg/proxmox provider, disk state tracking, LXC clone,
+           hot-resize, UUID mounting, disk naming race condition, SCSI, LVM
+Environment: DEV | pve-dev | FreeIPA VM (ID 1001) cloned from golden-image (ID 9000)
+             Terraform 1.14.3, bpg/proxmox provider
+Re-opened: No
 
-## 2. Issue
-- Symptom: When adding data disk to cloned VM, Terraform exhibits unexpected behavior due to how it tracks disk state for cloned VMs
-- Error:
-```
-~ disk {
-    ~ datastore_id = "local-lvm" -> "nas-dev-data"
-    ~ interface    = "scsi0" -> "scsi1"
-    ~ size         = 20 -> 25
-}
-- disk {
-    - datastore_id = "nas-dev-data" -> null
-    - interface    = "scsi1" -> null
-    ...
-}
-```
+_____________________________________________________________________
 
-**What Terraform tried to do:**
-1. Transform scsi0 properties to match scsi1 configuration
-2. Delete what it thought was scsi1 (didn't exist yet)
+[Issue Description]
+When adding a data disk to a cloned VM, Terraform exhibits unexpected behaviour
+due to how it tracks disk state for cloned VMs. Provider does not populate disk
+state from cloned VMs — disk array remains empty in tfstate despite scsi0
+existing in Proxmox.
 
-## 3. Analysis
+Terraform plan showed:
+  ~ disk {
+      ~ datastore_id = "local-lvm" -> "nas-dev-data"
+      ~ interface    = "scsi0" -> "scsi1"
+      ~ size         = 20 -> 25
+  }
+  - disk {
+      - datastore_id = "nas-dev-data" -> null
+      - interface    = "scsi1" -> null
+  }
 
-**Check 1: State file after clone**
-```json
-// terraform.tfstate after clone (BEFORE fix)
-{
-  "disk": [],
-  ...
-}
-```
-Finding: Provider does NOT track cloned disk in state. Disk array empty despite scsi0 existing in Proxmox.
+What Terraform tried to do:
+  1. Transform scsi0 properties to match scsi1 configuration
+  2. Delete what it thought was scsi1 (which did not exist yet)
 
-**Check 2: What happens with only data disk defined?**
-```hcl
-# What we tried (WRONG approach)
-disk {
-  datastore_id = "nas-dev-data"
-  interface    = "scsi1"
-  size         = 25
-  file_format  = "raw"
-}
-```
-Finding: Terraform has no record of scsi0, so it misinterprets the disk configuration entirely.
+_____________________________________________________________________
 
-## 4. Root Cause
-> The bpg/proxmox provider doesn't populate disk state from cloned VMs. When a VM is cloned, the disk array remains empty in Terraform state. Since Terraform is unaware of scsi0, adding only scsi1 causes it to misinterpret the configuration.
+[Analysis]
 
-## 5. Solution
-> Explicitly declare both disks - boot disk (scsi0) matching golden image template configuration, plus new data disk.
+# Initial Check Notes:
+Checked state file after clone:
 
-**Correct configuration:**
-```hcl
-# Boot disk - must match golden image template
-disk {
-  datastore_id = var.datastore_id  # "local-lvm"
-  interface    = "scsi0"
-  size         = 20
-  ssd          = true
-  discard      = "on"
-  file_format  = "raw"
-}
+  terraform.tfstate after clone:
+    "disk": []   ← empty despite scsi0 existing in Proxmox
 
-# Data disk - new addition
-disk {
-  datastore_id = "nas-dev-data"
-  interface    = "scsi1"
-  size         = 25
-  ssd          = true
-  discard      = "on"
-  file_format  = "raw"
-}
-```
+  Provider does NOT track cloned disks in state. Terraform has no record of
+  scsi0, so adding only scsi1 causes it to misinterpret the configuration.
 
-**Clean Terraform Plan After Fix:**
-```
-~ disk {
-    ~ discard = "ignore" -> "on"
-    ~ ssd     = false -> true
-}
-~ disk {
-    ~ size = 20 -> 25
-}
-```
+Wrong approach that triggered the error:
+  disk {
+    datastore_id = "nas-dev-data"
+    interface    = "scsi1"
+    size         = 25
+    file_format  = "raw"
+  }
 
-Now Terraform correctly:
-1. Recognizes scsi0 and adjusts properties (discard, ssd)
-2. Manages scsi1 as the data disk
+  Terraform sees: one disk in config (scsi1), no disk in state.
+  Terraform plans: transform the unknown disk into scsi1 configuration.
+  Result: chaos.
 
-**New tfstate (AFTER fix):**
-```json
-{
-  "disk": [
-    {
-      "datastore_id": "local-lvm",
-      "discard": "on",
-      "interface": "scsi0",
-      "path_in_datastore": "vm-1001-disk-0",
-      "size": 20,
-      "ssd": true
-    },
-    {
-      "datastore_id": "nas-dev-data",
-      "discard": "ignore",
-      "interface": "scsi1",
-      "path_in_datastore": "1001/vm-1001-disk-0.raw",
-      "size": 25,
-      "ssd": false
-    }
-  ]
-}
-```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None if scsi0 properties match golden image template
+# Suspected Root Cause
+bpg/proxmox provider does not populate disk state from cloned VMs. When a VM
+is cloned, the disk array remains empty in Terraform state. Terraform is unaware
+of scsi0 — adding only scsi1 causes it to misinterpret the entire disk configuration.
 
-## 7. Impact After Fix
-- Observed: Both disks properly tracked in state
-- Proxmox shows correct configuration
-- Hot-resize works without VM downtime
 
-**Proxmox Verification:**
-```
-Hard Disk (scsi0): local-lvm:vm-1001-disk-0,discard=on,size=20G,ssd=1
-Hard Disk (scsi1): nas-dev-data:1001/vm-1001-disk-0.raw,size=25G
-```
+# More Checks Notes:
+No additional checks needed — state file comparison confirmed the issue.
+Solution direction was clear: explicitly declare both disks.
 
-**VM Verification:**
-```bash
-lsblk
-# NAME   SIZE
-# sda    20G   (boot disk)
-# sdb    25G   (data disk)
-```
 
-## 8. Notes
+# Suspected Solution
+Declare both disks explicitly — boot disk (scsi0) matching the golden image
+template configuration, plus the new data disk (scsi1).
 
-### Hot Resize: Expanding Disk While VM Running
 
-Terraform/Proxmox supports **hot-resizing** disks without stopping the VM. The Linux kernel automatically detects the capacity change.
+# Test
+Added scsi0 declaration to Terraform config matching golden image template.
+Re-ran plan.
 
-**Test: Resize scsi0 from 20GB to 25GB via GitHub Actions Workflow**
+Corrected plan:
+  ~ disk { ~ discard = "ignore" -> "on" ~ ssd = false -> true }   (scsi0 adjusted)
+  ~ disk { ~ size = 20 -> 25 }                                     (scsi1 managed)
 
-**Before resize (VM running):**
-```bash
-[root@freeipa ~]# lsblk
-NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
-sda             8:0    0   20G  0 disk
-├─sda1          8:1    0    1M  0 part
-├─sda2          8:2    0    1G  0 part /boot
-└─sda3          8:3    0   19G  0 part
-  ├─rl-root   253:0    0   17G  0 lvm  /
-  └─rl-swap   253:1    0    2G  0 lvm  [SWAP]
-sdb             8:16   0   25G  0 disk
-```
+Result: PASS — both disks properly tracked in state.
 
-**Kernel detects capacity change automatically:**
-```
-[ 547.891964] sd 0:0:0:0: Capacity data has changed
-[ 547.892203] sd 0:0:0:0: [sda] 52428800 512-byte logical blocks: (26.8 GB/25.0 GiB)
-[ 547.894498] sda: detected capacity change from 41943040 to 52428800
-```
+  Proxmox verification:
+    Hard Disk (scsi0): local-lvm:vm-1001-disk-0,discard=on,size=20G,ssd=1
+    Hard Disk (scsi1): nas-dev-data:1001/vm-1001-disk-0.raw,size=25G
 
-**After resize (no reboot needed):**
-```bash
-[root@freeipa ~]# lsblk
-NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
-sda             8:0    0   25G  0 disk    # <-- Now 25GB
-├─sda1          8:1    0    1M  0 part
-├─sda2          8:2    0    1G  0 part /boot
-└─sda3          8:3    0   19G  0 part    # <-- Partition still 19G
-  ├─rl-root   253:0    0   17G  0 lvm  /
-  └─rl-swap   253:1    0    2G  0 lvm  [SWAP]
-sdb             8:16   0   25G  0 disk
-```
+  VM verification:
+    lsblk
+    sda  20G  (boot disk)
+    sdb  25G  (data disk)
 
-**Steps to use new space:**
-```bash
-# 1. Grow the partition to use new space
-growpart /dev/sda 3
+_____________________________________________________________________
 
-# 2. Resize the physical volume
-pvresize /dev/sda3
+[Final Root Cause]
+bpg/proxmox provider does not populate disk state from cloned VMs. After clone,
+the disk array in tfstate is empty. Terraform sees one disk in config (scsi1)
+and nothing in state — it plans to transform or delete what it misidentifies as
+an existing disk entry. Both disks must be explicitly declared for Terraform to
+correctly track the state.
 
-# 3. Extend the logical volume
-lvextend -l +100%FREE /dev/rl/root
+_____________________________________________________________________
 
-# 4. Grow the filesystem
-xfs_growfs /
-```
+[Final Solution]
 
-**Key findings:**
-- Hot resize works: Proxmox/Terraform can expand disks while VM is running
-- Kernel auto-detects: Linux kernel sees capacity change immediately via SCSI hotplug
-- No VM downtime: Resize happens live, workflow completes without stopping VM
-- Manual partition resize: Filesystem expansion still requires manual commands inside VM
+Correct Terraform configuration — declare both disks:
 
----
+  # Boot disk — must match golden image template exactly
+  disk {
+    datastore_id = var.datastore_id   # "local-lvm"
+    interface    = "scsi0"
+    size         = 20
+    ssd          = true
+    discard      = "on"
+    file_format  = "raw"
+  }
 
-### Disk Naming Race Condition After Reboot
+  # Data disk — new addition
+  disk {
+    datastore_id = "nas-dev-data"
+    interface    = "scsi1"
+    size         = 25
+    ssd          = true
+    discard      = "on"
+    file_format  = "raw"
+  }
 
-**The Problem:**
-After VM reboot, disk device names (`sda`, `sdb`) may swap:
+tfstate after fix:
+  disk[0]: datastore_id=local-lvm, interface=scsi0, size=20, ssd=true, discard=on
+  disk[1]: datastore_id=nas-dev-data, interface=scsi1, size=25
 
-**Before reboot:**
-```
-sda   25G  (boot disk - scsi0)
-├─sda1/2/3 partitions
-sdb   25G  (data disk - scsi1)
-```
+Verified: Yes
 
-**After reboot:**
-```
-sda   25G  (data disk - no partitions!)
-sdb   25G  (boot disk - has all partitions!)
-├─sdb1      1M  part
-├─sdb2      1G  part /boot
-└─sdb3     19G  part
-  ├─rl-root 17G lvm  /
-  └─rl-swap  2G lvm  [SWAP]
-```
+_____________________________________________________________________
 
-**Why this happens:**
-- Linux does **NOT** guarantee `sda` = `scsi0`
-- Device names are assigned based on **probe order**, not SCSI interface ID
-- After reboot, whichever disk is detected first becomes `sda`
-- This is standard Linux behavior, not a Terraform/Proxmox bug
+[Risk Level] LOW
+Note: No risk if scsi0 properties match golden image template. Mismatch would
+cause Terraform to modify the boot disk properties.
 
-**Why the system still boots:**
-- **GRUB**: Uses UUID to locate boot partition
-- **LVM**: Uses UUID for physical volume identification
-- **/etc/fstab**: Rocky Linux uses LVM device names (`/dev/mapper/rl-root`)
-- The boot process doesn't rely on `/dev/sda` being the boot disk
+_____________________________________________________________________
 
-**Best Practices - Never rely on device names (`sda`, `sdb`) for:**
-- Scripts that format/mount disks
-- Backup operations
-- Ansible playbooks
+[References]
+- TS-TF-011 — orphaned disks after removal
+- archive/poc-v1-vsphere/troubleshooting/storage/3-disk-race-condition-disaster.md
 
-**Always use persistent identifiers:**
-```bash
-# By UUID
-/dev/disk/by-uuid/xxxx-xxxx
+_____________________________________________________________________
 
-# By LVM name
-/dev/mapper/rl-root
+[Draft Notes]
 
-# By SCSI path (consistent with Proxmox interface)
-/dev/disk/by-path/pci-0000:00:1f.2-scsi-0:0:0:0  # scsi0
-/dev/disk/by-path/pci-0000:00:1f.2-scsi-0:0:1:0  # scsi1
+_____________________________________________________________________
+HOT RESIZE — expanding disk while VM is running
+_____________________________________________________________________
 
-# By Proxmox disk ID
-/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0
-/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
-```
+Terraform/Proxmox supports hot-resizing disks without stopping the VM.
+The Linux kernel automatically detects the capacity change via SCSI hotplug.
 
-**Verify disk identity:**
-```bash
-ls -la /dev/disk/by-path/
-ls -la /dev/disk/by-id/ | grep scsi
-lsblk -o NAME,SIZE,HCTL,SERIAL
-```
+Test: resize scsi0 from 20GB to 25GB via GitHub Actions workflow (VM running).
 
----
+Kernel log on resize:
+  [ 547.891964] sd 0:0:0:0: Capacity data has changed
+  [ 547.892203] sd 0:0:0:0: [sda] 52428800 512-byte logical blocks: (26.8 GB/25.0 GiB)
+  [ 547.894498] sda: detected capacity change from 41943040 to 52428800
 
-### Formatting and Mounting Data Disk with UUID
+After resize: lsblk shows sda = 25G — no reboot needed.
+Partition (sda3) still shows old size — filesystem expansion is manual:
 
-**Step-by-step procedure after disk naming swap:**
+  growpart /dev/sda 3     # grow partition to fill new space
+  pvresize /dev/sda3      # resize LVM physical volume
+  lvextend -l +100%FREE /dev/rl/root  # extend logical volume
+  xfs_growfs /            # grow filesystem
 
-**1. Identify the data disk (scsi1):**
-```bash
-ls -la /dev/disk/by-id/ | grep scsi
-```
-Example output:
-```
-scsi-0QEMU_QEMU_HARDDISK_drive-scsi0 -> ../../sdb  (boot disk)
-scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 -> ../../sda  (data disk)
-```
-In this case, `sda` is the data disk (scsi1).
+Key findings:
+  Hot resize works — Proxmox/Terraform can expand disks on a running VM.
+  Kernel auto-detects — capacity change seen immediately via SCSI hotplug.
+  No VM downtime — resize completes without stopping the VM.
+  Manual filesystem expansion — still required inside the VM.
 
-**2. Create partition on the data disk:**
-```bash
-fdisk /dev/sda
-```
-Interactive steps: `n` → `p` → `1` → Enter → Enter → `w`
 
-**3. Verify partition created:**
-```bash
-lsblk
-```
-Expected:
-```
-sda           8:0    0   25G  0 disk
-└─sda1        8:1    0   25G  0 part
-sdb           8:16   0   25G  0 disk
-├─sdb1...
-```
+_____________________________________________________________________
+DISK NAMING RACE CONDITION AFTER REBOOT
+_____________________________________________________________________
 
-**4. Format as XFS:**
-```bash
-mkfs.xfs /dev/sda1
-```
+After VM reboot, disk device names (sda, sdb) may swap:
 
-**5. Create mount point:**
-```bash
-mkdir -p /data
-```
+  Before reboot:
+    sda  20G  boot disk (scsi0) — has sda1/2/3 partitions, LVM
+    sdb  25G  data disk (scsi1) — no partitions
 
-**6. Add to fstab using UUID (critical for persistence):**
-```bash
-echo "UUID=$(blkid -s UUID -o value /dev/sda1) /data xfs defaults 0 0" >> /etc/fstab
-```
+  After reboot:
+    sda  25G  data disk (no partitions)
+    sdb  20G  boot disk — has all partitions, LVM
 
-**7. Reload systemd and mount:**
-```bash
-systemctl daemon-reload
-mount /data
-```
+Why this happens:
+  Linux does NOT guarantee sda = scsi0. Device names are assigned based on
+  probe order, not SCSI interface ID. Whichever disk is detected first becomes
+  sda. This is standard Linux behaviour, not a Terraform/Proxmox bug.
 
-**8. Verify:**
-```bash
-df -h /data
-tail -1 /etc/fstab
-```
-Expected:
-```
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/sda1        25G  522M   25G   3% /data
+Why the system still boots correctly despite the swap:
+  GRUB uses UUID to locate boot partition.
+  LVM uses UUID for physical volume identification.
+  /etc/fstab on Rocky Linux uses LVM device names (/dev/mapper/rl-root).
+  The boot process does not rely on /dev/sda being the boot disk.
 
-UUID=316ecfbc-1fb3-46b3-8c0c-405b1213cf97 /data xfs defaults 0 0
-```
+Never rely on device names (sda, sdb) for scripts, backups, or Ansible playbooks.
 
-**Why UUID Matters:**
-After reboot, the disk might become `sdb1` instead of `sda1`, but UUID stays the same:
-- **Without UUID**: `/dev/sda1` in fstab → mount fails if disk swaps to `sdb1`
-- **With UUID**: `UUID=316ecfbc-...` in fstab → mounts correctly regardless of device name
+Always use persistent identifiers:
+  By UUID:        /dev/disk/by-uuid/xxxx-xxxx
+  By LVM name:    /dev/mapper/rl-root
+  By SCSI path:   /dev/disk/by-path/pci-0000:00:1f.2-scsi-0:0:0:0  (scsi0)
+                  /dev/disk/by-path/pci-0000:00:1f.2-scsi-0:0:1:0  (scsi1)
+  By Proxmox ID:  /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0
+                  /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
 
-**Quick One-Liner (after fdisk):**
-```bash
-mkfs.xfs /dev/sda1 && \
-mkdir -p /data && \
-echo "UUID=$(blkid -s UUID -o value /dev/sda1) /data xfs defaults 0 0" >> /etc/fstab && \
-systemctl daemon-reload && \
-mount /data && \
-df -h /data
-```
+Verify disk identity:
+  ls -la /dev/disk/by-path/
+  ls -la /dev/disk/by-id/ | grep scsi
+  lsblk -o NAME,SIZE,HCTL,SERIAL
 
----
 
-### Key Takeaways
+_____________________________________________________________________
+FORMATTING AND MOUNTING DATA DISK WITH UUID
+_____________________________________________________________________
 
-1. **Cloned VMs don't auto-track disks**: The bpg/proxmox provider doesn't populate disk state from cloned VMs
-2. **Always declare boot disk**: When adding disks to cloned VMs, explicitly declare the boot disk (scsi0) with properties matching the source template
-3. **Match template configuration**: The scsi0 disk block should mirror the golden image's disk configuration
-4. **discard=on**: Enables TRIM for SSD/thin-provisioned storage to reclaim space
-5. **Hot resize supported**: Disks can be expanded via Terraform while VM is running
+Procedure after disk naming swap — identify and mount the data disk correctly.
 
-**Related:**
-- TS-TF-011 (orphaned disks after removal)
-- Archive: `archive/poc-v1-vsphere/troubleshooting/storage/3-disk-race-condition-disaster.md` - Original disk race condition incident
+Step 1 — Identify the data disk (scsi1):
+  ls -la /dev/disk/by-id/ | grep scsi
+  Example output:
+    scsi-0QEMU_QEMU_HARDDISK_drive-scsi0 -> ../../sdb  (boot disk)
+    scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 -> ../../sda  (data disk)
+  In this case sda is the data disk despite being named sda.
 
-## 9. Workaround (if any)
-> Manually add disk via Proxmox GUI, then import to Terraform state with `terraform import`.
+Step 2 — Create partition:
+  fdisk /dev/sda  → n → p → 1 → Enter → Enter → w
 
-## Related Files
-- Golden Image Template: `terraform/dev/proxmox/vms/golden-image/main.tf`
-- FreeIPA VM: `terraform/dev/proxmox/vms/freeipa/main.tf`
-- Golden Image Bootstrap: `proxmox/golden_templates/golden-vm-setup.sh`
+Step 3 — Verify partition:
+  lsblk
+  Expected: sda1 25G part  (new partition on data disk)
+
+Step 4 — Format as XFS:
+  mkfs.xfs /dev/sda1
+
+Step 5 — Create mount point:
+  mkdir -p /data
+
+Step 6 — Add to fstab using UUID (critical):
+  echo "UUID=$(blkid -s UUID -o value /dev/sda1) /data xfs defaults 0 0" >> /etc/fstab
+
+Step 7 — Mount:
+  systemctl daemon-reload && mount /data
+
+Step 8 — Verify:
+  df -h /data
+  tail -1 /etc/fstab
+  Expected: UUID=316ecfbc-1fb3-46b3-8c0c-405b1213cf97 /data xfs defaults 0 0
+
+Why UUID matters:
+  Without UUID: /dev/sda1 in fstab → mount fails if disk swaps to sdb1 after reboot.
+  With UUID:    UUID=316ecfbc-... in fstab → mounts correctly regardless of device name.
+
+Quick one-liner (after fdisk):
+  mkfs.xfs /dev/sda1 && \
+  mkdir -p /data && \
+  echo "UUID=$(blkid -s UUID -o value /dev/sda1) /data xfs defaults 0 0" >> /etc/fstab && \
+  systemctl daemon-reload && mount /data && df -h /data
+
+
+Key takeaways:
+  1. Cloned VMs do not auto-track disks — provider leaves disk array empty in state
+  2. Always declare boot disk (scsi0) explicitly when adding disks to cloned VMs
+  3. scsi0 disk block must mirror golden image configuration exactly
+  4. discard=on enables TRIM for SSD/thin-provisioned storage
+  5. Hot resize supported — disks can be expanded while VM is running
+  6. Disk device names are not stable across reboots — always use UUID or by-id paths
+
+Workaround if needed:
+  Add disk via Proxmox GUI, then import to Terraform state:
+  terraform import proxmox_virtual_environment_vm.freeipa <node>/<vmid>
+
+Related files:
+  terraform/dev/proxmox/vms/golden-image/main.tf
+  terraform/dev/proxmox/vms/freeipa/main.tf
+  proxmox/golden_templates/golden-vm-setup.sh

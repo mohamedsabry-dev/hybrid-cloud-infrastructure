@@ -1,150 +1,169 @@
-# TS-IDN-005 | 2026-03-05 | RESOLVED
+# TS-IDN-005 | 2026-03-05 | WORKAROUND APPLIED
+_____________________________________________________________________
 
-## 1. Context
-- System: FreeIPA / SSSD / Sudo
-- Environment: DEV (lab.local)
-- Related components: FreeIPA server, sudo rules, Ansible inventory
+[Info]
+Domain: Identity / FreeIPA
+Sub-techs: FreeIPA, SSSD, sudo rules, Ansible inventory
+Environment: DEV lab.local | FreeIPA server freeipa.lab.local | all IPA clients
+Re-opened: No
 
-## 2. Issue
-- Symptom: Sudo rules work on IPA clients but not on FreeIPA server itself
-- Error:
-```bash
-# On FreeIPA server - FAILS
-[root@ansible dev]# ansible freeipa -m command -a "id -u"
-freeipa.lab.local | FAILED | rc=-1 >> Missing sudo password
+_____________________________________________________________________
 
-# Check sudo rules on FreeIPA server
-[root@freeipa ~]# sudo -l -U super_bot
-User super_bot is not allowed to run sudo on freeipa.
+[Issue Description]
+Sudo rules work correctly on all IPA clients but not on the FreeIPA server itself.
+Ansible fails when targeting freeipa.lab.local with super_bot + sudo.
 
-# But on IPA clients - WORKS
-[root@ansible dev]# ansible managed_hosts -m command -a "id -u"
-vault1.lab.local | CHANGED | rc=0 >> 0
-k8s-master1.lab.local | CHANGED | rc=0 >> 0
-# All return 0
-```
+  # On FreeIPA server — FAILS
+  ansible freeipa -m command -a "id -u"
+  freeipa.lab.local | FAILED | rc=-1 >> Missing sudo password
 
-## 3. Analysis
+  sudo -l -U super_bot (on freeipa)
+  User super_bot is not allowed to run sudo on freeipa.
 
-**Check 1: Is the host in the hostgroup?**
-```bash
-# On FreeIPA server
-ipa hostgroup-show automation_group
-  Host-group: automation_group
-  Member hosts: freeipa.lab.local, vault1.lab.local, vault2.lab.local...
-```
-Finding: freeipa.lab.local IS in the hostgroup.
+  # On IPA clients — WORKS
+  ansible managed_hosts -m command -a "id -u"
+  vault1.lab.local | CHANGED | rc=0 >> 0
+  k8s-master1.lab.local | CHANGED | rc=0 >> 0
 
-**Check 2: Does the sudo rule exist?**
-```bash
-# On FreeIPA server
-ipa sudorule-show super_bot
-  Rule name: super_bot
-  Enabled: TRUE
-  User: super_bot
-  Host Groups: automation_group
-  Command category: all
-  RunAs User: root
-```
-Finding: Sudo rule exists and looks correct.
+_____________________________________________________________________
 
-**Check 3: Why doesn't it apply on FreeIPA server?**
-```bash
-# On FreeIPA server - check SSSD status
-systemctl status sssd
-# sssd is running
+[Analysis]
 
-# But check how sudo is configured
-cat /etc/nsswitch.conf | grep sudoers
-sudoers: files sss
-```
-Finding: SSSD is running, but FreeIPA server doesn't query itself via SSSD for sudo rules.
+# Initial Check Notes:
+First confirmed the sudo rule and hostgroup are configured correctly —
+ruled out a misconfiguration before digging deeper.
 
-**Check 4: Compare with IPA client**
-```bash
-# On vault1 (IPA client)
-sudo -l -U super_bot
-User super_bot may run the following commands on vault1:
+Command:
+  ipa hostgroup-show automation_group
+  ipa sudorule-show super_bot
+
+Output:
+  automation_group members: freeipa.lab.local, vault1.lab.local, vault2.lab.local...
+  sudo rule: enabled, user=super_bot, hostgroup=automation_group, command=all, runas=root
+
+freeipa.lab.local is in the hostgroup and the rule looks correct.
+So the rule exists and is configured right — problem is elsewhere.
+
+Command:
+  cat /etc/nsswitch.conf | grep sudoers  (on freeipa server)
+
+Output:
+  sudoers: files sss
+
+SSSD is running on the FreeIPA server, but checking sudo on an IPA client confirmed
+the same rule works fine there with the same user.
+
+
+# Suspected Root Cause
+FreeIPA server does not apply its own sudo rules to itself via SSSD — it is the
+identity provider, not a client, so SSSD-based sudo resolution does not work on
+the server itself.
+
+NOTE: This theory has evidence working against it. In the old POC environment,
+FreeIPA was managed via a domain user (super_ansible) using the same sudo approach
+and it worked without issues:
+
+  Old inventory (working):
+    [ansible]
+    ansible.home.lab ansible_connection=local
+
+    [ipa]
+    ipa.home.lab
+
+    [all:vars]
+    ansible_user=super_ansible
+
+IPA was managed under super_ansible with no sudo failures at that time.
+This means the suspected root cause may not be the full picture. The real root
+cause is not fully confirmed — could be related to differences in SSSD config,
+sudo rule setup, or domain enrollment between old and new environments.
+Not investigated further at this time.
+
+
+# More Checks Notes:
+Compared behavior between freeipa server and vault1 (IPA client) with same user and rule.
+
+Command:
+  sudo -l -U super_bot  (on vault1)
+
+Output:
+  User super_bot may run the following commands on vault1:
     (root) NOPASSWD: ALL
-```
-Finding: Same user, same rule - works on client, not on server.
 
-## 4. Root Cause
-> The FreeIPA **server** is the identity provider, not a client. It stores the rules but does NOT apply them to itself via SSSD. SSSD-based sudo only works on IPA **clients**.
+Same user, same rule — works on client, not on server.
 
-```
-FreeIPA Server                    IPA Clients
-┌─────────────────┐              ┌─────────────────┐
-│ Stores rules    │              │ SSSD queries    │
-│ Does NOT apply  │ ──────────── │ FreeIPA for     │
-│ rules to itself │              │ sudo rules      │
-└─────────────────┘              └─────────────────┘
-```
 
-**Analogy:** FreeIPA server is like the security office that issues access badges. The security office itself doesn't use badges to get in - guards just work there. IPA clients are like other buildings that check badges issued by the security office.
+# Suspected Solution
+Manage FreeIPA server separately in Ansible inventory using root directly.
+Bypass the unconfirmed sudo issue rather than spending more time on root cause.
 
-## 5. Solution
-> Manage FreeIPA server separately with direct root access in Ansible inventory.
 
-**Why this works:** Since FreeIPA server can't use its own sudo rules via SSSD, we bypass this by using root directly for FreeIPA operations.
+# Test
+Updated inventory to use ansible_user=root for freeipa group, re-ran Ansible.
 
-**File:** `ansible/dev/inventory/inventory.ini`
+Command:
+  ansible freeipa -m command -a "id -u"
+  ansible managed_hosts -m command -a "id -u"
 
-**Location:** Ansible control node inventory configuration
+Result: PASS — freeipa returns 0 via root, all managed_hosts return 0 via super_bot + sudo.
 
-**Configuration:**
-```ini
-[freeipa]
-freeipa.lab.local ansible_user=root
+_____________________________________________________________________
 
-[managed_hosts:children]
-k8s_masters
-k8s_workers
-vault_cluster
-ansible
-local_runners
-nginx
+[Final Root Cause]
+Not fully confirmed. Suspected: FreeIPA server not resolving sudo rules via SSSD
+for domain users in this environment. However this conflicts with old POC evidence
+where the same approach worked fine under super_ansible. Differences between old
+and new environment were not fully investigated. Workaround applied instead.
 
-[managed_hosts:vars]
-ansible_user=super_bot
-ansible_become=yes
-ansible_become_method=sudo
-```
+_____________________________________________________________________
 
-**Usage:**
-```bash
-# Normal operations - domain user with sudo (works on IPA clients)
-ansible managed_hosts -m ping
+[Final Solution]
+Workaround — separated FreeIPA server from managed hosts in Ansible inventory.
+FreeIPA server uses root directly, all IPA clients use super_bot + sudo.
 
-# FreeIPA server management - root directly
-ansible freeipa -m ping
-```
+  ansible/dev/inventory/inventory.ini:
 
-**Verification:**
-```bash
-[root@ansible dev]# ansible freeipa -m command -a "id -u"
-freeipa.lab.local | CHANGED | rc=0 >> 0
+  [freeipa]
+  freeipa.lab.local ansible_user=root
 
-[root@ansible dev]# ansible managed_hosts -m command -a "id -u"
-# All succeed via super_bot + sudo
-```
+  [managed_hosts:children]
+  k8s_masters
+  k8s_workers
+  vault_cluster
+  ansible
+  local_runners
+  nginx
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: FreeIPA server accessed as root - acceptable since it's the identity master and requires privileged access anyway
+  [managed_hosts:vars]
+  ansible_user=super_bot
+  ansible_become=yes
+  ansible_become_method=sudo
 
-## 7. Impact After Fix
-- Observed: All Ansible operations work correctly
-- FreeIPA managed via root, clients managed via domain user + sudo
-- No new issues caused
+Verified: Yes (workaround confirmed working, root cause not fully resolved)
 
-## 8. Notes
-- FreeIPA server is always managed separately from its clients
-- This is by design, not a bug
-- If you try to "fix" this by enrolling FreeIPA as its own client, you'll break things
+_____________________________________________________________________
 
-## 9. Workaround (if any)
-> N/A - this IS the solution. FreeIPA server must be managed differently from clients.
+[Risk Level] LOW
+Note: FreeIPA server accessed as root — acceptable since it is the identity master
+and requires privileged access regardless.
 
-## References
-- [FreeIPA SUDO Integration](https://freeipa.readthedocs.io/en/latest/designs/sudo.html)
+_____________________________________________________________________
+
+[References]
+- archive-poc-v1/automation/ansible/ipa
+- archive-poc-v1/automation/ansible/inventory
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Root cause remains open. If sudo via domain user on FreeIPA server becomes needed
+in the future, investigate:
+  - SSSD configuration differences between old POC and current lab
+  - How domain enrollment was done on the FreeIPA server itself
+  - Sudo rule and group membership resolution on the server
+  - We can compare the config of old poc ipa archive-poc-v1/automation/ansible/ipa with the current config ansible/dev/playbooks/freeipa && ansible/dev/inventory/inventory.ini
+
+Current working pattern:
+  ansible freeipa        → root directly
+  ansible managed_hosts  → super_bot + sudo (IPA clients)

@@ -63,9 +63,6 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/GitHubActions-TerraformAdmin-${{ env.ENVIRONMENT }}
           aws-region: ${{ vars.AWS_REGION_PROD }}
 
-      # - name: Install Terraform
-      #   uses: hashicorp/setup-terraform@v2
-
       - name: Terraform Init
         run: terraform init -upgrade
 

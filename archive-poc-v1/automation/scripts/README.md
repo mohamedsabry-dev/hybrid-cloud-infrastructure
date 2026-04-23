@@ -1,6 +1,9 @@
 # Scripts
 
-Shell scripts for infrastructure automation and emergency procedures.
+> **Archived PoC v1 material** — retired infrastructure, not the current project.
+> See [`../../README.md`](../../README.md) for the retirement story and the current stack.
+
+Shell scripts for infrastructure automation and emergency procedures (PoC v1 era).
 
 ## Structure
 

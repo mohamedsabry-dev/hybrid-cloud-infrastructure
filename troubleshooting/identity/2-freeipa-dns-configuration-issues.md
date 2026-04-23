@@ -1,158 +1,150 @@
 # TS-IDN-002 | 2026-03-05 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: FreeIPA / BIND DNS
-- Environment: DEV (lab.local)
-- Related components: FreeIPA server (freeipa.lab.local), all domain clients
+[Info]
+Domain: Identity / FreeIPA
+Sub-techs: BIND DNS, FreeIPA DNS, DNS forwarders, recursion, Ansible
+Environment: DEV lab.local | FreeIPA server freeipa.lab.local | all domain clients
+Re-opened: No
 
-## 2. Issue
-- Symptom: Clients joined to FreeIPA domain cannot resolve external domains
-- Error:
-```bash
-# From client (e.g., vault1.lab.local) - external DNS fails
-dig @10.0.60.10 google.com
-;; ->>HEADER<<- opcode: QUERY, status: REFUSED, id: 12345
-;; flags: qr rd; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 1
-;; WARNING: recursion requested but not available
-;; OPT PSEUDOSECTION:
-; EDNS: version: 0, flags:; udp: 4096
-; EDE: 18 (Prohibited)
+_____________________________________________________________________
 
-# From FreeIPA server itself - works fine
-dig google.com
-# Returns valid response
-```
+[Issue Description]
+FreeIPA domain clients cannot resolve external domains. FreeIPA server itself resolves fine.
 
-## 3. Analysis
+  # From client (vault1.lab.local) — FAILS
+  dig @10.0.60.10 google.com
+  status: REFUSED
+  WARNING: recursion requested but not available
+  EDE: 18 (Prohibited)
 
-**Check 1: Are forwarders configured in FreeIPA?**
-```bash
-# On FreeIPA server
-ipa dnsconfig-show
-```
-Result: Empty configuration - despite setting `ipaserver_forwarders` in playbook vars, forwarders were not applied by the role.
+  # From FreeIPA server itself — WORKS
+  dig google.com
+  → valid response
 
-**Check 2: Why does it work from FreeIPA server but not clients?**
+_____________________________________________________________________
 
-BIND defaults to allowing recursion only from localhost (127.0.0.1). When client (10.0.x.x) asks FreeIPA DNS "What's the IP of google.com?":
-1. FreeIPA DNS doesn't know google.com directly
-2. It needs to ask upstream DNS (forwarders) - this is "recursion"
-3. BIND only allows recursion from 127.0.0.1
-4. Clients get REFUSED
+[Analysis]
 
-## 4. Root Cause
-> Two problems:
-> 1. **Forwarders not applied:** The `ipaserver_forwarders` var in the role didn't configure DNS forwarders properly
-> 2. **Recursion denied:** BIND defaults to allowing recursion only from localhost (127.0.0.1)
+# Initial Check Notes:
+First checked if forwarders were even configured in FreeIPA — the playbook has
+ipaserver_forwarders set in vars so expected them to be applied.
 
-## 5. Solution
-> Add `post_tasks` to FreeIPA setup playbook to configure forwarders and allow recursion from internal networks.
+Command:
+  ipa dnsconfig-show
 
-**Why this works:** We manually configure DNS forwarders (8.8.8.8, 1.1.1.1) using the ipadnsconfig module, and tell BIND to allow recursive queries from our internal network (10.0.0.0/8).
+Output:
+  Empty — no forwarders configured at all. The ipaserver_forwarders var in the
+  role did not apply. This was the first problem.
 
-**File:** `ansible/dev/playbooks/freeipa/freeipa_setup.yml`
+Then figured out why server resolves fine but clients get REFUSED.
+BIND defaults to allowing recursion only from localhost (127.0.0.1).
+When a client at 10.0.x.x asks FreeIPA DNS to resolve google.com:
+  1. FreeIPA DNS doesn't know google.com directly
+  2. It needs to ask upstream DNS — this is recursion
+  3. BIND only allows recursion from 127.0.0.1
+  4. Client request gets REFUSED
 
-**Location:** On FreeIPA server (freeipa.lab.local)
+From the server itself, dig works because it queries from 127.0.0.1 — localhost is allowed.
+This was the second problem.
 
-**Added in post_tasks section:**
-```yaml
-post_tasks:
-  - name: Configure DNS forwarders
-    freeipa.ansible_freeipa.ipadnsconfig:
-      ipaadmin_password: "{{ ipaadmin_password }}"
-      forwarders:
-        - ip_address: 8.8.8.8
-        - ip_address: 1.1.1.1
-      forward_policy: first
-      allow_sync_ptr: yes
 
-  - name: Allow DNS recursion from internal networks
-    ansible.builtin.blockinfile:
-      path: /etc/named/ipa-options-ext.conf
-      block: |
-        allow-recursion { 127.0.0.1; 10.0.0.0/8; };
-        allow-query-cache { 127.0.0.1; 10.0.0.0/8; };
-      marker: "# {mark} ANSIBLE MANAGED - DNS RECURSION"
-      create: yes
-      owner: root
-      group: named
-      mode: '0640'
-    notify: Restart named
+# Suspected Root Cause
+Two problems combined:
+  1. Forwarders not applied — ipaserver_forwarders var in the role didn't work
+  2. Recursion denied — BIND default only allows recursion from 127.0.0.1, not from
+     internal network clients
 
-handlers:
-  - name: Restart named
-    ansible.builtin.service:
-      name: named
-      state: restarted
-```
 
-**Config file edited:** `/etc/named/ipa-options-ext.conf` (on FreeIPA server)
+# More Checks Notes:
+Confirmed BIND recursion restriction by checking named config.
 
-**Verification:**
-```bash
-# On FreeIPA server - check forwarders are set
-ipa dnsconfig-show
-  Global forwarders: 8.8.8.8, 1.1.1.1
-  Forward policy: first
+Command:
+  cat /etc/named/ipa-options-ext.conf
 
-# On FreeIPA server - check BIND config
-cat /etc/named/ipa-options-ext.conf
-# BEGIN ANSIBLE MANAGED - DNS RECURSION
-allow-recursion { 127.0.0.1; 10.0.0.0/8; };
-allow-query-cache { 127.0.0.1; 10.0.0.0/8; };
-# END ANSIBLE MANAGED - DNS RECURSION
+Output:
+  File exists but no allow-recursion or allow-query-cache directives present.
+  BIND falling back to default — localhost only.
 
-# From client - test external resolution
-dig @10.0.60.10 google.com
-# Should return A record
-```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Opening recursion to 10.0.0.0/8 - acceptable for internal network, would be risk if FreeIPA DNS exposed to internet
+# Suspected Solution
+Add post_tasks to the FreeIPA setup playbook to handle both problems:
+  1. Configure forwarders (8.8.8.8, 1.1.1.1) via ipadnsconfig module
+  2. Add allow-recursion and allow-query-cache for 10.0.0.0/8 in ipa-options-ext.conf
 
-## 7. Impact After Fix
-- Observed: All clients can resolve external domains
-- No new issues caused
 
-## 8. Notes
+# Test
+Applied post_tasks to freeipa_setup.yml and ran the playbook.
 
-**IMPORTANT:** Use `/etc/named/ipa-options-ext.conf` (included inside BIND options block), NOT `/etc/named/ipa-ext.conf` which is outside the options context.
+Command:
+  ipa dnsconfig-show
+  dig @10.0.60.10 google.com  (from client vault1)
 
-**Forwarders syntax gotcha:**
-```yaml
-# WRONG - plain strings (causes "dictionary requested" error)
-forwarders:
-  - 8.8.8.8
-  - 1.1.1.1
+Result: PASS — forwarders confirmed applied, external resolution working from all clients.
 
-# CORRECT - dictionary with ip_address key
-forwarders:
-  - ip_address: 8.8.8.8
-  - ip_address: 1.1.1.1
-```
+_____________________________________________________________________
 
-The ansible-freeipa module expects dictionaries because it supports additional options like port:
-```yaml
-forwarders:
-  - ip_address: 8.8.8.8
-    port: 53           # optional
-```
+[Final Root Cause]
+Two problems combined. Forwarders were never applied — the ipaserver_forwarders var
+in the FreeIPA Ansible role did not configure DNS forwarders on the server. Even if
+forwarders had been set, BIND denies recursive queries from non-localhost by default.
+Clients at 10.0.x.x asking FreeIPA DNS to resolve external domains got REFUSED because
+BIND would not perform recursive lookups on their behalf. The server itself worked
+because it queries from 127.0.0.1 which BIND allows by default.
 
-## 9. Workaround (if any)
-> Manual configuration on FreeIPA server:
-> ```bash
-> # Add forwarders via IPA CLI
-> ipa dnsconfig-mod --forwarder=8.8.8.8 --forwarder=1.1.1.1
->
-> # Edit BIND config
-> vi /etc/named/ipa-options-ext.conf
-> # Add: allow-recursion { 127.0.0.1; 10.0.0.0/8; };
->
-> # Restart named
-> systemctl restart named
-> ```
+_____________________________________________________________________
 
-## References
-- [FreeIPA DNS Configuration](https://freeipa.readthedocs.io/en/latest/designs/dns.html)
-- [BIND allow-recursion](https://bind9.readthedocs.io/en/latest/reference.html)
+[Final Solution]
+Two fixes added as post_tasks in ansible/dev/playbooks/freeipa/freeipa_setup.yml:
+
+1. Configure DNS forwarders via ipadnsconfig module:
+     forwarders: 8.8.8.8, 1.1.1.1
+     forward_policy: first
+     allow_sync_ptr: yes
+
+2. Allow recursion from internal network in /etc/named/ipa-options-ext.conf:
+     allow-recursion { 127.0.0.1; 10.0.0.0/8; };
+     allow-query-cache { 127.0.0.1; 10.0.0.0/8; };
+
+Named restarted via handler after config change.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Opening recursion to 10.0.0.0/8 is acceptable for internal lab network.
+Would be a risk if FreeIPA DNS were exposed to the internet.
+
+_____________________________________________________________________
+
+[References]
+
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+IMPORTANT — wrong config file will break things:
+  Use: /etc/named/ipa-options-ext.conf  (included INSIDE BIND options block — correct)
+  NOT: /etc/named/ipa-ext.conf          (outside the options context — wrong)
+
+Forwarders syntax gotcha in ansible-freeipa module:
+  # WRONG — plain strings cause "dictionary requested" error
+  forwarders:
+    - 8.8.8.8
+
+  # CORRECT — must use ip_address key
+  forwarders:
+    - ip_address: 8.8.8.8
+    - ip_address: 1.1.1.1
+
+  Module expects dicts because it supports optional port field:
+    - ip_address: 8.8.8.8
+      port: 53
+
+Workaround (manual, without Ansible):
+  ipa dnsconfig-mod --forwarder=8.8.8.8 --forwarder=1.1.1.1
+  vi /etc/named/ipa-options-ext.conf
+    → add: allow-recursion { 127.0.0.1; 10.0.0.0/8; };
+  systemctl restart named

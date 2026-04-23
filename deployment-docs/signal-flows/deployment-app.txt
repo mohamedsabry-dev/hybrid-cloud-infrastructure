@@ -1,0 +1,157 @@
+git push (deployment.yaml + service.yaml + ingress.yaml + configmap + secret + pvc + sa)
+  └─► Flux detects new commit → kustomize build on app folder
+        └─► all files combined into one manifest → sent to kube-apiserver
+              └─► kube-apiserver runs 3 gates on EVERY object:
+                    ├── Authentication → who is sending this request?
+                    ├── Authorization → are they allowed to create this resource?
+                    └── Admission control → is manifest valid? webhooks pass?
+                          └─► API server processes all objects (K8s handles basic ordering internally):
+                                ├── Namespace created first
+                                ├── ServiceAccount created
+                                ├── ConfigMap created
+                                ├── Secret (vault-ca) created
+                                ├── PVC created → CSI provisions NAS directory
+                                ├── Service (ClusterIP) created → gets stable IP (never changes)
+                                ├── Ingress object created → ingress-nginx controller picks it up
+                                └── Deployment created → saved to etcd ✅
+                                      └─► controller manager notified (watching kube-apiserver)
+                                            ├── sees Deployment with 2 replicas, no ReplicaSet exists
+                                            └─► creates ReplicaSet → saved to etcd via kube-apiserver
+                                                  ├── sees ReplicaSet needs 2 pods, has 0
+                                                  └─► creates 2 Pod objects (no node assigned yet)
+                                                        └─► saved to etcd → status: Pending ⏳
+                                                              └─► MutatingWebhook intercepts each Pod spec:
+                                                                    vault-agent-injector reads annotations:
+                                                                      agent-inject: true → inject
+                                                                      role: wordpress → which vault role
+                                                                      agent-inject-secret-db-creds → secret path + filename
+                                                                      agent-inject-template-db-creds → output format
+                                                                      tls-secret: vault-ca → mount this Secret at /vault/tls/
+                                                                      ca-cert: /vault/tls/ca.crt → verify vault TLS with this
+                                                                    └─► mutates pod spec — adds:
+                                                                          ├── vault-agent-init (init container, prepended first)
+                                                                          ├── vault-agent sidecar container
+                                                                          ├── emptyDir volume at /vault/secrets/ (shared)
+                                                                          └── /vault/tls/ volume mount (vault-ca Secret)
+                                                                                └─► mutated spec returned to kube-apiserver → etcd ✅
+
+etcd updated → scheduler notified (watching kube-apiserver)
+  └─► scheduler sees 2 pods with no node assigned
+        ├── Filtering stage → removes nodes that dont qualify:
+        │     ├── not enough CPU/memory → removed
+        │     ├── taint not tolerated → removed
+        │     ├── anti-affinity violated → removed
+        │     └── node selector not matched → removed
+        └── Scoring stage → picks best node from remaining
+              └─► writes node name into pod spec
+                    └─► sends to kube-apiserver → saved to etcd ✅
+                          └─► status: Scheduled ⏳
+
+etcd updated → kubelet on assigned node notified (watching kube-apiserver)
+  └─► kubelet reads full mutated pod spec
+        └─► kubelet writes /etc/resolv.conf inside pod:
+              nameserver 10.96.0.10  ← kube-dns Service ClusterIP
+              search default.svc.cluster.local svc.cluster.local cluster.local
+                └─► containerd pulls images (if not cached on node)
+                      └─► init containers run IN ORDER:
+                            1. vault-agent-init:
+                                 reads SA token mounted inside pod
+                                 └─► needs to resolve vault.lab.local
+                                       └─► DNS query UDP :53 → 10.96.0.10 (kube-dns ClusterIP)
+                                             └─► kube-proxy forwards → CoreDNS pod (kube-system)
+                                                   └─► CoreDNS checks Corefile plugins IN ORDER:
+                                                         [1] kubernetes plugin
+                                                               is query cluster.local? → NO, skip
+                                                         [2] hosts plugin
+                                                               is query vault.lab.local? → YES ✅
+                                                               └─► returns 10.0.62.100 directly
+                                                                     └─► no upstream DNS contacted
+                                                                           └─► answer returns to vault-agent-init
+                                                   └─► vault-agent-init connects to 10.0.62.100:8200
+                                                         └─► POST vault.lab.local/v1/auth/kubernetes/login
+                                                               └─► Vault calls K8s TokenReview API
+                                                                     └─► kube-apiserver confirms:
+                                                                           sa=wordpress-sa, ns=apps ✅
+                                                                           └─► Vault issues vault token
+                                                                                 └─► fetches secret/data/wordpress/config
+                                                                                       └─► renders template
+                                                                                             └─► writes /vault/secrets/db-creds
+                                                                                                   └─► exits 0 ✅
+
+                            2. wait-for-mariadb:
+                                 └─► needs to resolve mariadb-svc.database.svc.cluster.local
+                                       └─► DNS query UDP :53 → 10.96.0.10 (kube-dns ClusterIP)
+                                             └─► CoreDNS checks Corefile plugins IN ORDER:
+                                                   [1] kubernetes plugin
+                                                         is query cluster.local? → YES ✅
+                                                         └─► kubernetes plugin → HTTP/gRPC → kube-apiserver
+                                                               └─► kube-apiserver reads etcd
+                                                                     └─► returns ClusterIP of mariadb-svc
+                                                                           └─► answer returns to init container
+                                                   └─► nc -z mariadb-svc.database.svc.cluster.local 3306
+                                                         loops every 2s until port open
+                                                         exits 0 when MariaDB ready ✅
+
+                      └─► all init containers done → main containers start simultaneously:
+                            ├── wordpress container:
+                            │     checks /vault/secrets/db-creds exists
+                            │     export $(cat db-creds | xargs) → env vars
+                            │     exec docker-entrypoint.sh apache2-foreground
+                            │     entrypoint reads env vars → generates wp-config.php
+                            │     Apache starts → WordPress ready
+                            │     liveness probe: GET /wp-includes/images/blank.gif (local)
+                            │     readiness probe: GET /wp-content/index.php (NFS mount)
+                            │       pass → kubelet reports pod Ready to kube-apiserver ✅
+                            │             └─► kube-apiserver saves pod status + IP to etcd
+                            │                   └─► endpoint controller updates Service endpoints
+                            │                         └─► pod now receives traffic ✅
+                            │       fail → pod removed from Service endpoints
+                            └── vault-agent sidecar:
+                                  own auth flow → own vault token
+                                  watches secret for changes → re-renders db-creds
+                                  renews token before TTL expires → loops forever
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SERVICE AND DNS ROLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Service (ClusterIP) role:
+  ├── stable IP — survives pod restarts, rollouts, deployment delete/recreate
+  ├── selector: app=wordpress → finds healthy pods via readiness probe
+  ├── CoreDNS resolves wordpress.apps.svc.cluster.local → ClusterIP
+  │     └─► kubernetes plugin → kube-apiserver → etcd → returns ClusterIP
+  └── only reachable inside cluster — ingress-nginx forwards to it internally
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROLLING UPDATE (when deployment.yaml changes in Git)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ├── Flux detects change → sends updated Deployment to kube-apiserver
+  ├── pod template changed → controller manager triggers rolling update
+  │     create 1 new pod → full signal flow above repeats
+  │     wait until new pod Ready ✅
+  │     delete 1 old pod
+  │     repeat until all pods replaced
+  │     at least 1 pod always Running → zero downtime ✅
+  └── replicas count change only → scales without replacing pods
+
+pod template changes that trigger rolling update:
+  ├── image version
+  ├── env vars
+  ├── resource limits
+  ├── command
+  ├── volume mounts
+  └── probe configuration
+
+changes that do NOT trigger rolling update:
+  ├── replicas count → scale only
+  └── Deployment metadata labels (outside template block)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VOLUMES IN FINAL POD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ├── wordpress-data → PVC claimName: wordpress-data (NFS, /var/www/html/wp-content)
+  ├── php-config → ConfigMap wordpress-php-config (/usr/local/etc/php/conf.d/uploads.ini)
+  ├── /vault/secrets/ → emptyDir (added by injector, shared between all containers)
+  └── /vault/tls/ → Secret vault-ca (added by injector, ca.crt for TLS verification)
