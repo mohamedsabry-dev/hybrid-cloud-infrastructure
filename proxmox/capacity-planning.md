@@ -1,6 +1,8 @@
 ⚠️  LEGACY PLAN
 This was the initial resource allocation baseline. Actual deployment adapted as needed.
 For the dev server: masters adjusted to 2.5GB RAM, Vault nodes to 0.5GB, workers to 3.25GB.
+And it keep changing based on needs:
+latest 25 April >> k8s masters and workers on dev all 2.75GB // k8s master on prod 5GB , worker 7 GB 
 
 ================================================================================
 RESOURCE PLANNING

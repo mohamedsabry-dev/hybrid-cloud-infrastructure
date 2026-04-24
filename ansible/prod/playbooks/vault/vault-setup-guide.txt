@@ -1,7 +1,7 @@
 # Vault Playbooks — Setup & Init Guide (PROD)
 
 Deploy + initialize the 3-node Vault HA cluster via the playbooks in this
-folder. The workflow dev-vault-full-setup.yml runs vault_setup automatically;
+folder. The workflow prod-vault-full-setup.yml runs vault_setup automatically;
 vault_config is manual after `vault operator init`.
 
 See README.md for scope + decisions. The Vault system overview lives in:

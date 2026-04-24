@@ -30,9 +30,9 @@
 **Uplinks**: 1 physical vNIC from VMnet2
 
 **Security Policies (CRITICAL):**
-- **Promiscuous Mode: ON** ⚠️ (Required for nested virtualization)
-- **Forged Transmits: ON** ⚠️ (Required for nested ESXi)
-- **MAC Changes: ON** ⚠️ (Required for vMotion)
+- **Promiscuous Mode: ON**  (Required for nested virtualization)
+- **Forged Transmits: ON**  (Required for nested ESXi)
+- **MAC Changes: ON**  (Required for vMotion)
 
 ### Why Promiscuous Mode is Required
 
@@ -170,9 +170,9 @@ Nested ESXi hosts need to receive traffic for nested VMs with different MAC addr
 ### Why Not Separate Management and Production?
 
 **Current Design: Single Internal Network**
-- ✅ Simpler configuration
-- ✅ Fewer VMware networks to manage
-- ✅ Adequate for home lab scale
+- Simpler configuration
+- Fewer VMware networks to manage
+- Adequate for home lab scale
 
 **Future Consideration: Separate Networks**
 - Dedicated management VLAN (10.0.10.x/24)
@@ -188,7 +188,7 @@ Nested ESXi hosts need to receive traffic for nested VMs with different MAC addr
 
 | vSwitch | Promiscuous | Forged Transmits | MAC Changes |
 |---------|-------------|------------------|-------------|
-| ESXi Master (vSwitch_Internal) | **ON** ⚠️ | **ON** ⚠️ | **ON** ⚠️ |
+| ESXi Master (vSwitch_Internal) | **ON**  | **ON**  | **ON**  |
 | ESXi Nested (Production/DR) | OFF | OFF | OFF |
 
 **Why these settings:**

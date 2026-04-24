@@ -14,20 +14,20 @@
 - Snapshot captures only 10GB of actual data
 
 **Use Cases:**
-- ✅ All VMs except NAS VM
-- ✅ Infrastructure VMs (vCenter, Veeam, pfSense)
-- ✅ Production VMs (K8s, Vault, IPA, etc.)
+- All VMs except NAS VM
+- Infrastructure VMs (vCenter, Veeam, pfSense)
+- Production VMs (K8s, Vault, IPA, etc.)
 
 **Benefits:**
-- ✅ Efficient space usage
-- ✅ Smaller snapshots
-- ✅ Easier capacity planning
-- ✅ Faster VM creation
+- Efficient space usage
+- Smaller snapshots
+- Easier capacity planning
+- Faster VM creation
 
 **Trade-offs:**
-- ⚠️ Slightly slower initial writes
-- ⚠️ Risk of datastore over-subscription
-- ⚠️ Requires monitoring actual usage
+-  Slightly slower initial writes
+-  Risk of datastore over-subscription
+-  Requires monitoring actual usage
 
 ---
 
@@ -39,17 +39,17 @@
 - Even with 10GB data, full 100GB reserved
 
 **Use Cases:**
-- ✅ NAS VM data disks only (900GB + 5GB = 905GB total)
+- NAS VM data disks only (900GB + 5GB = 905GB total)
 
 **Benefits:**
-- ✅ Predictable performance (no thin overhead)
-- ✅ Guaranteed space (no over-subscription)
-- ✅ Simpler management for critical storage
+- Predictable performance (no thin overhead)
+- Guaranteed space (no over-subscription)
+- Simpler management for critical storage
 
 **Trade-offs:**
-- ❌ Snapshots capture ENTIRE allocated space
-- ❌ 900GB thick disk = 900GB snapshot (not 50GB actual data)
-- ❌ Requires dedicated datastore for snapshot safety
+- Snapshots capture ENTIRE allocated space
+- 900GB thick disk = 900GB snapshot (not 50GB actual data)
+- Requires dedicated datastore for snapshot safety
 
 ### Thick Provisioning Types
 
@@ -67,9 +67,9 @@
 ### Why RAID for Production VMs?
 
 **Data Protection:**
-- ✅ Mirror critical data across 2 disks
-- ✅ Survive single disk failure
-- ✅ Production best practice
+- Mirror critical data across 2 disks
+- Survive single disk failure
+- Production best practice
 
 **Production VMs with RAID1:**
 ```
@@ -153,18 +153,18 @@ Monitoring    | 90GB    | 2×20GB         | Thin         | RAID1 | 130GB   | Met
 ## Best Practices
 
 **DO:**
-- ✅ Use thin provisioning by default
-- ✅ Use thick provisioning for critical storage (NAS VM)
-- ✅ Configure RAID1 for critical data
-- ✅ Take snapshots before RAID configuration
-- ✅ Monitor datastore space usage regularly
+- Use thin provisioning by default
+- Use thick provisioning for critical storage (NAS VM)
+- Configure RAID1 for critical data
+- Take snapshots before RAID configuration
+- Monitor datastore space usage regularly
 
 **DON'T:**
-- ❌ Over-provision beyond 2.5x capacity
-- ❌ Mix thick and thin on same datastore without planning
-- ❌ Configure RAID without snapshot space calculation
-- ❌ Use thick provisioning unless necessary
-- ❌ Forget to calculate 2x disk size for thick snapshots
+- Over-provision beyond 2.5x capacity
+- Mix thick and thin on same datastore without planning
+- Configure RAID without snapshot space calculation
+- Use thick provisioning unless necessary
+- Forget to calculate 2x disk size for thick snapshots
 
 ---
 

@@ -102,13 +102,13 @@ ansible-playbook 02-validate_node_exporter.yml
 
 **Expected Output:**
 ```
-Target: k8s-master.home.lab | Local Service: ✅ UP | Prometheus Connection: ✅ SUCCESS
-Target: vault-01.home.lab   | Local Service: ✅ UP | Prometheus Connection: ✅ SUCCESS
+Target: k8s-master.home.lab | Local Service:  UP | Prometheus Connection:  SUCCESS
+Target: vault-01.home.lab   | Local Service:  UP | Prometheus Connection:  SUCCESS
 ```
 
 **Failure Example:**
 ```
-Target: jenkins.home.lab | Local Service: ✅ UP | Prometheus Connection: ❌ BLOCKED (Check Firewall)
+Target: jenkins.home.lab | Local Service:  UP | Prometheus Connection:  BLOCKED (Check Firewall)
 ```
 
 **Troubleshooting Failed Connections:**
@@ -383,7 +383,7 @@ ansible-playbook 01-node_exporter-setup.yml --limit <hostname>
 
 **Symptoms:**
 ```
-Prometheus Connection: ❌ BLOCKED (Check Firewall)
+Prometheus Connection:  BLOCKED (Check Firewall)
 ```
 
 **Diagnosis:**

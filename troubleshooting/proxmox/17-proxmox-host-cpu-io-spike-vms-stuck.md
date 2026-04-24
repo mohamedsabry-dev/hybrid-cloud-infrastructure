@@ -1,4 +1,4 @@
-# TS-PVE-017 | 2026-04-19 | WORKAROUND APPLIED | INCIDENT
+# TS-PVE-017 | 2026-04-19 | ROOT CAUSE CONFIRMED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -82,9 +82,22 @@ IO wait was above 50% on the host.
 _____________________________________________________________________
 
 [Final Root Cause]
-NOT IDENTIFIED. Proxmox host experienced CPU/IO exhaustion after extended DR
-testing. The qemu-ga EAGAIN busy loop (TS-K8S-038) may have been a contributing
-factor, but the exact trigger is unknown.
+CONFIRMED (2026-04-24, 8-hour investigation).
+
+Zero IO isolation on shared consumer NVMe combined with Kubernetes cascade dynamics.
+Single 476.9GB NVMe with LVM-thin pool, 15+ VM disks, ALL Proxmox IO throttles set
+to unlimited. Any single VM can monopolize the entire NVMe queue, starving all other
+VMs and triggering a self-sustaining cascade (probe failures → restarts → LIST storms
+→ etcd IO → more probe failures → loop).
+
+Empirically proven: CPU stress on all 3 masters (80% host CPU) = 0% IO spike.
+LIST operation spam (100x concurrent) = instant 57% IO spike, 1343ms NVMe latency.
+Single VM configmap write storm = host-wide IO delay, all SSH/VNC unresponsive.
+
+qemu-ga (TS-K8S-038) ruled out as direct cause for this occurrence (0% CPU, etcd
+slow 7 min before qemu-ga gap). Remains a potential indirect trigger for future events.
+
+Full investigation: troubleshooting/proxmox/17-root-cause-investigation/
 
 _____________________________________________________________________
 
@@ -108,14 +121,19 @@ Verified: Yes — all VMs recovered after host reboot.
 
 _____________________________________________________________________
 
-[Risk Level] MEDIUM
+[Risk Level] HIGH (until IO throttling applied)
 
-Root cause unknown. Could recur during heavy DR testing or if qemu-ga busy loop
-triggers again.
+Root cause confirmed but fix NOT YET APPLIED. Will recur from any trigger that
+generates heavy IO on a single VM (backup, qemu-ga, restart storm, Flux retry).
+Per-VM IO throttling via Proxmox Hardware → Disk → Bandwidth tab is the primary fix.
+See troubleshooting/proxmox/17-root-cause-investigation/05-remediation-stages.md.
 
 _____________________________________________________________________
 
 [References]
-- TS-K8S-038 — qemu-ga EAGAIN busy loop (likely related)
+- TS-K8S-038 — qemu-ga EAGAIN busy loop (potential indirect trigger, not direct cause)
 - TS-K8S-043 — DR testing that preceded this incident
-- TS-PVE-015 — similar unknown Proxmox crash during backup
+- TS-PVE-015 — backup IO impact (same architectural weakness, confirmed 40% IO during backup)
+- TS-PVE-018 — prod thermal shutdown during backup (same root cause family)
+- TS-K8S-042 — Flux retry storm (same cascade pattern, different trigger)
+- Full investigation: troubleshooting/proxmox/17-root-cause-investigation/

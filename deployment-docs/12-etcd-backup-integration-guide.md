@@ -1,6 +1,6 @@
 # etcd Backup with Vault AWS Integration
 # ========================================
-# Complete Guide - Tested & Working
+# Setup Guide
 
 ## Architecture Overview
 

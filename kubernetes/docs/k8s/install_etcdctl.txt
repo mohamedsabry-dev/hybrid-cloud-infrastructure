@@ -1,14 +1,30 @@
-## Need to do
+================================================================================
+ETCDCTL INSTALLATION + USAGE
+================================================================================
 
-kubectl exec -n kube-system etcd-k8s-master1.lab.local -- etcd --version 
+Install etcdctl on K8s masters to match the cluster's etcd version.
 
-# Download etcdctl 3.6.6                                                                       
-curl -LO https://github.com/etcd-io/etcd/releases/download/v3.6.6/etcd-v3.6.6-linux-amd64.tar.gz
-tar xzf etcd-v3.6.6-linux-amd64.tar.gz                                                           
-mv etcd-v3.6.6-linux-amd64/etcdctl /usr/local/bin/
-rm -rf etcd-v3.6.6-linux-amd64*                                                                  
-                                                                                                 
-# Create persistent env                                                                        
+--------------------------------------------------------------------------------
+1. CHECK CURRENT ETCD VERSION
+--------------------------------------------------------------------------------
+
+kubectl exec -n kube-system etcd-k8s-master1.lab.local -- etcd --version
+
+--------------------------------------------------------------------------------
+2. INSTALL ETCDCTL
+--------------------------------------------------------------------------------
+
+ETCD_VER=v3.6.6
+
+curl -LO https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz
+tar xzf etcd-${ETCD_VER}-linux-amd64.tar.gz
+mv etcd-${ETCD_VER}-linux-amd64/etcdctl /usr/local/bin/
+rm -rf etcd-${ETCD_VER}-linux-amd64*
+
+--------------------------------------------------------------------------------
+3. SET PERSISTENT ENV VARS
+--------------------------------------------------------------------------------
+
 cat > /etc/profile.d/etcdctl.sh << 'EOF'
 export ETCDCTL_API=3
 export ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
@@ -20,51 +36,34 @@ EOF
 chmod +x /etc/profile.d/etcdctl.sh
 source /etc/profile.d/etcdctl.sh
 
-  # Test
+--------------------------------------------------------------------------------
+4. VERIFY
+--------------------------------------------------------------------------------
+
 etcdctl endpoint health --cluster
 etcdctl member list
 
+--------------------------------------------------------------------------------
+5. COMMON OPERATIONS
+--------------------------------------------------------------------------------
 
-Convert to Ansible playbook 
-
-
-
-ETCD_VER=v3.6.6
-curl -L https://github.com/etcd-io/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz | tar xz
-./etcd-${ETCD_VER}-linux-amd64/etcdutl snapshot status /tmp/etcd-20260411-141101.snap --write-out=table
-
-
-
-
-# Check Health
+# Health check (via kubectl exec, no local install needed)
 kubectl exec -it etcd-k8s-master1.lab.local -n kube-system -- etcdctl \
---endpoints=https://127.0.0.1:2379 \
---cacert=/etc/kubernetes/pki/etcd/ca.crt \
---cert=/etc/kubernetes/pki/etcd/server.crt \
---key=/etc/kubernetes/pki/etcd/server.key \
-endpoint health
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  endpoint health
 
-https://127.0.0.1:2379 is healthy: successfully committed proposal: took = 6.578814ms
-
-# Take backup 
+# Manual snapshot
 kubectl exec -it etcd-k8s-master1.lab.local -n kube-system -- etcdctl \
---endpoints=https://127.0.0.1:2379 \
---cacert=/etc/kubernetes/pki/etcd/ca.crt \
---cert=/etc/kubernetes/pki/etcd/server.crt \
---key=/etc/kubernetes/pki/etcd/server.key \
-snapshot save /var/lib/etcd/backup.db
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save /var/lib/etcd/backup.db
 
-{"level":"info","ts":"2026-04-09T08:35:09.452443Z","caller":"snapshot/v3_snapshot.go:83","msg":"created temporary db file","path":"/var/lib/etcd/backup.db.part"}
-{"level":"info","ts":"2026-04-09T08:35:09.457178Z","logger":"client","caller":"v3@v3.6.6/maintenance.go:236","msg":"opened snapshot stream; downloading"}
-{"level":"info","ts":"2026-04-09T08:35:09.461367Z","caller":"snapshot/v3_snapshot.go:96","msg":"fetching snapshot","endpoint":"https://127.0.0.1:2379"}
-{"level":"info","ts":"2026-04-09T08:35:09.650195Z","logger":"client","caller":"v3@v3.6.6/maintenance.go:302","msg":"completed snapshot read; closing"}
-{"level":"info","ts":"2026-04-09T08:35:09.684178Z","caller":"snapshot/v3_snapshot.go:111","msg":"fetched snapshot","endpoint":"https://127.0.0.1:2379","size":"34 MB","took":"231.622891ms","etcd-version":"3.6.0"}
-{"level":"info","ts":"2026-04-09T08:35:09.684292Z","caller":"snapshot/v3_snapshot.go:121","msg":"saved","path":"/var/lib/etcd/backup.db"}
-Snapshot saved at /var/lib/etcd/backup.db
-Server version 3.6.0
+# Verify snapshot (needs etcdutl, not etcdctl)
+./etcd-${ETCD_VER}-linux-amd64/etcdutl snapshot status /tmp/etcd-snapshot.snap --write-out=table
 
-# Verify
-sudo ls -la /var/lib/etcd/backup.db 
-
-copy it to safe place: i currently will move local save insted of NAS since i dont have direct connection network with nas 
-i either add later or use another way but not on the current scope. "Operation of allow node to reach nas already done on worker level, just will be repeated." 
+================================================================================

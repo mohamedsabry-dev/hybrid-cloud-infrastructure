@@ -50,11 +50,11 @@ Resource optimization and best practices
 
 ### Key Design Principles
 
-✅ **Cold standby DR** instead of active HA (saves 29GB)
-✅ **CPU over-commitment** at 194% (safe with complementary workloads)
-✅ **Memory buffer** of 1GB for unexpected spikes
-✅ **Three K8s workers** for true application-layer HA
-✅ **Dedicated VMs** for critical services (Vault, Jenkins)
+- **Cold standby DR** instead of active HA (saves 29GB)
+- **CPU over-commitment** at 194% (safe with complementary workloads)
+- **Memory buffer** of 1GB for unexpected spikes
+- **Three K8s workers** for true application-layer HA
+- **Dedicated VMs** for critical services (Vault, Jenkins)
 
 ---
 

@@ -242,8 +242,8 @@ RESULT: All new pods on Worker2/Worker3, Worker1 empty
 │  TIME 2: New pods running, old pods terminating                         │
 │  ══════════════════════════════════════════════                         │
 │  Worker1: [terminating...] [terminating...] [terminating...] [term...]  │
-│  Worker2: [helm-NEW ✓] [notif-NEW ✓]                                    │
-│  Worker3: [kustomize-NEW ✓] [source-NEW ✓]                              │
+│  Worker2: [helm-NEW Yes] [notif-NEW Yes]                                    │
+│  Worker3: [kustomize-NEW Yes] [source-NEW Yes]                              │
 │                                                                         │
 │  TIME 3: Final state                                                    │
 │  ══════════════════                                                     │
@@ -266,11 +266,11 @@ RESULT: All new pods on Worker2/Worker3, Worker1 empty
 │  WHAT SCHEDULER SEES:                     WHAT IT IGNORES:              │
 │  ════════════════════                     ════════════════              │
 │                                                                         │
-│  ✅ Requests (guaranteed allocation)      ❌ Limits (max burst)         │
-│  ✅ Node allocatable resources            ❌ Actual current usage       │
-│  ✅ Taints and tolerations                ❌ Historical patterns        │
-│  ✅ Affinity/anti-affinity rules          ❌ Memory pressure trends     │
-│  ✅ Node selectors                        ❌ Limit over-commitment %    │
+│   Requests (guaranteed allocation)       Limits (max burst)         │
+│   Node allocatable resources             Actual current usage       │
+│   Taints and tolerations                 Historical patterns        │
+│   Affinity/anti-affinity rules           Memory pressure trends     │
+│   Node selectors                         Limit over-commitment %    │
 │                                                                         │
 │  SCHEDULER'S VIEW OF OUR CLUSTER:                                       │
 │  ════════════════════════════════                                       │
@@ -342,7 +342,7 @@ Sequential restart timeline:
    Worker1=1, Worker2=1, Worker3=1
    → Any node acceptable, picks best resources (Worker1)
 
-RESULT: 2-1-1 distribution ✓
+RESULT: 2-1-1 distribution Yes
 
 ────────────────────────────────────────────────────────────────────────────
 ```
@@ -478,12 +478,12 @@ After exploring options:
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Anti-affinity for Flux | ✅ Complete | Pods now spread across nodes |
-| Anti-affinity for Ingress | ✅ Complete | 1 pod per node |
-| Sequential restart workaround | ✅ Documented | Manual fix for rolling update issue |
-| Root cause analysis | ✅ Complete | Scheduler limitations understood |
-| VPA | 🔄 Planned | To be implemented |
-| Descheduler | 🔄 Planned | To be implemented |
+| Anti-affinity for Flux |  Complete | Pods now spread across nodes |
+| Anti-affinity for Ingress |  Complete | 1 pod per node |
+| Sequential restart workaround |  Documented | Manual fix for rolling update issue |
+| Root cause analysis |  Complete | Scheduler limitations understood |
+| VPA |  Planned | To be implemented |
+| Descheduler |  Planned | To be implemented |
 
 **Memory Allocation After Fix:**
 ```

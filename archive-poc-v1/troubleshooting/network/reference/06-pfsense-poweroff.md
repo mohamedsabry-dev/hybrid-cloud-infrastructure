@@ -9,23 +9,23 @@ Problem Discovery:
   └── Impact: Cannot perform graceful shutdowns
 
 Why VMware Tools Are Critical:
-  ✓ Graceful shutdown capability
-  ✓ vApp shutdown integration
-  ✓ Guest OS detection
-  ✓ Time synchronization
-  ✓ Resource monitoring
+  Yes Graceful shutdown capability
+  Yes vApp shutdown integration
+  Yes Guest OS detection
+  Yes Time synchronization
+  Yes Resource monitoring
 
 Without VMware Tools:
-  ✗ vApp shutdown hangs indefinitely
-  ✗ No graceful shutdown capability
-  ✗ Error: vix error code = 21001
-  ✗ Power operations timeout
+  No vApp shutdown hangs indefinitely
+  No No graceful shutdown capability
+  No Error: vix error code = 21001
+  No Power operations timeout
 
 With VMware Tools:
-  ✓ Clean graceful shutdown
-  ✓ vApp operations complete successfully
-  ✓ Guest shutdown signals acknowledged
-  ✓ Proper integration with vCenter
+  Yes Clean graceful shutdown
+  Yes vApp operations complete successfully
+  Yes Guest shutdown signals acknowledged
+  Yes Proper integration with vCenter
 
 Installation Procedure:
 
@@ -39,7 +39,7 @@ Step 3: Select Correct Package
   └── Package: open-vm-tools-nox11 (without X11 GUI dependencies)
 
 Step 4: Install Package
-  ├── Click: Install (✓ icon)
+  ├── Click: Install (Yes icon)
   └── Wait: Installation completes (1-2 minutes)
 
 Step 5: Verify Service Running

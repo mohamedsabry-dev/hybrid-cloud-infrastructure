@@ -15,7 +15,7 @@ Playbooks for configuring GitHub Actions self-hosted runners.
 Installs tools required by the GitHub Actions runner:
 - AWS CLI v2
 
-**Used by:** `dev-local-runner-full-setup.yml` workflow
+**Used by:** `prod-local-runner-full-setup.yml` workflow
 
 ## When it runs
 

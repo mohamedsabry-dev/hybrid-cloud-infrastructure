@@ -1,36 +1,72 @@
+================================================================================
+VAULT K8S AUTH — PRE-SETUP COMMANDS
+================================================================================
+
+Commands to set up Vault's Kubernetes auth backend. Run once per cluster.
+
+--------------------------------------------------------------------------------
+1. GET K8S CLUSTER INFO
+--------------------------------------------------------------------------------
+
 kubectl cluster-info
-Kubernetes control plane is running at https://10.0.61.100:16443
+# Kubernetes control plane is running at https://10.0.61.100:16443
 
-kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d
+# Get CA cert (base64-decoded)
+kubectl config view --raw --minify --flatten \
+  -o jsonpath='{.clusters[].cluster.certificate-authority-data}' | base64 -d
 
-  # Get its token
-kubectl create token vault-auth -n kube-system --duration=30000h 
+# Create a long-lived token for Vault's token reviewer
+kubectl create token vault-auth -n kube-system --duration=30000h
 
+# Get OIDC issuer (needed for Vault config)
 kubectl get --raw /.well-known/openid-configuration | python3 -m json.tool | grep issuer
+# "issuer": "https://kubernetes.default.svc.cluster.local"
 
-"issuer": "https://kubernetes.default.svc.cluster.local",
+--------------------------------------------------------------------------------
+2. VAULT INITIAL SETUP (one-time)
+--------------------------------------------------------------------------------
 
-
-  "" On VAUKT "" # Initiak :
-  1- Rnable secret 
-  2- trsut K8s 
-  3- Run script to create app policy,role,secret 
+# Login
 vault login -method=ldap username=sabry
+
+# Enable KV v2 secrets engine
 vault secrets enable -path=secret kv-v2
 
+# Enable Kubernetes auth method
+vault auth enable kubernetes
 
- vault auth enable kubernetes  
+--------------------------------------------------------------------------------
+3. CONFIGURE K8S AUTH ON VAULT
+--------------------------------------------------------------------------------
 
+# Save K8s CA cert to temp file
 cat > /tmp/k8s-ca.crt << 'EOF'
 -----BEGIN CERTIFICATE-----
-certificate_Value                                                           
+<certificate_value>
 -----END CERTIFICATE-----
 EOF
 
+# Save token reviewer JWT to temp file
 cat > /tmp/k8s.tk.jwt << 'EOF'
-token_value
+<token_value>
 EOF
 
+# Write the K8s auth config
+vault write auth/kubernetes/config \
+  kubernetes_host="https://10.0.61.100:16443" \
+  kubernetes_ca_cert=@/tmp/k8s-ca.crt \
+  token_reviewer_jwt=@/tmp/k8s.tk.jwt \
+  issuer="https://kubernetes.default.svc.cluster.local" \
+  disable_iss_validation=false
 
-  Then update Vault config:                                                  
-vault write auth/kubernetes/config kubernetes_host="https://10.0.61.100:16443" kubernetes_ca_cert=@/tmp/k8s-ca.crt token_reviewer_jwt=@/tmp/k8s.tk.jwt issuer="https://kubernetes.default.svc.cluster.local" disable_iss_validation=false
+--------------------------------------------------------------------------------
+4. PER-APP SETUP (repeatable)
+--------------------------------------------------------------------------------
+
+# Use the vault-pod-setup.sh script for each app:
+/opt/vault/scripts/vault-pod-setup.sh <role> <namespace> <service-account>
+
+# Example:
+/opt/vault/scripts/vault-pod-setup.sh grafana monitoring grafana-sa
+
+================================================================================

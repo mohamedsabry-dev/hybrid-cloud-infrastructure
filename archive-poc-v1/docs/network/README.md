@@ -77,12 +77,12 @@ Security best practices and common issues
 
 ### Key Design Principles
 
-✅ **Network segmentation** for security and performance isolation
-✅ **Dedicated vMotion network** prevents I/O contention
-✅ **NAS network bonding** for high availability
-✅ **DNS redundancy** (IPA primary, pfSense backup)
-✅ **Nested virtualization support** with promiscuous mode
-✅ **Future hybrid cloud ready** (VPN, AWS integration)
+- **Network segmentation** for security and performance isolation
+- **Dedicated vMotion network** prevents I/O contention
+- **NAS network bonding** for high availability
+- **DNS redundancy** (IPA primary, pfSense backup)
+- **Nested virtualization support** with promiscuous mode
+- **Future hybrid cloud ready** (VPN, AWS integration)
 
 ---
 

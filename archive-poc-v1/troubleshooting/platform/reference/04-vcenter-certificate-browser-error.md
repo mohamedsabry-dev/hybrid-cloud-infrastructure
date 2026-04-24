@@ -171,10 +171,10 @@ Step-by-Step Fix (All Causes):
 
 Verification:
 -------------
-✓ Padlock icon shows green/secure
-✓ Certificate details show new dates
-✓ Certificate CN matches vsphere.local
-✓ No certificate warnings
+Yes Padlock icon shows green/secure
+Yes Certificate details show new dates
+Yes Certificate CN matches vsphere.local
+Yes No certificate warnings
 
 ================================================================================
 PREVENTION

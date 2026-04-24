@@ -140,7 +140,7 @@ kubectl delete pvc mariadb-data-mariadb-0 -n database
 
 # Verify PV is now Released (not deleted)
 kubectl get pv | grep f54d8831
-# STATUS: Released ✅ — data safe on NAS
+# STATUS: Released  — data safe on NAS
 ```
 
 ---
@@ -181,12 +181,12 @@ WordPress comes back up (replicas: 3 in Git).
 
 ```bash
 kubectl get pods -n apps -w
-# All 3 wordpress pods: Running 2/2 ✅
+# All 3 wordpress pods: Running 2/2 
 ```
 
 ### Step 12 — Create PVC manually
 
-⚠️ StatefulSet with replicas: 0 does NOT create PVCs automatically.
+ StatefulSet with replicas: 0 does NOT create PVCs automatically.
 PVCs are only created when a pod needs to be scheduled.
 Must create manually — StatefulSet will adopt it when scaled to 1.
 
@@ -210,7 +210,7 @@ spec:
 EOF
 
 kubectl get pvc -n database -w
-# mariadb-data-mariadb-0   Bound   pvc-<new-uuid>   15Gi   RWO   nfs-database ✅
+# mariadb-data-mariadb-0   Bound   pvc-<new-uuid>   15Gi   RWO   nfs-database 
 ```
 
 ### Step 13 — Identify new NAS directory
@@ -273,7 +273,7 @@ kubectl get pods -n database -w
 # mariadb-0   Init:0/1 (vault-agent-init authenticating)
 # mariadb-0   PodInitializing
 # mariadb-0   Running 1/2 (MariaDB container ready)
-# mariadb-0   Running 2/2 (vault-agent sidecar ready) ✅
+# mariadb-0   Running 2/2 (vault-agent sidecar ready) 
 ```
 
 ### Step 18 — Verify data intact
@@ -282,14 +282,14 @@ kubectl get pods -n database -w
 kubectl exec -it mariadb-0 -n database -c mariadb -- mariadb -u root -p
 
 > show databases;
-# wordpress present ✅
+# wordpress present 
 
 > use wordpress;
 > show tables;
-# All WordPress tables present ✅
+# All WordPress tables present 
 
 > SELECT COUNT(*) FROM wp_posts;
-# Record count matches pre-migration ✅
+# Record count matches pre-migration 
 
 > EXIT;
 ```
@@ -299,15 +299,15 @@ kubectl exec -it mariadb-0 -n database -c mariadb -- mariadb -u root -p
 ```bash
 # Check pods healthy
 kubectl get pods -n apps
-# All 3: Running 2/2 ✅
+# All 3: Running 2/2 
 
 # Check WordPress accessible
 curl -I https://wordpress-dev.lab.local
-# HTTP/2 200 ✅
+# HTTP/2 200 
 
 # Verify media accessible
 # Open WordPress admin → Media Library
-# Confirm all uploaded files visible and downloadable ✅
+# Confirm all uploaded files visible and downloadable 
 ```
 
 ### Step 20 — Verify new StorageClass
@@ -315,10 +315,10 @@ curl -I https://wordpress-dev.lab.local
 ```bash
 kubectl get pvc -n database
 # NAME                     STATUS  STORAGECLASS   CAPACITY
-# mariadb-data-mariadb-0   Bound   nfs-database   15Gi ✅
+# mariadb-data-mariadb-0   Bound   nfs-database   15Gi 
 
 kubectl get pv | grep 6b39c4df
-# STORAGECLASS: nfs-database ✅
+# STORAGECLASS: nfs-database 
 ```
 
 ---
@@ -330,7 +330,7 @@ kubectl get pv | grep 6b39c4df
 ```bash
 kubectl delete pv pvc-f54d8831-2f9b-4cb7-8fa8-4b9b2f3ee167
 kubectl get pv | grep f54d8831
-# No output — gone ✅
+# No output — gone 
 ```
 
 ### Step 22 — Delete old NAS directory

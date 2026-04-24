@@ -500,21 +500,21 @@ PREVENTION & BEST PRACTICES
 ================================================================================
 
 DO:
-✅ Disable VMware Tools time sync on ALL VMs
-✅ Create clear NTP hierarchy (Internet → IPA → Clients)
-✅ Use single time source per VM
-✅ Monitor time drift regularly
-✅ Document time sync configuration
-✅ Test Kerberos after time changes
-✅ Use Ansible to enforce configuration
+- Disable VMware Tools time sync on ALL VMs
+- Create clear NTP hierarchy (Internet → IPA → Clients)
+- Use single time source per VM
+- Monitor time drift regularly
+- Document time sync configuration
+- Test Kerberos after time changes
+- Use Ansible to enforce configuration
 
 DON'T:
-❌ Mix VMware Tools time sync with chrony
-❌ Allow VMs to sync to multiple NTP sources
-❌ Use DHCP-provided NTP servers
-❌ Forget to test after configuration changes
-❌ Ignore small time drifts (they accumulate)
-❌ Configure client VMs to sync to external NTP (bypass IPA)
+- Mix VMware Tools time sync with chrony
+- Allow VMs to sync to multiple NTP sources
+- Use DHCP-provided NTP servers
+- Forget to test after configuration changes
+- Ignore small time drifts (they accumulate)
+- Configure client VMs to sync to external NTP (bypass IPA)
 
 Architecture Decision:
 ----------------------

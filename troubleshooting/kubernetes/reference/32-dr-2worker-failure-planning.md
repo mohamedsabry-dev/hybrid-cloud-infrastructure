@@ -90,9 +90,9 @@ injector-1 → master1
 injector-2 → master3
 
 Scenario: 2 workers down + 1 master down
-  → 1 injector replica still running on remaining master ✅
-  → remediation can still authenticate to Vault ✅
-  → self-healing path intact ✅
+  → 1 injector replica still running on remaining master 
+  → remediation can still authenticate to Vault 
+  → self-healing path intact 
 ```
 
 This is the foundation that makes the entire self-healing design possible.
@@ -230,7 +230,7 @@ Normal operation:
 
 2 workers down:
   ingress-1 dies, ingress-2 dies
-  ingress-1 reschedules on worker3 ✅ (no other ingress there)
+  ingress-1 reschedules on worker3  (no other ingress there)
   ingress-2 tries worker3 → anti-affinity blocks → stays Pending
   worker3 has only 1 ingress → resources available for remediation + MariaDB
 ```
@@ -379,7 +379,7 @@ vault-agent-injector ready
         └─► vault-agent-init runs → authenticates to Vault
               └─► /vault/secrets/proxmox-creds injected
                     └─► remediation container starts with credentials
-                          └─► remediation can call Proxmox API ✅
+                          └─► remediation can call Proxmox API 
 ```
 
 ---
@@ -440,20 +440,20 @@ T+5:01  — scheduler processes pending pods in priority order:
 
   system-cluster-critical (vault-injector, ingress-nginx, Flux):
     → already on masters/worker3 or rescheduling there
-    → vault-injector: 1 replica on remaining master ✅
-    → ingress-nginx: 1 replica on worker3 (other stays Pending) ✅
-    → Flux: reschedules on worker3 ✅
+    → vault-injector: 1 replica on remaining master 
+    → ingress-nginx: 1 replica on worker3 (other stays Pending) 
+    → Flux: reschedules on worker3 
 
   self-healing-critical (remediation):
     → wait-for-vault-injector init container starts
     → waits for injector ready (~30-60s)
     → vault-agent-init authenticates
     → /vault/secrets/proxmox-creds injected
-    → remediation starts ✅
+    → remediation starts 
 
   database-critical (MariaDB):
     → hard mount NFS — waits for connection
-    → schedules on worker3 ✅
+    → schedules on worker3 
     → NFS reconnects → MariaDB resumes
 
   app-standard (WordPress):

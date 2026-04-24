@@ -94,15 +94,15 @@ AWS VPC (10.0.100.0/16)
 ## Why Bridged Mode?
 
 **VMnet0 Bridged Advantages:**
-- ✅ Direct access to home router
-- ✅ Same subnet as physical workstations
-- ✅ Simplifies home network integration
-- ✅ No additional NAT layer
+- Direct access to home router
+- Same subnet as physical workstations
+- Simplifies home network integration
+- No additional NAT layer
 
 **Alternative Considered: NAT Mode**
-- ❌ Additional NAT layer (complexity)
-- ❌ Port forwarding required for external access
-- ❌ More difficult VPN configuration
+- Additional NAT layer (complexity)
+- Port forwarding required for external access
+- More difficult VPN configuration
 
 ---
 
@@ -117,8 +117,8 @@ AWS VPC (10.0.100.0/16)
 **Solution**: Access pfSense via LAN interface (10.0.20.170) from Windows Host instead of WAN interface
 
 **Proper Access Methods:**
-- Mac PC: Access via WAN (192.x.x.##) ✓
-- Windows Host: Access via LAN (10.0.20.170) ✓
+- Mac PC: Access via WAN (192.x.x.##) Yes
+- Windows Host: Access via LAN (10.0.20.170) Yes
 
 ### Issue: VMs Cannot Access Internet
 

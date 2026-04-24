@@ -15,9 +15,8 @@ data:
 
     # Configuration
     CHECK_INTERVAL = 300        # 5 minutes between checks
+    CONFIRM_DELAY = 180         # 3 minutes — re-check before acting
     PROXMOX_NODE = "pve-dev"
-    NFS_STORAGE = "nas-dev-data"
-    TARGET_STORAGE = "local-lvm"
 
     # Node to VMID mapping
     NODE_MAP = {
@@ -146,62 +145,8 @@ data:
             except Exception as e:
                 print(f"  -> Start failed: {e}")
 
-    def get_latest_backup(proxmox, vmid):
-        """Get the latest backup for a VMID."""
-        backups = proxmox.nodes(PROXMOX_NODE).storage(NFS_STORAGE).content.get(
-            content="backup", vmid=vmid
-        )
-        if not backups:
-            return None
-        # Sort by creation time, get latest
-        backups.sort(key=lambda x: x.get("ctime", 0), reverse=True)
-        return backups[0]["volid"]
-
-    def restore_vm(proxmox, vmid):
-        """Restore VM from latest backup (no clone - direct overwrite).
-
-        Returns: 'restored' or 'failed'
-        """
-        # Get latest backup first
-        latest_backup = get_latest_backup(proxmox, vmid)
-        if not latest_backup:
-            print(f"  -> No backup found for VM {vmid}!")
-            return "failed"
-
-        # Stop VM
-        print(f"  -> Stopping VM {vmid}")
-        try:
-            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.stop.post()
-            time.sleep(30)
-        except Exception as e:
-            print(f"  -> Stop failed (may already be stopped): {e}")
-
-        # Delete current VM
-        print(f"  -> Deleting VM {vmid}")
-        try:
-            proxmox.nodes(PROXMOX_NODE).qemu(vmid).delete()
-            time.sleep(10)
-        except Exception as e:
-            print(f"  -> Delete failed: {e}")
-            return "failed"
-
-        # Restore from backup
-        print(f"  -> Restoring from {latest_backup}")
-        try:
-            proxmox.nodes(PROXMOX_NODE).qemu.post(
-                vmid=vmid,
-                archive=latest_backup,
-                storage=TARGET_STORAGE,
-                start=1
-            )
-            print(f"  -> Restore initiated, VM {vmid} starting")
-            return "restored"
-        except Exception as e:
-            print(f"  -> Restore failed: {e}")
-            return "failed"
-
     def remediate(proxmox, node_name, vmid):
-        """Escalating remediation: reboot -> reset -> restore."""
+        """Escalating remediation: reboot -> reset -> exhausted (no restore on dev)."""
         counters[node_name] += 1
         attempt = counters[node_name]
 
@@ -215,17 +160,7 @@ data:
             reset_vm(proxmox, vmid)
             send_alert(node_name, "reset", "initiated")
 
-        elif attempt == 3:
-            result = restore_vm(proxmox, vmid)
-            if result == "restored":
-                send_alert(node_name, "restore", "initiated", severity="critical")
-                print(f"  -> Waiting 120s buffer for restore to complete...")
-                time.sleep(120)  # 2 min buffer for restore
-            else:
-                send_alert(node_name, "restore", "failed", severity="critical")
-
         else:
-            # attempt > 3: Already tried everything, just log
             send_alert(node_name, "all-attempts", "exhausted - manual intervention required", severity="critical")
             print(f"  -> Max attempts reached - manual intervention required")
 
@@ -251,7 +186,7 @@ data:
             print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())} ---")
 
             # Phase 1: Check all nodes first
-            unhealthy_nodes = []
+            suspect_nodes = []
             for node_name, vmid in NODE_MAP.items():
                 healthy, reason = is_node_healthy(v1, node_name)
 
@@ -263,10 +198,23 @@ data:
                     else:
                         print(f"{node_name}: Healthy")
                 else:
-                    print(f"{node_name}: UNHEALTHY! ({reason})")
-                    unhealthy_nodes.append((node_name, vmid))
+                    print(f"{node_name}: SUSPECT ({reason}) — waiting {CONFIRM_DELAY}s to confirm")
+                    suspect_nodes.append((node_name, vmid))
 
-            # Phase 2: Remediate all unhealthy nodes
+            # Phase 1.5: Confirmation — wait and re-check suspects
+            unhealthy_nodes = []
+            if suspect_nodes:
+                time.sleep(CONFIRM_DELAY)
+                print(f"\n--- Confirmation check after {CONFIRM_DELAY}s ---")
+                for node_name, vmid in suspect_nodes:
+                    healthy, reason = is_node_healthy(v1, node_name)
+                    if healthy:
+                        print(f"{node_name}: Recovered on its own (false alarm)")
+                    else:
+                        print(f"{node_name}: CONFIRMED UNHEALTHY ({reason})")
+                        unhealthy_nodes.append((node_name, vmid))
+
+            # Phase 2: Remediate confirmed unhealthy nodes
             if unhealthy_nodes:
                 print(f"\n--- Remediating {len(unhealthy_nodes)} unhealthy node(s) ---")
                 for node_name, vmid in unhealthy_nodes:

@@ -68,7 +68,7 @@ Why It Happened:
 CRITICAL WARNING ABOUT /etc/fstab
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️  CRITICAL:
+  CRITICAL:
   "This file is checked on VM boot. If it has errors or typos, the VM will
   NOT start. Always test before rebooting."
 
@@ -102,7 +102,7 @@ Step 3: Validate /etc/fstab BEFORE Rebooting
 
   Expected: No errors reported
 
-  ⚠️  If errors found, DO NOT reboot - fix them first!
+    If errors found, DO NOT reboot - fix them first!
 
 Step 4: Reboot and Verify
   ├── Reboot NAS VM
@@ -118,39 +118,39 @@ ALWAYS make sure that the configuration you are doing follows best practices
 to avoid planting issues for the future of the environment."
 
 Why UUID is Critical:
-  ✓ UUID is permanent identifier tied to filesystem
-  ✓ Device names (/dev/sdX) are dynamic and assigned at boot time
-  ✓ Multi-disk systems MUST use UUID for reliable mounting
-  ✓ Race conditions are unpredictable - may work for months, then fail
+  Yes UUID is permanent identifier tied to filesystem
+  Yes Device names (/dev/sdX) are dynamic and assigned at boot time
+  Yes Multi-disk systems MUST use UUID for reliable mounting
+  Yes Race conditions are unpredictable - may work for months, then fail
 
 Key Takeaways:
-  ✗ NEVER use /dev/sdX device names in /etc/fstab for multi-disk systems
-  ✓ ALWAYS use UUID for persistent mount points
-  ✓ ALWAYS validate /etc/fstab with findmnt --verify before rebooting
-  ✓ Taking the "easy way" with critical infrastructure = future disaster
-  ✓ Best practices exist for a reason - they prevent race conditions
+  No NEVER use /dev/sdX device names in /etc/fstab for multi-disk systems
+  Yes ALWAYS use UUID for persistent mount points
+  Yes ALWAYS validate /etc/fstab with findmnt --verify before rebooting
+  Yes Taking the "easy way" with critical infrastructure = future disaster
+  Yes Best practices exist for a reason - they prevent race conditions
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 System Configuration:
-  ✓ Use UUID-based mounting for all persistent disks
-  ✓ Use /dev/sdX ONLY for temporary/removable devices
-  ✓ Document UUID assignments in configuration comments
-  ✓ Test /etc/fstab changes in staging first
+  Yes Use UUID-based mounting for all persistent disks
+  Yes Use /dev/sdX ONLY for temporary/removable devices
+  Yes Document UUID assignments in configuration comments
+  Yes Test /etc/fstab changes in staging first
 
 Validation Process:
-  ✓ Always run `findmnt --verify` after editing /etc/fstab
-  ✓ Test in single-user mode if possible
-  ✓ Keep backup of working /etc/fstab
-  ✓ Never reboot without validation
+  Yes Always run `findmnt --verify` after editing /etc/fstab
+  Yes Test in single-user mode if possible
+  Yes Keep backup of working /etc/fstab
+  Yes Never reboot without validation
 
 Operational:
-  ✓ Document all mount points with purpose
-  ✓ Use descriptive comments in /etc/fstab
-  ✓ Include UUID discovery commands in documentation
-  ✓ Regular audit of mount configurations
+  Yes Document all mount points with purpose
+  Yes Use descriptive comments in /etc/fstab
+  Yes Include UUID discovery commands in documentation
+  Yes Regular audit of mount configurations
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DETECTION & MONITORING

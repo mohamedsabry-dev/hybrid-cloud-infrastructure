@@ -56,10 +56,10 @@ Internet sees connection from pfSense WAN IP only
 ```
 
 **Benefits:**
-- ✅ All VMs can reach internet via pfSense
-- ✅ Internal network hidden from internet
-- ✅ Single public IP for entire lab
-- ✅ Security through network address translation
+- All VMs can reach internet via pfSense
+- Internal network hidden from internet
+- Single public IP for entire lab
+- Security through network address translation
 
 ### 2. Firewall & Access Control
 
@@ -72,8 +72,8 @@ Internet sees connection from pfSense WAN IP only
 - Future: Granular rules for specific workloads
 
 **Web UI Access Control:**
-- Mac PC: Access via WAN (192.x.x.##) ✓
-- Windows Host: Access via LAN (10.0.20.170) ✓
+- Mac PC: Access via WAN (192.x.x.##) Yes
+- Windows Host: Access via LAN (10.0.20.170) Yes
 - Other devices: Denied by default
 
 ### 3. DNS Resolver (Backup)
@@ -135,11 +135,11 @@ Purpose: Internet access for all internal VMs
 **Path**: Services > DNS Resolver
 
 ```
-Enable: ✓
+Enable: Yes
 Listen Port: 53
 Network Interfaces: ALL
 Outgoing Interfaces: ALL
-DNSSEC: ✓ (optional)
+DNSSEC: Yes (optional)
 ```
 
 ### Domain Overrides
@@ -195,10 +195,10 @@ VM → pfSense (10.0.20.170) → External DNS (8.8.8.8)
 ```
 
 **Benefits:**
-- ✅ Redundancy: If IPA fails, pfSense provides DNS
-- ✅ HA: Multiple resolution paths
-- ✅ Future VPN: VPN clients can use pfSense as DNS
-- ✅ Hybrid Cloud: Can forward cloud domain queries to AWS Route53
+- Redundancy: If IPA fails, pfSense provides DNS
+- HA: Multiple resolution paths
+- Future VPN: VPN clients can use pfSense as DNS
+- Hybrid Cloud: Can forward cloud domain queries to AWS Route53
 
 ### Testing DNS Resolution
 
@@ -287,7 +287,7 @@ pfSense WAN (NAT translation applied)
   ↓
 pfSense LAN (source rewritten to 10.0.20.222)
   ↓
-Vault VM (sees connection from 10.0.20.222 → ✅ Allowed by firewall)
+Vault VM (sees connection from 10.0.20.222 →  Allowed by firewall)
 ```
 
 ### Verification
@@ -305,10 +305,10 @@ tcp  0  0  10.0.20.191:8200  10.0.20.222:5150   ESTABLISHED
 
 ### Benefits
 
-- ✅ Mac Mini can access Vault without weakening firewall rules
-- ✅ Vault OS firewall remains restrictive (10.0.20.0/24 only)
-- ✅ Easy maintenance from pfSense (no need to modify each VM's firewall)
-- ✅ Clean separation: pfSense handles network translation, VMs handle application security
+- Mac Mini can access Vault without weakening firewall rules
+- Vault OS firewall remains restrictive (10.0.20.0/24 only)
+- Easy maintenance from pfSense (no need to modify each VM's firewall)
+- Clean separation: pfSense handles network translation, VMs handle application security
 
 **Related Configuration:**
 - Vault firewall rules: `03-AUTOMATION/ansible-playbooks/vault/02-vault_fw_check.yml`

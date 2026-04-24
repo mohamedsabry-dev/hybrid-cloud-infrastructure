@@ -229,9 +229,9 @@ WHY:
 
 CORRECT Configuration:
 ----------------------
-✅ Windows Laptop: Static route 10.0.0.0/24 → 192.168.0.104
-❌ Physical Router: NO static route for 10.0.0.0/24
-✅ pfSense: Default route → 192.168.0.1, LAN route → 10.0.0.0/24
+- Windows Laptop: Static route 10.0.0.0/24 → 192.168.0.104
+- Physical Router: NO static route for 10.0.0.0/24
+- pfSense: Default route → 192.168.0.1, LAN route → 10.0.0.0/24
 
 Solution Implementation
 -----------------------
@@ -337,9 +337,9 @@ Expected output (2 hops, no loop):
   2    1 ms     1 ms     1 ms   10.0.0.100     (IPA Server)
 ```
 
-✓ Only 2 hops
-✓ No router (192.168.0.1) in the path
-✓ No repeated IPs (no loop)
+Yes Only 2 hops
+Yes No router (192.168.0.1) in the path
+Yes No repeated IPs (no loop)
 
 Test 2: SSH Should Remain Stable
 ---------------------------------
@@ -352,9 +352,9 @@ ssh root@10.0.0.100
 3. Wait 5+ minutes
 4. Connection should remain active
 
-✓ No disconnections
-✓ No timeouts
-✓ Stable RTT
+Yes No disconnections
+Yes No timeouts
+Yes Stable RTT
 
 Test 3: Continuous Ping (No Packet Loss)
 -----------------------------------------
@@ -364,10 +364,10 @@ ping -t 10.0.0.100
 
 Run for 5 minutes, observe:
 
-✓ 0% packet loss
-✓ Consistent RTT (~1-5ms)
-✓ No timeouts
-✓ TTL remains consistent (62-64)
+Yes 0% packet loss
+Yes Consistent RTT (~1-5ms)
+Yes No timeouts
+Yes TTL remains consistent (62-64)
 
 Test 4: tcpdump Shows Clean Flow
 ---------------------------------

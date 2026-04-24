@@ -1,7 +1,7 @@
 # FreeIPA Playbooks — Setup Guide (PROD)
 
 Run order + commands for the FreeIPA playbooks. The normal path is via the
-workflow `dev-freeipa-full-setup.yml`; manual runs are for emergencies or
+workflow `prod-freeipa-full-setup.yml`; manual runs are for emergencies or
 DR fallback.
 
 See README.md for scope + playbook descriptions.

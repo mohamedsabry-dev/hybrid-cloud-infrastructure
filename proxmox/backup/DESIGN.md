@@ -46,7 +46,7 @@ The `repeat-missed = 1` setting matters specifically because the Proxmox hosts a
 
 **Original schedule:** Thursday and Saturday at 21:00 — two backups per week, timed around weekend work (pre-change Thursday, post-change Saturday).
 
-**Why I'm planning to move to 3-4/week distributed every 2 days:** I ran the performance test documented in [`workload_backup/test-performance-plan.md`](workload_backup/test-performance-plan.md) and [`workload_backup/backup-performance-test-explained.txt`](workload_backup/backup-performance-test-explained.txt). The observation was that **the env doesn't notice the backup.** K8s workloads keep running smoothly through the backup window, Vault stays up and responsive, the network doesn't saturate. The initial 2/week cadence was cautious — picked before I had the numbers — and now that I have the numbers, there's no reason to stay at 2.
+**Why I'm planning to move to 3-4/week distributed every 2 days:** I ran the performance test documented in [`workload_backup/test-performance-plan.md`](workload_backup/test-performance-plan.md). The observation was that **the env doesn't notice the backup.** K8s workloads keep running smoothly through the backup window, Vault stays up and responsive, the network doesn't saturate. The initial 2/week cadence was cautious — picked before I had the numbers — and now that I have the numbers, there's no reason to stay at 2.
 
 **Planned cadence:** every 2 days, so roughly 3-4 per week depending on the month. Evenly distributed instead of lumped around the weekend, which matches how my actual changes land (I edit throughout the week, not just Fri/Sat).
 
@@ -83,5 +83,5 @@ This matches the `keep_last = 5` value already deployed in `terraform/*/proxmox/
 - [`proxmox_backup/backup-proxmox-config.sh`](proxmox_backup/backup-proxmox-config.sh) — config backup script
 - [`workload_backup/backup-snapshot.md`](workload_backup/backup-snapshot.md) — vzdump schedule, modes, retention, snapshot notes
 - [`workload_backup/backup_config_guide.txt`](workload_backup/backup_config_guide.txt) — PVE backup job config reference
-- [`workload_backup/test-performance-plan.md`](workload_backup/test-performance-plan.md) + [`workload_backup/backup-performance-test-explained.txt`](workload_backup/backup-performance-test-explained.txt) — the performance testing that drove the 2/week → 3-4/week change
+- [`workload_backup/test-performance-plan.md`](workload_backup/test-performance-plan.md) — the performance testing that drove the 2/week → 3-4/week change
 - [`../../troubleshooting/terraform/10-cloud-init-ssh-host-key-regeneration.md`](../../troubleshooting/terraform/10-cloud-init-ssh-host-key-regeneration.md) — the incident that drove retention 2 → 5

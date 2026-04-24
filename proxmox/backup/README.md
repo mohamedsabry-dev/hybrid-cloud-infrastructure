@@ -24,8 +24,7 @@ backup/
 └── workload_backup/                                 # VM / LXC vzdump reference
     ├── backup-snapshot.md                           # Main guide: schedule, modes, retention, performance, snapshots
     ├── backup_config_guide.txt                      # /etc/pve/jobs.cfg layout + PVE web-UI config walkthrough
-    ├── test-performance-plan.md                     # Performance test plan
-    └── backup-performance-test-explained.txt        # Performance test results + commentary
+    └── test-performance-plan.md                     # Performance test plan + results
 ```
 
 ## Quick reference
@@ -51,4 +50,4 @@ Full reasoning for why this replaces PBS is in [`DESIGN.md`](DESIGN.md).
 
 ## Notes on filenames
 
-Naming across this folder is inconsistent — `backup_config_guide.txt` uses underscores while everything else uses hyphens, and the two performance-test files aren't clearly paired by name. Kept as-is to avoid breaking a reference in `deployment-docs/01-proxmox-setup-guide.md`. Safe to normalise in a later pass if desired.
+Naming across this folder is inconsistent — `backup_config_guide.txt` uses underscores while everything else uses hyphens. Kept as-is to avoid breaking a reference in `deployment-docs/01-proxmox-setup-guide.md`.

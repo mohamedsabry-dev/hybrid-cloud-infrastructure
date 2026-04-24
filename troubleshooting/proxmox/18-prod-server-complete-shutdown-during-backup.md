@@ -305,30 +305,50 @@ instead of shutting down gracefully.
 _____________________________________________________________________
 
 [Final Solution]
-Temporary: Commented out the shutdown action in temperature_monitor.sh on prod
-to prevent recurrence during backup window. Script still logs and emails but
-does not trigger shutdown.
+Rewrote the temperature monitor from scratch. The old script was a simple cron
+job — one reading above 80°C and it pulled the trigger. That's what killed us.
+A single zstd spike during backup was enough to shut down the whole server.
 
-```bash
-#    /sbin/shutdown -h +1 "CPU temperature ${TEMP_C}°C - graceful thermal shutdown"
-     echo "Test Temp $TEMP_C"
+The new script follows the same pattern I used for the IO storm watchdog:
+a daemon loop that checks every 30s and requires sustained confirmation
+before acting. The key decisions I made:
+
+1. **Threshold raised to 90°C** — the old 80°C was too aggressive. Backup
+   spikes hit 85-92°C routinely. 90°C gives room for normal load while still
+   catching real overheating (idle is 63-65°C on this hardware).
+
+2. **Backup/restore awareness** — if `vzdump` or `qmrestore` is running, the
+   script skips shutdown entirely. Those spikes are expected and self-resolve
+   when the operation finishes. No point counting them.
+
+3. **5-minute sustained confirmation** — even without a backup running, a
+   single reading above 90°C doesn't trigger anything. The script needs 10
+   consecutive readings (10 × 30s = 5 minutes) before it acts. This handles
+   server boot, VM startups, scheduling bursts, CPU frequency ramp-up — all
+   the short-lived spikes that would have caused false triggers.
+
+4. **Counter resets on cooldown** — if temperature drops below 90°C at any
+   point during the confirmation window, the counter goes back to zero. The
+   spike has to be truly sustained with no dips.
+
+Combined effect: the only way this script triggers a shutdown is 90°C+ for
+5 straight minutes with no backup or restore running. That's a genuine
+thermal emergency, not a workload spike.
+
+Script: `proxmox/disaster_recovery/thermal/temperature_monitor.sh`
+
+Verified on pve-prod (2026-04-24):
 ```
-
-Permanent solution needed (TODO — pick one or combine):
-1. Raise threshold to 95°C (above backup spike, below hardware cutoff ~100°C)
-2. Add backup-awareness: skip shutdown if vzdump is running
-   (`pgrep -f vzdump && exit 0`)
-3. Reduce vzdump compression: use lzo instead of zstd (less CPU, bigger files)
-4. Add `--bwlimit` to vzdump to throttle I/O and reduce CPU pressure
-5. Schedule backups during cooler hours (night vs evening)
-
-Verified: Yes — backup re-ran successfully with shutdown action disabled.
-System stable. Temperature returned to 68°C after backup completed.
+root@pve-prod:~# ./scripts/temperature_monitor.sh
+2026-04-24 22:52:04 === Temperature Monitor started (threshold=90°C, confirm=10) ===
+2026-04-24 22:57:34 CPU: 90°C — backup/restore running, skipping
+```
+Hit 90°C during active backup — script correctly skipped shutdown. Exactly
+the scenario that caused the original incident, now handled properly.
 
 _____________________________________________________________________
 
-[Risk Level] MEDIUM — temporary fix disables thermal protection entirely.
-Need permanent solution before next heatwave or sustained high-load scenario.
+[Risk Level] LOW — thermal protection is back with proper safeguards.
 
 _____________________________________________________________________
 
@@ -338,5 +358,5 @@ _____________________________________________________________________
 - Related: TS-PVE-017 (CPU/IO spike during DR testing — similar thermal pattern)
 - Child: TS-K8S-050 (Remediation pod vs backup window race condition — preventive, raised from this investigation)
 - Related: DR proxmox-vzdump-backup.md (backup validation — updated with thermal findings)
-- Script: proxmox/disaster_recovery/thermal/draft-temperature_monitor.sh (threshold: 80°C)
-- Script: /root/scripts/temperature_monitor.sh (deployed on pve-prod, shutdown action now commented out)
+- Script: proxmox/disaster_recovery/thermal/temperature_monitor.sh (rewritten — daemon loop, 90°C threshold, backup-aware, 5-min confirmation)
+- Script: /root/scripts/temperature_monitor.sh (deployed on pve-prod — to be replaced with the rewritten version)

@@ -18,12 +18,12 @@
 
 | Node | Total RAM | Allocatable | Requests | Limits | Status |
 |------|-----------|-------------|----------|--------|--------|
-| k8s-master1 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
-| k8s-master2 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
-| k8s-master3 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) | ✅ OK |
-| **k8s-worker1** | 2.5GB | 2.4GB | 406Mi (17%) | **4596Mi (194%)** | ⚠️ CRITICAL |
-| k8s-worker2 | 2.5GB | 2.4GB | 220Mi (9%) | 670Mi (28%) | ✅ OK |
-| k8s-worker3 | 2.5GB | 2.4GB | 320Mi (13%) | 1970Mi (83%) | ⚠️ Warning |
+| k8s-master1 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |  OK |
+| k8s-master2 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |  OK |
+| k8s-master3 | 1.7GB | 1.6GB | 160Mi (9%) | 500Mi (31%) |  OK |
+| **k8s-worker1** | 2.5GB | 2.4GB | 406Mi (17%) | **4596Mi (194%)** |  CRITICAL |
+| k8s-worker2 | 2.5GB | 2.4GB | 220Mi (9%) | 670Mi (28%) |  OK |
+| k8s-worker3 | 2.5GB | 2.4GB | 320Mi (13%) | 1970Mi (83%) |  Warning |
 
 **Impact:** Worker1 at 194% memory over-commitment - risk of OOM under load.
 
@@ -144,8 +144,8 @@ kubectl describe deployment helm-controller -n flux-system | grep -A 10 "Limits"
 
 | Metric | Meaning | Scheduler Uses? | Risk When High |
 |--------|---------|-----------------|----------------|
-| **Requests** | Guaranteed allocation | ✅ Yes | Low requests = pods may starve |
-| **Limits** | Maximum allowed | ❌ No | Over 100% = OOM risk under load |
+| **Requests** | Guaranteed allocation |  Yes | Low requests = pods may starve |
+| **Limits** | Maximum allowed |  No | Over 100% = OOM risk under load |
 
 ### Why 194% Over-Commitment is Risky
 
@@ -260,8 +260,8 @@ See Case 9 for pod distribution fixes.
 |------|-------------|--------------|
 | Worker RAM | 2.5GB (unchanged) | Adequate |
 | Strategy | Test one app at a time | Run all apps |
-| Anti-affinity | ✅ Implemented | ✅ Implemented |
-| Advanced scheduling | 🔄 Planned (VPA + Descheduler) | 🔄 Planned |
+| Anti-affinity |  Implemented |  Implemented |
+| Advanced scheduling |  Planned (VPA + Descheduler) |  Planned |
 
 ---
 

@@ -21,8 +21,8 @@ Symptom:
   └── Result: 3 DUP! responses for each ICMP request
 
 Traffic Pattern:
-  ├── Same-host (VM1 → VM2 on same ESXi): No loop (stays internal) ✓
-  └── Cross-host (VM1 on Production → VM2 on DR Server): Loop occurs ✗
+  ├── Same-host (VM1 → VM2 on same ESXi): No loop (stays internal) Yes
+  └── Cross-host (VM1 on Production → VM2 on DR Server): Loop occurs No
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ROOT CAUSE ANALYSIS
@@ -32,7 +32,7 @@ Network Loop Created by Promiscuous Mode + Multiple Uplinks:
 
 Traffic Flow WITHOUT Fix (Loop):
   VM1 (ESXi Production Server) → ESXi Master vSwitch
-    ├── vmnic0 (Active) → forwards to ESXi DR Server → VM2 ✓
+    ├── vmnic0 (Active) → forwards to ESXi DR Server → VM2 Yes
     └── vmnic2 (Standby) → hears traffic → forwards AGAIN → VM2 (DUP!)
           └── vmnic0 hears vmnic2's forward → forwards AGAIN → VM2 (DUP!)
 
@@ -67,8 +67,8 @@ Applied on: ESXi Master only (nested ESXi don't need it)
 
 Traffic Flow WITH Fix (No Loop):
   VM1 (ESXi Production Server) → ESXi Master vSwitch
-    ├── vmnic0 (Active) → forwards to ESXi DR Server → VM2 ✓
-    └── vmnic2 (Standby) → hears traffic → RPF CHECK → "Wrong interface" → DROP ✓
+    ├── vmnic0 (Active) → forwards to ESXi DR Server → VM2 Yes
+    └── vmnic2 (Standby) → hears traffic → RPF CHECK → "Wrong interface" → DROP Yes
 
 Result: Only one packet delivered, no duplicates
 
@@ -96,10 +96,10 @@ LESSONS LEARNED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Key Insights:
-  ✓ Promiscuous mode + Multiple uplinks = Potential network loop
-  ✓ RPF check prevents duplicate packet forwarding
-  ✓ Only affects cross-host traffic, not same-host
-  ✓ Essential for HA with nested virtualization
+  Yes Promiscuous mode + Multiple uplinks = Potential network loop
+  Yes RPF check prevents duplicate packet forwarding
+  Yes Only affects cross-host traffic, not same-host
+  Yes Essential for HA with nested virtualization
 
 Important Note:
   "Future Consideration: Container networking inside nested VMs may need review.
@@ -111,22 +111,22 @@ PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ When planning HA with promiscuous mode, enable RPF check immediately
-  ✓ Document the relationship: Promiscuous + Uplinks = RPF required
-  ✓ Test cross-host connectivity after adding redundant uplinks
-  ✓ Include RPF check in initial ESXi Master configuration
+  Yes When planning HA with promiscuous mode, enable RPF check immediately
+  Yes Document the relationship: Promiscuous + Uplinks = RPF required
+  Yes Test cross-host connectivity after adding redundant uplinks
+  Yes Include RPF check in initial ESXi Master configuration
 
 Testing:
-  ✓ Ping tests between nested VMs on different hosts
-  ✓ Monitor for duplicate packets with tcpdump
-  ✓ Verify both Active and Standby uplink behavior
-  ✓ Test failover scenarios (disconnect Active uplink)
+  Yes Ping tests between nested VMs on different hosts
+  Yes Monitor for duplicate packets with tcpdump
+  Yes Verify both Active and Standby uplink behavior
+  Yes Test failover scenarios (disconnect Active uplink)
 
 Documentation:
-  ✓ Document RPF setting and why it's required
-  ✓ Include in ESXi Master build checklist
-  ✓ Note container networking considerations for future
-  ✓ Track ESXi version compatibility
+  Yes Document RPF setting and why it's required
+  Yes Include in ESXi Master build checklist
+  Yes Note container networking considerations for future
+  Yes Track ESXi version compatibility
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TROUBLESHOOTING GUIDE
