@@ -119,7 +119,7 @@ variable "k8s_master3" {
     gateway        = "10.0.61.1"
     bridge         = "vmbr0"
     vlan_id        = 61
-    startup_delay  = 60      # Wait 60s after masters before starting workers (order 9)
+    startup_delay  = 180      # Wait 180 after masters before starting workers (order 9)
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
     started        = true
