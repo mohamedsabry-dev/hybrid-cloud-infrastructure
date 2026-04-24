@@ -1,4 +1,4 @@
-What Pending to publish: //// 3 Days. == 26/April 
+What Pending to publish: //// 3 Days. == 25/April night
 
 deplymetn docs 10 to 15 manual redo 
 ++ signal flow of intgration 
@@ -9,4 +9,4 @@ deplymetn docs 10 to 15 manual redo
 ++ Fix auto alarm fake ones issue , with temp silent and make the case workaround and keep it open 
 ++ Clean Kubernetes sub folders and doc one by one 
 ++ Final Review + Readme + Notes + Design of root level 
-+ UpdateCV and write linked in post 
++ UpdateCV and write linked in post

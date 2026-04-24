@@ -25,6 +25,7 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 15 | [TS-PVE-015](15-proxmox-crash-during-backup-unknown-cause.md) | 2026-04-11 | Proxmox crash during backup mid-write | **UNDETERMINED** - Silent crash, no logs |
 | 16 | [TS-PVE-016](reference/16-proxmox-memory-metrics-misleading.md) | 2026-04-11 | Proxmox shows 97% memory but actual is 54% | Linux cache counted as "used" — normal behavior |
 | 17 | [TS-PVE-017](17-proxmox-host-cpu-io-spike-vms-stuck.md) | 2026-04-19 | CPU/IO spike during DR testing — all VMs hung | Unknown — rebooted host to recover |
+| 18 | [TS-PVE-018](18-prod-server-complete-shutdown-during-backup.md) | 2026-04-23 | Prod server graceful shutdown during backup | temperature_monitor.sh 80°C threshold hit by vzdump zstd compression spike (91°C) |
 
 ---
 

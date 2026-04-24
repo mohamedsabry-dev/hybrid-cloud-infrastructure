@@ -4,8 +4,8 @@ _____________________________________________________________________
 [Info]
 Domain: Proxmox VE / vzdump backup / Hardware
 Sub-techs: vzdump backup job, LXC containers, NFS storage (nas-dev-data), LVM thin pool, ASUS laptop server
-Environment: pve-dev
-Re-opened: No
+Environment: pve-dev + pve-prod (re-opened: both environments affected)
+Re-opened: Yes (2026-04-23)
 
 _____________________________________________________________________
 
@@ -185,8 +185,60 @@ _____________________________________________________________________
 
 _____________________________________________________________________
 
+[Re-opened: 2026-04-23 — Root cause likely thermal, confirmed via TS-PVE-018]
+
+# Context
+Live incident on 2026-04-23 ~21:00. Backup ran on both pve-dev and pve-prod.
+TS-PVE-018 investigation confirmed the root cause chain for prod. Findings here
+update the dev analysis and correct earlier suspicions.
+
+# Root cause update for THIS case (dev crash on 2026-04-11)
+TS-PVE-018 proved that vzdump + zstd compression spikes laptop CPU from 65°C
+idle to 85-92°C during backup. On prod, the temperature_monitor.sh script
+caught this at 91°C and triggered graceful shutdown. Dev does NOT have the
+temperature script deployed — so the CPU likely hit the hardware thermal
+cutoff (~100°C), causing the hard crash with no logs that this ticket
+originally documented. Same root cause, different failure mode.
+
+# Corrected finding: NAS overwhelm was wrong suspicion
+Original suspicion was that concurrent backup from both hosts overwhelmed the
+NAS. Investigation proved this wrong:
+- Prod IO delay during backup: only 11% — zero master impact, zero pod
+  restarts, zero CrashLoopBackOff. NAS handled it fine.
+- Dev IO delay during backup: 33-38% sustained for 13 minutes — this is
+  what caused the K8s master degradation on dev.
+- The difference is hardware: dev laptop is weaker, gets much higher IO
+  pressure under the same backup workload. NAS is not the bottleneck.
+
+# K8s master node degradation (DEV ONLY)
+Confirmed: kube-controller-manager and kube-scheduler entered CrashLoopBackOff
+on master2 and master3 during dev backup window. Caused by 33-38% IO delay
+overwhelming the weak dev hardware, not by NAS saturation.
+
+```
+# Observed on dev master nodes during backup window
+Warning  Unhealthy  17m                   kubelet  spec.containers{kube-controller-manager}: Liveness probe failed: Get "https://127.0.0.1:10257/healthz": EOF
+Warning  Unhealthy  7m37s (x5 over 17m)   kubelet  spec.containers{kube-controller-manager}: Liveness probe failed: Get "https://127.0.0.1:10257/dial tcp 127.0.0.1:10257: connect: connection refused
+Warning  BackOff    7m27s (x6 over 14m)   kubelet  spec.containers{kube-controller-manager}: Back-off restarting failed container
+
+kube-controller-manager-k8s-master3.lab.local   0/1     CrashLoopBackOff   17 (43s ago)     4d21h
+kube-scheduler-k8s-master2.lab.local            0/1     CrashLoopBackOff   77 (26s ago)     27d
+kube-scheduler-k8s-master3.lab.local            0/1     Running            74 (14s ago)     27d
+```
+
+Pattern: random CrashLoopBackOff across dev masters for ~10 minutes, stabilized
+directly after backup completed. Because vzdump backs up VMs one-by-one, HA
+keeps the cluster up — apps stay available. But the dev environment should
+expect this transient degradation during every backup window.
+
+Prod at 11% IO delay had zero cluster impact — no stagger required for NAS
+reasons, though still good practice.
+
+_____________________________________________________________________
+
 [References]
 - Related: TS-K8S-024 (Vault cluster resilience during this outage)
 - Related: TS-VAULT-005 (Vault node recovery after crash -- stale Raft data issue)
 - Related: TS-PVE-008 (LVM thin pool resize -- related to overprovisioning warnings)
 - Related: TS-PVE-014 (Worker VM crash unknown cause -- different incident, similar pattern)
+- Related: TS-PVE-018 (Prod thermal shutdown during backup -- ROOT CAUSE CONFIRMED: temperature_monitor.sh 80°C threshold + vzdump zstd spike to 91°C)

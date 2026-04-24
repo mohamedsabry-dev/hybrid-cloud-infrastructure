@@ -1,0 +1,241 @@
+# Dev Environment Drift — Drop Worker3 + Rebalance Memory
+# Date: 2026-04-24
+# Scope: pve-dev k8s cluster
+# Status: Manual first → Terraform alignment after 1 week if stable
+
+# ─────────────────────────────────────────────────────────────────────
+# Decision
+# ─────────────────────────────────────────────────────────────────────
+#
+# After the IO pressure spike investigation (April 23), I traced the root
+# cause to host memory overcommit + 3 etcd instances thrashing page cache
+# on shared NVMe. The dev host is at 104% memory commit — every VM is
+# fighting for physical pages, and etcd's random-read bbolt pattern
+# amplifies it into IO pressure spikes that cascade through liveness probes.
+#
+# The fix I'm testing: sacrifice one worker to buy headroom for the masters.
+#
+# Why worker3 specifically:
+# - 2 workers can handle the dev workload (MariaDB=1, WordPress HPA min=2
+#   with pod anti-affinity, ingress can run 2 replicas fine)
+# - Removing a master would break etcd quorum math — 3 is the minimum
+# - Worker RAM is less critical than master RAM (etcd doesn't run on workers)
+#
+# Memory math from Terraform baseline:
+#   Before:  3 masters × 2.5GB + 3 workers × 3.25GB = 17.25GB
+#   After:   3 masters × 3.5GB + 2 workers × 2.75GB = 16.00GB
+#   Net saving: 1.25GB on the host
+#
+# Each master gets a full +1GB (+40%). That should give etcd enough page
+# cache headroom to stop the random-read thrashing. Workers drop 0.5GB
+# each but they only run app pods — no etcd, no API server.
+#
+# I'm doing this manually (qm set) first, not through Terraform. If the
+# IO spikes stop after a week, I'll update the Terraform variables to
+# align state. If they don't stop, I roll back without any TF drift to
+# clean up.
+#
+# What I'm NOT doing yet:
+# - etcd defrag — want clean before/after comparison
+# - Liveness probe fix — want to confirm the analysis first, not mask it
+# - Vault LXC changes — they're 0.5GB each, not worth touching
+
+# ─────────────────────────────────────────────────────────────────────
+# Pre-flight
+# ─────────────────────────────────────────────────────────────────────
+
+  # Check where MariaDB is running (must NOT be on worker3)
+  kubectl get pods -n database -o wide
+
+  # Check pod distribution across workers
+  kubectl get pods -A -o wide | grep worker
+
+  # Check current memory on all VMs (verify tonight's changes are live)
+  ssh root@pve-dev "qm config 1010 | grep memory"   # master1
+  ssh root@pve-dev "qm config 1011 | grep memory"   # master2
+  ssh root@pve-dev "qm config 1012 | grep memory"   # master3
+  ssh root@pve-dev "qm config 1020 | grep memory"   # worker1
+  ssh root@pve-dev "qm config 1021 | grep memory"   # worker2
+  ssh root@pve-dev "qm config 1022 | grep memory"   # worker3
+
+  # Cluster health baseline
+  kubectl get nodes
+  kubectl top nodes
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 1: Git Changes (commit before executing)
+# ─────────────────────────────────────────────────────────────────────
+#
+# These files need updating to match the 2-worker topology:
+#
+# 1. kubernetes/dev/deployments/infrastructure/ingress/ingress-nginx-controller.yaml
+#    Line 28: replicaCount: 3 → 2
+#
+# 2. kubernetes/dev/deployments/apps/testing/nginx-test/nginx-test.yaml
+#    Line 14: replicas: 3 → 2
+#
+# 3. kubernetes/dev/deployments/apps/remediation/configmap.yaml
+#    Lines 23-27: Remove worker3 entry from NODE_MAP:
+#      NODE_MAP = {
+#          "k8s-worker1.lab.local": 1020,
+#          "k8s-worker2.lab.local": 1021,
+#      }
+#
+# Commit these BEFORE executing Phase 2.
+# Flux will pick them up after it's resumed in Phase 3.
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 2: K8s Operations — Remove Worker3
+# ─────────────────────────────────────────────────────────────────────
+
+  # Step 1: Suspend Flux (prevent reconciliation during drain)
+  flux suspend kustomization --all
+
+  # Step 2: Scale down remediation pod (prevent it from "fixing" worker3)
+  kubectl scale deployment remediation -n remediation --replicas=0
+
+  # Step 3: Scale ingress-nginx to 2 replicas manually (before Flux picks up git)
+  kubectl scale deployment ingress-nginx-controller -n ingress-nginx --replicas=2
+
+  # Step 4: Scale nginx-test to 2 replicas
+  kubectl scale deployment nginx-test -n testing --replicas=2
+
+  # Step 5: Cordon worker3 (no new pods scheduled)
+  kubectl cordon k8s-worker3.lab.local
+
+  # Step 6: Drain worker3 (evict all pods, respect PDBs)
+  kubectl drain k8s-worker3.lab.local --ignore-daemonsets --delete-emptydir-data --force --timeout=120s
+
+  # Step 7: Verify pods moved off worker3
+  kubectl get pods -A -o wide | grep worker3
+  # Should only show DaemonSet pods (calico, promtail, csi-nfs-node)
+
+  # Step 8: Shut down worker3 VM from Proxmox
+  ssh root@pve-dev "qm shutdown 1022 && qm wait 1022"
+
+  # Step 9: Disable worker3 auto-start
+  ssh root@pve-dev "qm set 1022 --onboot 0"
+
+  # Verify worker3 is stopped
+  ssh root@pve-dev "qm status 1022"
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 3: Memory Rebalance
+# ─────────────────────────────────────────────────────────────────────
+#
+# qm set applies to next boot — VMs must be restarted for changes to take effect.
+# Do masters one at a time to maintain etcd quorum (2/3 must be up).
+
+  # --- Workers first (simpler, no quorum risk) ---
+
+  # Worker1: 3072 → 2816 (2.75GB)
+  kubectl drain k8s-worker1.lab.local --ignore-daemonsets --delete-emptydir-data --force --timeout=120s
+  ssh root@pve-dev "qm set 1020 --memory 2816"
+  ssh root@pve-dev "qm reboot 1020"
+  # Wait for worker1 to rejoin
+  kubectl uncordon k8s-worker1.lab.local
+  kubectl wait --for=condition=Ready node/k8s-worker1.lab.local --timeout=180s
+
+  # Worker2: 3072 → 2816 (2.75GB)
+  kubectl drain k8s-worker2.lab.local --ignore-daemonsets --delete-emptydir-data --force --timeout=120s
+  ssh root@pve-dev "qm set 1021 --memory 2816"
+  ssh root@pve-dev "qm reboot 1021"
+  kubectl uncordon k8s-worker2.lab.local
+  kubectl wait --for=condition=Ready node/k8s-worker2.lab.local --timeout=180s
+
+  # --- Masters (one at a time, wait for etcd health between each) ---
+
+  # Master1: 3072 → 3584 (3.5GB)
+  ssh root@pve-dev "qm set 1010 --memory 3584"
+  ssh root@pve-dev "qm reboot 1010"
+  # Wait for master1 to rejoin and etcd to stabilize
+  kubectl wait --for=condition=Ready node/k8s-master1.lab.local --timeout=300s
+  # Verify etcd cluster health (run from any master)
+  ssh k8s-master1 "sudo etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/peer.crt --key=/etc/kubernetes/pki/etcd/peer.key endpoint health --cluster"
+
+  # Master2: 3072 → 3584 (3.5GB)
+  ssh root@pve-dev "qm set 1011 --memory 3584"
+  ssh root@pve-dev "qm reboot 1011"
+  kubectl wait --for=condition=Ready node/k8s-master2.lab.local --timeout=300s
+  ssh k8s-master1 "sudo etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/peer.crt --key=/etc/kubernetes/pki/etcd/peer.key endpoint health --cluster"
+
+  # Master3: 3072 → 3584 (3.5GB)
+  ssh root@pve-dev "qm set 1012 --memory 3584"
+  ssh root@pve-dev "qm reboot 1012"
+  kubectl wait --for=condition=Ready node/k8s-master3.lab.local --timeout=300s
+  ssh k8s-master1 "sudo etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/peer.crt --key=/etc/kubernetes/pki/etcd/peer.key endpoint health --cluster"
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 4: Resume + Verify
+# ─────────────────────────────────────────────────────────────────────
+
+  # Resume Flux (it will reconcile the git changes from Phase 1)
+  flux resume kustomization --all
+
+  # Scale remediation back up
+  kubectl scale deployment remediation -n remediation --replicas=1
+
+  # Full cluster verification
+  kubectl get nodes -o wide
+  kubectl top nodes
+  kubectl get pods -A | grep -v Running | grep -v Completed
+
+  # Verify memory on all running VMs
+  ssh root@pve-dev "qm config 1010 | grep memory"   # expect 3584
+  ssh root@pve-dev "qm config 1011 | grep memory"   # expect 3584
+  ssh root@pve-dev "qm config 1012 | grep memory"   # expect 3584
+  ssh root@pve-dev "qm config 1020 | grep memory"   # expect 2816
+  ssh root@pve-dev "qm config 1021 | grep memory"   # expect 2816
+
+  # Check host memory pressure (the whole point of this)
+  ssh root@pve-dev "free -h"
+  ssh root@pve-dev "cat /proc/pressure/memory"
+  ssh root@pve-dev "cat /proc/pressure/io"
+
+  # Watch for IO pressure spikes over the next hour
+  ssh root@pve-dev "watch -n 5 'cat /proc/pressure/io'"
+
+# ─────────────────────────────────────────────────────────────────────
+# Week 2: Terraform State Alignment (only if drift test passes)
+# ─────────────────────────────────────────────────────────────────────
+#
+# If IO pressure spikes are gone after 1 week, update Terraform to match:
+#
+# terraform/dev/proxmox/vms/k8s_masters/variables.tf:
+#   k8s_master1.memory = 3584  (line 37)
+#   k8s_master2.memory = 3584  (line 76)
+#   k8s_master3.memory = 3584  (line 116)
+#
+# terraform/dev/proxmox/vms/k8s_workers/variables.tf:
+#   k8s_worker1.memory = 2816  (line 40)
+#   k8s_worker2.memory = 2816  (line 86)
+#   k8s_worker3: either remove entirely or set started=false + on_boot=false
+#
+# Then run:
+#   cd terraform/dev/proxmox/vms/k8s_masters && terraform plan
+#   cd terraform/dev/proxmox/vms/k8s_workers && terraform plan
+#
+# Plan should show memory changes only (already applied via qm set).
+# Apply to align state. No VM restarts needed — memory already matches.
+
+# ─────────────────────────────────────────────────────────────────────
+# Rollback (if IO spikes persist — drift test failed)
+# ─────────────────────────────────────────────────────────────────────
+#
+#   # Restore worker3
+#   ssh root@pve-dev "qm set 1022 --onboot 1"
+#   ssh root@pve-dev "qm start 1022"
+#   kubectl uncordon k8s-worker3.lab.local
+#
+#   # Revert memory (requires VM restart per node, same rolling process)
+#   # Masters back to 3072, workers back to 3072
+#
+#   # Revert git changes (replica counts back to 3, NODE_MAP re-add worker3)
+
+# ─────────────────────────────────────────────────────────────────────
+# Related
+# ─────────────────────────────────────────────────────────────────────
+# - IO pressure investigation: drafts file at repo root (to be formalized)
+# - TS-PVE-015: dev crash during backup — same host overcommit context
+# - TS-PVE-018: prod thermal shutdown — different root cause, same incident chain
+# - TS-K8S-050: remediation pod backup window race condition
