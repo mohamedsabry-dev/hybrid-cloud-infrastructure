@@ -1,14 +1,8 @@
-What Pending to publish: //// 3 Days. == 26/April 
+What Pending to publish: //// 1 Days. == 26/April night
 
-2- Conslidation and Documentation && Add Signal Flow
-    - Grafana ↔ Prometheus ↔ Loki Integration 
-    - etcd ↔ Vault ↔ AWS Integration
-    - Remediation ↔ Vault ↔ Proxmo Integration
-    - Internal API Calls 
-
-
-4- Conslidate Kubernetes/env/deployment/apps && Add labels
-    :: 
-        - go through the prope readines and liveness before plan the evection test 
-
-5- Repo CleanUp on K8s//deployment-docs//root levels + (Readme - Design - Notes)
+deplymetn docs 10 to 15 manual redo 
+++ Mirror dev app to prod >> On it 
+    Aply tmp workround , clean pods restart to 0 after all storms done 
+++ Final Review + Readme + Notes + Design of root level 
+++ update tf 
+++ update the opened ts case with 1 review 

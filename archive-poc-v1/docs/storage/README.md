@@ -77,12 +77,12 @@ Common storage issues and solutions
 
 ### Key Design Principles
 
-✅ **Centralized NFS storage** for VM portability and vMotion
-✅ **Dedicated datastore** for thick-provisioned VMs (snapshot safety)
-✅ **UUID-based mounting** prevents disk race conditions
-✅ **Thin provisioning** for all VMs except NAS
-✅ **Thick provisioning** for NAS VM (predictable performance)
-✅ **Multi-layer backups** (Veeam internal + external)
+- **Centralized NFS storage** for VM portability and vMotion
+- **Dedicated datastore** for thick-provisioned VMs (snapshot safety)
+- **UUID-based mounting** prevents disk race conditions
+- **Thin provisioning** for all VMs except NAS
+- **Thick provisioning** for NAS VM (predictable performance)
+- **Multi-layer backups** (Veeam internal + external)
 
 ---
 

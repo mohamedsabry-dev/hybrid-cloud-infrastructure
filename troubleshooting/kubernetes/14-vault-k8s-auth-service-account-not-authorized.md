@@ -164,7 +164,7 @@ Common Helm chart SA naming patterns:
   MariaDB                            serviceAccount.name              default: <release>-mariadb
   WordPress                          serviceAccount.name              default: <release>-wordpress
 
-Key lessons:
+Notes:
   1. Helm charts create ServiceAccounts with release-name prefixes by default
   2. Always verify actual SA name before configuring Vault roles:
      kubectl get sa -n <namespace>

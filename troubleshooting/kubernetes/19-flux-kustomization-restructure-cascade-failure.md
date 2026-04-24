@@ -1,5 +1,4 @@
-# TS-K8S-019 | 2026-04-09 | RESOLVED
-# Severity: CATASTROPHIC
+# TS-K8S-019 | 2026-04-09 | RESOLVED | INCIDENT
 # Trigger: Power outage recovery + Flux restructuring done incorrectly
 _____________________________________________________________________
 
@@ -277,7 +276,7 @@ Verified: Yes
 
 _____________________________________________________________________
 
-[Risk Level] CATASTROPHIC (incident) / LOW (after fixes applied)
+[Risk Level] CRITICAL (incident) / LOW (after fixes applied)
 
 _____________________________________________________________________
 
@@ -290,7 +289,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. prune: true + Kustomization rename = mass deletion. ALWAYS disable prune before rename.
   2. HelmRelease deletion = Helm uninstall = all pods gone. Not just the CR — everything.
   3. healthCheck on a prunable resource = potential deadlock. Design carefully.

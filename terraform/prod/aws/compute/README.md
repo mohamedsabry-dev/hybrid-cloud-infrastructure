@@ -59,7 +59,7 @@ scoping, user_data split — see [`DESIGN.md`](DESIGN.md).
 ## Related
 
 - [`DESIGN.md`](DESIGN.md) — why WireGuard on EC2, instance sizing, SG scoping, EIP rationale
-- [`../../../../deployment-docs/vpn-setup-guide.txt`](../../../../deployment-docs/vpn-setup-guide.txt) — WireGuard install + peer config (post-EC2 setup)
+- [`../../../../deployment-docs/05-vpn-setup-guide.md`](../../../../deployment-docs/05-vpn-setup-guide.md) — WireGuard install + peer config (post-EC2 setup)
 - [`../../../../troubleshooting/terraform/7-security-group-rename-stuck-in-tf-state.md`](../../../../troubleshooting/terraform/7-security-group-rename-stuck-in-tf-state.md) — SG rename gets stuck when attached to EC2 ENI
 - [`../../../../.github/workflows/prod-aws-compute.yml`](../../../../.github/workflows/prod-aws-compute.yml) — apply workflow
 - [`../network/`](../network/) — upstream VPC + subnet state

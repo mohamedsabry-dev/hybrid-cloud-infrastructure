@@ -27,7 +27,7 @@ metadata:
     environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
-    description: "Application workloads"
+    description: "Application Workloads"
 ---
 apiVersion: v1
 kind: Namespace
@@ -37,7 +37,7 @@ metadata:
     environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
-    description: "Temporary testing workloads"
+    description: "Temporary testing Workloads"
 
 ---
 apiVersion: v1
@@ -68,4 +68,4 @@ metadata:
     environment: prod
     app.kubernetes.io/managed-by: flux
   annotations:
-    description: "NGINX Ingress Controller"
+    description: "Ingress Nginx"

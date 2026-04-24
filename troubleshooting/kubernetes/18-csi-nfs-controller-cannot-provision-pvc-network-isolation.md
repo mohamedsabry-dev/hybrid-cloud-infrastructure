@@ -179,7 +179,7 @@ Known limitation: if all workers are simultaneously down, CSI controller cannot
 provision or delete PVCs. Existing pod mounts also down if workers are down.
 Acceptable tradeoff for network isolation design.
 
-Key lessons:
+Notes:
   1. CSI controller needs network access to NFS — it mounts NFS during provisioning
   2. Default Helm chart tolerations cause unexpected placement in segmented networks
   3. Existing PVCs working ≠ new provisioning works — different code paths

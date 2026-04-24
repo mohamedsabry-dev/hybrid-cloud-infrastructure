@@ -1,7 +1,7 @@
 # FreeIPA Playbooks — Setup Guide (PROD)
 
 Run order + commands for the FreeIPA playbooks. The normal path is via the
-workflow `dev-freeipa-full-setup.yml`; manual runs are for emergencies or
+workflow `prod-freeipa-full-setup.yml`; manual runs are for emergencies or
 DR fallback.
 
 See README.md for scope + playbook descriptions.
@@ -49,4 +49,4 @@ Requires prior `kinit super_bot` or `kinit admin`:
 - README.md                                              — playbook scope + descriptions
 - ../../operation_guide.txt                              — kinit + testing commands
 - ../../../../deployment-docs/freeipa-overview.md        — identity-layer system overview
-- ../../../../deployment-docs/freeipa-initial-setup-guide.txt — sequenced step-7 setup walkthrough
+- ../../../../deployment-docs/07-freeipa-setup-guide.md — sequenced step-7 setup walkthrough

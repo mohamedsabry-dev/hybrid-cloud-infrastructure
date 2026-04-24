@@ -24,5 +24,5 @@ which adds the 10.0.0.0/8 route through the configured gateway.
 
 - [`route-setup-guide.txt`](route-setup-guide.txt) — commands
 - [`../README.md`](../README.md) — workstation scope
-- [`../../deployment-docs/network-setup-guide.txt`](../../deployment-docs/network-setup-guide.txt) — router-level routing
+- [`../../deployment-docs/00-network-setup-guide.md`](../../deployment-docs/00-network-setup-guide.md) — router-level routing
 - [`../../network/DESIGN.md`](../../network/DESIGN.md) — MikroTik / ER605 migration reasoning

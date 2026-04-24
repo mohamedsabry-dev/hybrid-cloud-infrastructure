@@ -25,9 +25,9 @@
 - Interfaces: 2 vNICs
 
 **Benefit:**
-- ✅ Zero downtime during single NIC failure
-- ✅ Automatic failover without manual intervention
-- ✅ Network-level redundancy for storage traffic
+- Zero downtime during single NIC failure
+- Automatic failover without manual intervention
+- Network-level redundancy for storage traffic
 
 ### NFS Mount Options (ESXi)
 
@@ -38,10 +38,10 @@ Protocol: NFS 3
 ```
 
 **Why NFSv3?**
-- ✅ Better ESXi compatibility
-- ✅ Lower overhead than NFSv4
-- ✅ Adequate for home lab use
-- ✅ Simpler troubleshooting
+- Better ESXi compatibility
+- Lower overhead than NFSv4
+- Adequate for home lab use
+- Simpler troubleshooting
 
 ---
 
@@ -56,16 +56,16 @@ I/O Scheduler: Deadline (default)
 ```
 
 **Why defaults work:**
-- ✅ Tuned for virtual workloads
-- ✅ Balanced for mixed I/O patterns
-- ✅ No change needed unless specific bottleneck
+- Tuned for virtual workloads
+- Balanced for mixed I/O patterns
+- No change needed unless specific bottleneck
 
 ### NAS VM Settings
 
 **Filesystem**: ext4
-- ✅ Proven stability
-- ✅ Good performance for NFS
-- ✅ Widely supported and documented
+- Proven stability
+- Good performance for NFS
+- Widely supported and documented
 
 **I/O Scheduler**: cfq (Completely Fair Queuing)
 ```bash

@@ -79,4 +79,4 @@ containers — the .tar.gz is only read at creation time).
 - DESIGN.md                                              — vzdump template-file pattern + provider limitation
 - ../../../../troubleshooting/proxmox/41-lxc-clone-vs-template-file-ssh-keys.md — the provider-limitation TS case
 - ../../../../troubleshooting/terraform/                 — broader Terraform-Proxmox TS cases
-- ../../../../deployment-docs/proxmox-setup-guide.txt    — Proxmox host setup (prereq)
+- ../../../../deployment-docs/01-proxmox-setup-guide.md    — Proxmox host setup (prereq)

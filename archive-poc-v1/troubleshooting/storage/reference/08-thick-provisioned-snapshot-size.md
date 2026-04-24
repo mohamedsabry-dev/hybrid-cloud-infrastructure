@@ -279,11 +279,11 @@ Solution 3: Take Snapshots BEFORE Major Reconfigurations
 **When:** Before configuring RAID, databases, or large data operations
 
 **Timing Strategy:**
-- ✅ Snapshot immediately after OS install (thin, small)
-- ✅ Snapshot before major package installations
-- ✅ Snapshot before RAID configuration
-- ❌ Snapshot after RAID is configured (will be huge)
-- ❌ Snapshot after database initialization
+- Snapshot immediately after OS install (thin, small)
+- Snapshot before major package installations
+- Snapshot before RAID configuration
+- Snapshot after RAID is configured (will be huge)
+- Snapshot after database initialization
 
 **Example Timeline:**
 ```
@@ -291,9 +291,9 @@ Solution 3: Take Snapshots BEFORE Major Reconfigurations
 2. Configure network, hostname
 3. Install packages → Take snapshot "configured" (8GB)
 4. Configure RAID-1 (disk writes to full capacity)
-5. ❌ DON'T snapshot here (would be 60GB)
+5.  DON'T snapshot here (would be 60GB)
 6. Initialize database
-7. ❌ DON'T snapshot here (would be 60GB)
+7.  DON'T snapshot here (would be 60GB)
 8. Use Veeam for backups instead
 ```
 
@@ -464,24 +464,24 @@ BEST PRACTICES SUMMARY
 ================================================================================
 
 DO:
-✅ Use thin provisioning for VMs that will need snapshots
-✅ Calculate required space before taking snapshots
-✅ Take snapshots BEFORE RAID/database configuration
-✅ Delete snapshots within 24-48 hours
-✅ Monitor datastore space with alerts (70% warning)
-✅ Document snapshot purpose and expiration
-✅ Use Veeam/backups for long-term protection
-✅ Test VM boot after snapshot deletion
+- Use thin provisioning for VMs that will need snapshots
+- Calculate required space before taking snapshots
+- Take snapshots BEFORE RAID/database configuration
+- Delete snapshots within 24-48 hours
+- Monitor datastore space with alerts (70% warning)
+- Document snapshot purpose and expiration
+- Use Veeam/backups for long-term protection
+- Test VM boot after snapshot deletion
 
 DON'T:
-❌ Use thick provisioning unless required for performance
-❌ Take snapshots without verifying free space
-❌ Take snapshots AFTER RAID configuration
-❌ Keep snapshots longer than 1 week
-❌ Accumulate more than 2-3 snapshots per VM
-❌ Use snapshots as backups
-❌ Ignore datastore space warnings
-❌ Assume thin disk snapshots will be small after RAID
+- Use thick provisioning unless required for performance
+- Take snapshots without verifying free space
+- Take snapshots AFTER RAID configuration
+- Keep snapshots longer than 1 week
+- Accumulate more than 2-3 snapshots per VM
+- Use snapshots as backups
+- Ignore datastore space warnings
+- Assume thin disk snapshots will be small after RAID
 
 ================================================================================
 REFERENCES

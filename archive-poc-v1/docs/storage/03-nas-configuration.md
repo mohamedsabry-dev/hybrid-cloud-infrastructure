@@ -43,13 +43,13 @@ Linux assigns device names based on initialization order, which is NOT guarantee
 Boot 1:
   /dev/sdb = 900GB disk (Production data)
   /dev/sdc = 5GB disk (Heartbeat)
-  ✓ Mounts correctly
+  Yes Mounts correctly
 
 Reboot:
   /dev/sdb = 5GB disk (swapped!)
   /dev/sdc = 900GB disk (swapped!)
-  ✗ 900GB production data mounted as 5GB heartbeat
-  ✗ All VMs fail to start
+  No 900GB production data mounted as 5GB heartbeat
+  No All VMs fail to start
 ```
 
 ### Solution: UUID-Based Mounting
@@ -141,9 +141,9 @@ sudo firewall-cmd --reload
 **Monitoring Interval**: 100ms (fast failover)
 
 **Benefits:**
-- ✅ Zero downtime during single NIC failure
-- ✅ Automatic failover to backup interface
-- ✅ No manual intervention required
+- Zero downtime during single NIC failure
+- Automatic failover to backup interface
+- No manual intervention required
 
 **Configuration:**
 See [Network Architecture](../Network/) for bonding setup details.

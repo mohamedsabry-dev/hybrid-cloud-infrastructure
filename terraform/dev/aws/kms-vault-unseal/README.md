@@ -37,7 +37,7 @@ The `dev/vault/unseal-keys` secret is created with a placeholder. After
 Vault is initialized (manual step, one-time), the recovery keys returned
 by `vault operator init` must be stored here. Procedure + commands:
 
-  deployment-docs/vault-initial-setup-guide.txt
+  deployment-docs/08-vault-setup-guide.md
   deployment-docs/vault-overview.md
 
 ## Related
@@ -46,4 +46,4 @@ by `vault operator init` must be stored here. Procedure + commands:
 - [`../vault-trust/`](../vault-trust/) — the OTHER Vault-AWS integration (AWS Secrets Engine for etcd-backup)
 - [`../../../../.github/workflows/dev-aws-kms-vault-unseal.yml`](../../../../.github/workflows/dev-aws-kms-vault-unseal.yml) — apply workflow (runs on `dev-security` branch, elevated privileges)
 - [`../../../../deployment-docs/vault-overview.md`](../../../../deployment-docs/vault-overview.md) — how Vault consumes this
-- [`../../../../deployment-docs/vault-initial-setup-guide.txt`](../../../../deployment-docs/vault-initial-setup-guide.txt) — recovery-key storage procedure
+- [`../../../../deployment-docs/08-vault-setup-guide.md`](../../../../deployment-docs/08-vault-setup-guide.md) — recovery-key storage procedure

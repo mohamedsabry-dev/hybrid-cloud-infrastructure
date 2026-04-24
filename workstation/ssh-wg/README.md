@@ -28,4 +28,4 @@ output or the AWS console). The two `.pem` key files are expected at
 ## Related
 
 - [`../README.md`](../README.md) — workstation scope
-- [`../../deployment-docs/vpn-setup-guide.txt`](../../deployment-docs/vpn-setup-guide.txt) — WireGuard VPN setup end-to-end
+- [`../../deployment-docs/05-vpn-setup-guide.md`](../../deployment-docs/05-vpn-setup-guide.md) — WireGuard VPN setup end-to-end

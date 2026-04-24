@@ -3,6 +3,7 @@ CASE: ESXi Network Failure After Windows Host Sleep
 ================================================================================
 Category: Platform - Windows Host Power Management
 Severity: High
+Incident: Yes
 Date: Runtime Operations
 Environment: Windows Host, VMware Workstation, ESXi on Bridged Network
 Issue: "Uplink Down" errors and VM connectivity loss after laptop sleep
@@ -167,8 +168,8 @@ Get-NetAdapter | Get-NetAdapterPowerManagement | Select-Object Name, AllowComput
 Expected output after fix:
 Name     AllowComputerToTurnOffDevice
 ----     ----------------------------
-Wi-Fi    False                         ✓
-Ethernet False                         ✓
+Wi-Fi    False                         Yes
+Ethernet False                         Yes
 
 Solution 3: Restart VMware Services After Wake (Recovery)
 ----------------------------------------------------------

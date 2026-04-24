@@ -9,9 +9,9 @@ Terraform, Kubernetes, GitHub Actions, and Troubleshooting — this file is
 the map that ties those pieces together.
 
 For operational setup, use the sequenced guides:
-- `vault-initial-setup-guide.txt` (step 8) — the 3-node cluster itself
-- `vault-k8s-integration-guide.txt` (step 11) — Vault ↔ K8s trust + injector
-- `k8s-etcd-vault-aws-integration.txt` (step 12) — etcd-backup → Vault → S3
+- `08-vault-setup-guide.md` (step 8) — the 3-node cluster itself
+- `11-vault-k8s-integration-guide.md` (step 11) — Vault ↔ K8s trust + injector
+- `12-etcd-backup-integration-guide.md` (step 12) — etcd-backup → Vault → S3
 
 This file is the overview above those guides — what the system is, the key
 design calls, and where every piece lives.
@@ -171,11 +171,11 @@ in its own `remediation` namespace.
 
 | File | Purpose |
 |------|---------|
-| `deployment-docs/vault-initial-setup-guide.txt` | 3-node cluster setup walkthrough (step 8 in sequence) |
-| `deployment-docs/vault-k8s-integration-guide.txt` | K8s auth method + injector deployment (step 11) |
-| `deployment-docs/k8s-etcd-vault-aws-integration.txt` | etcd-backup → Vault → S3 chain (step 12) |
+| `deployment-docs/08-vault-setup-guide.md` | 3-node cluster setup walkthrough (step 8 in sequence) |
+| `deployment-docs/11-vault-k8s-integration-guide.md` | K8s auth method + injector deployment (step 11) |
+| `deployment-docs/12-etcd-backup-integration-guide.md` | etcd-backup → Vault → S3 chain (step 12) |
 | `deployment-docs/signal-flows/vault-k8s-auth-signal-flow.txt` | Request trace: pod → Agent → Vault K8s auth → token → secret |
-| `deployment-docs/aws-secrets-setup-guide.txt` | AWS Secrets Manager entries this depends on (prerequisite) |
+| `deployment-docs/04-aws-secrets-setup-guide.md` | AWS Secrets Manager entries this depends on (prerequisite) |
 
 ---
 
@@ -203,7 +203,7 @@ consumers:
 
 Each consumer follows the same pattern: dedicated ServiceAccount + long-lived
 token Secret + IPA CA secret in its own namespace + Vault annotations on the
-Deployment/StatefulSet. Details in `vault-k8s-integration-guide.txt`.
+Deployment/StatefulSet. Details in `11-vault-k8s-integration-guide.md`.
 
 ### What breaks if Vault is unavailable
 
@@ -231,6 +231,6 @@ trying to understand Vault by reading the repo would otherwise need to open
 nine folders. This file is the map that gets them from "what is this?" to
 "where does this specific piece live?" in one skim.
 
-The setup guides (`vault-initial-setup-guide.txt` etc.) cover HOW to deploy.
+The setup guides (`08-vault-setup-guide.md` etc.) cover HOW to deploy.
 The TS cases cover WHAT went wrong when. This file covers WHAT IT IS and
 WHERE IT LIVES — the missing layer between those two.

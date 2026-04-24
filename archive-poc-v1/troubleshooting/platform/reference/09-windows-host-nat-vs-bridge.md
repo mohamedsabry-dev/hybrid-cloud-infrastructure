@@ -232,10 +232,10 @@ To SSH to vCenter:
 
 Benefits:
 ---------
-✓ Use standard ports (443, 22)
-✓ Use DNS names or IPs directly
-✓ Bookmarks work normally
-✓ Behaves like production environment
+Yes Use standard ports (443, 22)
+Yes Use DNS names or IPs directly
+Yes Bookmarks work normally
+Yes Behaves like production environment
 
 ================================================================================
 SOLUTION: SWITCH TO BRIDGED NETWORKING
@@ -243,15 +243,15 @@ SOLUTION: SWITCH TO BRIDGED NETWORKING
 
 Why Bridged is Superior:
 ------------------------
-✅ Direct network access - VMs have real IPs on home network
-✅ No port forwarding needed - Services use standard ports
-✅ No IP forwarding required - Windows host is not a router
-✅ Minimal firewall changes - Only allow VMware services
-✅ Production-like behavior - ESXi works like real hardware
-✅ Standard troubleshooting - Ping, traceroute, Wireshark work normally
-✅ DNS support - Assign hostnames in router or use hosts file
-✅ Easier management - Treat VMs like any other device on network
-✅ Better learning - Skills translate to production environments
+- Direct network access - VMs have real IPs on home network
+- No port forwarding needed - Services use standard ports
+- No IP forwarding required - Windows host is not a router
+- Minimal firewall changes - Only allow VMware services
+- Production-like behavior - ESXi works like real hardware
+- Standard troubleshooting - Ping, traceroute, Wireshark work normally
+- DNS support - Assign hostnames in router or use hosts file
+- Easier management - Treat VMs like any other device on network
+- Better learning - Skills translate to production environments
 
 Architecture Comparison:
 ------------------------

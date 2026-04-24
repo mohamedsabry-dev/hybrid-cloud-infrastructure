@@ -193,13 +193,13 @@ VMs vs LXC differences in Terraform:
   Source after tmpl   Keep (Terraform state)            Can destroy (vzdump is a backup)
   Template format     VM disk                           .tar.gz file
 
-Key lessons:
+Notes:
   1. Proxmox API limitations are not always obvious from Terraform error messages
   2. Clone and create have different API capabilities — clone uses PUT which
      does not support SSH keys or password
   3. GitHub Issues/Discussions are valuable for understanding provider limitations
   4. vzdump template files are the correct LXC golden image approach
-  5. VMs and LXC differ fundamentally in how templates and SSH keys are handled
+  5. VMs and LXC handle templates and SSH keys differently
 
 Workaround if vzdump not possible:
   Remove user_account from cloned containers.

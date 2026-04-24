@@ -39,7 +39,7 @@ module — see [`DESIGN.md`](DESIGN.md).
 After `terraform apply`, the secrets exist with placeholder values.
 Populate them using the procedure in:
 
-  deployment-docs/aws-secrets-setup-guide.txt
+  deployment-docs/04-aws-secrets-setup-guide.md
 
 That guide has the AWS CLI commands + the canonical secret-by-secret
 reference.
@@ -47,6 +47,6 @@ reference.
 ## Related
 
 - [`DESIGN.md`](DESIGN.md) — why Terraform creates but doesn't populate, lifecycle pattern
-- [`../../../../deployment-docs/aws-secrets-setup-guide.txt`](../../../../deployment-docs/aws-secrets-setup-guide.txt) — value-population commands
+- [`../../../../deployment-docs/04-aws-secrets-setup-guide.md`](../../../../deployment-docs/04-aws-secrets-setup-guide.md) — value-population commands
 - [`../../../../.github/workflows/prod-aws-secrets.yml`](../../../../.github/workflows/prod-aws-secrets.yml) — apply workflow
 - [`../../../../github/variables-secrets.md`](../../../../github/variables-secrets.md) — which GitHub workflows consume which secret

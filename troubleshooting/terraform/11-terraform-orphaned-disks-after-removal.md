@@ -182,7 +182,7 @@ Regular storage audit to detect orphaned disks:
     qm config $vmid | grep -E "scsi|virtio|ide" | grep -v net
   done
 
-Key lessons:
+Notes:
   1. Terraform state removal ≠ actual resource deletion for Proxmox disks
   2. Always manually verify disk cleanup after Terraform changes
   3. Storage migrations can leave orphaned disk images — audit periodically

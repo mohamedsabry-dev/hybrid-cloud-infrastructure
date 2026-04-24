@@ -377,13 +377,13 @@ LAST SEEN   TYPE     REASON    OBJECT          MESSAGE
 ┌───────────────────────────────────────────────────┬───────────────────────────────┐
 │                      Finding                      │           Confirmed           │
 ├───────────────────────────────────────────────────┼───────────────────────────────┤
-│ vault-agent crashes are separate from app crashes │ ✅ Yes (~2.5 hour gap)        │
+│ vault-agent crashes are separate from app crashes │  Yes (~2.5 hour gap)        │
 ├───────────────────────────────────────────────────┼───────────────────────────────┤
-│ App container restarts happened before IPA test   │ ✅ Yes (17:44Z vs 20:12Z)     │
+│ App container restarts happened before IPA test   │  Yes (17:44Z vs 20:12Z)     │
 ├───────────────────────────────────────────────────┼───────────────────────────────┤
-│ vault-agent crash does NOT cause app crash        │ ✅ Yes                        │
+│ vault-agent crash does NOT cause app crash        │  Yes                        │
 ├───────────────────────────────────────────────────┼───────────────────────────────┤
-│ WordPress container never crashed                 │ ✅ Yes (only vault-agent did) │
+│ WordPress container never crashed                 │  Yes (only vault-agent did) │
 └───────────────────────────────────────────────────┴───────────────────────────────┘
 ```
 

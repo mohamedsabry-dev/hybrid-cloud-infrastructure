@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-41 cases + 8 reference guides in [reference/](reference/)
+43 cases + 8 reference guides in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -45,3 +45,5 @@
 | [046](46-kustomization-stale-resource-reference.md) | 2026-04-20 | RESOLVED | Kustomization Stale Resource Reference |
 | [047](47-csi-nfs-podlabels-silent-accept.md) | 2026-04-20 | RESOLVED | CSI NFS podLabels Silent Accept + Near-Miss |
 | [048](48-prometheus-pvc-nfsv4-version-mismatch.md) | 2026-04-20 | RESOLVED | Prometheus PVC NFSv4 Version Mismatch |
+| [049](49-git-history-rewrite-flux-prune-cascade.md) | 2026-04-23 | RESOLVED | Git History Rewrite → Flux Prune Cascade (CoreDNS Lost) |
+| [050](50-remediation-pod-backup-window-race-condition.md) | 2026-04-24 | PENDING | Remediation Pod vs Backup Window Race Condition |

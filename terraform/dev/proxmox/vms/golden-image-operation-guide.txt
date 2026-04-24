@@ -77,4 +77,4 @@ refresh will use the updated template.
 
 - DESIGN.md                                              — why clone-then-template
 - ../../../../troubleshooting/terraform/                 — Proxmox VM TS cases
-- ../../../../deployment-docs/proxmox-setup-guide.txt    — Proxmox host setup (prereq)
+- ../../../../deployment-docs/01-proxmox-setup-guide.md    — Proxmox host setup (prereq)

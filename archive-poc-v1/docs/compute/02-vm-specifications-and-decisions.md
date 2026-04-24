@@ -187,11 +187,11 @@ ESXi memory ballooning behavior in nested environments:
 - Saved memory reallocated to Production VMs and Infrastructure
 
 **Trade-offs:**
-- ❌ Lost: Automatic HA failover
-- ❌ Lost: Live migration between hosts
-- ✅ Gained: 27GB for Production + 25GB for Infrastructure (vs 22GB each with active HA)
-- ✅ Gained: 3 K8s workers instead of 2 (true application HA)
-- ✅ Gained: IPA moved to Infrastructure layer for better resource distribution
+- Lost: Automatic HA failover
+- Lost: Live migration between hosts
+- Gained: 27GB for Production + 25GB for Infrastructure (vs 22GB each with active HA)
+- Gained: 3 K8s workers instead of 2 (true application HA)
+- Gained: IPA moved to Infrastructure layer for better resource distribution
 
 ---
 
@@ -204,11 +204,11 @@ ESXi memory ballooning behavior in nested environments:
 - Benefit: Lower memory footprint (Ansible VM: 5GB total)
 
 **Why Switched to Dedicated VMs:**
-- ✅ Dependency isolation: Core services shouldn't depend on containers
-- ✅ Security: Vault needs isolated environment (handles secrets)
-- ✅ Reliability: Separate failure domains
-- ✅ Learning: Simulates real-world enterprise architecture
-- ✅ Future-proof: Easier to scale independently
+- Dependency isolation: Core services shouldn't depend on containers
+- Security: Vault needs isolated environment (handles secrets)
+- Reliability: Separate failure domains
+- Learning: Simulates real-world enterprise architecture
+- Future-proof: Easier to scale independently
 
 **Memory Impact:**
 - Before: Ansible 5GB (hosting containers)
@@ -220,10 +220,10 @@ ESXi memory ballooning behavior in nested environments:
 ### Decision 3: Thick Provisioning for NAS VM
 
 **Rationale:**
-- ✅ Predictable performance (no thin provisioning overhead)
-- ✅ Guaranteed space for critical NFS storage
-- ✅ Simpler snapshot management (dedicated datastore)
-- ⚠️ Requires 2x disk space for snapshots
+- Predictable performance (no thin provisioning overhead)
+- Guaranteed space for critical NFS storage
+- Simpler snapshot management (dedicated datastore)
+-  Requires 2x disk space for snapshots
 
 **Snapshot Sizing Rule:**
 For thick provisioned disks, datastore must have ≥ 2× disk size:

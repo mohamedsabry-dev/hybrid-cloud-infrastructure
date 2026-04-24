@@ -11,7 +11,8 @@ Host-layer operational runbooks and prevention scripts for the Proxmox hyperviso
 | Folder | Scenario | What it contains |
 |--------|----------|------------------|
 | [`power/`](power/) | Power / battery loss | UPS (laptop battery) monitor — graceful shutdown on sustained discharge |
-| [`thermal/`](thermal/) | CPU temperature | Temperature monitor — email at 75 °C, graceful shutdown at 80 °C |
+| [`thermal/`](thermal/) | CPU temperature | Temperature monitor — vzdump-aware, shutdown after 5 min sustained 90°C |
+| [`io-storm/`](io-storm/) | IO cascade | IO storm watchdog — detects source VM by CPU+IO fingerprint, auto-resets |
 | [`hardware/`](hardware/) | Hardware failure | Runbook for USB-Ethernet adapter replacement (MAC mapping, safe order) |
 | [`recovery/`](recovery/) | Full host rebuild | Runbook for reinstalling Proxmox from scratch + restoring config + VMs |
 
@@ -23,7 +24,8 @@ Host-layer operational runbooks and prevention scripts for the Proxmox hyperviso
 | VM / LXC backups | Proxmox `vzdump` job | Scheduled backups to NAS — see [`../backup/`](../backup/) |
 | Spare adapters | Physical | Keep spare USB-Ethernet adapters ready |
 | UPS monitor | [`power/dr_ups_monitor.sh`](power/dr_ups_monitor.sh) | Auto graceful shutdown on battery discharge |
-| Temperature monitor | [`thermal/draft-temperature_monitor.sh`](thermal/draft-temperature_monitor.sh) | Draft — known bugs, see [`thermal/TODO.md`](thermal/TODO.md) |
+| Temperature monitor | [`thermal/temperature_monitor.sh`](thermal/temperature_monitor.sh) | Daemon — vzdump-aware, 5-min sustained threshold before shutdown |
+| IO storm watchdog | [`io-storm/io-storm-watchdog.sh`](io-storm/io-storm-watchdog.sh) | Daemon — detects IO cascade source VM, auto-resets it |
 
 ## Not here
 

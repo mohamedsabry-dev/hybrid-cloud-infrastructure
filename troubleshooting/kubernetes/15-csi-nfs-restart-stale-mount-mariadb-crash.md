@@ -1,4 +1,4 @@
-# TS-K8S-015 | 2026-04-06 | RESOLVED
+# TS-K8S-015 | 2026-04-06 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -226,7 +226,7 @@ Mount options by workload — final decision:
   Prometheus, Grafana, Loki    nfs-retain     soft          can rescrape, should not hang
   MariaDB, PostgreSQL          nfs-database   hard + intr   data integrity > availability
 
-Key lessons:
+Notes:
   1. CSI DaemonSet restarts break active mounts — any update to CSI node pods
      can affect pods with active NFS mounts on that node
   2. Soft mount crashes databases — TS-K8S-003 fix was correct for nginx, wrong for MariaDB

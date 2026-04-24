@@ -53,4 +53,4 @@ For the "why" — VPC CIDR scheme, subnet split, Route53 private zone — see
 
 - [`DESIGN.md`](DESIGN.md) — VPC CIDR scheme, subnet split, Route53 private zone reasoning
 - [`../../../../.github/workflows/prod-aws-network.yml`](../../../../.github/workflows/prod-aws-network.yml) — apply workflow
-- [`../../../../deployment-docs/network-setup-guide.txt`](../../../../deployment-docs/network-setup-guide.txt) — broader network setup (on-prem + AWS)
+- [`../../../../deployment-docs/00-network-setup-guide.md`](../../../../deployment-docs/00-network-setup-guide.md) — broader network setup (on-prem + AWS)

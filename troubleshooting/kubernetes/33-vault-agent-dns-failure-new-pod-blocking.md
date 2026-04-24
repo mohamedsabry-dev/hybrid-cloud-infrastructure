@@ -168,7 +168,7 @@ First wrong assumption: I thought `/etc/hosts` on K8s nodes would help — added
 `vault.lab.local` entry. But pods don't use the node's `/etc/hosts`. CoreDNS
 handles pod DNS, and CoreDNS only forwards to `/etc/resolv.conf`, not `/etc/hosts`.
 
-Key realization:
+What I realized:
 ```
 vault.lab.local = internal domain (.lab.local)
 8.8.8.8 = external DNS (Google)

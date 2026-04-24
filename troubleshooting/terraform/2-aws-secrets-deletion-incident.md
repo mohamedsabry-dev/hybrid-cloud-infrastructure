@@ -1,4 +1,4 @@
-# TS-TF-002 | 2026-02-14 | RESOLVED
+# TS-TF-002 | 2026-02-14 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
@@ -154,7 +154,7 @@ _____________________________________________________________________
 
 [Draft Notes]
 
-Key lessons:
+Notes:
   1. Workflow cancellation does NOT guarantee rollback of AWS API calls already sent
   2. Always verify state file integrity after any workflow cancellation
   3. Approval gate (3-minute delay) provides a manual review window before apply

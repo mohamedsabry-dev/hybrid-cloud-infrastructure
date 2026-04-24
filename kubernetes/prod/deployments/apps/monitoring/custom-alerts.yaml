@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: custom-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: prometheus
+    environment: prod
+spec:
+  groups:
+  - name: custom
+    rules:
+    - alert: ExternalNodeDown
+      expr: up{job="external-nodes"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "{{ $labels.instance }} is down"
+        description: "{{ $labels.role }} node unreachable for 2 minutes"
+
+    - alert: PodCrashLooping
+      expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "{{ $labels.namespace }}/{{ $labels.pod }} crash looping"
+        description: "Pod restarted more than 5 times in the last hour"
+
+    - alert: KubernetesNodeCriticalCPU
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Node {{ $labels.instance }} critical CPU ({{ $value | printf \"%.1f\" }}%)"
+        description: "Node CPU above 95% for 2 minutes. Immediate investigation required."

@@ -9,9 +9,9 @@
 ### Segmentation
 
 **Current Implementation:**
-- ✅ WAN network isolated from internal network (pfSense gateway)
-- ✅ vMotion traffic on dedicated network (no VM access)
-- ✅ Management traffic separated from production traffic
+- WAN network isolated from internal network (pfSense gateway)
+- vMotion traffic on dedicated network (no VM access)
+- Management traffic separated from production traffic
 
 **Benefits:**
 - Limits blast radius of security breaches
@@ -21,9 +21,9 @@
 ### Firewall Rules
 
 **Current Rules:**
-- ✅ Web UI access restricted to authorized IPs
-- ✅ Default deny on WAN interface
-- ✅ Granular rules for LAN egress (future)
+- Web UI access restricted to authorized IPs
+- Default deny on WAN interface
+- Granular rules for LAN egress (future)
 
 **Best Practices:**
 - Start with default deny
@@ -34,9 +34,9 @@
 ### Access Control
 
 **Current Controls:**
-- ✅ pfSense accessible only from Mac PC on WAN
-- ✅ Windows Host uses LAN interface (10.0.20.170)
-- ✅ Internal VMs cannot directly access WAN network
+- pfSense accessible only from Mac PC on WAN
+- Windows Host uses LAN interface (10.0.20.170)
+- Internal VMs cannot directly access WAN network
 
 **Future Enhancements:**
 - Multi-factor authentication for pfSense web UI
@@ -50,14 +50,14 @@
 ### Promiscuous Mode Requirements
 
 **ESXi Master vSwitch_Internal:**
-- ✅ Promiscuous Mode: **ON**
-- ✅ Forged Transmits: **ON**
-- ✅ MAC Address Changes: **ON**
+- Promiscuous Mode: **ON**
+- Forged Transmits: **ON**
+- MAC Address Changes: **ON**
 
 **ESXi Nested (Production/DR):**
-- ❌ Promiscuous Mode: **OFF** (not needed inside nested)
-- ❌ Forged Transmits: **OFF**
-- ❌ MAC Address Changes: **OFF**
+- Promiscuous Mode: **OFF** (not needed inside nested)
+- Forged Transmits: **OFF**
+- MAC Address Changes: **OFF**
 
 ### Why These Settings Are Required
 
@@ -85,13 +85,13 @@
 - No sensitive traffic from external sources on this network
 
 **Acceptable for Home Lab:**
-- ✅ Trusted environment (no untrusted VMs)
-- ✅ Required for nested virtualization
-- ✅ Isolated from external networks
+- Trusted environment (no untrusted VMs)
+- Required for nested virtualization
+- Isolated from external networks
 
 **Not Acceptable for Production (External Hosting):**
-- ❌ Security risk in multi-tenant environments
-- ❌ Consider bare-metal hypervisors instead of nested
+- Security risk in multi-tenant environments
+- Consider bare-metal hypervisors instead of nested
 
 ---
 

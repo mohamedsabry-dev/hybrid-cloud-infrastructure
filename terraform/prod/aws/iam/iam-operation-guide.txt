@@ -69,4 +69,4 @@ replacement for those resources — accepted). New naming:
 - ../../../../aws/DESIGN.md                             — 2-tier IAM model + prod-security branch strategy
 - ../../../../aws/bootstrap.md                          — CloudFormation bootstrap (where TerraformAdmin comes from)
 - ../../../../.github/workflows/prod-aws-iam.yml         — the workflow that normally runs this module
-- ../../../../deployment-docs/aws-bootstrap-setup-guide.txt — AWS-side bootstrap
+- ../../../../deployment-docs/02-aws-bootstrap-setup-guide.md — AWS-side bootstrap

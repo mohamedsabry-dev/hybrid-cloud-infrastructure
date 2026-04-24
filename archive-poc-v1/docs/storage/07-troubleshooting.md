@@ -68,7 +68,7 @@ Calculate 2x disk size before snapshot. Use Veeam for long-term backups instead.
 ```
 Thick Disk: 905GB
 Snapshot Required: 905GB × 1.5 = 1358GB
-Datastore Capacity: 2TB ✓ (sufficient)
+Datastore Capacity: 2TB Yes (sufficient)
 ```
 
 ---

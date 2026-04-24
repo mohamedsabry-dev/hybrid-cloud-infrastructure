@@ -54,7 +54,13 @@ Datacenter → Backup → Add
 | K8s Worker | VM | 105GB | 1.06GB | 2:46 |
 | LXC (Vault, Ansible, etc.) | LXC | ~15GB | ~300MB | ~1 min |
 
-> **Note:** 90-97% sparse (empty space) = efficient compression
+> **Note:** 90-97% sparse (empty space) = efficient compression.
+>
+> **DEV caveat (2026-04-25):** K8s nodes are excluded from dev backups.
+> The consumer NVMe can't handle vzdump reads on dense k8s disks alongside
+> running workloads — crashes the cluster within seconds. FreeIPA/LXC are
+> fine because they're 91%+ sparse. Prod hardware handles it. Full
+> investigation: [`../../../troubleshooting/proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md`](../../../troubleshooting/proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md)
 
 ### Backup Behavior
 

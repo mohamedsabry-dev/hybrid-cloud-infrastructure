@@ -111,18 +111,18 @@ ioping -c 20 /path/to/shared/folder
 |--------|----------------------|------------------------------|----------------------------|----------------------|
 | **Configuration** | 2 Tasks / 125MB Rule | Native NFS/SAN | SCSI Hot-Plug | 1 Task / 250MB Rule |
 | **Backup Time** | ~12 Minutes | ~4 Minutes ⚡ | ~6 Minutes | ~10 Minutes |
-| **Processing Rate** | 243 MB/s | 217 MB/s | ~200 MB/s | 220 MB/s (Stable) ✅ |
-| **Max CPU Freq** | 3,700 MHz | 5,300 MHz | 6,300 MHz ⚠️ | 3,300 MHz ✅ |
-| **Disk Utilization** | 135% - 270% ⚠️ | 130% - 170% | 170% | 25% Avg / 88% Peak ✅ |
-| **Max Ping Latency** | 782 ms | 900 ms ⚠️ | 137 ms ✅ | 701 ms |
-| **Packet Loss** | 0 ✅ | 0 ✅ | 2 Packets ❌ | 1 (Congestion) ⚠️ |
-| **Snapshot Removal** | Variable | Fast | 1.5 Min ❌ | 5 Seconds ✅ |
+| **Processing Rate** | 243 MB/s | 217 MB/s | ~200 MB/s | 220 MB/s (Stable)  |
+| **Max CPU Freq** | 3,700 MHz | 5,300 MHz | 6,300 MHz  | 3,300 MHz  |
+| **Disk Utilization** | 135% - 270%  | 130% - 170% | 170% | 25% Avg / 88% Peak  |
+| **Max Ping Latency** | 782 ms | 900 ms  | 137 ms  | 701 ms |
+| **Packet Loss** | 0  | 0  | 2 Packets  | 1 (Congestion)  |
+| **Snapshot Removal** | Variable | Fast | 1.5 Min  | 5 Seconds  |
 
 **Legend:**
-- ✅ = Best/Acceptable performance
-- ⚠️ = Warning/Concern
+- = Best/Acceptable performance
+-  = Warning/Concern
 - ⚡ = Fastest
-- ❌ = Problematic
+- = Problematic
 
 ---
 
@@ -131,30 +131,30 @@ ioping -c 20 /path/to/shared/folder
 ### 1. Speed vs. Stability Trade-off
 
 **Direct Storage Access (DSA)** - Test 2:
-- ✅ **Fastest**: 4 minutes backup time
-- ✅ **Efficient**: Best raw data movement
-- ❌ **High CPU**: 5,300 MHz peak (nested hypervisor stress)
-- ❌ **High Disk I/O**: 130-170% utilization
+- **Fastest**: 4 minutes backup time
+- **Efficient**: Best raw data movement
+- **High CPU**: 5,300 MHz peak (nested hypervisor stress)
+- **High Disk I/O**: 130-170% utilization
 - **Verdict**: Speed comes at the cost of system stress in nested environments
 
 ### 2. The Danger of HotAdd Mode
 
 **HotAdd (Appliance)** - Test 3:
-- ⚠️ **Highest CPU**: 6,300 MHz peak (extreme stress)
-- ❌ **Packet Loss**: 2 packets dropped during operation
-- ❌ **Slowest Snapshot Removal**: 1.5 minutes (hardware stun)
+-  **Highest CPU**: 6,300 MHz peak (extreme stress)
+- **Packet Loss**: 2 packets dropped during operation
+- **Slowest Snapshot Removal**: 1.5 minutes (hardware stun)
 - **Verdict**: **NOT SUITABLE** for production services (Kubernetes, Vault) in nested labs
 
 ### 3. Concurrency is the Multiplier
 
 **Network Mode (NBD) with 2 Tasks** - Test 1:
-- ❌ **Disk Saturation**: 135-270% utilization spikes
-- ⚠️ **Variable Performance**: Unpredictable during concurrent operations
+- **Disk Saturation**: 135-270% utilization spikes
+-  **Variable Performance**: Unpredictable during concurrent operations
 
 **Optimized Network Mode (NBD) with 1 Task** - Test 4:
-- ✅ **Stable Disk I/O**: 25% average, 88% peak (controlled)
-- ✅ **Fastest Snapshot Removal**: 5 seconds
-- ✅ **Predictable Performance**: Most consistent results
+- **Stable Disk I/O**: 25% average, 88% peak (controlled)
+- **Fastest Snapshot Removal**: 5 seconds
+- **Predictable Performance**: Most consistent results
 - **Verdict**: **Concurrency limiting is more effective than bandwidth throttling**
 
 ### 4. Nested Networking Reality
@@ -181,20 +181,20 @@ After selecting the Direct Storage Access (DSA) approach with 1 concurrent task,
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| **Average Ping** | 1.8 ms | ✅ Excellent (baseline) |
-| **Max Ping** | 505 ms | ⚠️ Acceptable (spike during peak I/O) |
-| **Packet Loss** | 0 | ✅ Perfect |
-| **Backup Duration** | 4 minutes | ✅ Fast |
-| **Snapshot Removal** | 2 seconds | ✅ Excellent |
-| **Average Disk Utilization** | 45% | ✅ Healthy |
-| **Disk Utilization Spikes** | 400% (1×), 350% (1×), 80% (1×) | ⚠️ Acceptable (brief spikes) |
-| **NAS VM CPU** | 5,500 MHz peak | ⚠️ High but acceptable |
+| **Average Ping** | 1.8 ms |  Excellent (baseline) |
+| **Max Ping** | 505 ms |  Acceptable (spike during peak I/O) |
+| **Packet Loss** | 0 |  Perfect |
+| **Backup Duration** | 4 minutes |  Fast |
+| **Snapshot Removal** | 2 seconds |  Excellent |
+| **Average Disk Utilization** | 45% |  Healthy |
+| **Disk Utilization Spikes** | 400% (1×), 350% (1×), 80% (1×) |  Acceptable (brief spikes) |
+| **NAS VM CPU** | 5,500 MHz peak |  High but acceptable |
 
 ### Validation Conclusion
-- ✅ **NAS VM**: Has sufficient resources and remains stable
-- ✅ **No Packet Loss**: Production VMs unaffected
-- ✅ **Fast Operations**: 4 minutes backup + 2 seconds snapshot removal
-- ⚠️ **CPU Spikes**: Brief but acceptable given 9GB memory and 4vCPU 12GHZ on normal
+- **NAS VM**: Has sufficient resources and remains stable
+- **No Packet Loss**: Production VMs unaffected
+- **Fast Operations**: 4 minutes backup + 2 seconds snapshot removal
+-  **CPU Spikes**: Brief but acceptable given 9GB memory and 4vCPU 12GHZ on normal
 - **Verdict**: **APPROVED** - This approach is safe for production use
 
 ---
@@ -372,11 +372,11 @@ ioping -c 20 /mnt/shared_storage
 ## Summary
 
 **Optimal Configuration:**
-- ✅ Transport Mode: Direct Storage Access (DSA)
-- ✅ Concurrent Tasks: 1
-- ✅ NAS VM Memory: 9GB
-- ✅ Expected Backup Time: 4-6 minutes per VM
-- ✅ Network Throttling: 250 MB/s (optional)
+- Transport Mode: Direct Storage Access (DSA)
+- Concurrent Tasks: 1
+- NAS VM Memory: 9GB
+- Expected Backup Time: 4-6 minutes per VM
+- Network Throttling: 250 MB/s (optional)
 
 **Key Success Factors:**
 1. Single concurrent task prevents disk I/O saturation

@@ -8,7 +8,7 @@ Environment: ESXi Nested 2 / VMware vSphere
 Source: Draft for Resource Allocation (Lines 397-570)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  RISK ASSESSMENT - READ CAREFULLY ⚠️
+  RISK ASSESSMENT - READ CAREFULLY 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 "This operation is EXTREMELY RISKY and varies based on whether disk is single
@@ -61,7 +61,7 @@ Step 2: Create Template
   └── Convert ESXi Nested 2 to template and store in safe location
 
 Step 3: Snapshot ESXi Nested 2
-  ⚠️  CANNOT snapshot ESXi Nested 2 directly (thick disk too large)
+    CANNOT snapshot ESXi Nested 2 directly (thick disk too large)
   └── This is why we are doing this refactor
 
 Step 4: Snapshot ESXi Master
@@ -156,9 +156,9 @@ Step 14: Remove Old Thick Disk from VM
     └── Click Save
 
   Why "Remove from virtual machine"?
-    ✓ Keeps original thick VMDK as backup until operation confirmed
-    ✓ Allows rollback if something goes wrong
-    ✓ Can delete manually later after full verification
+    Yes Keeps original thick VMDK as backup until operation confirmed
+    Yes Allows rollback if something goes wrong
+    Yes Can delete manually later after full verification
 
 Step 15: Add New Thin Disk
   Via ESXi Master Web UI:
@@ -211,7 +211,7 @@ Step 21: Take Fresh Snapshot
   └── With thin provisioning, snapshot should be < 5GB
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  PRODUCTION WARNING ⚠️
+  PRODUCTION WARNING 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 "This operation is EXTREMELY risky and varies based on disk structure (single
@@ -225,40 +225,40 @@ LESSONS LEARNED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Key Insights:
-  ✓ Always standardize provisioning type during initial deployment
-  ✓ Thick-to-thin conversion is high-risk operation
-  ✓ Requires multiple backups and careful planning
-  ✓ Snapshot consolidation is critical before conversion
-  ✓ Keep old files until fully verified
+  Yes Always standardize provisioning type during initial deployment
+  Yes Thick-to-thin conversion is high-risk operation
+  Yes Requires multiple backups and careful planning
+  Yes Snapshot consolidation is critical before conversion
+  Yes Keep old files until fully verified
 
 Best Practices:
-  ✓ Document provisioning decisions at design time
-  ✓ Use consistent provisioning across similar VMs
-  ✓ Test disk operations in staging first
-  ✓ Maintain rollback capability throughout process
-  ✓ Verify boot and functionality before cleanup
+  Yes Document provisioning decisions at design time
+  Yes Use consistent provisioning across similar VMs
+  Yes Test disk operations in staging first
+  Yes Maintain rollback capability throughout process
+  Yes Verify boot and functionality before cleanup
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Choose provisioning type BEFORE creating VMs
-  ✓ Document standard: All thin OR all thick (no mixing)
-  ✓ Create VM deployment checklist
-  ✓ Review provisioning settings during peer review
+  Yes Choose provisioning type BEFORE creating VMs
+  Yes Document standard: All thin OR all thick (no mixing)
+  Yes Create VM deployment checklist
+  Yes Review provisioning settings during peer review
 
 Deployment:
-  ✓ Use templates with correct provisioning
-  ✓ Double-check disk type during VM creation
-  ✓ Verify provisioning immediately after creation
-  ✓ Document actual provisioning in CMDB
+  Yes Use templates with correct provisioning
+  Yes Double-check disk type during VM creation
+  Yes Verify provisioning immediately after creation
+  Yes Document actual provisioning in CMDB
 
 Monitoring:
-  ✓ Regular audit of VM provisioning types
-  ✓ Alert on mixed provisioning in same environment
-  ✓ Track snapshot sizes for anomalies
-  ✓ Monitor datastore capacity trends
+  Yes Regular audit of VM provisioning types
+  Yes Alert on mixed provisioning in same environment
+  Yes Track snapshot sizes for anomalies
+  Yes Monitor datastore capacity trends
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED ISSUES

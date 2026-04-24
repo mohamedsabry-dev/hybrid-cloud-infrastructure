@@ -24,7 +24,7 @@ bootstrap, everything below runs via OIDC with no stored AWS credentials.
 | 4 | `{env}-ansible-full-setup` | `mac-mini` + `{env}-local-runner` (mixed) | Deploy Ansible LXC → add GitHub deploy key → test clone → run `ansible_setup.yml` |
 | 5 | `{env}-local-runner-full-setup` | `mac-mini` + `{env}-local-runner` | Deploy Local Runner LXC → register as GH self-hosted runner → install tools |
 | 6 | `{env}-freeipa-full-setup` | `mac-mini` + `{env}-local-runner` | Deploy FreeIPA VM → install IPA server with DNS |
-| 7 | Manual: `domain_config.yml`, generate `super_bot` keytab, upload to AWS Secrets | — | One-off setup of users / HBAC / sudo rules + keytab (see [`../deployment-docs/freeipa-initial-setup-guide.txt`](../deployment-docs/freeipa-initial-setup-guide.txt)) |
+| 7 | Manual: `domain_config.yml`, generate `super_bot` keytab, upload to AWS Secrets | — | One-off setup of users / HBAC / sudo rules + keytab (see [`../deployment-docs/07-freeipa-setup-guide.md`](../deployment-docs/07-freeipa-setup-guide.md)) |
 | 8 | Manual: `add_hosts_to_ipa.yml`, `fix_lxc_krb5_keyring.yml`, `add_dns_records.yml` | — | Domain-join all nodes, fix LXC krb5 ccache, add VIP DNS records |
 | 9 | `{env}-nginx-full-setup` | `mac-mini` | Deploy Nginx reverse proxy LXC |
 | 10 | `{env}-vault-full-setup` | `mac-mini` + `{env}-local-runner` | Deploy 3-node Vault cluster → install + config via Ansible (AWS KMS auto-unseal) |
@@ -39,7 +39,7 @@ Steps 1-3 can run in parallel. Everything from step 4 onward is serial because e
 **"Deployment order"** (above) — the order in which workflows are run to
 build the environment. Ansible and Local Runner come very early because
 they are the only way to reach the internal network; see
-[`../deployment-docs/ansible-runner-setup-guide.txt`](../deployment-docs/ansible-runner-setup-guide.txt)
+[`../deployment-docs/06-ansible-runner-setup-guide.md`](../deployment-docs/06-ansible-runner-setup-guide.md)
 for the reasoning.
 
 **"Boot order"** (below) — the order Proxmox starts machines at host
@@ -83,7 +83,7 @@ playbook against the fleet.
 
 For the reasoning behind keeping Ansible and the Local Runner as two
 separate LXCs, see
-[`../deployment-docs/ansible-runner-setup-guide.txt`](../deployment-docs/ansible-runner-setup-guide.txt).
+[`../deployment-docs/06-ansible-runner-setup-guide.md`](../deployment-docs/06-ansible-runner-setup-guide.md).
 
 ---
 

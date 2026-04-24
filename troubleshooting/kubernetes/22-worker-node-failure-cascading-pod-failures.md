@@ -1,5 +1,5 @@
-# TS-K8S-022 | 2026-04-11 | RESOLVED
-# REAL INCIDENT — unplanned production failure (worker node crash cascading to pod failures).
+# TS-K8S-022 | 2026-04-11 | RESOLVED | INCIDENT
+# Unplanned production failure — worker node crash cascading to pod failures.
 _____________________________________________________________________
 
 [Info]

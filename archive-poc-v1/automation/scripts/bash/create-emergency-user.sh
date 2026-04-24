@@ -67,7 +67,7 @@ if visudo -cf "$SUDOERS_FILE"; then
         echo "  → Sudo enabled (requires password)"
     fi
 else
-    echo "  ✗ ERROR: Invalid sudoers configuration, removing file"
+    echo "  No ERROR: Invalid sudoers configuration, removing file"
     rm -f "$SUDOERS_FILE"
     exit 1
 fi
@@ -78,7 +78,7 @@ echo ""
 ################################################################################
 
 echo "=================================="
-echo "✓ User Setup Complete!"
+echo "Yes User Setup Complete!"
 echo "=================================="
 echo "Username:     $USERNAME"
 echo "Password:     $USER_PASSWORD"

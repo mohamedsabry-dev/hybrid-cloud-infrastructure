@@ -58,7 +58,7 @@ ESXi Master
 | VM Templates | 20GB | Thin | Clone sources | DS_NVME_1 |
 
 **Total Provisioned**: ~1.52TB
-**Snapshot Safety**: ✅ Safe (all thin provisioned)
+**Snapshot Safety**:  Safe (all thin provisioned)
 
 ---
 
@@ -87,15 +87,15 @@ ESXi Master
 - Dedicated datastore ensures snapshot safety
 
 **Why Not Put NAS on DS_NVME_1?**
-- ❌ Would consume entire datastore capacity
-- ❌ No room for infrastructure VM snapshots
-- ❌ Violates 2x disk size rule
+- Would consume entire datastore capacity
+- No room for infrastructure VM snapshots
+- Violates 2x disk size rule
 
 **Provisioning Choice: Thick**
-- ✅ Predictable performance (no thin overhead)
-- ✅ Guaranteed space for NFS storage
-- ✅ Simpler management (no over-subscription)
-- ⚠️ Requires careful snapshot planning
+- Predictable performance (no thin overhead)
+- Guaranteed space for NFS storage
+- Simpler management (no over-subscription)
+-  Requires careful snapshot planning
 
 **Reference:** See troubleshooting case `09-Thick-Provisioned-Snapshot-Size.txt`
 
@@ -117,15 +117,15 @@ ESXi Master
 ### Why NFS for Production VMs?
 
 **Requirements for ESXi Cluster:**
-- ✅ Shared storage enables vMotion
-- ✅ VMs portable between ESXi hosts
-- ✅ HA heartbeat datastore
-- ✅ Single source of truth for VM files
+- Shared storage enables vMotion
+- VMs portable between ESXi hosts
+- HA heartbeat datastore
+- Single source of truth for VM files
 
 **Alternative Considered:**
-- ❌ Local VMDK per ESXi host: No vMotion, no HA
-- ❌ Hardware NAS: Too expensive for home lab
-- ✅ NFS from VM: Cost-effective, flexible
+- Local VMDK per ESXi host: No vMotion, no HA
+- Hardware NAS: Too expensive for home lab
+- NFS from VM: Cost-effective, flexible
 
 **Contents (Production VMs on ESXi Nested):**
 
@@ -147,9 +147,9 @@ ESXi Master
 **vCenter Backups**: Daily backups (max 7 days retention) = ~7GB
 
 **Note**: Total ~787GB fits within 900GB capacity:
-- ✅ Thin provisioning reduces actual usage
-- ✅ RAID1 mirrors count as allocated but use same space
-- ✅ Safe allocation with ~120GB headroom
+- Thin provisioning reduces actual usage
+- RAID1 mirrors count as allocated but use same space
+- Safe allocation with ~120GB headroom
 
 ---
 
@@ -168,9 +168,9 @@ ESXi Master
 ESXi HA cluster requires ≥ 2 datastores for heartbeat redundancy. If network fails, ESXi uses datastore heartbeat to determine if host is alive.
 
 **Why Separate Datastore?**
-- ✅ HA requirement (cannot use same datastore as VMs)
-- ✅ Small size (only metadata)
-- ✅ Isolates heartbeat from VM I/O
+- HA requirement (cannot use same datastore as VMs)
+- Small size (only metadata)
+- Isolates heartbeat from VM I/O
 
 ---
 

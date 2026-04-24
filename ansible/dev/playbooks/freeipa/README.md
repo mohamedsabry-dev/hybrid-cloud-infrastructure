@@ -62,5 +62,5 @@ See `/troubleshooting/identity/` (repo root) for the per-case writeups:
 
 - [`freeipa-setup-guide.txt`](freeipa-setup-guide.txt) — run order + commands
 - [`../../../../deployment-docs/freeipa-overview.md`](../../../../deployment-docs/freeipa-overview.md) — identity-layer system overview
-- [`../../../../deployment-docs/freeipa-initial-setup-guide.txt`](../../../../deployment-docs/freeipa-initial-setup-guide.txt) — sequenced step-7 walkthrough
+- [`../../../../deployment-docs/07-freeipa-setup-guide.md`](../../../../deployment-docs/07-freeipa-setup-guide.md) — sequenced step-7 walkthrough
 - [`../../inventory/group_vars/freeipa.yml`](../../inventory/group_vars/freeipa.yml) — host groups + user definitions + encrypted passwords

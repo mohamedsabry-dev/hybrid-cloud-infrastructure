@@ -314,11 +314,11 @@ Get-ChildItem "F:\ESXI_Master\" -Filter "*.vmdk" | Select-Object Name, Length, L
 
 **Verification Results**:
 ```
-✅ No delta files found (ESXI_Master-000012.vmdk deleted)
-✅ No delta files found (DS_NVME_01-000012.vmdk deleted)
-✅ No delta files found (DS_NVME_02_NEW-000012.vmdk deleted)
-✅ Base VMDK sizes increased (data merged successfully)
-✅ Last modified timestamps updated to consolidation time
+- No delta files found (ESXI_Master-000012.vmdk deleted)
+- No delta files found (DS_NVME_01-000012.vmdk deleted)
+- No delta files found (DS_NVME_02_NEW-000012.vmdk deleted)
+- Base VMDK sizes increased (data merged successfully)
+- Last modified timestamps updated to consolidation time
 ```
 
 **VMware Workstation Verification**:
@@ -362,11 +362,11 @@ vmkping -I vmk1 10.0.20.1
 **Results**:
 | Test | Before Consolidation | After Consolidation | Status |
 |------|---------------------|---------------------|--------|
-| Disk Read Latency | 1-8 seconds (peak) | 50-150ms (avg) | ✅ IMPROVED |
-| Disk Write Latency | 4-9 seconds (peak) | 80-200ms (avg) | ✅ IMPROVED |
-| VMware Tools Uptime | 2 timeouts in 6 min | No timeouts in 4 hours | ✅ STABLE |
-| VMXNET3 Errors | 100+ errors | 0 errors | ✅ RESOLVED |
-| Nested VM Responsiveness | Slow during snapshot | Normal | ✅ NORMAL |
+| Disk Read Latency | 1-8 seconds (peak) | 50-150ms (avg) |  IMPROVED |
+| Disk Write Latency | 4-9 seconds (peak) | 80-200ms (avg) |  IMPROVED |
+| VMware Tools Uptime | 2 timeouts in 6 min | No timeouts in 4 hours |  STABLE |
+| VMXNET3 Errors | 100+ errors | 0 errors |  RESOLVED |
+| Nested VM Responsiveness | Slow during snapshot | Normal |  NORMAL |
 
 **Conclusion**: Environment stable, performance returned to baseline.
 
@@ -396,7 +396,7 @@ $sourceHash = Get-FileHash "F:\ESXI_Master\ESXI_Master.vmdk" -Algorithm SHA256
 $destHash = Get-FileHash "E:\Backup\ESXI_Master_Clean_NoSnapshots_2026-01-02\ESXI_Master.vmdk" -Algorithm SHA256
 
 if ($sourceHash.Hash -eq $destHash.Hash) {
-    Write-Host "✅ Backup verified successfully" -ForegroundColor Green
+    Write-Host " Backup verified successfully" -ForegroundColor Green
 }
 ```
 
@@ -420,11 +420,11 @@ E:\Backup\
 ```
 
 **Benefits**:
-- ✅ Two recovery points available
-- ✅ Pre-cleanup backup preserves snapshot chain (if needed for forensics)
-- ✅ Clean backup ready for immediate DR restore
-- ✅ 30GB space savings after snapshot removal
-- ✅ Offsite backup protection (external disk can be disconnected)
+- Two recovery points available
+- Pre-cleanup backup preserves snapshot chain (if needed for forensics)
+- Clean backup ready for immediate DR restore
+- 30GB space savings after snapshot removal
+- Offsite backup protection (external disk can be disconnected)
 
 ---
 

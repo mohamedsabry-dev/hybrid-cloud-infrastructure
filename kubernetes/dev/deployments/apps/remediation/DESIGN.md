@@ -6,22 +6,25 @@ Why this node self-healing system is shaped the way it is. Focused on the reason
 
 ## What this system does
 
-A single-replica Deployment running on a K8s master watches worker-node `Ready` status via the K8s API and, when a worker is NotReady, remediates it via the Proxmox API on an escalating path. Every 5 minutes, the loop does two phases:
+A single-replica Deployment running on a K8s master watches worker-node `Ready` status via the K8s API and, when a worker is NotReady, remediates it via the Proxmox API on an escalating path. Every 5 minutes, the loop does three phases:
 
 ```
-Phase 1 — Check ALL worker nodes for Ready status
-          Collect the unhealthy set
+Phase 1   — Check ALL worker nodes for Ready status
+            Collect the suspect set
 
-Phase 2 — For each unhealthy worker (sequential, independent):
-            Attempt 1 → soft reboot (ACPI), or start if VM is stopped
-            Attempt 2 → hard reset, or start if VM is stopped
-            Attempt 3 → restore VM from latest NAS vzdump backup
-                        (stop → delete → restore at same VMID → start)
-                        + 120s buffer sleep to let restore complete
-            Attempt 4+ → alert "exhausted, manual intervention"
-          Send Alertmanager alert for each action
-          On recovery: reset counter, send recovery alert
+Phase 1.5 — Confirmation: wait 180s, re-check suspects
+            Nodes that recovered on their own → "false alarm," skip
+            Nodes still NotReady → confirmed unhealthy
+
+Phase 2   — For each confirmed unhealthy worker (sequential):
+              Attempt 1 → soft reboot (ACPI), or start if VM is stopped
+              Attempt 2 → hard reset, or start if VM is stopped
+              Attempt 3+ → alert "exhausted, manual intervention"
+            Send Alertmanager alert for each action
+            On recovery: reset counter, send recovery alert
 ```
+
+> **Note:** Prod runs a more aggressive version without the confirmation delay and with a restore-from-backup step at attempt 3. See "dev-specific drift" section below for the reasoning.
 
 Nothing about pods. Nothing about masters. No clone-to-dump step. No leader election. Each of those is absent for a specific reason — explained below.
 
@@ -118,7 +121,7 @@ If I want a forensic copy of a broken VM, I snapshot it manually on the Proxmox 
 
 Credentials flow: Vault secret at `secret/remediation/config` holds `PROXMOX_HOST`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`. The Vault Agent sidecar injects them at `/vault/secrets/proxmox-creds` inside the pod. The script reads that file at startup and uses it for every Proxmox API call.
 
-This matches the same Vault injection pattern every other app in the cluster uses — see [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt). Nothing special for remediation; it's the platform-wide pattern.
+This matches the same Vault injection pattern every other app in the cluster uses — see [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md). Nothing special for remediation; it's the platform-wide pattern.
 
 RBAC is minimal on the K8s side — read-only on nodes (see [`remediation-auth-sa.yaml`](remediation-auth-sa.yaml)):
 
@@ -182,6 +185,23 @@ CAPI on-prem does the same with VM templates, but running CAPI adds 3-4 controll
 
 Restore-at-same-VMID avoids all of that. VMID, MAC, IP, IPA enrollment, SSH host keys, kubelet cert — all preserved. Recovery time is comparable (~5 min) with much less moving infrastructure. It's the right tradeoff for this scale.
 
+## Decision — dev-specific drift: confirmation delay + no restore
+
+Dev and prod run different remediation behavior. On dev:
+
+- **3-minute confirmation delay before acting.** When a node is NotReady, the script waits 180s and checks again. Only acts if the node is still down. Prod acts immediately.
+- **No restore step.** Escalation is reboot → reset → exhausted. Prod keeps the full reboot → reset → restore path.
+
+Why: the dev server is a single consumer NVMe carrying 13+ guests. Concurrent operations — cluster boot, backup IO, multiple VMs starting — easily overwhelm the disk and cause temporary IO stalls. During an IO storm, kubelet can't report heartbeats fast enough, so nodes flip to NotReady even though the VM is fine. Without the confirmation delay, remediation sees "NotReady," immediately reboots a VM that's actually just IO-starved, which adds MORE concurrent startup IO to an already saturated disk, which makes things worse.
+
+The 3-minute delay catches these false alarms. If the node recovers on its own (IO storm passes), remediation logs "false alarm" and does nothing. If it's genuinely down after 3 minutes, then it acts.
+
+Restore is removed because on this hardware, a vzdump restore is itself an IO-heavy operation — restoring a 25-105 GB VM image while the disk is already struggling is the wrong move. If reboot + reset don't fix it, it's a manual problem. On prod hardware (enterprise NVMe, proper IOPS headroom) restore is safe and stays in the path.
+
+This drift is intentional and hardware-driven, not a feature gap. If dev hardware were upgraded, it could run the same config as prod.
+
+---
+
 ## What's not in scope
 
 Things explicitly NOT handled by this system, with the reasoning:
@@ -221,6 +241,6 @@ DR test writeups live in the main `disaster-recovery/` folder; worker-loss DR te
 ### Elsewhere in the repo
 - [`../../../../docker-images/remediation/`](../../../../docker-images/remediation/) — Dockerfile with debugging tools, image used by the Deployment
 - [`../monitoring/`](../monitoring/) — Prometheus + Alertmanager stack that receives alerts from this system
-- [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt) — Vault injection pattern used by this Deployment
+- [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md) — Vault injection pattern used by this Deployment
 - [`../../../../disaster-recovery/README.md`](../../../../disaster-recovery/README.md) — DR hub
 - [`../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md`](../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md) — the TS case that drove the dedicated `remediation` namespace

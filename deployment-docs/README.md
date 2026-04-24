@@ -10,21 +10,22 @@ Follow these guides **in order**. Each step depends on the previous ones being c
 
 | Order | Guide | Purpose |
 |-------|-------|---------|
-| 0 | [network-setup-guide.txt](network-setup-guide.txt) | Physical network (router, switch, AP) |
-| 1 | [proxmox-setup-guide.txt](proxmox-setup-guide.txt) | Proxmox VE hypervisor installation |
-| 2 | [aws-bootstrap-setup-guide.txt](aws-bootstrap-setup-guide.txt) | AWS OIDC, state bucket, IAM bootstrap |
-| 3 | [github-setup-guide.txt](github-setup-guide.txt) | GitHub secrets, variables, runners |
-| 4 | [aws-secrets-setup-guide.txt](aws-secrets-setup-guide.txt) | AWS Secrets Manager placeholders |
-| 5 | [vpn-setup-guide.txt](vpn-setup-guide.txt) | WireGuard VPN to AWS |
-| 6 | [ansible-runner-setup-guide.txt](ansible-runner-setup-guide.txt) | Ansible LXC + GitHub Runner LXC |
-| 7 | [freeipa-initial-setup-guide.txt](freeipa-initial-setup-guide.txt) | FreeIPA identity management |
-| 8 | [vault-initial-setup-guide.txt](vault-initial-setup-guide.txt) | HashiCorp Vault cluster |
-| 9 | [k8s-initial-setup-guide.txt](k8s-initial-setup-guide.txt) | Kubernetes cluster |
-| 10 | [k8s-flux-setup-guide.txt](k8s-flux-setup-guide.txt) | Flux bootstrap on K8s + app/infra loop pattern |
-| 11 | [vault-k8s-integration-guide.txt](vault-k8s-integration-guide.txt) | Vault-Kubernetes trust + secret injection |
-| 12 | [k8s-etcd-vault-aws-integration.txt](k8s-etcd-vault-aws-integration.txt) | etcd backup CronJob → Vault AWS Secrets Engine → S3 (temp STS creds, no long-lived keys in K8s) |
-| 13 | [enpoint-dns-ingress-exnginx-setup-guide.txt](enpoint-dns-ingress-exnginx-setup-guide.txt) | Endpoint DNS + ingress-nginx controller + external Nginx reverse proxy |
-| 14 | [remediation-integration-guide.txt](remediation-integration-guide.txt) | Remediation integration — Proxmox API + K8s + Alertmanager for worker self-healing |
+| 0 | [00-network-setup-guide.md](00-network-setup-guide.md) | Physical network (router, switch, AP) |
+| 1 | [01-proxmox-setup-guide.md](01-proxmox-setup-guide.md) | Proxmox VE hypervisor installation |
+| 2 | [02-aws-bootstrap-setup-guide.md](02-aws-bootstrap-setup-guide.md) | AWS OIDC, state bucket, IAM bootstrap |
+| 3 | [03-github-setup-guide.md](03-github-setup-guide.md) | GitHub secrets, variables, runners |
+| 4 | [04-aws-secrets-setup-guide.md](04-aws-secrets-setup-guide.md) | AWS Secrets Manager placeholders |
+| 5 | [05-vpn-setup-guide.md](05-vpn-setup-guide.md) | WireGuard VPN to AWS |
+| 6 | [06-ansible-runner-setup-guide.md](06-ansible-runner-setup-guide.md) | Ansible LXC + GitHub Runner LXC |
+| 7 | [07-freeipa-setup-guide.md](07-freeipa-setup-guide.md) | FreeIPA identity management |
+| 8 | [08-vault-setup-guide.md](08-vault-setup-guide.md) | HashiCorp Vault cluster |
+| 9 | [09-k8s-setup-guide.md](09-k8s-setup-guide.md) | Kubernetes cluster |
+| 10 | [10-k8s-flux-setup-guide.md](10-k8s-flux-setup-guide.md) | Flux bootstrap on K8s + app/infra loop pattern |
+| 11 | [11-vault-k8s-integration-guide.md](11-vault-k8s-integration-guide.md) | Vault-Kubernetes trust + secret injection |
+| 12 | [12-etcd-backup-integration-guide.md](12-etcd-backup-integration-guide.md) | etcd backup CronJob → Vault AWS Secrets Engine → S3 (temp STS creds, no long-lived keys in K8s) |
+| 13 | [13-endpoint-dns-ingress-setup-guide.md](13-endpoint-dns-ingress-setup-guide.md) | Endpoint DNS + ingress-nginx controller + external Nginx reverse proxy |
+| 14 | [14-remediation-integration-guide.md](14-remediation-integration-guide.md) | Remediation integration — Proxmox API + K8s + Alertmanager for worker self-healing |
+| 15 | [15-monitoring-stack-setup-guide.md](15-monitoring-stack-setup-guide.md) | Grafana + Prometheus + Loki + Alertmanager monitoring stack |
 
 ---
 
@@ -124,7 +125,7 @@ All troubleshooting documentation is in the `troubleshooting/` folder, organized
 | troubleshooting/network/ | VPN, VLAN, switch, router issues |
 | troubleshooting/proxmox/ | Hypervisor, storage, backup issues |
 | troubleshooting/identity/ | FreeIPA, Kerberos, LDAP issues |
-| troubleshooting/github-actions/ | Workflow, runner issues |
+| troubleshooting/github/ | Workflow, runner issues |
 | troubleshooting/aws/ | IAM, secrets, OIDC issues |
 | troubleshooting/kubernetes/ | K8s cluster issues |
 | troubleshooting/nginx/ | Reverse proxy, upstream, logging issues |

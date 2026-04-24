@@ -480,21 +480,21 @@ PREVENTION & BEST PRACTICES
 ================================================================================
 
 DO:
-✅ Clear SSSD cache after making IPA changes
-✅ Use Ansible to clear cache on all clients simultaneously
-✅ Reduce cache TTL in lab environments
-✅ Test changes on one client before assuming cluster-wide
-✅ Document cache behavior in runbooks
-✅ Set expectations: Changes take 1-5 minutes to propagate
-✅ Monitor SSSD online/offline status
+- Clear SSSD cache after making IPA changes
+- Use Ansible to clear cache on all clients simultaneously
+- Reduce cache TTL in lab environments
+- Test changes on one client before assuming cluster-wide
+- Document cache behavior in runbooks
+- Set expectations: Changes take 1-5 minutes to propagate
+- Monitor SSSD online/offline status
 
 DON'T:
-❌ Expect instant propagation of IPA changes
-❌ Assume cache clears automatically
-❌ Delete /var/lib/sss/db/ while SSSD is running (corrupts cache)
-❌ Set cache TTL too low (<60 seconds) in production
-❌ Ignore SSSD offline status
-❌ Restart SSSD during active user sessions (may disconnect users)
+- Expect instant propagation of IPA changes
+- Assume cache clears automatically
+- Delete /var/lib/sss/db/ while SSSD is running (corrupts cache)
+- Set cache TTL too low (<60 seconds) in production
+- Ignore SSSD offline status
+- Restart SSSD during active user sessions (may disconnect users)
 
 Operational Workflow:
 ---------------------

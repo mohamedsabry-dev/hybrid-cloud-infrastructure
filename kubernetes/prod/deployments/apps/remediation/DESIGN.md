@@ -118,7 +118,7 @@ If I want a forensic copy of a broken VM, I snapshot it manually on the Proxmox 
 
 Credentials flow: Vault secret at `secret/remediation/config` holds `PROXMOX_HOST`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`. The Vault Agent sidecar injects them at `/vault/secrets/proxmox-creds` inside the pod. The script reads that file at startup and uses it for every Proxmox API call.
 
-This matches the same Vault injection pattern every other app in the cluster uses — see [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt). Nothing special for remediation; it's the platform-wide pattern.
+This matches the same Vault injection pattern every other app in the cluster uses — see [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md). Nothing special for remediation; it's the platform-wide pattern.
 
 RBAC is minimal on the K8s side — read-only on nodes (see [`remediation-auth-sa.yaml`](remediation-auth-sa.yaml)):
 
@@ -221,6 +221,6 @@ DR test writeups live in the main `disaster-recovery/` folder; worker-loss DR te
 ### Elsewhere in the repo
 - [`../../../../docker-images/remediation/`](../../../../docker-images/remediation/) — Dockerfile with debugging tools, image used by the Deployment
 - [`../monitoring/`](../monitoring/) — Prometheus + Alertmanager stack that receives alerts from this system
-- [`../../../../deployment-docs/vault-k8s-integration-guide.txt`](../../../../deployment-docs/vault-k8s-integration-guide.txt) — Vault injection pattern used by this Deployment
+- [`../../../../deployment-docs/11-vault-k8s-integration-guide.md`](../../../../deployment-docs/11-vault-k8s-integration-guide.md) — Vault injection pattern used by this Deployment
 - [`../../../../disaster-recovery/README.md`](../../../../disaster-recovery/README.md) — DR hub
 - [`../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md`](../../../../troubleshooting/kubernetes/17-vault-injection-system-namespace-denied.md) — the TS case that drove the dedicated `remediation` namespace

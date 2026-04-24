@@ -268,7 +268,7 @@ Quick one-liner (after fdisk):
   systemctl daemon-reload && mount /data && df -h /data
 
 
-Key takeaways:
+Notes:
   1. Cloned VMs do not auto-track disks — provider leaves disk array empty in state
   2. Always declare boot disk (scsi0) explicitly when adding disks to cloned VMs
   3. scsi0 disk block must mirror golden image configuration exactly

@@ -1,6 +1,6 @@
-# TS-VLT-005 | 2026-04-11 | RESOLVED
-# REAL INCIDENT — unplanned production failure (Proxmox crash during backup),
-# not planned DR testing. Documented before DR test phase began.
+# TS-VLT-005 | 2026-04-11 | RESOLVED | INCIDENT
+# Unplanned production failure (Proxmox crash during backup), not planned DR testing.
+# Documented before DR test phase began.
 _____________________________________________________________________
 
 [Info]

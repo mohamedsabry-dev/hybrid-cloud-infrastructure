@@ -25,7 +25,7 @@ spec:
         namespace: ingress-nginx
   values:
     controller:
-      replicaCount: 3
+      replicaCount: 2
       podLabels:
         app: nginx
       service:

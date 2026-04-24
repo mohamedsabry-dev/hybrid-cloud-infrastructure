@@ -6,29 +6,24 @@ metadata:
 data:
   remediation.py: |
     import time
+    import requests
     from kubernetes import client, config
     from proxmoxer import ProxmoxAPI
 
+    # Alertmanager endpoint (runs on master, survives worker failures)
+    ALERTMANAGER_URL = "http://alertmanager.monitoring.svc:9093/api/v2/alerts"
+
     # Configuration
-    CHECK_INTERVAL = 300        # 5 minutes between checks (prevents race during boot)
-    REMEDIATION_WAIT = 240      # 4 minutes wait after remediation
+    CHECK_INTERVAL = 300        # 5 minutes between checks
     PROXMOX_NODE = "pve-prod"
     NFS_STORAGE = "nas-prod-data"
     TARGET_STORAGE = "local-lvm"
-    POD_FAILURE_THRESHOLD = 0.7  # 70% pods failing triggers remediation
 
     # Node to VMID mapping
     NODE_MAP = {
         "k8s-worker1.lab.local": 1020,
         "k8s-worker2.lab.local": 1021,
         "k8s-worker3.lab.local": 1022,
-    }
-
-    # Dump VMID mapping (for cloning broken VMs before restore)
-    DUMP_MAP = {
-        "k8s-worker1.lab.local": 5020,
-        "k8s-worker2.lab.local": 5021,
-        "k8s-worker3.lab.local": 5022,
     }
 
     # Track remediation attempts per node
@@ -53,6 +48,26 @@ data:
             verify_ssl=False
         )
 
+    def send_alert(node_name, action, status, severity="warning"):
+        """Send alert to Alertmanager for email notification."""
+        alert = [{
+            "labels": {
+                "alertname": "RemediationAction",
+                "node": node_name,
+                "action": action,
+                "severity": severity
+            },
+            "annotations": {
+                "summary": f"Remediation {action} on {node_name}: {status}",
+                "description": f"Self-healing action '{action}' was performed on node {node_name}. Result: {status}"
+            }
+        }]
+        try:
+            requests.post(ALERTMANAGER_URL, json=alert, timeout=5)
+            print(f"  -> Alert sent: {action} - {status}")
+        except Exception as e:
+            print(f"  -> Failed to send alert: {e}")
+
     def is_node_ready(v1, node_name):
         """Check if node exists and is Ready."""
         try:
@@ -67,55 +82,12 @@ data:
                 return False
             raise
 
-    def are_pods_healthy(v1, node_name):
-        """Check if pods on node are healthy (not in CrashLoopBackOff/Error)."""
-        try:
-            pods = v1.list_pod_for_all_namespaces(
-                field_selector=f"spec.nodeName={node_name}"
-            )
-
-            if not pods.items:
-                return True  # No pods = healthy
-
-            total_pods = len(pods.items)
-            failing_pods = 0
-
-            for pod in pods.items:
-                if pod.status.phase in ["Failed", "Unknown"]:
-                    failing_pods += 1
-                    continue
-
-                # Check container statuses for CrashLoopBackOff
-                if pod.status.container_statuses:
-                    for cs in pod.status.container_statuses:
-                        if cs.state.waiting:
-                            if cs.state.waiting.reason in ["CrashLoopBackOff", "Error", "ImagePullBackOff"]:
-                                failing_pods += 1
-                                break
-
-            failure_rate = failing_pods / total_pods
-
-            if failure_rate >= POD_FAILURE_THRESHOLD:
-                print(f"  Pod failure rate: {failing_pods}/{total_pods} ({failure_rate*100:.0f}%)")
-                return False
-
-            return True
-
-        except Exception as e:
-            print(f"  Error checking pods: {e}")
-            return True  # Assume healthy on error
-
     def is_node_healthy(v1, node_name):
-        """Check node status AND pod health."""
+        """Check if node is Ready."""
         node_ready = is_node_ready(v1, node_name)
 
         if not node_ready:
             return False, "Node NotReady"
-
-        pods_healthy = are_pods_healthy(v1, node_name)
-
-        if not pods_healthy:
-            return False, "Pods failing"
 
         return True, "OK"
 
@@ -157,9 +129,22 @@ data:
                 print(f"  -> Start failed: {e}")
 
     def reset_vm(proxmox, vmid):
-        """Hard reset."""
-        print(f"  -> Hard resetting VM {vmid}")
-        proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reset.post()
+        """Hard reset - checks status first."""
+        vm_status = get_vm_status(proxmox, vmid)
+        print(f"  -> VM {vmid} status: {vm_status}")
+
+        if vm_status == "stopped":
+            print(f"  -> VM {vmid} is stopped, starting instead of resetting")
+            start_vm(proxmox, vmid)
+        elif vm_status == "running":
+            print(f"  -> Hard resetting VM {vmid}")
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.reset.post()
+        else:
+            print(f"  -> VM {vmid} in state '{vm_status}', attempting start")
+            try:
+                start_vm(proxmox, vmid)
+            except Exception as e:
+                print(f"  -> Start failed: {e}")
 
     def get_latest_backup(proxmox, vmid):
         """Get the latest backup for a VMID."""
@@ -172,77 +157,77 @@ data:
         backups.sort(key=lambda x: x.get("ctime", 0), reverse=True)
         return backups[0]["volid"]
 
-    def restore_vm(proxmox, node_name, vmid, dump_vmid):
-        """Stop VM, clone to dump, restore from latest backup."""
-        print(f"  -> Stopping VM {vmid}")
-        try:
-            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.stop.post()
-            time.sleep(30)  # Wait for VM to stop
-        except Exception as e:
-            print(f"  -> Stop failed (may already be stopped): {e}")
+    def restore_vm(proxmox, vmid):
+        """Restore VM from latest backup (no clone - direct overwrite).
 
-        # Clone current state to dump VMID
-        print(f"  -> Cloning VM {vmid} to dump VMID {dump_vmid}")
-        try:
-            # Delete existing dump if exists
-            try:
-                proxmox.nodes(PROXMOX_NODE).qemu(dump_vmid).delete()
-                time.sleep(10)
-            except:
-                pass  # Dump VM doesn't exist
-
-            proxmox.nodes(PROXMOX_NODE).qemu(vmid).clone.post(
-                newid=dump_vmid,
-                name=f"dump-{node_name.split('.')[0]}",
-                full=1
-            )
-            time.sleep(60)  # Wait for clone
-        except Exception as e:
-            print(f"  -> Clone failed: {e}")
-
-        # Get latest backup
+        Returns: 'restored' or 'failed'
+        """
+        # Get latest backup first
         latest_backup = get_latest_backup(proxmox, vmid)
         if not latest_backup:
             print(f"  -> No backup found for VM {vmid}!")
-            return False
+            return "failed"
 
-        print(f"  -> Restoring from {latest_backup}")
+        # Stop VM
+        print(f"  -> Stopping VM {vmid}")
+        try:
+            proxmox.nodes(PROXMOX_NODE).qemu(vmid).status.stop.post()
+            time.sleep(30)
+        except Exception as e:
+            print(f"  -> Stop failed (may already be stopped): {e}")
 
-        # Delete broken VM
+        # Delete current VM
+        print(f"  -> Deleting VM {vmid}")
         try:
             proxmox.nodes(PROXMOX_NODE).qemu(vmid).delete()
             time.sleep(10)
         except Exception as e:
             print(f"  -> Delete failed: {e}")
+            return "failed"
 
         # Restore from backup
-        proxmox.nodes(PROXMOX_NODE).qemu.post(
-            vmid=vmid,
-            archive=latest_backup,
-            storage=TARGET_STORAGE,
-            start=1
-        )
-        print(f"  -> Restore initiated, VM {vmid} starting")
-        return True
+        print(f"  -> Restoring from {latest_backup}")
+        try:
+            proxmox.nodes(PROXMOX_NODE).qemu.post(
+                vmid=vmid,
+                archive=latest_backup,
+                storage=TARGET_STORAGE,
+                start=1
+            )
+            print(f"  -> Restore initiated, VM {vmid} starting")
+            return "restored"
+        except Exception as e:
+            print(f"  -> Restore failed: {e}")
+            return "failed"
 
     def remediate(proxmox, node_name, vmid):
         """Escalating remediation: reboot -> reset -> restore."""
         counters[node_name] += 1
         attempt = counters[node_name]
-        dump_vmid = DUMP_MAP[node_name]
 
         print(f"[Attempt {attempt}] Remediating {node_name} (VM {vmid})")
 
         if attempt == 1:
             reboot_vm(proxmox, vmid)
+            send_alert(node_name, "reboot", "initiated")
+
         elif attempt == 2:
             reset_vm(proxmox, vmid)
-        elif attempt >= 3:
-            restore_vm(proxmox, node_name, vmid, dump_vmid)
-            counters[node_name] = 0  # Reset counter after restore
+            send_alert(node_name, "reset", "initiated")
 
-        print(f"  -> Waiting {REMEDIATION_WAIT}s for recovery...")
-        time.sleep(REMEDIATION_WAIT)
+        elif attempt == 3:
+            result = restore_vm(proxmox, vmid)
+            if result == "restored":
+                send_alert(node_name, "restore", "initiated", severity="critical")
+                print(f"  -> Waiting 120s buffer for restore to complete...")
+                time.sleep(120)  # 2 min buffer for restore
+            else:
+                send_alert(node_name, "restore", "failed", severity="critical")
+
+        else:
+            # attempt > 3: Already tried everything, just log
+            send_alert(node_name, "all-attempts", "exhausted - manual intervention required", severity="critical")
+            print(f"  -> Max attempts reached - manual intervention required")
 
     def main():
         print("Remediation service starting...")
@@ -257,28 +242,37 @@ data:
 
         print(f"Monitoring nodes: {list(NODE_MAP.keys())}")
         print(f"Check interval: {CHECK_INTERVAL}s")
-        print(f"Pod failure threshold: {POD_FAILURE_THRESHOLD*100:.0f}%")
 
         # Startup delay: wait before first health check to avoid race during cluster boot
         print(f"Waiting {CHECK_INTERVAL}s before first health check (cluster stabilization)...")
         time.sleep(CHECK_INTERVAL)
 
         while True:
-            print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
+            print(f"\n--- Health check at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())} ---")
 
+            # Phase 1: Check all nodes first
+            unhealthy_nodes = []
             for node_name, vmid in NODE_MAP.items():
                 healthy, reason = is_node_healthy(v1, node_name)
 
                 if healthy:
                     if counters[node_name] > 0:
                         print(f"{node_name}: Recovered! Resetting counter.")
+                        send_alert(node_name, "recovery", "node is healthy again", severity="info")
                         counters[node_name] = 0
                     else:
                         print(f"{node_name}: Healthy")
                 else:
                     print(f"{node_name}: UNHEALTHY! ({reason})")
+                    unhealthy_nodes.append((node_name, vmid))
+
+            # Phase 2: Remediate all unhealthy nodes
+            if unhealthy_nodes:
+                print(f"\n--- Remediating {len(unhealthy_nodes)} unhealthy node(s) ---")
+                for node_name, vmid in unhealthy_nodes:
                     remediate(proxmox, node_name, vmid)
 
+            # Wait before next check
             time.sleep(CHECK_INTERVAL)
 
     if __name__ == "__main__":
