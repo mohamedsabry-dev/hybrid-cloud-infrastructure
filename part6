@@ -1,0 +1,407 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 6 OF 10
+The breakthrough: scale to zero → cascade breaks → reintroduction
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: ~05:45 to ~06:30 local
+PHASE: Empirical validation of cascade theory
+
+─────────────────────────────────────────────────────────────────────
+THE AGGRESSIVE SCALE-DOWN APPROACH
+─────────────────────────────────────────────────────────────────────
+
+Theory: if cascade is self-sustaining via restart loops, breaking the
+loops should stabilize the system. Only way to know: test it.
+
+Proposed comprehensive scale-down:
+
+# Scale down application workloads
+  kubectl -n apps scale deployment wordpress --replicas=0
+  # (Mariadb: user said "already running, didn't shut it")
+
+# Suspend Flux (it's in CrashLoopBackOff anyway)
+  kubectl -n flux-system scale deployment helm-controller --replicas=0
+  kubectl -n flux-system scale deployment kustomize-controller --replicas=0
+  kubectl -n flux-system scale deployment notification-controller --replicas=0
+  kubectl -n flux-system scale deployment source-controller --replicas=0
+
+# Scale down monitoring stack (huge IO consumer during churn)
+  kubectl -n monitoring scale statefulset loki --replicas=0
+  kubectl -n monitoring scale statefulset alertmanager-kube-prometheus-stack-alertmanager --replicas=0
+  kubectl -n monitoring scale statefulset prometheus-kube-prometheus-stack-prometheus --replicas=0
+  kubectl -n monitoring scale deployment kube-prometheus-stack-grafana --replicas=0
+  kubectl -n monitoring scale deployment kube-prometheus-stack-operator --replicas=0
+  kubectl -n monitoring scale deployment kube-prometheus-stack-kube-state-metrics --replicas=0
+
+# Stop promtail and node-exporter daemonsets (can't scale daemonsets,
+# use nodeSelector trick)
+  kubectl -n monitoring patch daemonset promtail \
+    -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+  kubectl -n monitoring patch daemonset kube-prometheus-stack-prometheus-node-exporter \
+    -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+
+# Remediation controller
+  kubectl -n remediation scale deployment remediation --replicas=0
+
+# Wait 10+ minutes for things to terminate cleanly
+  watch kubectl get pods -A
+
+GOTCHA #3: Can't scale daemonsets directly with --replicas=0.
+Workaround: use nodeSelector that matches no nodes. Pods terminate
+because they can't schedule anywhere.
+
+─────────────────────────────────────────────────────────────────────
+EXECUTED SCALE-DOWN
+─────────────────────────────────────────────────────────────────────
+
+User ran the scale-down commands.
+
+Result (observed within minutes):
+- IO PRESSURE DROPPED TO BASELINE
+- Control plane components STOPPED CRASHING
+- Restart counts STOPPED GROWING
+- Cluster became quiet
+
+The PSI graph went from sustained 40-67% to near baseline (~0-5%)
+within ~5 minutes of the scale-down completing.
+
+THIS WAS THE DEFINITIVE DIAGNOSTIC ANSWER:
+- Cascade dynamics confirmed
+- NOT resource exhaustion (if it were, hardware would still be over
+  capacity)
+- NOT hardware problem
+- NOT memory-alone problem
+- Was self-sustaining feedback loop
+
+─────────────────────────────────────────────────────────────────────
+WHAT THIS PROVED
+─────────────────────────────────────────────────────────────────────
+
+The experiment empirically proved:
+
+1. The cluster CAN run stably (proven by it being quiet after scale-down)
+
+2. The trigger wasn't persistent (if it were, would still be active)
+
+3. Restart loops were sustaining the cascade (stopping them stopped it)
+
+4. Root cause = cascade dynamics, NOT:
+   - Hardware (same hardware was fine before and after)
+   - Memory (VM memory sizing unchanged)
+   - etcd DB (healthy throughout)
+   - Any specific component
+
+─────────────────────────────────────────────────────────────────────
+CLUSTER STATE AFTER SCALE-DOWN
+─────────────────────────────────────────────────────────────────────
+
+What was left running (minimum viable cluster):
+- 3x etcd (static pod)
+- 3x kube-apiserver (static pod)
+- 3x kube-scheduler (static pod)
+- 3x kube-controller-manager (static pod)
+- 5x kube-proxy
+- 5x calico-node
+- 2x coredns
+- 2x csi-nfs-controller (stopped crashing!)
+- 5x csi-nfs-node
+- 2x metrics-server
+- 2x vault-agent-injector
+- alertmanager-0 (couldn't be scaled - maybe forgotten)
+- loki-canary (daemonset, separate from main loki)
+- etcd-backup cronjob (completed pods)
+- mariadb-0 (still running - user didn't scale down)
+- wordpress (may have been reduced from 2 to 0)
+- ingress-nginx-controller × 2
+
+Recovery signs:
+- controller-managers stopped crashing
+- schedulers stabilized
+- csi-nfs-controller went from Error to Running
+- All daemon sets normal
+
+─────────────────────────────────────────────────────────────────────
+WORKER3 CAME BACK
+─────────────────────────────────────────────────────────────────────
+
+User noted: "remediation brought worker3 up and it in the cluster and
+it share in workload"
+
+The remediation controller (which had been scaled down briefly then
+came back via restart) automatically re-added worker3. This was
+actually beneficial — restored 3+3 topology.
+
+But NOTE: worker3 came back at original 2.75 GB memory (not 3 GB
+like workers 1 and 2 had been changed to). Memory inconsistency
+discovered — worker3 wasn't in cluster when memory change was applied
+earlier.
+
+ACTION ITEM flagged: reconcile worker3 memory later.
+
+─────────────────────────────────────────────────────────────────────
+BEGINNING REINTRODUCTION
+─────────────────────────────────────────────────────────────────────
+
+Plan: scale services back up ONE AT A TIME, with 5-minute waits,
+watching PSI after each.
+
+Order strategy (safest first):
+1. Prometheus (essential monitoring)
+2. Grafana (light, for visibility)
+3. Loki (log storage)
+4. Node-exporter (light, per-node)
+5. Promtail (BIG — main log shipper)
+6. kube-state-metrics (apiserver watcher)
+7. Prometheus-operator (manages CRDs)
+8. Flux controllers (LAST - will reconcile everything)
+
+─────────────────────────────────────────────────────────────────────
+STEP 1: PROMETHEUS
+─────────────────────────────────────────────────────────────────────
+
+Command:
+  kubectl -n monitoring scale statefulset prometheus-kube-prometheus-stack-prometheus --replicas=1
+
+Result:
+  prometheus-kube-prometheus-stack-prometheus-0  2/2  Running  0  27s
+  (On worker3)
+
+Zero restarts. Started clean.
+
+Waited 5 minutes. PSI stayed quiet. Continue.
+
+─────────────────────────────────────────────────────────────────────
+STEP 2: GRAFANA
+─────────────────────────────────────────────────────────────────────
+
+Command:
+  kubectl -n monitoring scale deployment kube-prometheus-stack-grafana --replicas=1
+
+Result:
+  kube-prometheus-stack-grafana-7bc777d646-8rrnd  4/4  Running  0  3m49s
+  (On worker1)
+
+Zero restarts. 4/4 containers ready (grafana + sidecars).
+
+Waited 5 minutes. PSI stable.
+
+─────────────────────────────────────────────────────────────────────
+STEP 3: LOKI
+─────────────────────────────────────────────────────────────────────
+
+Command:
+  kubectl -n monitoring scale statefulset loki --replicas=1
+
+Result:
+  loki-0  1/2  Running  0  4s  (initially)
+  loki-0  2/2  Running  0  [later]
+  (On worker3)
+
+Zero restarts. Both containers eventually ready.
+
+Waited 5 minutes. PSI stable.
+
+─────────────────────────────────────────────────────────────────────
+STEP 4: NODE-EXPORTER
+─────────────────────────────────────────────────────────────────────
+
+Command (remove nodeSelector trick):
+  kubectl -n monitoring patch daemonset kube-prometheus-stack-prometheus-node-exporter \
+    -p '{"spec":{"template":{"spec":{"nodeSelector":null}}}}'
+
+Result: 6 pods in 5 seconds
+  kube-prometheus-stack-prometheus-node-exporter-9sp79  1/1  Running  0  5s
+  kube-prometheus-stack-prometheus-node-exporter-bk7s6  1/1  Running  0  5s
+  kube-prometheus-stack-prometheus-node-exporter-c5jnr  1/1  Running  0  5s
+  kube-prometheus-stack-prometheus-node-exporter-dsh9r  1/1  Running  0  5s
+  kube-prometheus-stack-prometheus-node-exporter-gxfwp  1/1  Running  0  5s
+  kube-prometheus-stack-prometheus-node-exporter-snf6v  1/1  Running  0  (s count building)
+
+Zero restarts on all 6. Very fast start.
+
+Waited 5 minutes.
+
+─────────────────────────────────────────────────────────────────────
+STEP 5: PROMTAIL (THE BIG TEST)
+─────────────────────────────────────────────────────────────────────
+
+Promtail was expected to be the tipping point because:
+- Ships all container logs
+- High-volume writes to Loki over HTTP
+- Previously had 14+ restarts each
+
+Command:
+  kubectl -n monitoring patch daemonset promtail \
+    -p '{"spec":{"template":{"spec":{"nodeSelector":null}}}}'
+
+Result: all 6 pods ready in 14 seconds!
+  promtail-cl7hx  0/1→1/1  Running  0  (on master1)
+  promtail-flmqw  0/1→1/1  Running  0  (on master3)
+  promtail-pmzrw  0/1→1/1  Running  0  (on worker2)
+  promtail-wm88c  0/1→1/1  Running  0  (on worker1)
+  promtail-wwwg6  0/1→1/1  Running  0  (on worker3)
+  promtail-zw2f8  0/1→1/1  Running  0  (on master2)
+
+User: "they was never that fast"
+
+THIS WAS IMPORTANT. Previously promtail had 14+ restarts. Now starting
+clean in 14 seconds. Cluster in healthy state = promtail fast.
+
+─────────────────────────────────────────────────────────────────────
+STEP 6: KUBE-STATE-METRICS
+─────────────────────────────────────────────────────────────────────
+
+Command:
+  kubectl -n monitoring scale deployment kube-prometheus-stack-kube-state-metrics --replicas=1
+
+Result:
+  kube-prometheus-stack-kube-state-metrics-567d49447b-hns8r  1/1  Running  0  13s
+
+Zero restarts. Previously had 13+ restarts in CrashLoopBackOff.
+Now clean.
+
+─────────────────────────────────────────────────────────────────────
+CHECK KUBECTL TOP NODES (HEALTH VERIFICATION)
+─────────────────────────────────────────────────────────────────────
+
+User ran:
+  kubectl top nodes
+
+Output:
+  NAME                    CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)
+  k8s-master1.lab.local   136m         3%       1790Mi          58%
+  k8s-master2.lab.local   177m         4%       2134Mi          70%
+  k8s-master3.lab.local   138m         3%       1729Mi          56%
+  k8s-worker1.lab.local   91m          4%       1631Mi          69%
+  k8s-worker2.lab.local   87m          4%       1815Mi          77%
+  k8s-worker3.lab.local   73m          3%       1659Mi          70%
+
+EXCELLENT HEALTH:
+- All nodes: 3-4% CPU
+- Masters: 56-70% memory
+- Workers: 69-77% memory
+
+Memory tighter on workers, but CPU idle. This is what a healthy
+cluster under monitoring load looks like.
+
+─────────────────────────────────────────────────────────────────────
+STEP 7: PROMETHEUS-OPERATOR
+─────────────────────────────────────────────────────────────────────
+
+Command:
+  kubectl -n monitoring scale deployment kube-prometheus-stack-operator --replicas=1
+
+Result:
+  kube-prometheus-stack-operator-75f77b9df6-zpqbq  1/1  Running  0  60s
+
+Zero restarts. Clean start.
+
+─────────────────────────────────────────────────────────────────────
+STEP 8: FLUX CONTROLLERS
+─────────────────────────────────────────────────────────────────────
+
+Warning given to user:
+"Before starting flux: if your git has original replicas (wordpress:3,
+ingress:3, csi-nfs-controller:2, metrics-server:2), flux will revert
+them."
+
+Options presented:
+A. Commit reduced replicas to git first
+B. Start flux then IMMEDIATELY suspend kustomizations
+C. Leave flux off for now (recommended for tonight)
+
+User chose to proceed anyway.
+
+Commands:
+  kubectl -n flux-system scale deployment source-controller --replicas=1
+  kubectl -n flux-system scale deployment notification-controller --replicas=1
+  kubectl -n flux-system scale deployment helm-controller --replicas=1
+  kubectl -n flux-system scale deployment kustomize-controller --replicas=1
+
+Result:
+  flux-system  helm-controller-844f6958dc-gks65         1/1  Running  0  2m52s
+  flux-system  kustomize-controller-67486f5bfd-jkmz5    1/1  Running  0  2m52s
+  flux-system  notification-controller-7f5d7cb966-zr6m7 1/1  Running  0  2m53s
+  flux-system  source-controller-6d8d58659f-v7hk8       1/1  Running  0  3m29s
+
+Zero restarts. Clean starts.
+
+Flux then reconciled workloads to git state:
+- Wordpress scaled back to 2 replicas (from 0 or 1)
+  Output showed:
+    apps  wordpress-6d4f6bbd46-gmwn8  2/2 Running 0  55s (worker2)
+    apps  wordpress-6d4f6bbd46-td756  2/2 Running 0  25s (worker3)
+
+Remediation came back:
+  remediation  remediation-774679955-n29q4  2/2 Running 0  55s
+
+─────────────────────────────────────────────────────────────────────
+FINAL STATE POST-REINTRODUCTION
+─────────────────────────────────────────────────────────────────────
+
+All pods Running (or Completed for cronjobs).
+Zero new restarts on any reintroduced pod.
+PSI graph at baseline.
+
+User shared full kubectl output confirming:
+- All etcds Running (48, 49, 22 old restart counts)
+- All apiservers 1/1 Running
+- All controller-managers 1/1 Running
+- All schedulers 1/1 Running (including master3 which was
+  CrashLoopBackOff before!)
+- All flux controllers Running
+- All monitoring Running
+- Wordpress 2/2 on both pods
+
+─────────────────────────────────────────────────────────────────────
+THE BREAKTHROUGH UNDERSTANDING
+─────────────────────────────────────────────────────────────────────
+
+Final answer that the investigation produced:
+
+"Starting from total crash → gradual reintroduction one-by-one → all
+stable. This proves:
+- No single component is the problem
+- The issue was CASCADE DYNAMICS — once something triggers failure,
+  the restart loops keep IO high
+- Bring-up sequence matters: parallel startup breaks the host,
+  sequential startup works fine"
+
+Key insights:
+1. Cluster CAN run all workloads stably
+2. Cluster CANNOT recover from cascade on its own
+3. Sequential operations mandatory
+4. 5 min waits work cleanly
+5. Probe timeouts too aggressive for constrained hardware
+
+─────────────────────────────────────────────────────────────────────
+STATUS AT END OF PART 6
+─────────────────────────────────────────────────────────────────────
+
+CASCADE THEORY: CONFIRMED empirically
+- Reproduced by scale-down breaking cascade
+- Validated by reintroduction succeeding cleanly
+
+What we now knew:
+- Cluster health matters enormously
+- Healthy cluster can absorb stressors
+- Degraded cluster multiplies stressors
+- Recovery requires manual intervention
+
+Remaining unknown:
+- What triggers the ORIGINAL cascade?
+- Why did master1 hang this morning?
+
+Cluster state: HEALTHY, baseline operation resumed.
+
+Investigation time elapsed: ~7 hours
+User preparing to sleep.
+
+[END OF PART 6]
+
+Part 7 will cover:
+- Final recovery confirmation
+- First investigation doc creation (TS-PVE-DEV-002)
+- Testing resilience: deliberate full-cluster reboot
+- The 30% spike test (new baseline!)
+- User's question about qemu-ga cascade

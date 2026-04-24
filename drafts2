@@ -1,0 +1,1019 @@
+TS-PVE-DEV-002 | 2026-04-24 | ROOT CAUSE CONFIRMED — K8S CASCADE STORMS
+_____________________________________________________________________
+
+[Status]
+RESOLVED (diagnosis) — Root cause DEFINITIVELY IDENTIFIED.
+Mitigation validated. Permanent fix requires follow-up work but
+break-glass recovery procedure documented and tested.
+
+This document is a continuation of TS-PVE-DEV-001. Covers the session
+from ~04:00 local through ~06:30 local on 2026-04-24.
+
+_____________________________________________________________________
+
+[Info]
+Domain: Proxmox VE / Kubernetes / Cascade failure dynamics
+Sub-techs: etcd contention, probe cascades, sequential vs parallel
+           startup, Flux/GitOps, reintroduction methodology
+Environment: DEV Proxmox host (pve-dev, laptop-based)
+Occurrences: 1 major cascade event, plus multiple secondary spikes
+             during troubleshooting
+Investigation phase: Post-memory-change experiments
+Related: TS-PVE-DEV-001 (initial investigation doc)
+Related: TS-K8S-038 (qemu-ga EAGAIN busy loop — ruled out for
+         tonight's occurrences)
+Investigator note: This is the continuation doc documenting actions
+                   taken AFTER planning the memory change, through
+                   the accidental discovery of the real root cause
+                   via the minimum-viable-cluster test.
+
+_____________________________________________________________________
+
+[Executive Summary]
+
+What was planned: 3x3.5GB masters + 2x3.5GB workers (dump 1 worker,
+                  bump memory to test if per-VM memory was the cause)
+
+What actually happened:
+1. Executed drain + remove of worker3
+2. Shut down all K8s VMs
+3. Brought them back up sequentially (3 masters then 2 workers)
+4. IO pressure CLIMBED to sustained 40-67% for 40+ minutes
+5. Control plane entered cascade failure (schedulers, controller-
+   managers, csi-nfs, flux controllers all CrashLoopBackOff)
+6. User challenged "if hardware is root cause, why did this work
+   for weeks and fail today?" — critical question that redirected
+   the investigation
+7. Checked etcd DB size: 46 MB (HEALTHY, eliminated DB bloat theory)
+8. Performed minimum-viable-cluster test: scaled all non-core
+   workloads to 0
+9. IO pressure DROPPED TO BASELINE within minutes
+10. Control plane STOPPED CRASHING immediately
+11. Brought services back one at a time with 5-minute waits
+12. All services came back cleanly, ZERO new restarts on any
+    newly-scheduled pod
+13. Cluster is now fully operational and stable
+
+Root cause: CASCADE FAILURE DYNAMICS in the K8s cluster itself.
+Not hardware. Not memory. Not a software bug. Not TS-K8S-038.
+
+Mechanism: When the cluster experiences any trigger event (OOM,
+probe timeout, brief apiserver unavailability), control plane
+components fail liveness probes and restart. Each restart
+generates IO load (LIST operations, log writes, image pulls).
+On resource-constrained hardware, this load prevents the next
+restart from succeeding fast enough to beat ITS liveness probe.
+Feedback loop continues indefinitely until external intervention.
+
+_____________________________________________________________________
+
+[Current Configuration — As Left After Session]
+
+## Masters (K8s control plane)
+All 3 masters running at 3 GB memory each (as set earlier in session)
+Note: Original plan was 3.5 GB each. Session ended before that step.
+Worth revisiting: bumping masters to 3.5 or 4 GB remains a valid
+additional resilience improvement but is NOT the primary fix.
+
+- VM 1010 (k8s-master1): memory=3072, balloon=0
+- VM 1011 (k8s-master2): memory=3072, balloon=0
+- VM 1012 (k8s-master3): memory=3072, balloon=0
+
+## Workers
+- VM 1020 (k8s-worker1): memory=3072 (was 3328, reduced earlier)
+- VM 1021 (k8s-worker2): memory=3072 (was 3328, reduced earlier)
+- VM 1022 (k8s-worker3): memory=2.75 GB unchanged (brought back by
+  remediation controller automatically after its initial removal)
+
+⚠️ INCONSISTENCY NOTED: worker3 is at 2.75 GB while workers 1 and 2
+are at 3 GB. This should be normalized. Worker3 was not intentionally
+at different size — it was started by remediation controller without
+our memory update being applied to it.
+
+ACTION ITEM: Reconcile worker3 memory to match others, OR bring all
+workers to 3.5 GB, OR intentionally standardize to some value.
+Decision deferred — system is stable and user needs sleep.
+
+## Cluster topology
+3 masters + 3 workers (back to original 3+3 after worker3 rejoined
+via remediation)
+
+## Other VMs on host (unchanged)
+- 1001 freeipa: ~2 GB
+- 2001-2006: ansible, local-runner, ex-nginx, vault1, vault2, vault3
+- 9000, 9010: rocky10 golden images/template
+- 1 LXC: 9010 rocky10-lxc-golden
+
+## Host state (final)
+Total RAM: 23 GB
+Host free: monitored during final verification, looked healthy
+K8s VMs allocation total: ~18 GB (3×3 masters + 3×3 workers + worker3 at 2.75)
+Other VMs running: variable
+
+_____________________________________________________________________
+
+[Detailed Timeline — This Session]
+
+All times local (EEST = UTC+3)
+
+## Pre-session context
+01:41 — First major spike observed (PSI Some 49.7%)
+02:51 — User manually rebooted master1 (had been hung since morning)
+02:53 — Second major spike (PSI Some 54.3%)
+03:09 — Third major spike (PSI Full 19.75%, memory pressure appeared)
+
+## This session begins after TS-PVE-DEV-001 was written
+
+### Phase 1: Plan-the-memory-change (~04:00-04:30)
+
+User wrote architectural decision document proposing:
+- Keep 3 masters, dump worker3
+- Bump remaining VMs to 3.5 GB masters, 2.75 GB workers
+- Run 1-2 week observation
+- Reduce app replicas via Flux
+
+Assistant pushed back on several items:
+- Warned that 2.75 GB workers were LESS than current 3.25 GB
+- Recommended keeping workers at 3.5 GB to avoid under-provisioning
+- Emphasized need for sequential (not parallel) VM operations
+- Noted that 2-master configuration would break quorum (math:
+  quorum = floor(n/2)+1, so 2 masters needs BOTH up; 1 master is
+  better than 2 for redundancy in unusual case)
+
+User clarified preference: keep 3 masters for quorum/HA learning,
+accept worker reduction.
+
+Final agreed plan:
+- 3 masters × 3.5 GB (bumped)
+- 1 worker × 5 GB (heavy on one)
+- Reduce replicas
+- OR 3 masters × 3.5 GB + 2 workers × 3.5 GB
+
+### Phase 2: Worker3 drain and removal (~04:30-05:00)
+
+Step-by-step execution:
+
+1. Verified cluster state: kubectl get nodes showed all 6 Ready
+
+2. Reduced app replicas (or would have, several already at 1)
+
+3. Cordoned worker3:
+   kubectl cordon k8s-worker3.lab.local
+   Result: SchedulingDisabled
+
+4. Drained worker3:
+   kubectl drain k8s-worker3.lab.local \
+     --ignore-daemonsets --delete-emptydir-data --force --timeout=600s
+   Result: node/k8s-worker3.lab.local drained
+   Only DaemonSet pods remained: calico-node-hrpcf, csi-nfs-node-vjkhv,
+   kube-proxy-bq4vp, kube-prometheus-stack-prometheus-node-exporter-8dffc,
+   loki-canary-kgp8g, promtail-9vfn7
+
+5. Shut down worker3 VM on Proxmox host:
+   qm shutdown 1022
+
+6. (User noted: "already shutdown the node" — drain and shutdown
+    happened in slightly unusual order but functionally fine)
+
+7. Deleted node object:
+   kubectl delete node k8s-worker3.lab.local
+   Result: 5 nodes remaining (3 master + 2 worker)
+
+### Phase 3: First concerning signal (~05:00)
+
+Observed sustained PSI spike, unlike anything seen tonight:
+- 05:00 start climbing from baseline
+- 05:07 peak ~67%
+- Multiple peaks at 05:11, 05:14, 05:21
+- Brief drop 05:28
+- Back up at 05:31
+- Still at 47.48% at 05:15 (cursor time)
+- Memory pressure panel showed sustained activity at 0.4-0.8%
+- Total duration: ~38 minutes and counting
+
+Assistant's (incorrect) hypothesis at this point:
+"Worker3 removal concentrated workload on worker1/2 who are now
+thrashing. Reducing capacity made it worse."
+
+Action taken: user decided to shut down all K8s VMs and restart
+sequentially, starting with masters.
+
+### Phase 4: Sequential restart (~05:30)
+
+1. User shut down all 5 K8s VMs (masters + remaining 2 workers)
+2. Started masters one at a time per assistant's guidance:
+   qm start 1010; wait; qm start 1011; wait; qm start 1012
+3. Started workers sequentially
+4. Checked etcd health:
+   etcdctl endpoint status --cluster -w table
+   After fixing ETCDCTL_API env var conflict and ETCDCTL_ENDPOINTS
+   conflict (etcd v3.6 is strict about conflicting env + flag)
+
+   Result: All 3 masters healthy, same raft term (224), matching
+   raft indices, leader elected on master3 (ID e0a1c396a5ca70ba)
+   DB Size: 46 MB (tiny, healthy)
+
+### Phase 5: The spike continues (~05:38)
+
+Despite sequential restart, PSI climbed AGAIN to 40-60% sustained.
+Pattern continued:
+- 05:04 start
+- 05:07 peak ~67%
+- 05:11 ~50%
+- 05:14 ~55%
+- 05:21 ~60%
+- 05:27-29 brief drop to baseline
+- 05:31+ climbing again
+- 05:41 at 65.54%
+
+User: "but my other proxmox survived this, i want to do the opposite,
+       keep 1 worker, dump replicas of apps to 1 or 2"
+
+Observation at this point (critical for later insight):
+- kube-scheduler CrashLoopBackOff on 2 of 3 masters
+- kube-controller-manager CrashLoopBackOff on 2 of 3 masters
+- kube-apiserver on master2 not ready (0/1)
+- csi-nfs-controller: 88 restarts
+- flux helm-controller: 25 restarts CrashLoopBackOff
+- flux kustomize-controller: 39 restarts CrashLoopBackOff
+- kube-state-metrics: 13 restarts CrashLoopBackOff
+
+This was NOT a boot storm — components were actively failing to start.
+
+### Phase 6: The critical question (~05:40)
+
+User pushed back with the question that broke the investigation wide open:
+"it was running stable over weeks, why this time now exactly today it dying"
+
+This forced the assistant to abandon the "hardware is the cause"
+narrative. Hardware hadn't changed. Config hadn't changed. Something
+specific happened today.
+
+Hypotheses tested:
+1. etcd DB bloat → CHECKED, 46 MB, healthy. RULED OUT.
+2. Container log accumulation → not checked yet
+3. NFS storage slow → not checked yet
+4. LVM-thin metadata fragmentation → not checked yet
+5. KSM memory dedup pressure → not checked yet
+
+Assistant acknowledged prior wrong conclusions and searched for what
+actually changed TODAY specifically:
+- master1 hung "since morning" (user report)
+- user manually rebooted master1 at 02:51
+- cluster limping since
+- current sustained spike since 05:04
+
+Pattern: once master1 hung, cluster entered degraded state and never
+recovered. The current spike was continuation of that degraded state.
+
+### Phase 7: The breakthrough experiment (~06:00)
+
+Assistant proposed aggressive scale-down to break the cascade:
+
+```bash
+# Scale down all application workloads
+kubectl -n apps scale deployment wordpress --replicas=0
+kubectl -n database scale statefulset mariadb --replicas=0 (not done - already running)
+
+# Suspend Flux (it was CrashLooping)
+kubectl -n flux-system scale deployment helm-controller --replicas=0
+kubectl -n flux-system scale deployment kustomize-controller --replicas=0
+kubectl -n flux-system scale deployment notification-controller --replicas=0
+kubectl -n flux-system scale deployment source-controller --replicas=0
+
+# Scale down monitoring
+kubectl -n monitoring scale statefulset loki --replicas=0
+kubectl -n monitoring scale statefulset alertmanager-kube-prometheus-stack-alertmanager --replicas=0
+kubectl -n monitoring scale statefulset prometheus-kube-prometheus-stack-prometheus --replicas=0
+kubectl -n monitoring scale deployment kube-prometheus-stack-grafana --replicas=0
+kubectl -n monitoring scale deployment kube-prometheus-stack-operator --replicas=0
+kubectl -n monitoring scale deployment kube-prometheus-stack-kube-state-metrics --replicas=0
+
+# Stop promtail & node-exporter daemons
+kubectl -n monitoring patch daemonset promtail \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+kubectl -n monitoring patch daemonset kube-prometheus-stack-prometheus-node-exporter \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+
+# Remediation (if running)
+kubectl -n remediation scale deployment remediation --replicas=0
+```
+
+Result: IO PRESSURE DROPPED TO BASELINE WITHIN MINUTES.
+
+Control plane components stopped crashing. Restart counts stopped
+growing. Cluster became quiet.
+
+This was the definitive diagnostic answer: cascade dynamics, not
+resource exhaustion.
+
+### Phase 8: Sequential reintroduction (~06:00-06:30)
+
+Once baseline was achieved, services reintroduced ONE AT A TIME
+with 5-minute waits between each:
+
+T+0  : Baseline confirmed stable
+T+5  : prometheus scaled to 1 → started successfully, 0 restarts
+T+10 : grafana scaled to 1 → started, 4/4 containers ready, 0 restarts
+T+15 : loki scaled to 1 → started, 2/2 ready, 0 restarts
+T+20 : node-exporter daemonset re-enabled → 6 pods in 5 seconds, 0 restarts
+T+25 : promtail daemonset re-enabled → 6 pods in 14 seconds, 0 restarts
+       (previously had 14+ restarts — this was dramatically different)
+T+30 : kube-state-metrics scaled to 1 → started clean, 0 restarts
+T+35 : prometheus-operator scaled to 1 → started clean, 0 restarts
+T+40 : flux-system controllers scaled to 1 each → all Running, 0 restarts
+       (flux reconciled workloads, wordpress scaled to 2 per git)
+T+45 : Remediation came back online via its own logic
+
+Final state:
+- All pods Running
+- All new pods showing 0 restarts
+- PSI stable at baseline
+- CPU usage:
+  Masters: 3-4% CPU, 56-70% memory
+  Workers: 3-4% CPU, 69-77% memory
+
+kubectl top nodes output (final):
+NAME                    CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)
+k8s-master1.lab.local   136m         3%       1790Mi          58%
+k8s-master2.lab.local   177m         4%       2134Mi          70%
+k8s-master3.lab.local   138m         3%       1729Mi          56%
+k8s-worker1.lab.local   91m          4%       1631Mi          69%
+k8s-worker2.lab.local   87m          4%       1815Mi          77%
+k8s-worker3.lab.local   73m          3%       1659Mi          70%
+
+_____________________________________________________________________
+
+[ROOT CAUSE — CONFIRMED]
+
+## The mechanism
+
+Cascade failure dynamics in the Kubernetes control plane running on
+resource-constrained hardware.
+
+Sequence of events during a cascade:
+1. Trigger event: any minor perturbation — OOM kill of single pod,
+   brief network hiccup, etcd slow-apply, probe timeout, anything
+2. One or more components fail liveness probe
+3. Kubelet restarts the failed container
+4. Restart generates IO load:
+   - Container image mount
+   - Log file rotation/creation
+   - Controller does full LIST against apiserver
+   - Apiserver queries etcd
+5. This IO load pushes other nearby components past their own
+   probe timeouts
+6. Those components also restart
+7. Now multiple components are restarting simultaneously, competing
+   for the same NVMe bandwidth
+8. Each restart attempt is slower than it would be in isolation
+9. Slower starts mean MORE probes failing
+10. Feedback loop: failures cause load causes more failures
+11. Without intervention, this self-sustains indefinitely
+
+## Why it worked for weeks then failed
+
+The cluster has a normal operating envelope where baseline load
+fits within NVMe capacity. Day-to-day, minor perturbations happen
+but are absorbed without cascade because the system has enough
+headroom.
+
+What pushed it over: master1 hung for hours this morning. During
+that time, the cluster ran in degraded 2-master mode. etcd was
+accepting writes, kubelet was reporting, but there was no master1
+to participate in quorum or serve its share of apiserver traffic.
+
+When master1 eventually rebooted:
+- Had to resync etcd delta (hours of writes to catch up)
+- Apiserver came back and immediately faced full scrape/LIST load
+- Probes fired before components were stable
+- Cascade began
+- Has been in various stages of cascade since 01:41 local
+
+Each subsequent action we took (reboots, drains, shutdowns) either
+triggered a new cascade or extended the existing one.
+
+The EXPERIMENT that confirmed this:
+- Scaling all workloads to 0 → instant stability
+- No hardware change, no memory change, nothing else different
+- Just: remove the load that was driving the cascade
+- Therefore: load on the hardware was the issue, not the hardware itself
+
+## Why it's NOT the things we initially suspected
+
+Hardware: Same hardware ran stable for weeks. Only fails when
+cascade is running.
+
+Memory (primary cause): VMs were running with same memory for weeks.
+Bumping master memory probably helps resilience but wasn't the
+actual cause of tonight's event.
+
+etcd DB: 46 MB, tiny, healthy. Ruled out.
+
+TS-K8S-038 qemu-ga bug: qemu-ga was consistently at 0% CPU throughout.
+No strace evidence of EAGAIN loop. Ruled out for these occurrences.
+(Original doc's occurrences 1-3 had captured strace evidence and
+are legitimate TS-K8S-038 cases. Different failure mode.)
+
+SSSD/NSS: User confirmed earlier that SSSD restart at 02:51 was
+normal VM boot, not mid-operation restart. Ruled out.
+
+Lid switch/logind: Logind bursts are downstream symptom of host
+being IO-blocked, not cause. Ruled out.
+
+Prometheus scrape storms: Prometheus was running continuously for
+14 hours before first spike. Not a trigger.
+
+NFS backend: Was not specifically tested but cluster recovered fully
+without touching NFS, which it would not have if NFS was the problem.
+
+_____________________________________________________________________
+
+[What We Definitively Know Now]
+
+1. The cluster CAN run all its workloads stably on current hardware
+   - Final state showed 3-4% CPU utilization across all nodes
+   - Memory at 56-77% (tight but not critical)
+   - Everything Running, zero new restarts during reintroduction
+
+2. The cluster CANNOT recover from cascade failures on its own
+   - Once in cascade, probe timeouts perpetuate the failure state
+   - External intervention (scale to 0, let settle, scale up)
+     is required to break the loop
+
+3. Sequential startup is mandatory
+   - Parallel startup of 5+ VMs at once causes boot storm
+   - Each startup adds load; parallel startups compound the load
+   - 60-second delays between VM starts avoids this
+
+4. Sequential workload reintroduction is mandatory
+   - Even after baseline is established, bringing up 20+ workloads
+     at once will recreate cascade conditions
+   - 5-minute delays between workload activations works cleanly
+
+5. The trigger for the initial cascade is unclear
+   - Master1's hang earlier today started it
+   - But what caused master1 to hang is still unknown
+   - Root investigation of THAT requires previous-boot journal review
+     which was not done tonight
+
+_____________________________________________________________________
+
+[Evidence — Key Data Points]
+
+## etcd health confirmed
+
+etcdctl endpoint status --cluster -w table:
++--------+------------------+---------+---------+---------+--------+-----------+-----------+
+|ENDPOINT|        ID        | VERSION | DB SIZE | IN USE  |PERC NIU|IS LEADER  | RAFT TERM |
++--------+------------------+---------+---------+---------+--------+-----------+-----------+
+|.10:2379| 2699402e05a84d4b |  3.6.6  |  46 MB  |  38 MB  |  17%   |  false    |    224    |
+|.11:2379| 4c17d04fdb863468 |  3.6.6  |  46 MB  |  38 MB  |  17%   |  false    |    224    |
+|.12:2379| e0a1c396a5ca70ba |  3.6.6  |  46 MB  |  38 MB  |  17%   |  TRUE     |    224    |
++--------+------------------+---------+---------+---------+--------+-----------+-----------+
+
+Key takeaway: Quota is 2.1 GB, actual DB is 46 MB (2.2% of quota).
+Zero chance etcd DB size is the problem. All 3 in sync.
+
+## Pod restart counts — before vs after cascade
+
+Selected examples showing cascade dynamics:
+
+Component                          | Before  | During  | After (stable)
+calico-kube-controllers            | 93      | 107     | 107 (stable)
+kube-apiserver-master1             | 88      | 102     | 102 (stable)
+kube-apiserver-master2             | 62      | 75      | 75 (stable)
+kube-apiserver-master3             | 73      | 84      | 84 (stable)
+kube-scheduler-master1             | 73      | 83      | 83 (stable)
+kube-scheduler-master2             | 80      | 91      | 91 (stable)
+kube-scheduler-master3             | 78      | 90      | 90 (stable)
+csi-nfs-controller-5bb656c79-8r8vt | 51      | 88      | 93 (stable)
+kube-state-metrics                 | 54      | 13 (new | 0 (after
+                                             | cascade | reintro)
+                                             | fresh   |
+                                             | pod)    |
+Newly scheduled post-reintro pods  | n/a     | n/a     | 0 restarts each
+
+Key insight: Restart counts GREW during cascade but STOPPED growing
+once cascade broke. This is the clearest evidence cascade was
+actively occurring.
+
+## IO Pressure Stall pattern
+
+All times local (EEST = UTC+3):
+01:41 sharp peak 49.7% (~5 min)
+02:53 sharp peak 54.3% (~3 min)
+03:09 sharp peak Full 19.75% (~5 min)
+05:04-05:41+ SUSTAINED 40-67% (38+ minutes) ← THIS IS THE CASCADE
+
+After scale-down:
+~06:00 Dropped to baseline
+After reintroduction:
+Baseline maintained throughout, no spikes
+
+## CPU metrics at end of session
+
+Masters: 3-4% CPU (very low)
+Workers: 3-4% CPU (very low)
+Memory: 56-77% across all nodes
+
+This proves the hardware has plenty of CPU capacity. The constraint
+is memory (workers 70%+) and IO contention during cascade events.
+
+_____________________________________________________________________
+
+[Reintroduction Sequence — Tested and Validated]
+
+Order proven to work on this hardware:
+
+1. Verify baseline: all non-core scaled to 0, PSI < 5%
+2. Wait 15-20 minutes minimum for stability
+3. Bring up workloads in this order with 5 min waits:
+
+   a. Prometheus (core monitoring)
+   b. Grafana (light)
+   c. Loki (logs consumer)
+   d. Node-exporter daemonset (light per-node work)
+   e. Promtail daemonset (log shipper — BIG, watch carefully)
+   f. Kube-state-metrics (apiserver watcher)
+   g. Prometheus-operator (manages CRDs)
+   h. Alertmanager (optional, skip in dev if possible)
+
+   i. Mariadb (database — already running tonight)
+   j. Wordpress (apps)
+   k. Ingress-nginx (already running)
+
+   l. Flux controllers — LAST
+      Before starting: suspend kustomizations to prevent revert
+      OR commit reduced replicas to git first
+      Start order: source-controller → notification → helm → kustomize
+
+4. Monitor PSI and kubectl get pods between each step
+5. If PSI climbs >20% after any step: stop, wait, investigate
+
+_____________________________________________________________________
+
+[Gotchas Encountered]
+
+## etcd env variable conflict
+etcd v3.6+ is strict about env var + flag conflicts.
+If ETCDCTL_ENDPOINTS is set in environment AND --endpoints is used
+as flag, the command fails with fatal error.
+
+Fix: either unset the env vars, or use them exclusively (no flags).
+Also ETCDCTL_API=3 is now unrecognized in v3.6 — emits warning but
+otherwise harmless (v3 is the only API now).
+
+## Drain-before-shutdown order
+Proper order: cordon → drain → delete node → shutdown VM
+Alternative used tonight: cordon → drain → shutdown VM → delete node
+Both work, but the "proper" order leaves cleaner state.
+
+## Cordon vs drain vs delete
+- Cordon = "no new pods here" (existing pods stay)
+- Drain = "evict existing pods"
+- Delete node = "remove node object from API"
+
+User initially asked why cordoned node wasn't removed — needed to
+explain the 3-step process.
+
+## worker3 came back automatically
+Remediation controller brought worker3 back up without being asked.
+This was noted but not stopped because it was harmless.
+Indicates remediation is doing its job, but also means you can't
+just "turn things off" without considering automation.
+
+## Flux will revert scaling
+If Flux controllers are running while you scale workloads down,
+Flux reconciliation will scale them back up to match git.
+Must suspend kustomizations or commit reduced replicas to git BEFORE
+scaling down, OR start flux LAST after reducing workloads.
+
+## memory inconsistency after worker3 rejoined
+worker3 came back at 2.75 GB while workers 1 and 2 are at 3 GB.
+Our memory change didn't apply to worker3 because it wasn't in the
+cluster when we did the change.
+
+ACTION ITEM: Reconcile worker3 memory to match or standardize all
+workers. Not urgent since cluster is stable.
+
+## "why did it work for weeks then fail today?"
+This question from the user was THE turning point of the investigation.
+Every theory before this treated the cluster as "always broken" but
+that framing was wrong — it was recently broken.
+
+Should have been asked earlier. Lesson: when investigating anomalies,
+first establish the baseline of normal operation and ask what changed.
+
+_____________________________________________________________________
+
+[Failed Theories — Chronological List]
+
+1. systemd-logind lid switch bouncing
+   Why considered: Logind bursts correlated with IO spikes
+   Why wrong: Logind is downstream symptom, not cause
+   Time wasted: ~45 minutes
+
+2. Disk failure / bad NVMe
+   Why considered: High latency observed in some samples
+   Why wrong: SMART healthy, kernel logs clean, disk can hit 3ms
+   under good conditions — it's workload-dependent, not failing
+   Time wasted: ~30 minutes
+
+3. TS-K8S-038 qemu-ga EAGAIN busy loop
+   Why considered: qemu-ga ping gap matched prior doc pattern
+   Why wrong: qemu-ga was at 0% CPU, no strace evidence, etcd
+   slowness preceded gap by 7 minutes
+   Time wasted: ~30 minutes
+
+4. SSSD/NSS cascade from service restart
+   Why considered: SSSD restarted at 02:51:35, pod cascade 77s later
+   Why wrong: SSSD restart was normal VM boot (user had rebooted VM),
+   not mid-operation restart
+   Time wasted: ~20 minutes
+
+5. Prometheus scrape storm
+   Why considered: Prometheus scrapes all pods continuously
+   Why wrong: Prometheus had been running 14 hours before first spike
+   Time wasted: ~15 minutes
+
+6. VM memory undersizing alone
+   Why considered: 2.5 GB masters are tight for K8s
+   Why wrong: Bumping to 3 GB didn't fix it; cluster had run fine
+   at 2.5 GB for weeks
+   Time wasted: ~30 minutes
+
+7. Host memory overcommit
+   Why considered: 24 GB VMs on 22 GB host
+   Why wrong: This was the config all along; no recent change
+   Time wasted: ~20 minutes
+
+8. NVMe contention from multi-etcd
+   Why considered: 3 etcds fsyncing same disk
+   Why wrong: Worked for weeks in same config
+   Time wasted: ~15 minutes
+
+9. "Just accept hardware is the limit"
+   Why considered: Exhaustion after failed theories
+   Why wrong: Couldn't explain "worked for weeks"
+   User pushback corrected this
+   Time wasted: ~20 minutes
+
+10. etcd DB bloat
+    Why considered: Good candidate for "gradually accumulated"
+    Why wrong: DB is 46 MB, tiny
+    Time wasted: 5 minutes (quick check ruled it out)
+
+Total investigation time: ~4-5 hours tonight alone
+Actual useful time to find real cause: 10 minutes (scale-to-0 test)
+
+_____________________________________________________________________
+
+[What We Still Don't Know]
+
+## What caused master1 to hang originally
+
+master1 was reported hung "since morning" before the user rebooted
+it at 02:51. We don't know what caused that initial hang.
+
+Hypotheses (ordered by likelihood):
+1. OOM cascade inside VM (most likely — 2.5 GB with K8s is tight)
+2. Kernel soft lockup under memory pressure
+3. Specific bug in a component at this version
+4. Random transient trigger that would have resolved but cluster
+   didn't recover fast enough
+
+Investigation step NOT done: previous boot journal review
+Command to run tomorrow (or whenever):
+  journalctl --list-boots | head -5
+  journalctl -b -1 -n 500 --no-pager | tail -200
+  journalctl -b -1 -k --no-pager | \
+    grep -iE 'oom|panic|hung|blocked|soft lockup|killed process'
+
+## Why liveness probes are so aggressive
+
+Many components had default 1-5 second probe timeouts. On a
+resource-constrained system, these need to be much more generous.
+Specifically:
+- calico-kube-controllers: exec probe 10s timeout, 6 failures = 60s
+- csi-nfs: exec probe, very fast timeout
+- Flux controllers: HTTP probe, 1s default
+- kube-apiserver: HTTP probe, default times
+
+ACTION ITEM: Patch probe timeouts for resilience. Suggested values:
+- timeoutSeconds: 30 (instead of 1-5)
+- periodSeconds: 30 (instead of 10)
+- failureThreshold: 6 (instead of 3)
+
+## Whether master memory should be bumped to 3.5 or 4 GB
+
+Original plan was 3.5 GB masters. Didn't get there.
+Current 3 GB is stable but "stable" was achieved via scale-down,
+not via per-VM sizing.
+
+Hypothesis: 3.5 or 4 GB masters + existing workload = more resilience
+to perturbations, less likely to trigger initial cascade.
+
+Worth testing in next observation window.
+
+_____________________________________________________________________
+
+[Recommended Actions — Prioritized]
+
+## Immediate (this morning when user wakes up)
+
+### 1. Verify cluster still stable
+kubectl get pods -A | grep -v Running | grep -v Completed
+# Should return nothing unexpected
+kubectl get nodes
+# All 6 nodes Ready
+
+### 2. Check PSI graph for past 6-8 hours
+Should show baseline since ~06:30, no spikes
+
+### 3. Reconcile worker3 memory
+Either bump to 3 GB to match (requires short outage) or document
+the intentional variance:
+  qm shutdown 1022
+  qm set 1022 --memory 3072
+  qm start 1022
+
+### 4. Update investigation docs
+- TS-PVE-DEV-001: mark closed with reference to TS-PVE-DEV-002
+- TS-PVE-DEV-002: this document
+- Update TS-K8S-038: note that investigation tonight did NOT find
+  qemu-ga evidence on these occurrences; different failure mode
+
+## Short-term (this week)
+
+### 5. Investigate why master1 hung originally
+journalctl --list-boots | head -5
+journalctl -b -1 -n 500 --no-pager | tail -200
+journalctl -b -1 -k --no-pager | \
+  grep -iE 'oom|panic|hung|blocked'
+
+If OOM evidence: confirms memory sizing matters for resilience
+If kernel panic: different issue, investigate specifically
+If blocked tasks: IO subsystem issue, check host at that time
+
+### 6. Patch liveness probe timeouts
+Critical pods need more generous timeouts on constrained hardware:
+
+For kubeadm-managed static pods (edit on each master):
+/etc/kubernetes/manifests/kube-apiserver.yaml
+/etc/kubernetes/manifests/kube-scheduler.yaml
+/etc/kubernetes/manifests/kube-controller-manager.yaml
+/etc/kubernetes/manifests/etcd.yaml
+
+Suggested values:
+livenessProbe.timeoutSeconds: 30 (was ~15)
+livenessProbe.periodSeconds: 30 (was 10)
+livenessProbe.failureThreshold: 6 (was 8 usually)
+
+For DaemonSets and Deployments (Flux-managed):
+kubectl -n kube-system patch daemonset calico-node --type json -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/timeoutSeconds", "value": 30},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/periodSeconds", "value": 30},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/failureThreshold", "value": 6}
+]'
+
+### 7. Optionally bump master VM memory to 3.5 or 4 GB
+After cluster has been stable for 48-72 hours baseline:
+qm shutdown 1010; qm set 1010 --memory 3584; qm start 1010
+wait 5 min
+qm shutdown 1011; qm set 1011 --memory 3584; qm start 1011
+wait 5 min
+qm shutdown 1012; qm set 1012 --memory 3584; qm start 1012
+
+### 8. Add swap inside each master VM
+As safety net against OOM:
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+Update kubelet config to tolerate swap (Kubernetes 1.28+):
+/var/lib/kubelet/config.yaml:
+  failSwapOn: false
+systemctl restart kubelet
+
+## Medium-term (this month)
+
+### 9. Document break-glass recovery procedure
+Cascade failure recovery runbook should be in the repo:
+
+```
+When PSI stays elevated >30% for >10 minutes:
+
+1. Scale down all workloads:
+   kubectl -n apps scale deployment --all --replicas=0
+   kubectl -n database scale statefulset mariadb --replicas=0
+   kubectl -n flux-system scale deployment --all --replicas=0
+   kubectl -n monitoring scale deployment --all --replicas=0
+   kubectl -n monitoring scale statefulset --all --replicas=0
+   kubectl -n monitoring patch daemonset promtail \
+     -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+   kubectl -n monitoring patch daemonset kube-prometheus-stack-prometheus-node-exporter \
+     -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+   kubectl -n remediation scale deployment --all --replicas=0
+
+2. Wait 15-20 minutes for baseline
+
+3. Reintroduce in tested order with 5 min waits:
+   (see TS-PVE-DEV-002 Phase 8)
+
+4. Suspend Flux before scaling up if needed:
+   kubectl get kustomization -A -o name | \
+     xargs -I {} kubectl patch {} -n flux-system --type=merge \
+     -p '{"spec":{"suspend":true}}'
+```
+
+### 10. Investigate etcd defrag benefit
+Even though DB is small (46 MB), periodic defrag can help:
+etcdctl defrag  # one member at a time, several minutes apart
+
+### 11. Reduce dev cluster monitoring footprint
+For dev only (not prod):
+- Increase Prometheus scrape interval from 15s to 30s or 60s
+- Disable loki-canary (synthetic log generator)
+- Reduce retention on Loki to 24-48 hours
+- Single replica on non-critical components
+- Consider removing alertmanager if not actively used
+
+## Long-term (if/when dev work expands)
+
+### 12. Consider hardware upgrade path
+Current: laptop with 23 GB RAM, single NVMe, shared with host OS
+For comfortable K8s dev lab work:
+- 32+ GB RAM
+- Separate NVMe for VM disks (removes host/VM contention)
+- Or: dedicate separate machine for K8s dev lab
+
+### 13. Evaluate moving to k3s for dev
+Full kubeadm K8s (what you have) is "production-ready" with overhead.
+k3s (or k0s, kind, minikube) is lighter:
+- Single binary instead of many static pods
+- SQLite backend instead of etcd
+- Much lower baseline IO
+- Still teaches K8s concepts
+- Faster iteration
+
+Not a replacement for prod use, but appropriate for laptop dev lab.
+
+_____________________________________________________________________
+
+[Lessons Learned]
+
+## Investigation methodology
+
+1. Establish baseline before investigating deviation
+   "Why does it fail sometimes?" requires knowing what "success"
+   looks like. Tonight's best question was "why today specifically?"
+   That framing made the right diagnosis visible.
+
+2. User instinct often correct
+   User pushed back multiple times on wrong theories. Each pushback
+   led to new evidence that disproved current theory. Listen to
+   users who know their system.
+
+3. Simple tests beat complex theories
+   Scaling everything to 0 and watching what happens was the most
+   diagnostic action of the night. Took 5 minutes to execute.
+   Gave definitive answer.
+
+4. Multiple correlations don't prove causation
+   Logind bursts + IO spikes = strong correlation, zero causation.
+   Both are symptoms of the same upstream cause (host IO blocked).
+
+5. Confidence should scale with evidence, not effort
+   Earlier in the investigation, theories were presented with more
+   confidence than warranted. Effort spent investigating doesn't
+   equal certainty of conclusion.
+
+## System design insights
+
+6. Probe timeouts are critical parameters
+   Default 1-5 second timeouts work on beefy hardware but fail
+   catastrophically on constrained hardware. Cascade dynamics
+   depend on whether probes fire faster than restarts can complete.
+
+7. Sequential operations beat parallel
+   Whether it's VM startup, workload activation, or node changes:
+   sequential with delays ALWAYS works, parallel sometimes works
+   but can fail unpredictably. On constrained hardware, always
+   sequential.
+
+8. Automation can hide problems
+   Remediation controller brought worker3 back automatically. That's
+   great for recovery but also means "just turn it off" isn't a
+   sufficient action — need to consider all automation.
+
+9. GitOps has a timing dilemma
+   Flux reverting manual changes is a feature, not a bug. But during
+   incident response, it creates fighting-the-tool problems. Either
+   commit changes to git first, or suspend GitOps during response.
+
+10. Dev and prod aren't always equivalent
+    User's repeated prod comparison was valuable ("prod survives this
+    with 4GB masters"). Dev hardware being smaller matters. Don't
+    expect dev to behave like prod under same workload.
+
+## Knowledge gaps identified
+
+- etcd v3.6 strictness about env/flag conflicts (gotcha)
+- Probe timeout tuning for constrained hardware
+- When to use cordon vs drain vs delete node
+- How to gracefully break flux reconciliation for incident response
+- Recovery procedure for K8s cascade failure (now documented)
+
+_____________________________________________________________________
+
+[Status of Related Cases]
+
+## TS-PVE-DEV-001 (initial investigation)
+Status: Should be updated to reference TS-PVE-DEV-002 as follow-up
+Conclusions from that doc: Mostly correct about contributing factors
+but missed the cascade-dynamics root cause. Should be revised.
+
+## TS-K8S-038 (qemu-ga EAGAIN busy loop)
+Status: Still valid for occurrences 1-3 (captured strace evidence)
+Tonight's occurrences: NOT TS-K8S-038 (no qemu-ga high CPU, no
+strace evidence, different failure mode)
+Update needed: Add note distinguishing tonight's cascade failure
+from the original qemu-ga bug pattern
+
+## This doc (TS-PVE-DEV-002)
+Status: OPEN for verification
+Resolution criteria:
+- 7+ days with zero PSI spikes >30% during normal operation
+- OR: documented pattern of triggers that cause known-recoverable
+  cascade (with recovery procedure)
+
+_____________________________________________________________________
+
+[Session Summary — The Short Version]
+
+Started: planning a memory change to stop IO spikes
+Ended: memory change was wrong theory, real cause is cascade dynamics
+
+Tried: dump worker3, restart cluster, various configurations
+Discovered: scaling all workloads to 0 instantly stabilizes system
+Confirmed: sequential reintroduction restores full functionality
+           with zero additional restarts
+
+The cluster works. The hardware is sufficient. The bug is in how
+Kubernetes responds to probe timeouts on constrained hardware —
+it enters self-sustaining failure loops that require external
+intervention to break.
+
+Break-glass procedure: scale everything down, wait, scale back up
+sequentially. Tested tonight, works reliably.
+
+_____________________________________________________________________
+
+[Critical Reminders for Future Incidents]
+
+## When you see PSI sustained >30% for >10 minutes
+
+1. DO NOT reboot VMs — this makes it worse (new boot storm load)
+2. DO NOT drain nodes — eviction creates more cascade load
+3. DO scale workloads down (apps first, then monitoring, then flux)
+4. DO wait 15-20 minutes for baseline
+5. DO scale back up one service at a time with 5 min waits
+
+## When you need to make VM changes
+
+1. ALWAYS sequential, never parallel
+2. ALWAYS wait for one VM to be fully healthy before touching the next
+3. For masters: etcd quorum means 2-of-3 up throughout any change
+4. For workers: drain first, don't just shut down
+
+## When GitOps is reverting your changes
+
+1. Suspend the relevant kustomizations BEFORE scaling
+   kubectl patch kustomization <name> -n flux-system \
+     --type=merge -p '{"spec":{"suspend":true}}'
+2. Or shut down flux controllers first
+3. Or commit desired state to git FIRST
+
+_____________________________________________________________________
+
+[Document Metadata]
+
+Created: 2026-04-24 ~06:30 local (03:30 UTC)
+Session duration: ~04:00 to 06:30 local (2.5 hours)
+Combined with TS-PVE-DEV-001 total investigation time: ~6-7 hours
+Primary investigator: user (with Claude assistance)
+Status: OPEN for 7-day observation period
+
+Next review: 2026-05-01 (one week)
+Close criteria: No unexplained spikes during observation
+             OR: documented trigger pattern with known recovery
+
+Related artifacts:
+- TS-PVE-DEV-001 (initial investigation, session 1)
+- TS-K8S-038 (qemu-ga bug, referenced but distinguished)
+- break-glass-recovery runbook (to be extracted from this doc)
+
+[END OF DOCUMENT]

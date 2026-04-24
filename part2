@@ -1,0 +1,367 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 2 OF 10
+Disk/kernel health verification & storage subsystem mapping
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: ~00:00 to ~00:45 local
+PHASE: User's pushback led to systematic hardware/OS health ruling out
+
+─────────────────────────────────────────────────────────────────────
+REFRAMED INVESTIGATION APPROACH
+─────────────────────────────────────────────────────────────────────
+
+After user's "I'm not convinced, I suspect kernel or disk" pushback,
+investigation pivoted to systematic ruling out.
+
+Approach:
+1. Deep disk health (not just SMART "OK")
+2. Kernel-level IO error logs
+3. Task hang evidence ("blocked for more than 120 seconds")
+4. Kernel bug/oops/MCE evidence
+5. Storage subsystem mapping
+6. Historical IO via sysstat
+7. Live capture script for next event
+
+─────────────────────────────────────────────────────────────────────
+DEEP DISK HEALTH INVESTIGATION
+─────────────────────────────────────────────────────────────────────
+
+Commands provided:
+
+# List block devices
+  lsblk -o NAME,MODEL,SIZE,ROTA,TYPE
+
+# Full SMART data
+  smartctl -a /dev/nvme0n1 | less
+
+# Specific red-flag scan
+  smartctl -a /dev/nvme0n1 | grep -iE 'critical|media_errors|error_log|
+    percentage_used|unsafe_shutdown|temperature'
+
+# Red flags to watch:
+  - Reallocated_Sector_Ct > 0
+  - Current_Pending_Sector > 0
+  - Offline_Uncorrectable > 0
+  - UDMA_CRC_Error_Count > 0 (bad cable)
+  - NVMe Percentage Used > 80%
+  - Media and Data Integrity Errors > 0
+
+# Short SMART test
+  smartctl -t short /dev/nvme0n1
+  sleep 120
+  smartctl -l selftest /dev/nvme0n1
+
+# Long SMART test (overnight)
+  smartctl -t long /dev/nvme0n1
+
+User's earlier answer: SMART already checked, health OK.
+Finding: Storage hardware reports healthy.
+
+─────────────────────────────────────────────────────────────────────
+KERNEL IO ERROR SCAN
+─────────────────────────────────────────────────────────────────────
+
+Commands:
+
+# SCSI/ATA/NVMe errors in last 2 weeks
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'ata[0-9]|scsi|nvme|blk_update|i/o error|medium error|
+              sense key|buffer i/o|end_request|reset|link down|timeout|
+              aborted' | head -50
+
+# Filesystem-level issues
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'ext4|xfs|btrfs|zfs|journal_io|remount.*read-only|
+              corruption' | head -50
+
+# Task hangs (classic disk-slow indicator)
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'blocked for more than|hung_task|task .* blocked|
+              khungtaskd|INFO: task' | head -50
+
+Result: All returned empty or non-relevant lines.
+Finding: Host kernel IO subsystem is CLEAN:
+  - No blocked tasks
+  - No IO errors
+  - No ATA/NVMe/SCSI errors
+  - No filesystem corruption
+  - No controller resets
+
+Eliminated: hardware-level IO failure as cause.
+
+─────────────────────────────────────────────────────────────────────
+KERNEL HEALTH — BUGS, OOPS, MCE
+─────────────────────────────────────────────────────────────────────
+
+Commands:
+  uname -a
+  cat /proc/version
+
+# Hardware errors
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'bug:|oops|warning:|call trace|kernel panic|
+              hardware error|mce:|edac|uncorrected|machine check|
+              rcu_sched|soft lockup|nmi watchdog' | head -50
+
+# MCE (machine check exceptions)
+  journalctl -k --since "2 weeks ago" | grep -iE 'mce|corrected error|thermal' | head
+
+# EDAC memory error counters
+  cat /sys/devices/system/edac/mc/mc*/ce_count 2>/dev/null
+  cat /sys/devices/system/edac/mc/mc*/ue_count 2>/dev/null
+
+Kernel: 6.17.9-1-pve (Proxmox VE Debian-based)
+Result: No kernel bugs, no oopses, no hardware errors, no soft lockups.
+Finding: Host kernel is healthy.
+
+Eliminated: kernel-level failure as cause.
+
+─────────────────────────────────────────────────────────────────────
+STORAGE SUBSYSTEM VERIFICATION
+─────────────────────────────────────────────────────────────────────
+
+Commands:
+  pvesm status
+  cat /etc/pve/storage.cfg
+  zpool status
+  zpool iostat -v 2 5
+
+pvesm status output:
+  Name           Type     Status     Total (KiB)      Used (KiB)
+  local           dir     active        98497780        12989016
+  local-lvm   lvmthin     active       262144000       102209945
+  nas-backups     nfs     active      1917209088       401179136
+  nas-dev-data    nfs     active      1917209088       401179136
+  nas-iso         nfs     active      1917209088       401179136
+
+zpool status:
+  no pools available
+
+zpool iostat:
+  no pools available
+
+CRITICAL FINDING: ZFS module was loaded (kernel taint shown) but
+NO ZFS pools existed. Storage is LVM-thin on single NVMe, not ZFS.
+
+This eliminated entire class of ZFS-specific theories:
+- ZFS ARC pressure
+- txg_sync stalls
+- scrub interference
+- zpool resilver
+- dnode cache churn
+
+─────────────────────────────────────────────────────────────────────
+FULL STORAGE LAYOUT DISCLOSED
+─────────────────────────────────────────────────────────────────────
+
+User shared lsblk output:
+
+nvme0n1  (476.9G)
+├─ nvme0n1p1  (1007K)
+├─ nvme0n1p2  (1G)  EFI
+└─ nvme0n1p3  (475.9G)
+   ├─ pve-swap (8G)
+   ├─ pve-root (96G)
+   └─ pve-data-tpool (250G LVM-thin)
+      ├─ vm-1010-disk-0 (25G)  k8s-master1
+      ├─ vm-1011-disk-0 (25G)  k8s-master2
+      ├─ vm-1012-disk-0 (25G)  k8s-master3
+      ├─ vm-1020-disk-0 (25G)  k8s-worker1
+      ├─ vm-1021-disk-0 (25G)  k8s-worker2
+      ├─ vm-1022-disk-0 (25G)  k8s-worker3
+      ├─ vm-1001-disk-0 (20G)  freeipa
+      ├─ vm-2001-disk-0 (8G)   ansible
+      ├─ vm-2002-disk-0 (8G)   local-runner
+      ├─ vm-2003-disk-0 (8G)   ex-nginx
+      ├─ vm-2004-disk-0 (12G)  vault1
+      ├─ vm-2005-disk-0 (12G)  vault2
+      ├─ vm-2006-disk-0 (12G)  vault3
+      ├─ vm-9000-disk-0 (15G)  rocky10-golden-image
+      └─ vm-9010-disk-0 (10G)  rocky10-lxc-golden
+
+ARCHITECTURE FINDING:
+- 15+ VM disks on single 250GB LVM-thin pool
+- On single consumer NVMe
+- No redundancy
+- Shared queue depth between all VMs
+
+This became important later — all IO from all VMs funnels through
+the same NVMe with no isolation.
+
+─────────────────────────────────────────────────────────────────────
+SYSSTAT INSTALLATION FOR HISTORICAL DATA
+─────────────────────────────────────────────────────────────────────
+
+Suggested:
+  apt install -y sysstat
+  sed -i 's/^ENABLED="false"/ENABLED="true"/' /etc/default/sysstat
+  systemctl enable --now sysstat
+  systemctl restart sysstat
+
+Historical query syntax:
+  sar -d -s 01:30:00 -e 01:55:00 -f /var/log/sysstat/sa$(date +%d)
+  sar -u  # CPU including %iowait
+
+Status: NOT installed during session (too much to set up mid-crisis).
+
+─────────────────────────────────────────────────────────────────────
+LIVE CAPTURE SCRIPT PROPOSED
+─────────────────────────────────────────────────────────────────────
+
+Script for next-spike capture:
+
+  cat > /usr/local/bin/io-snapshot.sh << 'EOF'
+  #!/bin/bash
+  LOG=/var/log/io-snapshot.log
+  while true; do
+    {
+      echo "=== $(date '+%Y-%m-%d %H:%M:%S') ==="
+      echo "-- PSI --"
+      cat /proc/pressure/io
+      cat /proc/pressure/cpu
+      cat /proc/pressure/memory
+      echo "-- iostat --"
+      iostat -xz 1 2 | tail -n +4
+      echo "-- top IO processes --"
+      ps -eo pid,stat,comm,wchan | awk '$2 ~ /D/'
+      echo "-- dirty pages --"
+      grep -E 'Dirty|Writeback' /proc/meminfo
+      echo ""
+    } >> "$LOG"
+    sleep 60
+  done
+  EOF
+
+With systemd service wrapper. Status: not installed.
+
+─────────────────────────────────────────────────────────────────────
+DECISION MATRIX PROVIDED TO USER
+─────────────────────────────────────────────────────────────────────
+
+How to read future evidence:
+
+| Evidence | Most likely cause |
+|----------|-------------------|
+| "Task blocked for more than 120s" kernel at spike time | Disk/storage |
+| "ata X.00: exception" or NVMe reset | Disk hardware |
+| SMART shows pending/reallocated | Disk dying |
+| zpool errors or high wait | ZFS issue (RULED OUT — no ZFS) |
+| D-state processes all on same device | Disk saturated |
+| D-state processes scattered, dirty pages huge | Memory/writeback, not disk |
+| Call traces, Oops, MCE events | Kernel/hardware fault |
+| Lid events match spikes exactly | Logind theory |
+| Nothing in any log, just PSI spike | Something in a VM/CT |
+
+─────────────────────────────────────────────────────────────────────
+FAIR NOTE ON LOGIND THEORY (DOWNGRADE)
+─────────────────────────────────────────────────────────────────────
+
+At this point, acknowledged to user:
+"You're right to be skeptical. Logind itself probably ISN'T the root
+cause of 49% IO pressure — a few hundred log lines don't do that.
+But logind being in a storm at the exact moment of the IO spike is
+still significant."
+
+Most likely reading at this point:
+- Something causes a real IO stall
+- During the stall, systemd-logind's timer-driven suspend attempts queue up
+- When IO unblocks, they all drain at once
+- Lid storm is a MARKER of the stall, not the CAUSE
+
+This was closer to truth but still incomplete.
+
+─────────────────────────────────────────────────────────────────────
+STATUS AT END OF PART 2
+─────────────────────────────────────────────────────────────────────
+
+Theories status:
+
+THEORY 1: Lid switch / logind storm
+Status: DOWNGRADED from "smoking gun" to "probably symptom"
+Evidence against: too small to cause 49% PSI
+Rebuttal: could be marker not cause
+
+THEORY 2: Disk hardware failure
+Status: RULED OUT
+Evidence: SMART OK, kernel logs clean, no IO errors, no blocked tasks
+
+THEORY 3: Kernel issue
+Status: RULED OUT
+Evidence: no oopses, no bugs, no MCE, no soft lockups
+
+THEORY 4: ZFS issue
+Status: RULED OUT
+Evidence: no ZFS pools exist
+
+THEORY 5: Storage layer (LVM-thin/NVMe)
+Status: PLAUSIBLE (contention between many VMs)
+Evidence: 15+ VMs on single NVMe
+Pending: need live IO capture during spike
+
+THEORY 6: Something inside a VM
+Status: UNEXPLORED — moving here next
+
+Key insight gained: architecture maps (15+ VMs, single NVMe, LVM-thin)
+are pivotal for understanding later cascade dynamics.
+
+Investigation time elapsed: ~1.5 hours
+User still skeptical, investigation continues.
+
+─────────────────────────────────────────────────────────────────────
+COMMANDS PROVIDED BUT NOT ALL EXECUTED
+─────────────────────────────────────────────────────────────────────
+
+Full command set offered to user (selective execution):
+
+# Disk health commands (SKIPPED - user already verified)
+  lsblk -o NAME,MODEL,SIZE,ROTA,TYPE
+  smartctl -a /dev/nvme0n1 | grep -iE 'critical|media_errors|...'
+
+# Kernel IO error search (EXECUTED - all clean)
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'ata[0-9]|scsi|nvme|blk_update|i/o error|...'
+
+# Kernel bug search (EXECUTED - all clean)
+  journalctl -k --since "2 weeks ago" --no-pager | \
+    grep -iE 'bug:|oops|warning:|call trace|kernel panic|...'
+
+# Storage subsystem (EXECUTED - revealed LVM-thin not ZFS)
+  pvesm status
+  cat /etc/pve/storage.cfg
+  zpool status
+  lsblk
+
+# Sysstat install (NOT DONE - would have helped)
+  apt install -y sysstat
+
+# Live IO snapshotter (NOT DONE - would have caught later spikes live)
+  [systemd service script above]
+
+─────────────────────────────────────────────────────────────────────
+USER ENGAGEMENT PATTERN
+─────────────────────────────────────────────────────────────────────
+
+User was:
+- Pushing back on theories (beneficial, accurate)
+- Providing existing data (fast)
+- NOT installing new tools (understandable mid-crisis)
+- NOT running full diagnostic sweeps
+
+This pattern meant investigation relied on:
+- Existing log data
+- User-observable symptoms
+- Pattern matching rather than live capture
+
+This explains why some later theories couldn't be fully tested and
+had to be rejected only by counter-evidence rather than by running
+the diagnostic that would confirm/deny them cleanly.
+
+[END OF PART 2]
+
+What Part 3 will cover:
+- qemu-ga evidence discovery
+- TS-K8S-038 reference
+- Timezone confusion and correction
+- etcd slow-apply evidence
+- VM memory state reveal (2.2 GB on K8s master!)
+- kube-apiserver OOMKilled discovery (86 restarts!)

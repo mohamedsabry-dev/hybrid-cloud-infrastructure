@@ -1,0 +1,667 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 10 OF 10
+Complete command reference, key outputs, final consolidation
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: Retrospective — full session summary
+PHASE: Consolidation for future reference
+
+─────────────────────────────────────────────────────────────────────
+COMPLETE COMMAND REFERENCE FROM SESSION
+─────────────────────────────────────────────────────────────────────
+
+Organized by phase and purpose.
+
+## PHASE 1: Historical log analysis
+
+# Journal message counts by minute (outlier detection)
+journalctl --since "2 weeks ago" -o short-iso --no-pager | \
+  awk '{print substr($1,1,16)}' | uniq -c | sort -rn | head -30
+
+# Journal message counts by hour
+journalctl --since "2 weeks ago" -o short-iso --no-pager | \
+  awk '{print substr($1,1,13)}' | uniq -c | sort -rn | head -20
+
+# Error-level messages by hour
+journalctl --since "2 weeks ago" -p err -o short-iso --no-pager | \
+  awk '{print substr($1,1,13)}' | uniq -c | sort -rn | head -20
+
+# Most repeated warning messages
+journalctl --since "2 weeks ago" -p warning --no-pager | \
+  awk '{$1=$2=$3=""; print}' | sort | uniq -c | sort -rn | head -20
+
+# Kernel messages by hour
+journalctl -k --since "2 weeks ago" -o short-iso --no-pager | \
+  awk '{print substr($1,1,13)}' | uniq -c | sort -rn | head -20
+
+# Windowed journal analysis (specific time range)
+journalctl --since "2026-04-24 01:30:00" --until "2026-04-24 01:55:00" \
+  -o short-iso --no-pager | awk '{print $4}' | sort | uniq -c | sort -rn | head -20
+
+# Top systemd units in window
+journalctl --since "2026-04-24 01:30:00" --until "2026-04-24 01:55:00" \
+  -o json --no-pager | jq -r '._SYSTEMD_UNIT // "none"' | \
+  sort | uniq -c | sort -rn | head -15
+
+# Lid switch event histogram (2 weeks)
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep "Lockdown: systemd-logind" | \
+  awk '{print $1, $2, $3}' | cut -c1-12 | uniq -c | sort -rn | head -20
+
+## PHASE 2: Disk/kernel health
+
+# List block devices
+lsblk -o NAME,MODEL,SIZE,ROTA,TYPE
+
+# Full SMART data
+smartctl -a /dev/nvme0n1 | less
+
+# Red flag scan
+smartctl -a /dev/nvme0n1 | grep -iE 'critical|media_errors|error_log|
+  percentage_used|unsafe_shutdown|temperature'
+
+# SMART tests
+smartctl -t short /dev/nvme0n1
+sleep 120
+smartctl -l selftest /dev/nvme0n1
+
+# IO errors in kernel
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep -iE 'ata[0-9]|scsi|nvme|blk_update|i/o error|medium error|
+    sense key|buffer i/o|end_request|reset|link down|timeout|aborted'
+
+# Filesystem errors
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep -iE 'ext4|xfs|btrfs|zfs|journal_io|remount.*read-only|corruption'
+
+# Task hangs
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep -iE 'blocked for more than|hung_task|task .* blocked|
+    khungtaskd|INFO: task'
+
+# Kernel bugs
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep -iE 'bug:|oops|warning:|call trace|kernel panic|hardware error|
+    mce:|edac|uncorrected|machine check|rcu_sched|soft lockup|nmi watchdog'
+
+## PHASE 3: Storage inspection
+
+pvesm status
+cat /etc/pve/storage.cfg
+zpool status
+zpool iostat -v 2 5
+vgs
+lvs -a -o +devices
+pvs
+df -h
+df -i
+
+## PHASE 4: Live monitoring
+
+# Top processes by CPU
+top -b -n 1 | head -30
+
+# Processes in D-state (blocked on IO)
+ps -eo pid,stat,comm,wchan | awk '$2 ~ /D/'
+
+# Per-device IO
+iostat -xz 2 5
+
+# Per-process IO
+iotop -o -b -n 3
+
+# PSI state
+cat /proc/pressure/io
+cat /proc/pressure/cpu
+cat /proc/pressure/memory
+
+# Dirty pages
+grep -E 'Dirty|Writeback' /proc/meminfo
+
+## PHASE 5: VM inspection (host side)
+
+# All VMs with memory config
+for vmid in $(qm list | awk 'NR>1 {print $1}'); do
+  mem=$(qm config $vmid 2>/dev/null | grep -E '^memory:' | awk '{print $2}')
+  balloon=$(qm config $vmid 2>/dev/null | grep -E '^balloon:' | awk '{print $2}')
+  name=$(qm config $vmid 2>/dev/null | grep -E '^name:' | awk '{print $2}')
+  running=$(qm status $vmid 2>/dev/null | awk '{print $2}')
+  printf "VM %-6s %-30s [%-7s] memory=%-6s balloon=%s\n" \
+    "$vmid" "$name" "$running" "$mem" "${balloon:-default}"
+done
+
+# Total VM RAM allocated
+qm list | awk 'NR>1 {sum+=$4} END {print "Total:", sum, "MB"}'
+
+# Specific VM config
+qm config 1010
+
+# Live VM memory query
+qm monitor 1010
+# > info balloon
+# > quit
+
+# VM scsi config
+qm config 1010 | grep -E 'scsi|virtio|ide|sata'
+
+## PHASE 6: VM inspection (inside VM)
+
+# Free memory
+free -h
+
+# Memory detail
+cat /proc/meminfo | grep -iE 'MemAvailable|SwapTotal|SwapFree|
+  Committed|Dirty|Writeback'
+
+# OOM history
+dmesg -T | grep -iE 'oom|killed process|kill_process'
+journalctl | grep -iE 'oom|killed process|invoked oom-killer'
+
+# Previous boot
+journalctl --list-boots | head
+journalctl -b -1 -n 200 --no-pager | tail -100
+journalctl -b -1 -k --no-pager | \
+  grep -iE 'soft lockup|hung_task|rcu_sched|blocked for more|INFO: task'
+
+## PHASE 7: K8s / etcd inspection
+
+# Cluster state
+kubectl get nodes
+kubectl get pods -A
+kubectl top nodes
+
+# etcd health
+etcdctl \
+  --endpoints=https://10.0.61.10:2379,https://10.0.61.11:2379,https://10.0.61.12:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  endpoint status --cluster -w table
+
+# etcd slow-apply warnings
+ETCD_ID=$(crictl ps -a | grep etcd | awk '{print $1}' | head -1)
+crictl logs --since 6h $ETCD_ID 2>&1 | \
+  grep -iE 'slow|took too long|apply request'
+
+# kube-apiserver errors
+APISRV_ID=$(crictl ps -a | grep kube-apiserver | awk '{print $1}' | head -1)
+crictl logs --since 6h $APISRV_ID 2>&1 | \
+  grep -iE 'timeout|slow|etcdserver|context deadline'
+
+# kubelet errors
+journalctl -u kubelet --since "2026-04-24 01:25" --until "2026-04-24 01:50" | \
+  grep -iE 'timeout|slow|etcdserver|failed|error'
+
+# Pod OOM/BackOff events
+kubectl get events -A --field-selector reason=OOMKilled
+kubectl get events -A --field-selector reason=Unhealthy
+kubectl get events -A --field-selector reason=BackOff
+
+# Pod describe
+kubectl describe pod -n NAMESPACE POD | \
+  grep -A 5 -iE 'last state|reason|exit code|oom'
+
+## PHASE 8: qemu-ga investigation
+
+# Guest agent logs
+journalctl -u qemu-guest-agent | tail -20
+journalctl -u qemu-guest-agent --since "2026-04-23 22:00" --until "2026-04-24 02:00"
+
+# CPU check
+ps -eo pid,%cpu,comm | grep qemu-ga
+
+# Host-side qga timeouts
+journalctl -u pvedaemon --since "2026-04-24 01:30" --until "2026-04-24 01:50"
+journalctl -u pveproxy --since "2026-04-24 01:30" --until "2026-04-24 01:50"
+
+# VM operation events
+journalctl --since "2026-04-23 22:00" --until "2026-04-24 02:00" | \
+  grep -E 'VM 1010|qmeventd.*1010|qmp.*1010'
+
+## PHASE 9: Lid switch / logind
+
+# Config inspection
+loginctl show-seat seat0
+grep -vE '^\s*#|^\s*$' /etc/systemd/logind.conf
+cat /etc/systemd/logind.conf
+
+# Live event monitoring
+evtest /dev/input/event0
+
+# Historical lid events
+journalctl -k --since "2 weeks ago" | grep -i "lid"
+
+# Logind activity around window
+journalctl -u systemd-logind --since "2026-04-24 01:35:00" --until "2026-04-24 01:50:00"
+
+# ACPI events
+journalctl -k --since "2 weeks ago" --no-pager | \
+  grep -iE 'acpi|lid|battery|ac_adapter|power supply|thermal'
+
+# Proposed drop-in (NOT APPLIED)
+mkdir -p /etc/systemd/logind.conf.d/
+cat > /etc/systemd/logind.conf.d/ignore-power-events.conf << 'EOF'
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+HandlePowerKey=ignore
+HandlePowerKeyLongPress=ignore
+HandleSuspendKey=ignore
+HandleSuspendKeyLongPress=ignore
+HandleHibernateKey=ignore
+HandleHibernateKeyLongPress=ignore
+HandleRebootKey=ignore
+HandleRebootKeyLongPress=ignore
+EOF
+systemctl restart systemd-logind
+
+## PHASE 10: Recovery operations
+
+# Cordon + drain node
+kubectl cordon k8s-worker3.lab.local
+kubectl drain k8s-worker3.lab.local \
+  --ignore-daemonsets --delete-emptydir-data --force --timeout=600s
+kubectl delete node k8s-worker3.lab.local
+
+# VM operations
+qm shutdown 1010
+qm stop 1010
+qm start 1010
+qm reboot 1010
+
+# Sequential VM restart
+qm start 1010; sleep 180
+qm start 1011; sleep 180
+qm start 1012; sleep 180
+qm start 1020; sleep 180
+qm start 1021
+
+# Scale workloads down
+kubectl -n apps scale deployment --all --replicas=0
+kubectl -n flux-system scale deployment --all --replicas=0
+kubectl -n monitoring scale deployment --all --replicas=0
+kubectl -n monitoring scale statefulset --all --replicas=0
+
+# Daemonset disable trick
+kubectl -n monitoring patch daemonset promtail \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+
+# Scale workloads back up (sequential with waits)
+kubectl -n monitoring scale statefulset prometheus-kube-prometheus-stack-prometheus --replicas=1
+sleep 300
+kubectl -n monitoring scale deployment kube-prometheus-stack-grafana --replicas=1
+sleep 300
+kubectl -n monitoring scale statefulset loki --replicas=1
+sleep 300
+# etc...
+
+## PHASE 11: Stress/reproduction tests
+
+# CPU stress on one master
+for i in 1 2 3 4; do yes > /dev/null & done
+sleep 300
+killall yes
+
+# CPU stress multi-master (DANGEROUS)
+timeout 300 bash -c 'for i in 1 2 3 4; do yes > /dev/null & done; wait'
+# Run on master1, master2, master3 simultaneously via separate terminals
+
+# LIST operation spam (reproduces cascade)
+for i in {1..100}; do
+  kubectl get pods -A --output=json > /dev/null &
+  kubectl get events -A --output=json > /dev/null &
+done
+
+# Write storm (reproduces cascade)
+for i in {1..1000}; do
+  kubectl create configmap stress-test-$i \
+    --from-literal=data="$(head -c 10000 /dev/urandom | base64)" &
+done
+
+# Cleanup stress configmaps
+kubectl delete configmap -l stress-test
+
+## PHASE 12: IO throttling application (NOT APPLIED YET)
+
+# Check current config
+qm config 1010 | grep scsi0
+
+# Apply to worker3 first (least critical)
+qm set 1022 -scsi0 local-lvm:vm-1022-disk-0,\
+  aio=io_uring,backup=1,cache=none,discard=on,iothread=0,\
+  replicate=1,size=25G,ssd=1,\
+  mbps_rd=200,mbps_wr=100,\
+  iops_rd=3000,iops_wr=2000,\
+  mbps_rd_max=400,mbps_wr_max=200
+
+# Workers 1 and 2
+for vmid in 1020 1021; do
+  qm set $vmid -scsi0 local-lvm:vm-${vmid}-disk-0,\
+    aio=io_uring,backup=1,cache=none,discard=on,iothread=0,\
+    replicate=1,size=25G,ssd=1,\
+    mbps_rd=200,mbps_wr=100,iops_rd=3000,iops_wr=2000,\
+    mbps_rd_max=400,mbps_wr_max=200
+done
+
+# Masters one at a time
+qm set 1010 -scsi0 local-lvm:vm-1010-disk-0,\
+  aio=io_uring,backup=1,cache=none,discard=on,iothread=0,\
+  replicate=1,size=25G,ssd=1,\
+  mbps_rd=100,mbps_wr=50,iops_rd=2000,iops_wr=1000,\
+  mbps_rd_max=200,mbps_wr_max=100,\
+  iops_rd_max=4000,iops_wr_max=2000
+
+# Non-critical VMs
+for vmid in 1001 2001 2002 2003 2004 2005 2006 9000 9010; do
+  qm set $vmid --scsi0 $(qm config $vmid | grep ^scsi0 | cut -d: -f2-),\
+    mbps_rd=50,mbps_wr=25,iops_rd=1000,iops_wr=500
+done
+
+# Enable IO thread (requires stop/start)
+qm shutdown 1010
+qm set 1010 --scsi0 ...,iothread=1
+qm start 1010
+
+─────────────────────────────────────────────────────────────────────
+KEY OUTPUTS THAT DROVE BREAKTHROUGHS
+─────────────────────────────────────────────────────────────────────
+
+## OUTPUT 1: Lid switch bursts histogram
+Showed: 28 events/min peak vs 2 baseline
+Drove: initial (wrong) theory
+Eliminated by: user's "closed all day" observation
+
+## OUTPUT 2: qemu-ga 5-minute gap
+22:33:03 UTC → 22:38:30 UTC gap
+Drove: TS-K8S-038 theory
+Eliminated by: qemu-ga at 0% CPU, etcd slow BEFORE gap
+
+## OUTPUT 3: etcd slow-apply at 22:26 UTC
+Slow-applies started 7 minutes BEFORE qemu-ga gap
+Drove: causality reversal — etcd was first
+Led to: memory starvation theory
+
+## OUTPUT 4: free -h inside master1
+2.2 GB total, 83 MB free, Committed 4.7 GB
+Drove: VM memory starvation theory
+Supported by: 86 apiserver restarts (exit 137 OOM)
+
+## OUTPUT 5: Host free -h
+22 GB total, 780 MB free, 24 GB VMs allocated
+Drove: host overcommit theory
+
+## OUTPUT 6: balloon=0 discovery
+VM 1010 config: balloon: 0, memory: 2560
+Drove: realization that VM was sized at 2.5 GB from day one
+Refined: not about ballooning, about fixed undersizing
+
+## OUTPUT 7: User's prod comparison
+4 GB master, 8 GB worker, 18 GB free, better NVMe, max spike 15%
+Drove: "capacity planning" realization
+Shifted strategy toward memory increase
+
+## OUTPUT 8: sssd restart at 02:51:35
+Drove: SSSD cascade theory
+Eliminated by: user clarification "master1 was hung all day"
+
+## OUTPUT 9: etcdctl endpoint status
+46 MB DB, healthy, raft term 224, all in sync
+Drove: elimination of etcd DB bloat theory
+Confirmed: etcd is NOT the problem
+
+## OUTPUT 10: User's breakthrough question
+"it was running stable over weeks, why this time now exactly today"
+Drove: complete reframing of investigation
+Led to: cascade dynamics theory
+
+## OUTPUT 11: Scale-to-zero experiment
+Entire cluster → scale-all-to-0 → baseline in 5 min
+Drove: definitive confirmation of cascade theory
+This was THE breakthrough moment
+
+## OUTPUT 12: Reintroduction sequence
+Sequential workload activation → zero new restarts
+Drove: validated recovery procedure
+
+## OUTPUT 13: All-masters CPU stress test
+80% host CPU, 0% IO spike
+Drove: elimination of CPU stress as cascade trigger
+
+## OUTPUT 14: LIST spam reproduction
+100× kubectl get pods on 3 masters → 57% IO delay instantly
+Drove: CONFIRMED root cause
+
+## OUTPUT 15: Single-VM write storm
+1000 configmaps on 1 node → host-wide 57% IO delay, SSH unresponsive
+Drove: CONFIRMED no IO isolation architectural issue
+
+─────────────────────────────────────────────────────────────────────
+USER'S DECISIVE OBSERVATIONS (CHRONOLOGICAL)
+─────────────────────────────────────────────────────────────────────
+
+Through the session, user's contributions drove key pivots:
+
+1. "it already happened from 15 m and lastyed 10 m"
+   → Shifted from live to historical analysis
+
+2. "all those commands not helpful, issue happen random across last
+   2 weeks, where to chjeck if there error storm in logs"
+   → Shifted to log pattern analysis (gold mine)
+
+3. "at the high io, i recieved many of the suspend error"
+   → Pointed at logind correlation (though was wrong theory)
+
+4. "but the led closed all the day, why happen only once each 4 days"
+   → First critical pushback on lid theory
+
+5. "im not convinced at all, breother, i very suspect eaither kernal
+   issue or disk issue"
+   → Redirected to hardware investigation
+
+6. "is this rel;ated" + qemu-ga output
+   → Revealed TS-K8S-038 parallel
+
+7. "this issue happened from some days"
+   → Set context for recurring pattern
+
+8. "but i really dont know which caused the other"
+   → Causality humility that drove proper investigation
+
+9. "no its correct time because its utc, despite mine utc_+2"
+   → Corrected massive timezone misunderstanding
+
+10. "im sick of this, my prod laptop, dont face this issue, but it
+    have better nvme, more plenty of rams, 4gb for eahc master"
+    → PROVIDED baseline comparison (critical)
+
+11. "do u think promethius scrapimng... but it scaping all the day
+    why only few spikes"
+    → Eliminated Prometheus via logical test
+
+12. "only thios node, it was hang form tyhr morinign and i didnt
+    know, i just started it now and this happened"
+    → CRUCIAL clarification about master1 hang
+
+13. "i changed masters to 3 from 2.5 and worker to 3 from 3.25"
+    → Applied intervention (partial)
+
+14. "it was running stable over weeks, why this time now exactly
+    today it dying"
+    → THE breakthrough question — reframed investigation
+
+15. "i reboted all vms on purpose to see, spike happen just 3
+    minutes to only 30 % for bootup"
+    → Deliberate experiment validated cascade theory
+
+16. "despite the load avg iuncrease and cpu increase muchg but the
+    IO never moved, which actually tell us not the cpu overload the
+    quem cause make us io issue but the concurnt spam of requests"
+    → Empirical insight — CPU ruled out, request spam theorized
+
+17. "this command on only 1 node, was enough to break all ssh"
+    → Demonstrated single-VM can kill host
+
+18. "which actuallyu make a complete picture, that even if quem ran
+    against 1 node, only one node and overwhelm it with io, it
+    complete overwhelm the whole cluster... there is no actually
+    isolation and 1 node crash can kill the server"
+    → FINAL root cause insight
+
+Each of these was valuable. User drove investigation through
+empirical tests and smart questions. Without these, the
+investigation would have stalled on wrong theories.
+
+─────────────────────────────────────────────────────────────────────
+COMPLETE THEORY ELIMINATION TIMELINE
+─────────────────────────────────────────────────────────────────────
+
+Hour 0-1: Theory 1 (lid switch) proposed and weakened
+Hour 1-2: Theories 2-6 (disk, kernel, ZFS, TS-K8S-038 rushed conclusion) ruled out
+Hour 2-3: Theory 5 (TS-K8S-038) properly ruled out, Theory 7 (VM memory) introduced
+Hour 3-4: Theory 8 (host overcommit) introduced, memory change applied
+Hour 4-5: Theory 9 (SSSD) introduced and ruled out, Theory 10 (Prometheus) ruled out
+Hour 5-6: Cascade observation, Theory 11 (cascade dynamics) proposed
+Hour 6-7: Scale-down confirms cascade, reintroduction succeeds
+Hour 7-8: Theory 11a (CPU) ruled out, Theory 11b (request spam) CONFIRMED
+Hour 8+: Theory 12 (IO isolation) CONFIRMED via single-VM test
+
+─────────────────────────────────────────────────────────────────────
+FINAL ANSWER — THE UNIFIED THEORY
+─────────────────────────────────────────────────────────────────────
+
+ROOT CAUSE: Proxmox host has ZERO IO isolation between VMs on the
+shared NVMe. Any single VM generating heavy IO can saturate the
+entire NVMe queue, causing host-wide IO delay affecting all other VMs.
+
+MECHANISM:
+1. Any trigger causes high IO on one VM (OOM, qemu-ga, cascade, etc.)
+2. No IO throttling → VM monopolizes NVMe queue
+3. NVMe latency climbs from 1-3ms to 300-1300ms
+4. ALL other VMs experience IO starvation
+5. K8s probes (HTTP to apiserver, exec into containers) time out
+6. Pods marked unhealthy, restart
+7. Restarting pods do full LIST from etcd
+8. More IO load on already-saturated NVMe
+9. Self-sustaining cascade
+10. Requires external intervention to break
+
+FIX (PRIMARY): Per-VM IO throttling via Proxmox Hardware → Disk →
+Bandwidth tab, or qm set --scsi0 with mbps_*, iops_* parameters.
+
+FIX (SECONDARY):
+- Larger probe timeouts on constrained hardware
+- Sequential VM operations (never parallel)
+- Scale-down procedure for break-glass recovery
+- Adequate VM memory sizing (masters 4 GB minimum recommended)
+
+─────────────────────────────────────────────────────────────────────
+LESSONS FOR FUTURE INVESTIGATIONS
+─────────────────────────────────────────────────────────────────────
+
+## Process lessons
+
+1. Listen to user pushback — they often see truth
+2. Empirical tests > theoretical reasoning
+3. Scale-down is cheap and definitive
+4. Question baselines: "why NOW if hardware same?"
+5. Don't pattern-match too fast
+
+## Technical lessons
+
+6. PSI "Some" is symptom, not cause — find what's BLOCKED
+7. Correlations ≠ causation (logind was both)
+8. CPU ≠ IO — stress-test each separately
+9. One VM can monopolize shared hardware
+10. K8s cascades are hard to stop once started
+
+## Architecture lessons
+
+11. IO isolation is NECESSARY on shared storage
+12. Liveness probes amplify transient issues into cascades
+13. GitOps controllers fight-the-incident-response
+14. Daemonset workloads don't scale with --replicas
+15. Sequential operations always safer than parallel
+
+─────────────────────────────────────────────────────────────────────
+FILES CREATED
+─────────────────────────────────────────────────────────────────────
+
+During investigation:
+1. TS-PVE-DEV-001-io-pressure-spikes.txt (913 lines) — early analysis
+2. TS-PVE-DEV-002-cascade-storms-root-cause.txt (1019 lines) — post-breakthrough
+
+This session review:
+3. part-01.txt — Opening, symptoms, logind theory (~500 lines)
+4. part-02.txt — Disk/kernel verification, storage mapping (~400 lines)
+5. part-03.txt — qemu-ga, TS-K8S-038, memory reveal (~500 lines)
+6. part-04.txt — Frustration, prod comparison, first interventions (~450 lines)
+7. part-05.txt — Worker3 drain, cascade discovery, breakthrough question (~450 lines)
+8. part-06.txt — Scale-to-zero experiment, reintroduction (~500 lines)
+9. part-07.txt — Resilience test, qemu-ga theory connection (~450 lines)
+10. part-08.txt — BREAKTHROUGH: reproducing cascade (~500 lines)
+11. part-09.txt — Lessons, failed theories inventory (~450 lines)
+12. part-10.txt — Complete command reference, consolidation (this file)
+
+─────────────────────────────────────────────────────────────────────
+SESSION STATISTICS
+─────────────────────────────────────────────────────────────────────
+
+Duration: ~8 hours (23:15 local → 07:30 local)
+Theories explored: 12
+Theories rejected: 9
+Theories confirmed: 2 (11b cascade, 12 IO isolation)
+Theories contributing: 2 (7 memory, 8 overcommit)
+Commands executed: ~100+
+Major screenshots/outputs: ~30
+User messages: ~30
+Assistant messages: ~30
+
+Root cause discovery time: 7 hours (would have been 15 minutes with
+immediate scale-down test, but required all the eliminations to get
+there)
+
+Cluster state changes:
+- Masters: 2.5 → 3 GB (all 3)
+- Workers: 3.25 → 3 GB (workers 1, 2) / 2.75 GB (worker 3 - inconsistent)
+- Removed and re-added worker3 (via remediation controller)
+- Full cluster restart (3x)
+- Deliberate cascade reproduction (2x)
+
+─────────────────────────────────────────────────────────────────────
+FINAL STATUS
+─────────────────────────────────────────────────────────────────────
+
+Investigation: COMPLETE
+Root cause: IDENTIFIED + EMPIRICALLY CONFIRMED
+Fix: IDENTIFIED (not yet applied)
+Recovery procedure: DOCUMENTED AND VALIDATED
+Cluster: HEALTHY
+Documentation: 12 files totaling ~6,000+ lines
+
+User's action items pending:
+1. Sleep
+2. Apply IO throttling (starting with worker3)
+3. Test with reproduction command post-throttle
+4. Investigate master1 original hang cause
+5. 14-day observation window
+
+Investigation success criteria met:
+✓ Identified root cause with empirical evidence
+✓ Documented fix with specific commands
+✓ Validated break-glass recovery procedure
+✓ Created comprehensive knowledge base
+✓ User understands the system better than before
+
+═══════════════════════════════════════════════════════════════════════
+END OF 10-PART SESSION REVIEW
+═══════════════════════════════════════════════════════════════════════
+
+Thank you Ahmed, for the patience, the pushback, and the empirical
+mindset. The investigation succeeded because you insisted on testing
+every theory rather than accepting any of them. The final answer
+came from your intuition ("concurrent spam of requests") combined
+with direct empirical reproduction — exactly the right way to do it.
+
+Sleep well. The cluster is stable. The docs are complete. Future-you
+has everything needed to apply the fix with confidence.

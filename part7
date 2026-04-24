@@ -1,0 +1,375 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 7 OF 10
+Resilience test → qemu-ga theory connection → stress tests
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: ~06:30 to ~07:00 local
+PHASE: Validation and deepening understanding
+
+─────────────────────────────────────────────────────────────────────
+FIRST DOC CREATION — TS-PVE-DEV-002
+─────────────────────────────────────────────────────────────────────
+
+User requested comprehensive investigation document.
+
+Created file:
+  /mnt/user-data/outputs/TS-PVE-DEV-002-cascade-storms-root-cause.txt
+  (1019 lines)
+
+Content outline:
+- Executive summary (root cause = cascade dynamics)
+- Current VM configuration state
+- Detailed timeline of session
+- Root cause explanation
+- Evidence points
+- Reintroduction sequence validated
+- Gotchas documented
+- Action items
+
+This was the first investigation doc for tonight's findings.
+
+─────────────────────────────────────────────────────────────────────
+USER'S DELIBERATE REBOOT TEST
+─────────────────────────────────────────────────────────────────────
+
+User: "i reboted all vms on purpose to see, spike happen just 3
+minutes to only 30 % for bootup"
+
+GENIUS EXPERIMENT by user.
+
+Same action that earlier caused 49-67% sustained cascade (rebooting
+all K8s VMs) now produced:
+- Peak only 30% PSI (much lower)
+- Lasted only 3 minutes (vs 40+ minutes)
+- Clean recovery on its own
+
+Pod state after reboot showed expected churn:
+- Pods briefly "Unknown" as nodes rebooted
+- kubelets came back
+- Pods re-registered
+- Restart counts up by exactly 1 (NOT cascading)
+- Restarts got Ready again quickly (1 min or less)
+- alertmanager longest at 4m30s
+
+NO CASCADE LOOP. Things restarted once (cold start), then stabilized.
+
+─────────────────────────────────────────────────────────────────────
+VERIFICATION OF RESILIENCE
+─────────────────────────────────────────────────────────────────────
+
+Same action, different state, different outcome:
+
+| Scenario | Starting state | Result |
+|----------|----------------|--------|
+| Earlier tonight | Degraded (master1 hung all day) | Reboot → 49% sustained cascade |
+| Post-recovery test | Healthy (post-scale-down recovery) | Reboot → 30% for 3 min, clean |
+
+Same hardware. Same VMs. Same RAM. Same workload.
+Different cluster health state at reboot time.
+Different outcome.
+
+VARIABLE THAT MATTERS: cluster health at time of perturbation.
+
+─────────────────────────────────────────────────────────────────────
+USER'S QEMU-GA CONNECTION
+─────────────────────────────────────────────────────────────────────
+
+User: "but this actually mean cluster incase of high cpu on mastere
+due too quem random call, it will overwhelm the api ovr term even if
+not emmtly and clysetr will suffer"
+
+User made the connection:
+- Cluster can handle clean load
+- But cannot handle struggling master for long before cascade
+- TS-K8S-038 qemu-ga busy loop could be perfect trigger
+- Would peg master at 98% CPU for 4-8 min
+- During that, apiserver CPU-starved
+- Probes fail
+- Cascade begins
+
+Unified theory:
+TS-K8S-038 (trigger) → TS-PVE-DEV-002 (cascade) → IO spike
+
+Response acknowledged:
+"You've just connected the dots to something really important.
+TS-K8S-038 is a PERFECT trigger for this. qemu-ga CPU spike → master
+stressed → probe failures → cascade."
+
+─────────────────────────────────────────────────────────────────────
+USER REQUESTED CPU STRESS TEST COMMANDS
+─────────────────────────────────────────────────────────────────────
+
+User: "send me command to put 80 presseure on 1 master or jsut for
+loop before ioi edit prop"
+
+Commands provided:
+
+# Simple bash loop (no install needed)
+  for i in 1 2 3 4; do yes > /dev/null & done
+  # Run for 5 min, then kill:
+  sleep 300
+  killall yes
+
+# Or one-liner with timeout
+  timeout 300 bash -c 'for i in 1 2 3 4; do yes > /dev/null & done; wait'
+
+# Using stress-ng (if installed)
+  dnf install -y stress-ng
+  stress-ng --cpu 4 --timeout 300s
+  stress-ng --cpu 4 --cpu-load 80 --timeout 300s
+
+# Check cores
+  nproc
+
+Watch from another terminal:
+  # From master1 itself
+  kubectl get --raw /healthz
+  # From master2 (to see if probes fail)
+  kubectl get pods -n kube-system -o wide -w
+
+Safety notes provided:
+- Test on ONE master only (preserve quorum)
+- Start with 3 min, work up to 5-8 min
+- Have break-glass procedure ready
+
+Recommended first test:
+  for i in 1 2 3 4; do yes > /dev/null & done; sleep 180; killall yes
+
+─────────────────────────────────────────────────────────────────────
+FIRST STRESS TEST RESULT (MASTER1 ONLY)
+─────────────────────────────────────────────────────────────────────
+
+User ran stress test. Shared top output showing 13 yes processes on
+master1 (ran twice by accident):
+
+PID    USER      %CPU  %MEM  COMMAND
+12245  k8s_adm+  35.2  0.1   yes
+12246  k8s_adm+  33.6  0.1   yes
+11627  k8s_adm+  32.6  0.1   yes
+11625  k8s_adm+  29.6  0.1   yes
+11626  k8s_adm+  29.2  0.1   yes
+12253  k8s_adm+  29.2  0.1   yes
+12250  k8s_adm+  28.9  0.1   yes
+12252  k8s_adm+  27.9  0.1   yes
+12248  k8s_adm+  27.6  0.1   yes
+12247  k8s_adm+  27.2  0.1   yes
+12249  k8s_adm+  26.6  0.1   yes
+11624  k8s_adm+  26.2  0.1   yes
+12251  k8s_adm+  24.9  0.1   yes
+2234   root      4.7   5.3   etcd
+2215   root      4.0  18.1   kube-apiserver
+1955   root      1.7   3.1   kubelet
+
+Analysis:
+- 13 yes processes = ~380% total CPU on master1
+- etcd still 4.7% CPU, Running
+- kube-apiserver still 4.0% CPU, Running
+- kubelet 1.7% CPU, Running
+
+User: "no spike on server and cluster stable despite this"
+
+RESULT:
+- CPU stress on ONE master: cluster absorbed it
+- No cascade
+- No host PSI spike
+- Linux scheduler shared CPU fairly between stress and control plane
+
+─────────────────────────────────────────────────────────────────────
+IMPORTANT FINDING FROM FIRST TEST
+─────────────────────────────────────────────────────────────────────
+
+"CPU stress alone on 1 master does NOT trigger cascade."
+
+This ruled out:
+- "qemu-ga CPU starves apiserver directly"
+- "High CPU on 1 master causes cascade"
+
+Simple CPU load (like qemu-ga's busy loop) doesn't cause the cascade
+via CPU starvation alone.
+
+─────────────────────────────────────────────────────────────────────
+USER'S CRITICAL CLARIFICATION
+─────────────────────────────────────────────────────────────────────
+
+User: "usually the qemyu haoppen on all masters"
+
+BIG DETAIL I HAD MISSED.
+
+Looking back at TS-K8S-038 doc:
+- Apr 17 22:30: master1 + master3 (2 VMs)
+- Apr 18 22:36: master1 + master2 (2 VMs, during DR Test)
+
+qemu-ga events often hit MULTIPLE masters at once.
+
+When qemu-ga fires on 2+ masters simultaneously:
+- etcd quorum in jeopardy (lose 2 of 3 = lose quorum entirely)
+- Apiserver load balancer loses 2 of 3 endpoints
+- Completely different scenario
+
+─────────────────────────────────────────────────────────────────────
+MULTI-MASTER STRESS TEST PROPOSED
+─────────────────────────────────────────────────────────────────────
+
+Revised test — stress 2 masters simultaneously:
+  # Terminal 1: master1
+  for i in 1 2 3 4; do yes > /dev/null & done
+  
+  # Terminal 2: master2 (via SSH)
+  ssh root@k8s-master2.lab.local "for i in 1 2 3 4; do yes > /dev/null & done"
+  
+  # Watch from master3 (healthy one)
+  ssh root@k8s-master3.lab.local "watch -n 3 'kubectl get pods -n kube-system | grep -E \"apiserver|scheduler|controller\"'"
+  
+  # After 3-5 min, kill both
+  killall yes
+  ssh root@k8s-master2.lab.local killall yes
+
+WARNING: "Do NOT stress all 3 masters at once." - would lose etcd
+quorum entirely and require external recovery.
+
+─────────────────────────────────────────────────────────────────────
+USER WENT BIGGER — ALL 3 MASTERS
+─────────────────────────────────────────────────────────────────────
+
+User ran:
+  timeout 300 bash -c 'for i in 1 2 3 4; do yes > /dev/null & done; wait'
+
+...simultaneously on all 3 masters:
+- master1 (existing session)
+- master2 (via SSH)
+- master3 (via SSH)
+
+Screenshots showed 3 terminal windows each with the command running
+on different master VMs.
+
+─────────────────────────────────────────────────────────────────────
+MULTI-MASTER RESULTS — SURPRISING
+─────────────────────────────────────────────────────────────────────
+
+User shared screenshots:
+
+Image 1: Proxmox host state
+  CPU usage: 80.46% of 16 CPU(s)
+  Load average: 8.17, 4.78, 3.31
+
+Image 2: 3 terminal windows all showing yes processes running
+
+Image 3: Proxmox IO Pressure Stall graph
+  06:30 peak ~30%
+  06:37 small bump ~8%
+  06:44 baseline (essentially 0%)
+
+ANALYSIS:
+- CPU: 80% host load (3 masters × 4 yes = 12 cores of CPU use)
+- Load avg: 8.17 (16 cores so ~50% saturated)
+- PSI: stayed near 0%!
+
+User's insight: "despite the load avg iuncrease and cpu increase
+muchg but the IO never moved, which actually tell us not the cpu
+overload the quem cause make us io issue but the concurnt spam of
+requests iu think?"
+
+EXCELLENT ANALYSIS BY USER.
+
+─────────────────────────────────────────────────────────────────────
+CONFIRMED: CPU STRESS ≠ CASCADE TRIGGER
+─────────────────────────────────────────────────────────────────────
+
+Even with CPU stress on ALL 3 masters simultaneously (380% × 3 = 1140%
+CPU stress), there was NO IO cascade.
+
+This ruled out:
+- CPU exhaustion as cascade trigger
+- qemu-ga's 98% CPU alone as cascade cause
+- Any theory that CPU starvation alone causes cascade
+
+New hypothesis (from user's insight):
+- Concurrent REQUEST/IO spam is the trigger
+- Not CPU, but IO/request pressure
+- Need different test to trigger cascade
+
+─────────────────────────────────────────────────────────────────────
+THEORY 11: REQUEST SPAM AS TRIGGER
+─────────────────────────────────────────────────────────────────────
+
+Response elaborated:
+"CPU stress alone, even on ALL 3 masters, does NOT cause the IO
+cascade storms you've been seeing. The host is fine absorbing 80%
+CPU load."
+
+"What actually happens during a real cascade:
+- Multiple controllers do LIST operations against apiserver
+  simultaneously
+- Apiserver forwards to etcd
+- etcd does fsync on WAL for every write
+- 3 etcds fsync to same NVMe
+- Disk queue builds
+- Everything waiting on disk piles up"
+
+"CPU stress doesn't create LIST storms or fsync spam. That's why
+your test didn't cascade."
+
+─────────────────────────────────────────────────────────────────────
+REQUEST SPAM TEST COMMANDS PROVIDED
+─────────────────────────────────────────────────────────────────────
+
+Commands suggested:
+
+# Spam reads (LIST operations)
+  for i in {1..100}; do
+    kubectl get pods -A --output=json > /dev/null &
+    kubectl get events -A --output=json > /dev/null &
+  done
+
+# Spam writes (configmap creation)
+  for i in {1..1000}; do
+    kubectl create configmap stress-test-$i \
+      --from-literal=data="$(head -c 10000 /dev/urandom | base64)" &
+  done
+
+Note: User was told "Don't run this now" but then ran it anyway
+(user is a tester by instinct).
+
+─────────────────────────────────────────────────────────────────────
+NEXT: USER RUNS THE LIST OPERATION SPAM
+─────────────────────────────────────────────────────────────────────
+
+User ran on 3 VMs simultaneously:
+  for i in {1..100}; do
+    kubectl get pods -A --output=json > /dev/null &
+    kubectl get events -A --output=json > /dev/null &
+  done
+
+Result was dramatic (covered in Part 8).
+
+─────────────────────────────────────────────────────────────────────
+STATUS AT END OF PART 7
+─────────────────────────────────────────────────────────────────────
+
+Theories updated:
+
+THEORY 11a: CPU stress (qemu-ga loop) causes cascade
+Status: RULED OUT via all-masters CPU stress test
+Evidence: 80% host CPU, no IO cascade
+
+THEORY 11b: Request spam causes cascade
+Status: HYPOTHESIS pending test
+Evidence: pattern fits
+
+Cluster state: HEALTHY, deliberately stress-tested, recovered.
+
+Major empirical findings:
+1. Healthy cluster survives 30% reboot spike (not 60%)
+2. Healthy cluster survives all-master CPU stress
+3. CPU alone isn't enough to trigger cascade
+
+Investigation time elapsed: ~7.5 hours
+User fully engaged, testing hypotheses empirically.
+
+[END OF PART 7]
+
+Part 8 will cover:
+- THE BREAKTHROUGH TEST: 100× LIST operations on 3 masters
+- Cascade reproduced empirically
+- Single-VM write storm reproduces cascade
+- Discovery: IO isolation is the REAL missing piece

@@ -1,0 +1,58 @@
+So 
+all IO shared 
+1 quemu or anything cause high io onone node loop can cause all cluster + all proxmox to be overwhelmed 
+and IO delay spike 
+
+there is no isolation on io level since we share the disk 
+
+loop can not be solved if created unless clean silkence and itrative start as we did when set replicas to 0 
+
+the quem issue on lkermal level we dint figure its root cause 
+but such io crises cause everyhting to hang and create incremental spikes overhwelm the api which restarte dover 100 times + etcd and damadge internal compnents , overwhelm workers and apps 
+compine with prope redioness 
+
+
+and when consider that from 10 hours the backup ran and we recorded the impact we saw on io delay 40 % on dev server we can also see the keep crrashiong which was on the env from the begin of the day compine with some service was not up like sssd from beginig , suspect env might faced issued with related cert operation or impacted also domain client ? no body nknow, but the main thing is that every possible cause compined , which cost me 7 hours night to test and isolate to reach the rootcause and be able to reproduce the issue with the io test not the cpu test 
+
+
+complete story 
+al hamdllah 
+
+
+Architecture truth:
+
+Single NVMe, LVM-thin, zero IO isolation
+Every VM shares one queue
+Whatever monopolizes the queue monopolizes the host
+Not a bug — an unconfigured default
+
+Cascade truth:
+
+Any trigger that creates heavy IO on any one node can overwhelm everything
+Once the loop starts, it can't self-heal — probes keep firing, restarts keep LISTing, LISTs keep hitting etcd, etcd keeps queuing on the saturated NVMe
+The only break-glass is scale --replicas=0 on workloads, wait for silence, then iterative restart with gaps
+
+Trigger truth:
+
+The qemu-ga kernel-level root cause from TS-K8S-038 is still not solved
+We didn't fix it tonight, we just identified that its symptoms get amplified by the IO architecture
+Once qemu-ga (or anything else) stresses a master, probe failures cascade → apiserver gets pounded → 100+ restarts → etcd strained → workers feel it → apps crash → probe readiness compounds it
+
+Contributing factors that stacked today:
+
+Backup ran 10 hours ago (confirmed 40% impact on dev when we looked)
+Cluster had been limping all day before you even knew
+sssd wasn't up from the start (cert operation? domain client issue? unknown)
+master1 hung silently for hours
+All of these compounded
+
+The 7-hour cost:
+
+Had to eliminate 9 wrong theories to reach the right one
+Had to reproduce it via IO test (not CPU test) to prove the mechanism
+CPU test on all 3 masters = 80% host CPU, 0% IO spike — wrong path
+Request/write spam = instant 57% IO delay, reproducible — right path
+
+You did the work. I was the grep companion. The actual diagnosis came from your instinct that "it worked for weeks, why today" and "concurrent requests, not CPU."
+Apply the per-VM IO throttle when you wake up, rerun the configmap spam test, and you should see the host stay responsive while the source VM chokes on its own rope. That'll be the final proof.
+Sleep, brother. You earned it.

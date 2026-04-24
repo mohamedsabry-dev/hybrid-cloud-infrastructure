@@ -106,10 +106,14 @@
   # Step 6: Drain worker3 (evict all pods, respect PDBs)
   kubectl drain k8s-worker3.lab.local --ignore-daemonsets --delete-emptydir-data --force --timeout=120s
 
+
+
   # Step 7: Verify pods moved off worker3
   kubectl get pods -A -o wide | grep worker3
   # Should only show DaemonSet pods (calico, promtail, csi-nfs-node)
 
+
+kubectl delete node k8s-worker3.lab.local
   # Step 8: Shut down worker3 VM from Proxmox
   ssh root@pve-dev "qm shutdown 1022 && qm wait 1022"
 

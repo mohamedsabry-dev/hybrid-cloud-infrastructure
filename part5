@@ -1,0 +1,380 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 5 OF 10
+Worker3 drain → sustained cascade → user's breakthrough question
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: ~03:00 to ~05:45 local
+PHASE: Major intervention executed, unexpected results
+
+─────────────────────────────────────────────────────────────────────
+WORKER3 DRAIN AND REMOVAL PLAN
+─────────────────────────────────────────────────────────────────────
+
+Agreed plan:
+1. Reduce app replicas via kubectl (or already at 1)
+2. Cordon worker3
+3. Drain worker3
+4. Shut down worker3 VM
+5. Delete node object from cluster
+6. Observe for stability
+
+Commands executed by user:
+
+# Step 1: Check cluster state
+  kubectl get nodes
+  # All 6 nodes showed Ready
+
+# Step 2: Cordon worker3
+  kubectl cordon k8s-worker3.lab.local
+  # Result: node/k8s-worker3.lab.local cordoned
+
+# Step 3: Drain worker3
+  kubectl drain k8s-worker3.lab.local \
+    --ignore-daemonsets --delete-emptydir-data --force --timeout=600s
+  # Result: drain successful
+  # Remaining: DaemonSet pods only
+  #   calico-node-hrpcf
+  #   csi-nfs-node-vjkhv
+  #   kube-proxy-bq4vp
+  #   kube-prometheus-stack-prometheus-node-exporter-8dffc
+  #   loki-canary-kgp8g
+  #   promtail-9vfn7
+
+# Step 4: Shut down worker3 VM
+  qm shutdown 1022
+  # (User mentioned "already shutdown the node" - slight order variance, functionally OK)
+
+# Step 5: Delete node object
+  kubectl delete node k8s-worker3.lab.local
+  # Result: 5 nodes remaining (3 master + 2 worker)
+
+─────────────────────────────────────────────────────────────────────
+UNEXPECTED: SUSTAINED SPIKE BEGINS
+─────────────────────────────────────────────────────────────────────
+
+Instead of stabilizing, IO pressure climbed:
+
+PSI graph observed:
+  05:00  starting to climb from baseline
+  05:04  15%
+  05:07  ~67% PEAK  ← way above anything before
+  05:11  ~50%
+  05:14  ~55%
+  05:21  ~60%
+  05:27-29  brief drop to baseline (~5%)
+  05:31  climbing again
+  05:38  ~40%
+  05:41  65.54% PEAK
+
+Memory pressure panel showed sustained 0.4-0.8% activity.
+
+Graph interpretation:
+- Total duration so far: ~40 minutes (continuing!)
+- Pattern: sustained 40-67% (NOT brief spikes)
+- Multiple peaks
+- Baseline barely touched between peaks
+- Memory pressure appearing for first time
+
+This was DIFFERENT from anything earlier in the session.
+Not a boot storm (too long).
+Not a single event (multiple peaks).
+
+─────────────────────────────────────────────────────────────────────
+INITIAL WRONG HYPOTHESIS
+─────────────────────────────────────────────────────────────────────
+
+Hypothesis proposed: "Worker3 removal concentrated workload on
+worker1/worker2 who are now thrashing. Reducing capacity made it
+worse."
+
+This was later proven WRONG but drove next actions.
+
+─────────────────────────────────────────────────────────────────────
+USER RESPONSE: TRY OPPOSITE
+─────────────────────────────────────────────────────────────────────
+
+User: "but my other proxmox survived this, i want to do the opposite,
+keep 1 worker, dump replicas of apps to 1 or 2"
+
+This was another good instinct — if reducing workers made it worse,
+test with even fewer workers but smaller workload.
+
+─────────────────────────────────────────────────────────────────────
+SHUTDOWN ALL K8S VMS DECISION
+─────────────────────────────────────────────────────────────────────
+
+Plan: shut down all K8s VMs, restart sequentially, observe clean state.
+
+User shutdown sequence:
+  qm shutdown 1010  # master1
+  qm shutdown 1011  # master2
+  qm shutdown 1012  # master3
+  qm shutdown 1020  # worker1
+  qm shutdown 1021  # worker2
+  # (worker3 already shut down)
+
+─────────────────────────────────────────────────────────────────────
+SEQUENTIAL RESTART WITH ETCD VERIFICATION
+─────────────────────────────────────────────────────────────────────
+
+Sequential restart approach (critical — never all at once):
+  qm start 1010
+  # Wait for etcd readiness
+  qm start 1011
+  # Wait
+  qm start 1012
+  # Then workers:
+  qm start 1020
+  # Wait
+  qm start 1021
+
+Etcd health check:
+  etcdctl endpoint status --cluster -w table
+
+GOTCHA #2: etcd v3.6 is strict about env var + flag conflicts:
+  - Had to unset ETCDCTL_API=3 (warning "unrecognized environment
+    variable" — v3.6 removed API env var, v3 is only option)
+  - Had to resolve ETCDCTL_ENDPOINTS env vs --endpoints flag conflict
+
+Final working command included all certs:
+  etcdctl \
+    --endpoints=https://10.0.61.10:2379,https://10.0.61.11:2379,https://10.0.61.12:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key \
+    endpoint status --cluster -w table
+
+Output showed:
+  +-------------------------+------------------+---------+---------+---------+--------+-----------+-----------+
+  | ENDPOINT                | ID               | VERSION | DB SIZE | IN USE  |PERC NIU| IS LEADER | RAFT TERM |
+  +-------------------------+------------------+---------+---------+---------+--------+-----------+-----------+
+  | https://10.0.61.10:2379 | 2699402e05a84d4b |  3.6.6  |  46 MB  |  38 MB  |  17%   |  false    |    224    |
+  | https://10.0.61.11:2379 | 4c17d04fdb863468 |  3.6.6  |  46 MB  |  38 MB  |  17%   |  false    |    224    |
+  | https://10.0.61.12:2379 | e0a1c396a5ca70ba |  3.6.6  |  46 MB  |  38 MB  |  17%   |  TRUE     |    224    |
+  +-------------------------+------------------+---------+---------+---------+--------+-----------+-----------+
+
+KEY FINDING: etcd is HEALTHY.
+- DB size: 46 MB (tiny)
+- In use: 38 MB
+- Quota: 2.1 GB (using 2.2% of quota)
+- All 3 members in sync (raft term 224, matching indices)
+- Leader on master3
+- Zero errors
+
+This ELIMINATED the "etcd DB bloat" theory that I had been
+considering. etcd was not the problem.
+
+─────────────────────────────────────────────────────────────────────
+SPIKE CONTINUED DESPITE SEQUENTIAL RESTART
+─────────────────────────────────────────────────────────────────────
+
+After sequential restart, PSI climbed AGAIN to 40-60% sustained.
+
+Pattern:
+  05:04  start climbing
+  05:07  peak 67%
+  05:11  ~50%
+  05:14  ~55%
+  05:21  ~60%
+  05:27-29  brief drop
+  05:31  climbing
+  05:41  peak 65%
+
+Kubectl get pods showed:
+- kube-scheduler-master1: CrashLoopBackOff (82 restarts)
+- kube-scheduler-master2: CrashLoopBackOff (90 restarts)
+- kube-scheduler-master3: Running (89 restarts)
+- kube-controller-manager-master2: CrashLoopBackOff (24 restarts)
+- kube-controller-manager-master3: CrashLoopBackOff (32 restarts)
+- kube-apiserver-master2: 0/1 Running (73 restarts, NOT ready)
+- csi-nfs-controller: 88 restarts
+- flux helm-controller: 25 restarts CrashLoopBackOff
+- flux kustomize-controller: 39 restarts CrashLoopBackOff
+- kube-state-metrics: 13 restarts CrashLoopBackOff
+
+Half the control plane was crashing. This was NOT a boot storm.
+
+─────────────────────────────────────────────────────────────────────
+THE CRITICAL USER QUESTION
+─────────────────────────────────────────────────────────────────────
+
+User: "it was running stable over weeks, why this time now exactly
+today it dying"
+
+THIS QUESTION BROKE THE INVESTIGATION OPEN.
+
+Previous framing: "the cluster is always broken"
+Correct framing: "the cluster was stable for weeks AND NOW BROKEN"
+
+If hardware were the cause, it would have been broken all along.
+Something specific had changed today.
+
+Response acknowledged this:
+"You're right — this doesn't add up. The hardware hasn't changed.
+The workload configuration hasn't changed. If hardware was the true
+root cause, you'd have seen sustained 40-60% spikes from day 1.
+You didn't. Something changed."
+
+─────────────────────────────────────────────────────────────────────
+WHAT CHANGED TODAY — NEW INVESTIGATION ANGLES
+─────────────────────────────────────────────────────────────────────
+
+What happened in last 24 hours that wasn't happening before:
+
+1. master1 was hung all day ("since morning")
+2. User rebooted master1 at 02:51
+3. Cluster limping since with multiple spikes
+4. Drained worker3 at ~03:30-05:00
+5. Restarted all VMs fresh
+6. Sustained spike since 05:04
+
+Candidates for "gradually accumulated" trigger:
+
+A. etcd DB bloat
+   Suspicion: good candidate - works for weeks, gradually fails
+   Status: CHECKED → 46 MB, tiny, healthy. RULED OUT.
+
+B. Prometheus TSDB corruption / size
+   Suspicion: possible if accumulating metrics
+   Status: untested
+
+C. Loki data accumulation
+   Suspicion: possible if retention long
+   Status: untested
+
+D. Container logs accumulation
+   Suspicion: 86 apiserver restarts = huge logs
+   Status: untested
+
+E. Proxmox host filesystem pressure
+   Suspicion: journald, pve logs accumulating
+   Status: untested
+
+F. KSM / memory dedup pressure
+   Suspicion: ksmd walking all VM memory constantly
+   Status: untested
+
+G. LVM-thin metadata fragmentation
+   Suspicion: after 27 days of VM disk writes, could fragment
+   Status: untested
+
+─────────────────────────────────────────────────────────────────────
+ACKNOWLEDGMENT OF WRONG CONCLUSION EARLIER
+─────────────────────────────────────────────────────────────────────
+
+Had to admit:
+"You're right to push back on 'hardware is the cause.' If hardware
+was causing this, it would have been causing it all along."
+
+"More likely: something has gradually accumulated and crossed a
+threshold today. The fact that master1 hung 'since morning' is
+probably a SYMPTOM of this same underlying growth, not a cause."
+
+─────────────────────────────────────────────────────────────────────
+ETCD DB CHECK (ACTUAL CHECK)
+─────────────────────────────────────────────────────────────────────
+
+The one candidate that could be checked in 30 seconds:
+  etcdctl endpoint status --cluster -w table
+
+Already done earlier: 46 MB.
+
+This single check eliminated etcd DB bloat as root cause.
+
+─────────────────────────────────────────────────────────────────────
+REALIZATION: CLUSTER IS IN FEEDBACK LOOP
+─────────────────────────────────────────────────────────────────────
+
+With etcd healthy but things still crashing, another theory emerged:
+
+"etcd is HEALTHY on all 3 masters. Raft term 224, all in sync, same
+DB size. Etcd is not thrashing. But the things that TALK to etcd
+(scheduler, controller-manager, apiserver) are crashing repeatedly."
+
+"This is not etcd being slow. This is components failing to start
+successfully."
+
+What's probably happening when a scheduler or controller-manager starts:
+1. Connect to apiserver
+2. Try to acquire leader lease
+3. Do initial LIST of resources
+4. Start reconciling
+
+If any step takes too long, liveness probe kills at 10-15 seconds.
+Under sustained IO pressure, even fast operations become slow.
+Probes fail → restart → try again → fail → LOOP.
+
+"It's a self-reinforcing failure loop."
+
+─────────────────────────────────────────────────────────────────────
+TIMING ANALYSIS
+─────────────────────────────────────────────────────────────────────
+
+User had rebooted master1 at 02:51 local.
+
+Pattern since then:
+- 02:53 spike from master1 rejoin (was understood at the time)
+- Cluster never FULLY recovered between events
+- Controllers restarting throughout 02:53 → 05:00
+- By 05:00 was in sustained cascade
+- Drain operation added more load
+- Full restart added more load
+- Now in death spiral that wouldn't break on its own
+
+"Master1's hang earlier today started it. Major cascade that didn't
+recover → tonight's marathon investigation."
+
+─────────────────────────────────────────────────────────────────────
+CURRENT POD STATE DETAIL
+─────────────────────────────────────────────────────────────────────
+
+Detailed kubectl get pods output shared by user showed:
+
+Status:
+- Most pods: Running but high restart counts
+- Several: CrashLoopBackOff
+- Some: Error status
+
+Specific unhealthy:
+- helm-controller: CrashLoopBackOff (25 restarts)
+- kustomize-controller: CrashLoopBackOff (39 restarts)
+- notification-controller: Running (28 restarts - frequent)
+- csi-nfs-controller-5bb656c79-8r8vt: 3/5 Error (88 restarts!)
+- kube-apiserver-master2: 0/1 Running (73 restarts, not ready!)
+- kube-controller-manager-master2: CrashLoopBackOff (24 restarts)
+- kube-controller-manager-master3: CrashLoopBackOff (32 restarts)
+- kube-scheduler-master1: CrashLoopBackOff (82 restarts)
+- kube-scheduler-master2: CrashLoopBackOff (90 restarts)
+- kube-state-metrics: CrashLoopBackOff (13 restarts - NEW POD recent)
+- wordpress: 1/2 Running (degraded, 4-27 restarts)
+
+This was definitively a sick cluster.
+
+─────────────────────────────────────────────────────────────────────
+STATUS AT END OF PART 5
+─────────────────────────────────────────────────────────────────────
+
+Breakthrough understanding:
+- Cluster is in active cascade failure
+- Not a trigger problem (trigger was master1 hang)
+- NOW a FEEDBACK LOOP problem
+- Self-sustaining: restarts cause load, load causes restarts
+- Needs external intervention
+
+New theories considered:
+- Gradually accumulated state → RULED OUT (etcd 46 MB)
+- Cascade dynamics → ACTIVE theory
+
+What hadn't been tried yet:
+- Reduce load and watch if cascade breaks
+
+Investigation time elapsed: ~6 hours
+User exhausted but engaged.
+
+[END OF PART 5]
+
+Part 6 will cover:
+- The breakthrough experiment: scale everything to 0
+- Observing cascade break
+- Sequential reintroduction plan
+- First reintroduction steps

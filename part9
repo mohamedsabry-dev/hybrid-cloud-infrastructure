@@ -1,0 +1,388 @@
+═══════════════════════════════════════════════════════════════════════
+SESSION REVIEW PART 9 OF 10
+Documentation creation, lessons, failed theories inventory
+═══════════════════════════════════════════════════════════════════════
+
+TIMEFRAME: ~07:20 to ~07:30 local
+PHASE: Consolidation and knowledge preservation
+
+─────────────────────────────────────────────────────────────────────
+DOCUMENTS CREATED DURING SESSION
+─────────────────────────────────────────────────────────────────────
+
+First doc: TS-PVE-DEV-001-io-pressure-spikes.txt (913 lines)
+Created during early investigation before breakthrough.
+Content:
+- 8 theories pursued and rejected
+- Evidence at each step
+- Timeline through ~03:30 local
+- Initial (incomplete) conclusions
+
+Second doc: TS-PVE-DEV-002-cascade-storms-root-cause.txt (1019 lines)
+Created after breakthrough.
+Content:
+- Cascade discovery
+- Scale-down breakthrough
+- Reintroduction procedure
+- Lessons learned
+- Action items
+
+Third set of docs (THIS 10-part review): created at end of session.
+Purpose: comprehensive chronological record of every test with command,
+output, and elimination reasoning.
+
+─────────────────────────────────────────────────────────────────────
+COMPLETE FAILED THEORIES INVENTORY
+─────────────────────────────────────────────────────────────────────
+
+Theory 1: systemd-logind lid switch bouncing
+  Proposed: burst of 7-28 suspend events correlated with IO spikes
+  Evidence for: histogram showed bursts
+  Evidence against: user's "lid closed all day" observation
+  Final: DOWNGRADE to symptom not cause
+  Time spent: ~45 min
+
+Theory 2: Disk hardware failure
+  Proposed: failing NVMe causing latency
+  Evidence for: PSI spikes suggest disk issues
+  Evidence against: SMART OK, kernel logs clean, no IO errors
+  Final: RULED OUT
+  Time spent: ~30 min
+
+Theory 3: Kernel bug
+  Proposed: PVE kernel 6.17.9-1 issue
+  Evidence for: kernel loaded ZFS even without pools
+  Evidence against: no oopses, no BUGs, no MCEs, no soft lockups
+  Final: RULED OUT
+  Time spent: ~15 min
+
+Theory 4: ZFS issue
+  Proposed: txg stalls, pool errors
+  Evidence against: no ZFS pools (LVM-thin used)
+  Final: RULED OUT
+  Time spent: ~10 min (quick check)
+
+Theory 5: TS-K8S-038 qemu-ga occurrence #4
+  Proposed: tonight's gap was same bug
+  Evidence for: 5-min qemu-ga ping gap, similar timing
+  Evidence against: qemu-ga at 0% CPU (never high captured)
+                    etcd slow 7 min BEFORE gap
+                    Causality reversed from doc's theory
+  Final: RULED OUT for tonight's event (doc's 1-3 still valid)
+  Time spent: ~45 min
+
+Theory 6: Host storage stall
+  Proposed: something froze the disk briefly
+  Evidence against: host kernel clean during spike window
+  Final: RULED OUT
+  Time spent: ~20 min
+
+Theory 7: VM memory starvation (alone)
+  Proposed: 2.5 GB too small for K8s master
+  Evidence for: 86 apiserver restarts, exit 137 (OOM), low available
+  Evidence against: worked stable for weeks before
+                    Memory sized same all along
+  Final: CONTRIBUTOR, not root cause
+  Time spent: ~60 min
+
+Theory 8: Host RAM overcommit
+  Proposed: 24 GB VMs on 22 GB host = constant pressure
+  Evidence for: 4.3 GB available, 3.8 MB swap touched
+  Evidence against: was the config before problems started
+  Final: CONTRIBUTOR, not root cause
+  Time spent: ~30 min
+
+Theory 9: SSSD restart cascade
+  Proposed: sssd unavailability stalled NSS → probes timeout
+  Evidence for: 57-second sssd restart → cascade timing
+                Calico/csi exec probes use NSS
+  Evidence against: user's clarification "master1 was hung all day,
+                    I just restarted it now" — sssd was part of boot
+  Final: RULED OUT (artifact of reboot)
+  Time spent: ~40 min
+
+Theory 10: Prometheus scrape storm
+  Proposed: heavy scraping overloaded apiserver/etcd
+  Evidence against: Prometheus running continuously, no restarts
+  Final: RULED OUT as trigger (amplifier possible)
+  Time spent: ~10 min
+
+Theory 11a: CPU stress (qemu-ga) causes cascade
+  Proposed: qemu-ga 98% CPU starves apiserver → cascade
+  Evidence for: timing correlation
+  Evidence against: all-masters CPU stress test showed no cascade
+  Final: RULED OUT (CPU stress alone isn't enough)
+  Time spent: ~30 min (stress test)
+
+Theory 11b: Concurrent request/IO spam causes cascade
+  Proposed: many LIST ops or writes saturate NVMe via etcd
+  Evidence for: 100×LIST test reproduced 57% IO delay
+                Single-VM write storm reproduced cascade
+  Final: CONFIRMED root cause mechanism
+  Time spent: ~20 min (empirical reproduction)
+
+Theory 12: No IO isolation between VMs on shared NVMe
+  Proposed: Proxmox unlimited IO per VM = noisy neighbor
+  Evidence for: one VM saturated host for all
+  Final: CONFIRMED architectural limitation
+  Time spent: ~15 min (during reproduction)
+
+─────────────────────────────────────────────────────────────────────
+SUMMARY TABLE — ALL THEORIES
+─────────────────────────────────────────────────────────────────────
+
+| # | Theory                       | Status        | Time  |
+|---|------------------------------|---------------|-------|
+| 1 | Lid switch logind storm      | Symptom only  | 45m   |
+| 2 | Disk hardware failure        | RULED OUT     | 30m   |
+| 3 | Kernel bug                   | RULED OUT     | 15m   |
+| 4 | ZFS issue                    | RULED OUT     | 10m   |
+| 5 | TS-K8S-038 tonight           | RULED OUT     | 45m   |
+| 6 | Host storage stall           | RULED OUT     | 20m   |
+| 7 | VM memory starvation         | CONTRIBUTOR   | 60m   |
+| 8 | Host RAM overcommit          | CONTRIBUTOR   | 30m   |
+| 9 | SSSD restart cascade         | RULED OUT     | 40m   |
+| 10| Prometheus scrape storm      | RULED OUT     | 10m   |
+| 11a|CPU stress causes cascade   | RULED OUT     | 30m   |
+| 11b|Request spam causes cascade | CONFIRMED     | 20m   |
+| 12| No IO isolation architecture | CONFIRMED     | 15m   |
+|   |                              |               |       |
+|   | TOTAL investigation time:    |               | 370m  |
+|   |                              |               | =6.2h |
+
+─────────────────────────────────────────────────────────────────────
+LESSONS LEARNED
+─────────────────────────────────────────────────────────────────────
+
+## Investigation methodology
+
+1. Establish baseline before investigating deviation
+   User's question "it worked for weeks — why today?" was the single
+   most valuable question of the night. Framing the anomaly against
+   a working baseline forced the right diagnosis.
+
+2. User instinct often correct — LISTEN
+   User pushed back multiple times:
+   - "im not convinced" on lid switch theory
+   - "why only sometimes if scraping all day" on prometheus
+   - "my prod works fine with same workload"
+   - "it was running stable over weeks"
+   - "only 1 node concurrent spam was enough"
+   Each pushback redirected investigation toward truth.
+
+3. Simple tests beat complex theories
+   The scale-to-0 test took 5 minutes and gave definitive answer.
+   The LIST spam test took 3 minutes to reproduce cascade.
+   Hours of theorizing couldn't replace 5 minutes of testing.
+
+4. Multiple correlations don't prove causation
+   Logind bursts + IO spikes = strong correlation, zero causation.
+   Both symptoms of same upstream cause (host IO blocked).
+
+5. Confidence should scale with evidence, not effort
+   Early messages had over-confidence. Effort ≠ certainty.
+
+## System design insights
+
+6. Probe timeouts are critical parameters
+   Default 1-5 second timeouts work on beefy hardware.
+   Fail catastrophically on constrained hardware.
+   Cascade dynamics depend on whether probes fire faster than
+   restarts can complete.
+
+7. Sequential operations beat parallel (on constrained hardware)
+   Whether VM startup, workload activation, or node changes:
+   sequential with delays always works.
+   Parallel sometimes works, sometimes cascades.
+
+8. Automation can hide problems
+   Remediation controller brought worker3 back automatically.
+   Great for recovery, but means "turn it off" isn't simple.
+
+9. GitOps has a timing dilemma
+   Flux reverting manual changes is feature, not bug.
+   But during incident response = fighting-the-tool problems.
+   Commit changes to git first, OR suspend GitOps.
+
+10. Dev and prod aren't always equivalent
+    User's prod comparison was valuable ("prod survives this").
+    Dev hardware being smaller matters.
+    Don't expect dev to behave like prod under same workload.
+
+11. IO isolation is often missing in consumer setups
+    Proxmox LVM-thin on single NVMe has NO IO QoS by default.
+    Any VM can monopolize entire disk bandwidth.
+    Per-VM throttling must be explicitly configured.
+
+─────────────────────────────────────────────────────────────────────
+KNOWLEDGE GAPS IDENTIFIED
+─────────────────────────────────────────────────────────────────────
+
+Environment-specific gotchas discovered:
+- jq not installed on Proxmox host (minor)
+- etcd v3.6 strictness about env/flag conflicts
+- Cannot scale daemonsets directly (nodeSelector trick)
+- LVM-thin has no IO QoS by default
+- ZFS module loaded even without pools (legacy)
+- Flux reverts manual changes (gitops reconciliation)
+- kubectl exec probes depend on NSS/sssd inside containers
+- Proxmox GUI Bandwidth tab for IO throttling
+
+Skills recommended:
+- Recovery procedure for K8s cascade failure (documented)
+- Probe timeout tuning for constrained hardware
+- When to use cordon vs drain vs delete node
+- How to gracefully break flux reconciliation
+
+─────────────────────────────────────────────────────────────────────
+BREAK-GLASS RECOVERY PROCEDURE (DOCUMENTED)
+─────────────────────────────────────────────────────────────────────
+
+When PSI stays elevated >30% for >10 minutes:
+
+Step 1: DO NOT reboot VMs (makes it worse)
+Step 2: DO NOT drain nodes (creates more load)
+Step 3: Scale workloads down:
+
+# Apps
+kubectl -n apps scale deployment --all --replicas=0
+kubectl -n database scale statefulset mariadb --replicas=0
+
+# Flux (prevents reconciliation revert)
+kubectl -n flux-system scale deployment --all --replicas=0
+
+# Monitoring
+kubectl -n monitoring scale deployment --all --replicas=0
+kubectl -n monitoring scale statefulset --all --replicas=0
+
+# Daemonsets (use nodeSelector trick)
+kubectl -n monitoring patch daemonset promtail \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+kubectl -n monitoring patch daemonset kube-prometheus-stack-prometheus-node-exporter \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"disabled":"true"}}}}}'
+
+# Remediation
+kubectl -n remediation scale deployment --all --replicas=0
+
+Step 4: Wait 15-20 minutes for baseline
+
+Step 5: Reintroduce in tested order with 5 min waits:
+  1. Prometheus
+  2. Grafana
+  3. Loki
+  4. Node-exporter
+  5. Promtail
+  6. kube-state-metrics
+  7. Prometheus-operator
+  8. alertmanager
+  9. Mariadb
+  10. Wordpress
+  11. Flux (LAST, suspend kustomizations first or commit reduced state)
+
+Step 6: Monitor PSI between each step. If climbs >20%, STOP.
+
+─────────────────────────────────────────────────────────────────────
+MITIGATIONS PRIORITIZED
+─────────────────────────────────────────────────────────────────────
+
+Ranked by impact based on proven trigger:
+
+1. Reduce concurrent controller restart blast radius
+   - PodDisruptionBudgets so not all replicas restart at once
+
+2. Rate-limit apiserver request concurrency
+   - --max-requests-inflight=200 (default 400)
+   - --max-mutating-requests-inflight=100 (default 200)
+
+3. Enable apiserver priority & fairness
+   - Already on by default, verify flowschemas
+
+4. Reduce etcd read load
+   - Compact etcd regularly (user has cron already)
+   - Defrag periodically
+   - Consider --etcd-request-timeout increase on apiserver
+
+5. Reduce fan-out of watches
+   - Promtail scrape interval longer
+   - Prometheus scrape interval 30s (not 15s)
+   - Flux reconciliation interval longer for dev
+
+6. Separate etcd onto dedicated disk (long-term)
+   - Second NVMe for etcd data
+   - Prevents etcd fsyncs competing with VM IO
+
+7. PRIMARY FIX: Per-VM IO throttling
+   - Via Proxmox Hardware → Disk → Bandwidth tab
+   - Or qm set --scsi0 with mbps_*, iops_*
+   - Prevents single VM from monopolizing NVMe
+
+─────────────────────────────────────────────────────────────────────
+CURRENT CLUSTER STATE AT SESSION END
+─────────────────────────────────────────────────────────────────────
+
+VMs running:
+- 3x master (3 GB each) + 3x worker (3 GB × 2 + 2.75 GB × 1)
+
+Memory inconsistency flagged:
+- workers 1020, 1021: 3 GB (from 3.25 GB reduction earlier)
+- worker 1022: 2.75 GB (came back via remediation without memory update)
+
+Health status:
+- All pods Running
+- Zero new restarts on reintroduced pods
+- PSI at baseline (except during deliberate tests)
+- kubectl top nodes showing 3-4% CPU, 56-77% memory
+- Cluster survived:
+  - Deliberate full-cluster reboot (30% peak, 3 min duration)
+  - CPU stress on all 3 masters (0% IO spike!)
+  - Request spam (reproduced cascade — intentional)
+  - Write storm (reproduced cascade — intentional)
+
+─────────────────────────────────────────────────────────────────────
+ACTION ITEMS FOR USER (PRIORITIZED)
+─────────────────────────────────────────────────────────────────────
+
+Immediate (when user wakes up):
+1. Verify cluster still stable
+2. Check PSI graph for past 6-8 hours
+3. Reconcile worker3 memory (2.75 → 3 GB)
+4. Update investigation docs
+
+Short-term (this week):
+5. Investigate why master1 hung originally (journalctl -b -1)
+6. Apply IO throttling per test plan, one VM at a time
+7. Raise liveness probe timeouts on control plane
+
+Medium-term (this month):
+8. Reduce monitoring footprint for dev
+9. Document break-glass recovery in repo
+10. Consider k3s for dev lab
+
+Long-term:
+11. Hardware upgrade path (if dev work grows)
+12. Separate NVMe for etcd
+
+─────────────────────────────────────────────────────────────────────
+STATUS AT END OF PART 9
+─────────────────────────────────────────────────────────────────────
+
+Investigation: COMPLETE
+Root cause: IDENTIFIED (no IO isolation + cascade dynamics)
+Fix: IDENTIFIED (Proxmox IO throttling)
+Validation: EMPIRICAL REPRODUCTION x2 (LIST spam, write storm)
+
+Cluster: HEALTHY
+Docs: 2 created (TS-PVE-DEV-001, TS-PVE-DEV-002) + this session review
+
+User mental state: Exhausted but satisfied
+Time: 07:30 local (~8 hours of continuous investigation)
+
+[END OF PART 9]
+
+Part 10 will cover:
+- Complete command reference (every command used during session)
+- Key outputs that led to breakthroughs
+- Final answer consolidation
+- User's key observations that drove the investigation
+- Complete theory elimination timeline
+- Lessons for future investigations
