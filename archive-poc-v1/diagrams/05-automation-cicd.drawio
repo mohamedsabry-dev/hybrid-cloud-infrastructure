@@ -1,0 +1,161 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Automation and CI/CD" id="poc-automation">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== ANSIBLE AUTOMATION ==================== -->
+        <mxCell id="ansible_layer" value="&lt;b&gt;Ansible Automation — super_ansible (Kerberos keytab, passwordless sudo)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1420" height="210" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ipa_auto_label" value="&lt;b&gt;FreeIPA Setup (5 phases):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="15" y="35" width="200" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_01" value="&lt;b&gt;01&lt;/b&gt; Create&lt;br&gt;Users + Groups&lt;br&gt;8 groups, 12 users" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="15" y="55" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_02" value="&lt;b&gt;02&lt;/b&gt; Create&lt;br&gt;Host Groups&lt;br&gt;7 groups, 12 hosts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="165" y="55" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_03" value="&lt;b&gt;03&lt;/b&gt; Configure&lt;br&gt;HBAC Rules&lt;br&gt;6 SSH access rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="315" y="55" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_04" value="&lt;b&gt;04&lt;/b&gt; Configure&lt;br&gt;Sudo Rules&lt;br&gt;6 privilege rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="465" y="55" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_05" value="&lt;b&gt;05&lt;/b&gt; Update&lt;br&gt;DNS Resolution&lt;br&gt;All VMs → IPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="615" y="55" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="eipa1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="ipa_01" target="ipa_02" parent="ansible_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eipa2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="ipa_02" target="ipa_03" parent="ansible_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eipa3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="ipa_03" target="ipa_04" parent="ansible_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eipa4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="ipa_04" target="ipa_05" parent="ansible_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="vault_auto_label" value="&lt;b&gt;Vault Setup (6 phases):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="15" y="115" width="200" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_01" value="&lt;b&gt;01&lt;/b&gt; Preflight&lt;br&gt;CPU/RAM/kernel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="15" y="135" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_02" value="&lt;b&gt;02&lt;/b&gt; Firewall&lt;br&gt;Port 8200" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="145" y="135" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_03" value="&lt;b&gt;03&lt;/b&gt; Mesh Check&lt;br&gt;Node connectivity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="265" y="135" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_04" value="&lt;b&gt;04&lt;/b&gt; Storage&lt;br&gt;/var/lib/vault" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="395" y="135" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_05" value="&lt;b&gt;05&lt;/b&gt; Install&lt;br&gt;Vault binary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="515" y="135" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_06" value="&lt;b&gt;06&lt;/b&gt; Configure&lt;br&gt;Raft auto-join" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="635" y="135" width="120" height="45" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="mon_auto" value="&lt;b&gt;Monitoring Setup:&lt;/b&gt;&lt;br&gt;01-node_exporter → 02-validate → 03-update_prometheus (dynamic targets via Jinja2)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="790" y="55" width="380" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="os_auto" value="&lt;b&gt;OS Services:&lt;/b&gt;&lt;br&gt;01-emergency-user (deploy veeam_emergency SSH keys from Vault)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="790" y="115" width="380" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="jenkins_auto" value="&lt;b&gt;Jenkins:&lt;/b&gt;&lt;br&gt;01-install_jenkins + Ansible plugin" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ansible_layer">
+          <mxGeometry x="790" y="160" width="250" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== JENKINS CI/CD ==================== -->
+        <mxCell id="jenkins_layer" value="&lt;b&gt;Jenkins CI/CD — jenkins-master.home.lab (10.0.20.196)&lt;/b&gt;&lt;br&gt;3GB RAM • 3vCPU • FreeIPA auth (Kerberos/LDAP SSO)" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="700" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="jen_plugins" value="&lt;b&gt;Plugins&lt;/b&gt;&lt;br&gt;Ansible • Vault integration&lt;br&gt;GitHub • Email notifications" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="jenkins_layer">
+          <mxGeometry x="15" y="48" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="jen_users" value="&lt;b&gt;Users&lt;/b&gt;&lt;br&gt;super_ansible • cicd_admin1&lt;br&gt;cicd_admin2" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="jenkins_layer">
+          <mxGeometry x="255" y="48" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="jen_replaced" value="&lt;b&gt;REPLACED BY&lt;/b&gt;&lt;br&gt;GitHub Actions&lt;br&gt;+ self-hosted runners" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="jenkins_layer">
+          <mxGeometry x="475" y="48" width="200" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DR SCRIPTS ==================== -->
+        <mxCell id="dr_scripts" value="&lt;b&gt;PowerShell DR Scripts — Windows Host&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="290" width="680" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="ps_battery" value="&lt;b&gt;BatteryMonitor.ps1&lt;/b&gt;&lt;br&gt;UPS/battery status" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_scripts">
+          <mxGeometry x="15" y="38" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ps_shutdown" value="&lt;b&gt;EmergencyLabShutdown.ps1&lt;/b&gt;&lt;br&gt;Cascading shutdown&lt;br&gt;nested ESXi → outer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="dr_scripts">
+          <mxGeometry x="175" y="38" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ps_veeam" value="&lt;b&gt;Test-VeeamStop.ps1&lt;/b&gt;&lt;br&gt;Kill backup jobs&lt;br&gt;before shutdown" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_scripts">
+          <mxGeometry x="375" y="38" width="150" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ps_creds" value="&lt;b&gt;Test-LabCreds.ps1&lt;/b&gt;&lt;br&gt;Validate credentials&lt;br&gt;before DR scenario" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_scripts">
+          <mxGeometry x="535" y="38" width="130" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STARTUP ORDER ==================== -->
+        <mxCell id="startup" value="&lt;b&gt;VM Startup Order (8-10 min total)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="450" width="1420" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot_label1" value="&lt;b&gt;ESXi Master (Infrastructure):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="startup">
+          <mxGeometry x="15" y="35" width="250" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot1" value="&lt;b&gt;1. IPA&lt;/b&gt;&lt;br&gt;60s delay&lt;br&gt;DNS/auth first" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="15" y="55" width="110" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot2" value="&lt;b&gt;2. pfSense&lt;/b&gt;&lt;br&gt;60s&lt;br&gt;NAT gateway" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="135" y="55" width="110" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot3" value="&lt;b&gt;3. NAS&lt;/b&gt;&lt;br&gt;60s&lt;br&gt;Storage" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="255" y="55" width="100" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot4" value="&lt;b&gt;4. Prod ESXi&lt;/b&gt;&lt;br&gt;60s&lt;br&gt;Triggers nested" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="365" y="55" width="110" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot5" value="&lt;b&gt;5. vCenter&lt;/b&gt;&lt;br&gt;100s&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="485" y="55" width="110" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot6" value="&lt;b&gt;6. Veeam&lt;/b&gt;&lt;br&gt;200s&lt;br&gt;Lowest priority" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="605" y="55" width="110" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="boot_label2" value="&lt;b&gt;Production ESXi (Nested):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="startup">
+          <mxGeometry x="760" y="35" width="250" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot7" value="&lt;b&gt;1. Ansible&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="760" y="55" width="90" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot8" value="&lt;b&gt;2. Vault ×3&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="860" y="55" width="90" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot9" value="&lt;b&gt;3. Monitor&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="960" y="55" width="90" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot10" value="&lt;b&gt;4. Jenkins&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="1060" y="55" width="90" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot11" value="&lt;b&gt;5. K8s Master&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="1160" y="55" width="100" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="boot12" value="&lt;b&gt;6. Workers ×3&lt;/b&gt;&lt;br&gt;60s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="startup">
+          <mxGeometry x="1270" y="55" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="eb1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="boot1" target="boot2" parent="startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="boot2" target="boot3" parent="startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="boot3" target="boot4" parent="startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="boot4" target="boot5" parent="startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;" edge="1" source="boot5" target="boot6" parent="startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_ansible_jenkins" value="deploys" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" edge="1" source="ansible_layer" target="jenkins_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_ansible_dr" value="complemented by" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="ansible_layer" target="dr_scripts" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_dr_startup" value="shutdown reverses order" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;" edge="1" source="dr_scripts" target="startup" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

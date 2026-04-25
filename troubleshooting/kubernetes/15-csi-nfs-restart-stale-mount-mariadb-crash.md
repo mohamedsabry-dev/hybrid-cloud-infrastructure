@@ -6,7 +6,7 @@ Domain: Kubernetes / Storage
 Sub-techs: CSI NFS driver, MariaDB, InnoDB, NFS stale handle, soft/hard mount,
            StatefulSet, DaemonSet rollout, Flux GitOps, StorageClass
 Environment: DEV k8s-dev cluster | bare-metal kubeadm | 3 masters, 3 workers |
-             Calico CNI | NFS CSI storage | Synology 10.0.40.120 | Vault sidecar
+             Calico CNI | NFS CSI storage | Asustor 10.0.40.120 | Vault sidecar
 Re-opened: No
 
 _____________________________________________________________________

@@ -48,7 +48,7 @@ infrastructure/
 |--------|------|-------------|
 | `namespaces` | Pre-creates all namespaces | 7 namespaces, all labeled `managed-by: flux` |
 | `priority-classes` | Scheduling priority tiers | `database-critical` preempts `app-standard` — databases survive resource pressure |
-| `storage` | NFS-backed persistent storage | CSI driver + 3 StorageClasses against Synology NAS (`10.0.40.120:/volume1/k8s-dev`). `nfs-database` uses `hard` mounts with longer timeouts |
+| `storage` | NFS-backed persistent storage | CSI driver + 3 StorageClasses against Asustor NAS (`10.0.40.120:/volume1/k8s-dev`). `nfs-database` uses `hard` mounts with longer timeouts |
 | `vault` | Vault Agent Injector | Points to external Vault HA cluster at `vault.lab.local:8200`. Server is disabled — Vault runs on dedicated LXCs, not in K8s |
 | `ingress` | Ingress controller | ingress-nginx on NodePort 30080/30443. External Nginx LXC handles TLS termination and forwards here |
 | `coredns` | Cluster DNS customization | Hosts block maps `vault.lab.local` → Vault VIP and `k8s.lab.local` → K8s VIP. Pinned to control-plane nodes with anti-affinity |
@@ -84,7 +84,7 @@ until the NAS comes back.
   when needed.
 - **Remediation** is in `../apps/` not here, because it needs Vault Agent
   injection and has to deploy after the injector is ready.
-- **No `nfsvers=4`** — the Synology NAS is on NFSv3 only. The `nolock`
+- **No `nfsvers=4`** — the Asustor NAS is on NFSv3 only. The `nolock`
   option is there because NFSv3 lock manager was flaky across VLANs.
 
 ## Related

@@ -18,11 +18,10 @@ data:
     CONFIRM_DELAY = 180         # 3 minutes — re-check before acting
     PROXMOX_NODE = "pve-dev"
 
-    # Node to VMID mapping
+    # Node to VMID mapping (worker3 excluded — dev runs 2 workers only)
     NODE_MAP = {
         "k8s-worker1.lab.local": 1020,
         "k8s-worker2.lab.local": 1021,
-        "k8s-worker3.lab.local": 1022,
     }
 
     # Track remediation attempts per node

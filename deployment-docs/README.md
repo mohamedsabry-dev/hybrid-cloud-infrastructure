@@ -65,6 +65,7 @@ These documents provide reference information, not deployment steps:
 
 | Document | Purpose |
 |----------|---------|
+| [../diagrams/](../diagrams/) | Architecture diagrams (draw.io) — 8 diagrams covering full stack |
 | [../proxmox/capacity-planning.md](../proxmox/capacity-planning.md) | Resource allocation for VMs/LXCs (lives in the proxmox/ folder) |
 
 ---

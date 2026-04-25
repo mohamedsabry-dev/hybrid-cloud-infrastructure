@@ -1,0 +1,151 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Monitoring and Observability Stack" id="monitoring">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="s1" value="&lt;b&gt;DATA COLLECTION — Exporters &amp;amp; ServiceMonitors&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="node_exp" value="&lt;b&gt;Node Exporter&lt;/b&gt;&lt;br&gt;DaemonSet on K8s nodes&lt;br&gt;+ manual on FreeIPA, Vault, Nginx" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="15" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="svc_mon" value="&lt;b&gt;ServiceMonitors&lt;/b&gt;&lt;br&gt;Auto-discover K8s targets&lt;br&gt;kube-state-metrics, kubelet" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="310" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ext_scrape" value="&lt;b&gt;additionalScrapeConfigs&lt;/b&gt;&lt;br&gt;External nodes: FreeIPA (10.0.62.10)&lt;br&gt;Vault (10.0.62.21-23) • Nginx (10.0.62.40)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="605" y="40" width="330" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="promtail" value="&lt;b&gt;Promtail DaemonSet&lt;/b&gt;&lt;br&gt;Collects pod logs&lt;br&gt;from every K8s node" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="970" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ec1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="node_exp" target="svc_mon" parent="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="svc_mon" target="ext_scrape" parent="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a12" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="153" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s2" value="&lt;b&gt;METRICS ENGINE — Prometheus Server&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="185" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="prom_server" value="&lt;b&gt;Prometheus Server&lt;/b&gt;&lt;br&gt;kube-prometheus-stack v82.18.0&lt;br&gt;HelmRelease via Flux" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="15" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="prom_rules" value="&lt;b&gt;Custom Alert Rules&lt;/b&gt;&lt;br&gt;ExternalNodeDown (5m)&lt;br&gt;PodCrashLooping (5m)&lt;br&gt;NodeCriticalCPU (3m)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="320" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="prom_storage" value="&lt;b&gt;Prometheus PVC&lt;/b&gt;&lt;br&gt;nfs-retain class&lt;br&gt;20Gi dev / 50Gi prod" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="625" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="prom_retention" value="&lt;b&gt;Retention&lt;/b&gt;&lt;br&gt;15d metrics&lt;br&gt;NFSv3 soft mount (30s)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="870" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="em1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="prom_server" target="prom_rules" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="em2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="prom_server" target="prom_storage" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="em3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="prom_storage" target="prom_retention" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a23" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="308" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s3" value="&lt;b&gt;ALERTING — Standalone Alertmanager&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="am_sts" value="&lt;b&gt;Alertmanager StatefulSet&lt;/b&gt;&lt;br&gt;Runs on K8s master&lt;br&gt;PriorityClass: self-healing-critical" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="15" y="40" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="am_vault" value="&lt;b&gt;Vault Injection&lt;/b&gt;&lt;br&gt;SMTP creds (Gmail)&lt;br&gt;via agent-inject annotation" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="330" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="am_routing" value="&lt;b&gt;Route Config&lt;/b&gt;&lt;br&gt;group_by: [alertname, namespace]&lt;br&gt;group_wait: 30s • repeat: 4h" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="605" y="40" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="am_smtp" value="&lt;b&gt;SMTP Receiver&lt;/b&gt;&lt;br&gt;Gmail relay&lt;br&gt;→ operator email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="920" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ea1a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="am_sts" target="am_vault" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="am_vault" target="am_routing" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ea3a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="am_routing" target="am_smtp" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a34" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="463" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s4" value="&lt;b&gt;LOGGING — Loki + Promtail Pipeline&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="495" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="pt_collect" value="&lt;b&gt;Promtail v6.16.6&lt;/b&gt;&lt;br&gt;DaemonSet, every node&lt;br&gt;Scrapes /var/log/pods" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="15" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="loki_srv" value="&lt;b&gt;Loki v6.29.0&lt;/b&gt;&lt;br&gt;Single-binary mode&lt;br&gt;HelmRelease via Flux" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="290" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="loki_ret" value="&lt;b&gt;Log Retention&lt;/b&gt;&lt;br&gt;7 days dev / 14 days prod&lt;br&gt;Auto-compaction" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="565" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="loki_pvc" value="&lt;b&gt;Loki PVC&lt;/b&gt;&lt;br&gt;nfs-retain class&lt;br&gt;50Gi dev / 100Gi prod" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="830" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="el1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="pt_collect" target="loki_srv" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="el2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="loki_srv" target="loki_ret" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="el3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="loki_ret" target="loki_pvc" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a45" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="618" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s5" value="&lt;b&gt;VISUALIZATION — Grafana&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="graf_srv" value="&lt;b&gt;Grafana&lt;/b&gt;&lt;br&gt;Single replica (SQLite)&lt;br&gt;Vault-injected admin creds" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="15" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="graf_ds" value="&lt;b&gt;3 Datasources&lt;/b&gt;&lt;br&gt;Prometheus • Loki • Alertmanager" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="310" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="graf_ingress" value="&lt;b&gt;Ingress Path&lt;/b&gt;&lt;br&gt;ingress-nginx → ClusterIP&lt;br&gt;External Nginx → DNS" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="605" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="graf_pvc" value="&lt;b&gt;Grafana PVC&lt;/b&gt;&lt;br&gt;nfs-retain class&lt;br&gt;5Gi dev / 10Gi prod" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="880" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="graf_limit" value="&lt;b&gt;Limitation&lt;/b&gt;&lt;br&gt;No HA (SQLite on NFS)&lt;br&gt;No dashboards-as-code" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="1125" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="eg1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="graf_srv" target="graf_ds" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eg2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="graf_ds" target="graf_ingress" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eg3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="graf_ingress" target="graf_pvc" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a56" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="773" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s6" value="&lt;b&gt;FULL PIPELINE — Metrics → Alerts → Logs → Dashboards&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="805" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow_scrape" value="&lt;b&gt;K8s Nodes + External&lt;/b&gt;&lt;br&gt;node-exporter:9100&lt;br&gt;kube-state-metrics" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="15" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow_prom" value="&lt;b&gt;Prometheus&lt;/b&gt;&lt;br&gt;Scrape → Store → Evaluate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="280" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow_alert" value="&lt;b&gt;Alert Rules Fire&lt;/b&gt;&lt;br&gt;→ Alertmanager&lt;br&gt;→ SMTP → Email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="525" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow_log" value="&lt;b&gt;Pod Logs&lt;/b&gt;&lt;br&gt;→ Promtail&lt;br&gt;→ Loki" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="770" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow_dash" value="&lt;b&gt;Grafana Dashboard&lt;/b&gt;&lt;br&gt;Unified view of metrics,&lt;br&gt;logs, and alert state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="995" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ef1a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flow_scrape" target="flow_prom" parent="s6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ef2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flow_prom" target="flow_alert" parent="s6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ef3a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flow_alert" target="flow_log" parent="s6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ef4a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flow_log" target="flow_dash" parent="s6"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

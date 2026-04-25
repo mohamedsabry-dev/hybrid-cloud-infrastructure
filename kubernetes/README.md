@@ -52,6 +52,7 @@ are all configuration:
 
 | What | Dev | Prod |
 |------|-----|------|
+| Workers | 2 (4GB each, worker3 shut down) | 3 (2.75GB each) |
 | Git branch | `dev` | `prod` |
 | Subnet | 10.0.6x | 10.0.5x |
 | NFS share | `/volume1/k8s-dev` | `/volume1/k8s-prod` |
@@ -72,7 +73,7 @@ I write dev first, then mirror to prod with the env/subnet/sizing swaps.
 a ServiceAccount + `vault-ca-secret` + pod annotations. The Vault agent injector
 (deployed in infrastructure layer) handles the rest. No hardcoded credentials anywhere.
 
-**NFS storage classes** — three classes on the Synology NAS, each for a different use case:
+**NFS storage classes** — three classes on the Asustor NAS, each for a different use case:
 - `nfs-retain` — soft mount, 30s timeout. For stateful apps that can tolerate brief NFS
   hiccups (Grafana, Prometheus, Loki).
 - `nfs-delete` — soft mount. For ephemeral/testing workloads.

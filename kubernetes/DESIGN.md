@@ -71,6 +71,24 @@ Every DR test has produced at least one surprise that improved the setup. The re
 
 That's the pattern: break it on purpose, learn, harden, repeat.
 
+## 8. Dev drift — 2 workers instead of 3
+
+Dev runs 2 workers (4GB each) while prod keeps the full 3+3. This is a deliberate resource optimization, not a feature gap.
+
+The math: all the workloads that land on workers — Flux controllers, metrics-server, Helm operators, WordPress, MariaDB, Prometheus, Loki, Grafana, ingress-nginx, plus every DaemonSet (node-exporter, promtail, calico-node, kube-proxy, CSI-NFS) — can fit on 2 nodes. The question is whether they run better on 3×2.75GB or 2×4GB.
+
+3 workers × 2.75GB = 8.25GB gross, but each node burns ~500MB on Linux kernel + kube-system DaemonSet pods before a single app runs. That's 1.5GB of overhead across 3 nodes, leaving ~6.75GB usable. With 2 workers × 4GB = 8GB gross, only 1GB overhead, leaving ~7GB usable. Fewer nodes, more headroom per node.
+
+The secondary win: worker3's shutdown frees 2.75GB back to the Proxmox host. The dev server runs 13+ guests on a single NVMe with 24GB total — every megabyte returned to the hypervisor reduces the memory pressure that causes IO storms and OOM kills on the host level.
+
+Worker3 still exists in Terraform (VM 1022) — it's just `started: false`, `on_boot: false`. The VM, its IPA enrollment, its kubelet cert on disk — all preserved. If I need it back, `terraform apply` with `started: true` brings it online and kubelet rejoins automatically. No rebuild required.
+
+Remediation pod updated to monitor workers 1 and 2 only. Prod keeps all 3 workers in the remediation map.
+
+This decision came directly from TS-K8S-051 — a cluster-wide rollout restart exposed that worker1 was already at 96% memory with OOM events. The rollout just made the underlying resource problem visible. See `troubleshooting/kubernetes/reference/51-worker1-rollout-restart-micro-cascade.md`.
+
+---
+
 ## 7. etcd backup — automated snapshots, manual restore (for now)
 
 A CronJob takes daily etcd snapshots and pushes them to S3. The upload uses a Vault-assumed IAM role, so no static AWS credentials sit in the cluster. That side is fully automated and working.
