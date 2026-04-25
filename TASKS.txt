@@ -1,5 +1,3 @@
 What Pending to publish: //// 1 Days. == 26/April night
-
 deplymetn docs 10 to 15 manual redo 
-++ Final Review + Readme + Notes + Design of root level 
-++ update the opened ts case with 1 review 
+++ Final Review

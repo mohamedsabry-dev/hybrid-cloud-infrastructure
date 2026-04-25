@@ -37,7 +37,7 @@ variable "k8s_worker1" {
     vmid           = 1020
     name           = "k8s-worker1"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 4096  # 4GB — 2-worker drift: fewer nodes, more RAM each
     ip             = "10.0.64.10/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -83,7 +83,7 @@ variable "k8s_worker2" {
     vmid           = 1021
     name           = "k8s-worker2"
     cores          = 2
-    memory         = 2816  # 2.75GB
+    memory         = 4096  # 4GB — 2-worker drift: fewer nodes, more RAM each
     ip             = "10.0.64.11/24"
     gateway        = "10.0.64.1"
     bridge         = "vmbr0"
@@ -137,11 +137,11 @@ variable "k8s_worker3" {
     ip2            = "10.0.40.203/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
-    startup_delay  = 0       # All workers start together (parallel boot)
+    startup_delay  = 0
     shutdown_delay = 60
-    startup_order  = 9       # All workers share same order, start after masters (order 8)
-    started        = true
-    on_boot        = true
+    startup_order  = 9
+    started        = false   # Shut down — dev runs 2 workers only (see kubernetes/DESIGN.md §8)
+    on_boot        = false   # Excluded from auto-start sequence
     stop_on_destroy = true
   }
 }

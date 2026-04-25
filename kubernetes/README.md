@@ -52,6 +52,7 @@ are all configuration:
 
 | What | Dev | Prod |
 |------|-----|------|
+| Workers | 2 (4GB each, worker3 shut down) | 3 (2.75GB each) |
 | Git branch | `dev` | `prod` |
 | Subnet | 10.0.6x | 10.0.5x |
 | NFS share | `/volume1/k8s-dev` | `/volume1/k8s-prod` |
