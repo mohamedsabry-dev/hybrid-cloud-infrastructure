@@ -6,7 +6,7 @@ Domain: Kubernetes / Storage / NFS
 Sub-techs: CSI NFS driver, StorageClass mountOptions, PV immutability,
            NFS version auto-negotiation, NFSv3 vs NFSv4.2, Prometheus TSDB,
            Git history as audit trail
-Environment: DEV k8s-dev cluster | k8s-worker2 | Synology NAS 10.0.40.120
+Environment: DEV k8s-dev cluster | k8s-worker2 | Asustor NAS 10.0.40.120
 Re-opened: No
 Triggered by: TS-K8S-047 — post-rollout NFS health check revealed mixed versions
 
@@ -149,7 +149,7 @@ The Prometheus PVC was provisioned on 2026-04-05 when the nfs-retain StorageClas
 contained only 3 mountOptions (soft, timeo=30, retrans=3), per commit 86536ef.
 The nfsvers=3 and nolock options were not added until 2026-04-08 in commit 416be76.
 
-Without nfsvers=3, the Linux NFS client auto-negotiated NFSv4.2 with the Synology
+Without nfsvers=3, the Linux NFS client auto-negotiated NFSv4.2 with the Asustor
 NAS. The PV spec was frozen at provisioning time. Kubernetes does not retroactively
 update existing PVs when their StorageClass changes — this is by design.
 

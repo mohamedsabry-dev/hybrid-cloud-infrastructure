@@ -62,6 +62,8 @@ got built up to that decision point.
 archive-poc-v1/
 ├── README.md                   # This file
 │
+├── diagrams/                   # Architecture diagrams (draw.io) — 9 diagrams covering full PoC v1 stack
+│
 ├── docs/                       # VMware-era documentation
 │   ├── compute/                # VM specs, resource allocation
 │   ├── failover/               # VM startup/shutdown order, DR procedures
@@ -131,8 +133,27 @@ These are the most interesting ones — the kind of incidents that teach you som
 
 ---
 
+## Diagrams
+
+9 architecture diagrams in [`diagrams/`](diagrams/README.md) covering the full PoC v1 stack. All diagrams rendered inline in the [diagrams README](diagrams/README.md). Source `.drawio` files open with [draw.io](https://app.diagrams.net).
+
+| # | Diagram | What it covers |
+|---|---------|----------------|
+| 00 | [poc-overview](diagrams/README.md#00--poc-overview) | High-level: 17 VMs, nested ESXi, all IPs |
+| 01 | [network-architecture](diagrams/README.md#01--network-architecture) | WAN/LAN/vMotion, vSwitches, DNS/NTP |
+| 02 | [storage-architecture](diagrams/README.md#02--storage-architecture) | 4.5TB NVMe layout, NFS exports, thin/thick |
+| 03 | [backup-architecture](diagrams/README.md#03--backup-architecture) | Dual Veeam (10-VM CE limit), vCenter backup |
+| 04 | [security-identity](diagrams/README.md#04--security--identity) | FreeIPA 8 groups, Vault HA, HBAC, emergency access |
+| 05 | [automation-cicd](diagrams/README.md#05--automation--cicd) | Ansible playbooks, Jenkins, PowerShell DR scripts |
+| 06 | [compute-resource-allocation](diagrams/README.md#06--compute-resource-allocation) | 64GB RAM hierarchy, CPU over-commit, all VM specs |
+| 07 | [dr-failover-lifecycle](diagrams/README.md#07--dr-failover-lifecycle) | Emergency shutdown chain, startup order, DR activation |
+| 08 | [troubleshooting-incident-map](diagrams/README.md#08--troubleshooting-incident-map) | 25 cases, 4 categories, progressive failure pattern |
+
+---
+
 ## Related
 
+- **Current infrastructure diagrams:** [`/diagrams/`](../diagrams/)
 - **Current infrastructure docs:** [`/deployment-docs/`](../deployment-docs/)
 - **Current troubleshooting (post-rebuild):** [`/troubleshooting/`](../troubleshooting/)
 - **Current top-level structure:** [`/network/`](../network/), [`/proxmox/`](../proxmox/), [`/kubernetes/`](../kubernetes/), [`/ansible/`](../ansible/), [`/terraform/`](../terraform/), [`/aws/`](../aws/), [`/.github/workflows/`](../.github/workflows/)

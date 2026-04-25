@@ -73,7 +73,7 @@ I write dev first, then mirror to prod with the env/subnet/sizing swaps.
 a ServiceAccount + `vault-ca-secret` + pod annotations. The Vault agent injector
 (deployed in infrastructure layer) handles the rest. No hardcoded credentials anywhere.
 
-**NFS storage classes** — three classes on the Synology NAS, each for a different use case:
+**NFS storage classes** — three classes on the Asustor NAS, each for a different use case:
 - `nfs-retain` — soft mount, 30s timeout. For stateful apps that can tolerate brief NFS
   hiccups (Grafana, Prometheus, Loki).
 - `nfs-delete` — soft mount. For ephemeral/testing workloads.

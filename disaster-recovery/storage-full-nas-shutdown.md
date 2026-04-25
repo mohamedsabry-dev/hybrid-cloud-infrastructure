@@ -50,7 +50,7 @@ _____________________________________________________________________
 [Test 1.1 — Short NAS Restart (~2 min outage)]
 
 Action:
-  NAS restart via Synology UI. Down ~2-2.5 minutes.
+  NAS restart via Asustor UI. Down ~2-2.5 minutes.
 
 What happened:
   WordPress (soft): endpoints removed within seconds. All 3 pods went

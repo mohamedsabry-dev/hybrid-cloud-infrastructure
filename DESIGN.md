@@ -54,7 +54,7 @@ Infrastructure also has a health check on the Vault Agent Injector deployment. I
 
 ### NFS Storage — 3 Classes, Same NAS
 
-All persistent data lives on a Synology NAS accessible via VLAN 40 (L2-isolated, no router hop). Three StorageClasses serve different failure tolerance:
+All persistent data lives on an Asustor NAS accessible via VLAN 40 (L2-isolated, no router hop). Three StorageClasses serve different failure tolerance:
 
 - **nfs-retain** (soft mount, 3s timeout) — Grafana, Prometheus, Loki, WordPress. Returns IO errors fast if NAS goes down. Apps decide how to handle failure.
 - **nfs-database** (hard mount, 60s timeout) — MariaDB only. Hangs on NFS failure instead of returning errors. InnoDB can't handle silent IO errors mid-write — a soft mount error during a transaction can corrupt data.

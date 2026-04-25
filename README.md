@@ -8,7 +8,24 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 
 ---
 
+## Project Timeline
+
+| Phase | Period | Focus |
+|-------|--------|-------|
+| PoC v1 (VMware) | Nov 2025 → Jan 2026 | Nested ESXi lab — killed before K8s phase ([why](archive-poc-v1/DESIGN.md)) |
+| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 99 troubleshooting cases |
+| Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
+
+---
+
 ## Architecture
+
+![Architecture Overview](diagrams/00-parent-overview.png)
+
+All 8 architecture diagrams with full detail: [`diagrams/`](diagrams/README.md)
+
+<details>
+<summary>Text version</summary>
 
 ```
     ┌──────────── AWS ─────────────┐          ┌────── GitHub ──────┐
@@ -21,7 +38,7 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
     │                    MikroTik Router                             │
     │              13 VLANs · firewall ACLs · VPN endpoint          │
     ├───────────────────────┬───────────────────────┬───────────────┤
-    │  pve-dev (24GB)       │  Synology NAS         │  pve-prod (64GB)
+    │  pve-dev (24GB)       │  Asustor NAS         │  pve-prod (64GB)
     │  VLANs 60-65          │  VLAN 40 (L2-isolated)│  VLANs 50-55
     │                       │                       │
     │  FreeIPA       (VM)   │  K8s PVs (NFS)        │  Same topology,
@@ -32,6 +49,8 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
     │  Nginx proxy   (LXC)  │                       │
     └───────────────────────┴───────────────────────┴───────────────┘
 ```
+
+</details>
 
 ### Kubernetes Cluster (per environment)
 
@@ -75,7 +94,7 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | Monitoring | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
 | Alerting | Alertmanager | Vault-injected SMTP → email |
 | Networking | MikroTik + WireGuard | 13 VLANs, site-to-site VPN to AWS |
-| Storage | Synology NAS (NFS) | PVs, backups, ISOs — VLAN 40 L2-isolated |
+| Storage | Asustor NAS (NFS) | PVs, backups, ISOs — VLAN 40 L2-isolated |
 | Self-healing | Remediation pod | Proxmox API reboot/reset on worker failure |
 
 ---
@@ -91,9 +110,10 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | [`proxmox/`](proxmox/README.md) | Bootstrap scripts, golden templates, backup config, DR prevention scripts |
 | [`.github/workflows/`](.github/workflows/README.md) | 31 CI/CD workflows — Terraform + Ansible + Docker builds |
 | [`disaster-recovery/`](disaster-recovery/README.md) | 16 tested DR scenarios with outcomes and recovery procedures |
+| [`diagrams/`](diagrams/) | Architecture diagrams (draw.io) — topology, GitOps, network, security, monitoring, DR, storage |
 | [`deployment-docs/`](deployment-docs/README.md) | 15 sequential setup guides — full stack from bare metal to apps |
 | [`troubleshooting/`](troubleshooting/README.md) | 99 documented cases across 9 domains with root-cause analysis |
-| [`archive-poc-v1/`](archive-poc-v1/) | Retired VMware PoC v1 — 25 cases preserved as learning record |
+| [`archive-poc-v1/`](archive-poc-v1/) | Retired VMware PoC v1 — 25 cases, 9 architecture diagrams, preserved as learning record |
 
 ---
 
@@ -124,10 +144,6 @@ Follow the 15-guide sequence in [`deployment-docs/`](deployment-docs/README.md).
 ## Troubleshooting
 
 99 cases across kubernetes, proxmox, terraform, identity, vault, network, github, linux, and AWS. Organized by domain in [`troubleshooting/`](troubleshooting/README.md). Open issues tracked in [`OPEN-TICKETS.md`](troubleshooting/OPEN-TICKETS.md).
-
-## What's Next
-
-See [`ROADMAP.md`](ROADMAP.md) — custom PromQL/LogQL dashboards, RBAC + NetworkPolicy hardening, Lambda-based master recovery path, CKA certification.
 
 ## Design Decisions
 

@@ -1,7 +1,7 @@
 # Proxmox Storage — DEV
 
 Terraform module for provisioning NFS storage mounts on the Proxmox host.
-Connects the hypervisor to the Synology NAS (10.0.40.120) for shared ISOs,
+Connects the hypervisor to the Asustor NAS (10.0.40.120) for shared ISOs,
 env-specific VM/LXC data, and centralized backups.
 
 ---
@@ -15,7 +15,7 @@ env-specific VM/LXC data, and centralized backups.
 ## Storage layout on the NAS
 
 ```
-Synology NAS (10.0.40.120)
+Asustor NAS (10.0.40.120)
 │
 ├── /volume1/shared-iso      → nas-iso         (shared dev + prod)
 │   ├── ISO images
