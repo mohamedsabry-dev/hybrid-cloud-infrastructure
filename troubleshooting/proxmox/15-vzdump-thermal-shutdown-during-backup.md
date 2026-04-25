@@ -1,10 +1,10 @@
-# TS-PVE-018 | 2026-04-23 | RESOLVED | INCIDENT
+# TS-PVE-015 | 2026-04-11 / 2026-04-23 | RESOLVED | INCIDENT
 _____________________________________________________________________
 
 [Info]
 Domain: Proxmox VE / vzdump backup / Thermal Management
 Sub-techs: vzdump backup job, zstd compression, temperature_monitor.sh, ASUS laptop server
-Environment: pve-prod
+Environment: pve-prod + pve-dev (same root cause, different failure modes)
 Re-opened: No
 
 _____________________________________________________________________
@@ -259,11 +259,10 @@ an 80°C threshold there would trigger constantly and make the server unusable.
 The script was deployed only on prod as a safety net because it's a more
 expensive laptop that normally idles at 64-65°C.
 
-This means TS-PVE-015 (dev crash during backup on 2026-04-11) was likely the
-same thermal cause but WITHOUT the graceful shutdown — dev hit the hardware
-thermal limit (~100°C) causing a hard crash with no logs. Prod was caught at
-91°C by the script before hardware cutoff. Same root cause, different failure
-mode, explained by presence/absence of one script.
+The dev crash on 2026-04-11 was the same thermal cause but WITHOUT the graceful
+shutdown — dev hit the hardware thermal limit (~100°C) causing a hard crash with
+no logs. Prod was caught at 91°C by the script before hardware cutoff. Same root
+cause, different failure mode, explained by presence/absence of one script.
 
 # Step 12: Dev environment backup metrics comparison
 Noted on dev during same backup window:
@@ -271,7 +270,7 @@ Noted on dev during same backup window:
 - CPU: rose from avg 8% to 16%
 - kubectl commands delayed ~3 seconds during backup
 - kube-controller-manager and kube-scheduler entered CrashLoopBackOff on
-  master2 and master3 for ~10 minutes (see TS-PVE-015 re-opened section)
+  master2 and master3 for ~10 minutes
 
 Prod at 11% IO delay had zero cluster impact. The K8s master degradation is
 a dev hardware capacity issue, not a backup-inherent or NAS-related problem.
@@ -298,9 +297,9 @@ legitimate backup I/O load — the 80°C threshold was calibrated for sustained
 overheating, not for the 1-minute thermal spikes that backup zstd compression
 produces.
 
-This also retroactively explains TS-PVE-015: same thermal cause, but dev has
-no temperature script — the CPU hit hardware thermal limit and crashed hard
-instead of shutting down gracefully.
+The dev crash (2026-04-11) was the same thermal cause — no temperature script
+on dev meant the CPU hit hardware thermal limit and crashed hard instead of
+shutting down gracefully.
 
 _____________________________________________________________________
 
@@ -353,9 +352,10 @@ _____________________________________________________________________
 _____________________________________________________________________
 
 [References]
-- Related: TS-PVE-015 (Dev crash during backup — SAME ROOT CAUSE, different failure mode: hard crash vs graceful shutdown because dev has no temperature script)
 - Related: TS-PVE-014 (Worker VM crash unknown cause — may also be thermal)
 - Related: TS-PVE-017 (CPU/IO spike during DR testing — similar thermal pattern)
+- Related: TS-VLT-005 (Vault node recovery after dev crash — stale Raft data from CT 2006 going down)
+- Related: TS-K8S-024 (Vault cluster resilience during dev crash outage)
 - Child: TS-K8S-050 (Remediation pod vs backup window race condition — preventive, raised from this investigation)
 - Related: DR proxmox-vzdump-backup.md (backup validation — updated with thermal findings)
 - Script: proxmox/disaster_recovery/thermal/temperature_monitor.sh (rewritten — daemon loop, 90°C threshold, backup-aware, 5-min confirmation)

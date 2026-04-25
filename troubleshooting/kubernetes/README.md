@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-43 cases + 8 reference guides in [reference/](reference/)
+41 cases + 10 reference guides in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -16,7 +16,7 @@
 | [013](13-k8s-master-node-resource-exhaustion.md) | 2026-04-05 | RESOLVED | Master Node Resource Exhaustion |
 | [014](14-vault-k8s-auth-service-account-not-authorized.md) | 2026-04-05 | RESOLVED | Vault K8s Auth Service Account Not Authorized |
 | [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) | 2026-04-06 | RESOLVED | CSI NFS Restart Stale Mount (MariaDB Crash) |
-| [016](16-pod-priority-classes-dr-readiness.md) | 2026-04-06 | RESOLVED | Pod Priority Classes (DR Readiness) |
+| [016](reference/16-pod-priority-classes-dr-readiness.md) | 2026-04-06 | RESOLVED | Pod Priority Classes (DR Readiness) |
 | [017](17-vault-injection-system-namespace-denied.md) | 2026-04-07 | RESOLVED | Vault Injection System Namespace Denied |
 | [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) | 2026-04-08 | RESOLVED | CSI NFS Controller Network Isolation |
 | [019](19-flux-kustomization-restructure-cascade-failure.md) | 2026-04-09 | RESOLVED | Flux Kustomization Restructure Cascade Failure |
@@ -46,4 +46,4 @@
 | [047](47-csi-nfs-podlabels-silent-accept.md) | 2026-04-20 | RESOLVED | CSI NFS podLabels Silent Accept + Near-Miss |
 | [048](48-prometheus-pvc-nfsv4-version-mismatch.md) | 2026-04-20 | RESOLVED | Prometheus PVC NFSv4 Version Mismatch |
 | [049](49-git-history-rewrite-flux-prune-cascade.md) | 2026-04-23 | RESOLVED | Git History Rewrite → Flux Prune Cascade (CoreDNS Lost) |
-| [050](50-remediation-pod-backup-window-race-condition.md) | 2026-04-24 | PENDING | Remediation Pod vs Backup Window Race Condition |
+| [050](reference/50-remediation-pod-backup-window-race-condition.md) | 2026-04-24 | PENDING | Remediation Pod vs Backup Window Race Condition |
