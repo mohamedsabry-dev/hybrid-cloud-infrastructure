@@ -287,6 +287,23 @@ _____________________________________________________________________
 [References]
 - TS-PVE-017 — IO storm that preceded the drift (remediation controller activated
   during this incident)
+- TS-PVE-020 — vzdump backup destabilizes k8s cluster (suspect amplifier — see update below)
 - TS-K8S-030 — Worker3 OOM crashes on April 13-14 (prior instability, same VM)
 - TS-PVE-014 — Worker VM crash/restart via remediation pod (same controller)
 - Terraform source: `terraform/dev/proxmox/vms/k8s_workers/` (confirmed correct)
+
+_____________________________________________________________________
+
+[Update — 2026-04-24]
+
+The drift window (April 16-18) overlaps with the Thursday April 17 scheduled backup
+(thu,sat 21:00). TS-PVE-020 confirmed that vzdump backup of k8s nodes on the dev server
+causes sustained IO saturation and cluster instability — dense data on the shared consumer
+NVMe starves all other VMs. If the Thursday backup triggered enough instability for the
+remediation controller to see worker3 as NotReady, that would explain why the controller
+activated and did the qmrestore that caused the drift. The backup IO didn't cause the
+config drift directly (qmrestore's volume rename behavior did), but it's a suspect trigger
+for the remediation chain that led to it.
+
+K8s nodes have since been excluded from the dev backup job (TS-PVE-020 solution), which
+removes this trigger path entirely.

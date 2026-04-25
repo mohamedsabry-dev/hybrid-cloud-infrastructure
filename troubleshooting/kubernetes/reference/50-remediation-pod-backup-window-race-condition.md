@@ -1,4 +1,4 @@
-# TS-K8S-050 | 2026-04-24 | PENDING | IMPROVEMENT
+# TS-K8S-050 | 2026-04-24 | WORKAROUND APPLIED | IMPROVEMENT
 _____________________________________________________________________
 
 [Info]
@@ -10,9 +10,9 @@ Re-opened: No
 _____________________________________________________________________
 
 [Issue Description]
-NOT YET AN INCIDENT — preventive ticket raised from TS-PVE-018 investigation.
+NOT YET AN INCIDENT — preventive ticket raised from TS-PVE-015 investigation.
 
-During TS-PVE-018 analysis, identified a potential race condition: if the
+During TS-PVE-015 analysis, identified a potential race condition: if the
 remediation pod's 5-minute health check fires during the vzdump "suspend vm
 to make snapshot" phase, the worker VM will appear unresponsive. The
 remediation pod could interpret this as a node failure and attempt to
@@ -59,16 +59,18 @@ PENDING — preventive investigation, no incident yet
 _____________________________________________________________________
 
 [Final Solution]
-PENDING
+WORKAROUND APPLIED — k8s nodes excluded from vzdump backup (TS-PVE-020), eliminating
+the collision path on dev. Dev remediation also hardened with 3-min confirmation delay.
+Prod still has k8s nodes in backup but hardware handles IO without cluster impact.
 
 _____________________________________________________________________
 
-[Risk Level] MEDIUM — not yet triggered but guaranteed to collide eventually
+[Risk Level] LOW — collision path eliminated on dev, reduced on prod
 
 _____________________________________________________________________
 
 [References]
-- Parent: TS-PVE-018 (prod thermal shutdown during backup — investigation surfaced this risk)
+- Parent: TS-PVE-015 (thermal shutdown during backup — investigation surfaced this risk)
 - Related: TS-PVE-014 (remediation pod triggered reboot during boot — similar race condition pattern)
-- Related: TS-PVE-015 (backup crash + K8s master degradation during backup window)
+- Related: TS-PVE-020 (vzdump backup destabilizes k8s — k8s nodes excluded from dev backup)
 - Code: kubernetes/dev/deployments/apps/remediation/configmap.yaml (remediation logic)

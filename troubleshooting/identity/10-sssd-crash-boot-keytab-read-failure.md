@@ -10,9 +10,9 @@ Re-opened: No
 _____________________________________________________________________
 
 [Issue Description]
-REAL INCIDENT -- discovered during TS-PVE-018 investigation.
+REAL INCIDENT -- discovered during TS-PVE-015 investigation.
 
-After k8s-master1 rebooted following the backup incident (TS-PVE-018), SSSD
+After k8s-master1 rebooted following the backup incident (TS-PVE-015), SSSD
 failed to start and stayed in `failed` state for 12+ hours (14:13 → 02:51).
 All domain user logins to master1 were broken — `su k8s_admin` returned
 "user does not exist", SSH with password fell back to keyboard-interactive
@@ -161,7 +161,7 @@ silent failure without alerting is a monitoring gap.
 _____________________________________________________________________
 
 [References]
-- Parent: TS-PVE-018 (Prod thermal shutdown during backup — same incident chain)
+- Parent: TS-PVE-015 (Prod thermal shutdown during backup — same incident chain)
 - Related: TS-IDN-001 (LXC Kerberos keyring auth failure — similar keytab/SSSD pattern)
 - Related: TS-IDN-008 (Keytab preauthentication failed — keytab issues)
 - Related: TS-PVE-015 (Dev crash during backup — same backup suspend trigger)

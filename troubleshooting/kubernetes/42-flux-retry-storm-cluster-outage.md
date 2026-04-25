@@ -253,4 +253,31 @@ _____________________________________________________________________
 - TS-K8S-041 — PrometheusRule not picked up (discovered during same session)
 - TS-K8S-040 — HPA memory scaling behavior (discovered during same session)
 - TS-K8S-038 — QEMU guest agent CPU loop (discovered during same session)
+- TS-PVE-017 — IO storm investigation (suspect amplifier — see update below)
+- TS-PVE-020 — vzdump backup destabilizes k8s cluster (suspect amplifier — see update below)
 - disaster-recovery/worker-2of3-down.md — related DR test for node failure scenarios
+
+_____________________________________________________________________
+
+[Update — 2026-04-24]
+
+After completing the TS-PVE-017 root cause investigation, this incident's severity makes
+more sense. The dev server runs all 13 guests on a single consumer NVMe with zero IO
+isolation. When the Flux retry loop hammered etcd with rapid-fire write operations, those
+writes competed with every other VM's IO on the same physical drive. The zero IO isolation
+didn't cause the Flux retry storm — that was anti-affinity + no circuit breaker — but it
+almost certainly amplified how fast the cascade escalated and why two nodes became
+completely unresponsive (needing physical reboot rather than just recovering after Flux
+was suspended).
+
+Per-VM IO throttling has since been applied via Terraform (TS-PVE-017 remediation), which
+should limit how fast any single VM's IO can starve the others. This won't prevent a Flux
+retry storm, but it should slow the cascade enough to give more time to react.
+
+Additionally, TS-PVE-020 confirmed that the Thursday scheduled backup (thu,sat 21:00) causes
+sustained IO saturation and cluster instability when backing up k8s nodes. This incident hit
+on Friday April 18 — the morning after the Thursday backup. TS-PVE-017's analysis notes the
+cluster was "limping all day" with 40% IO impact recorded during the backup ~10 hours prior.
+The Flux retry storm hit a cluster that was already degraded from the previous night's backup
+IO. K8s nodes have since been excluded from the dev backup job, removing this pre-degradation
+path.

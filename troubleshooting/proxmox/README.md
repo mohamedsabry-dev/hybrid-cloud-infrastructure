@@ -22,10 +22,10 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 12 | [TS-PVE-012](12-vm-autostart-timeout-nfs-disk-not-ready.md) | 2026-04-06 | VM autostart timeout after reboot | NFS mount not ready when autostart begins |
 | 13 | [TS-PVE-013](13-ups-monitor-cronjob-misconfiguration.md) | 2026-04-07 | UPS monitor cronjob misconfiguration | Wrong cron syntax |
 | 14 | [TS-PVE-014](14-worker-vm-crash-unknown-root-cause.md) | 2026-04-11 | Worker VM crash on autostart — 3-part investigation | Remediation pod triggered reboot during boot |
-| 15 | [TS-PVE-015](15-proxmox-crash-during-backup-unknown-cause.md) | 2026-04-11 | Proxmox crash during backup mid-write | **UNDETERMINED** - Silent crash, no logs |
+| 15 | [TS-PVE-015](15-vzdump-thermal-shutdown-during-backup.md) | 2026-04-11 | vzdump thermal crash/shutdown during backup (dev+prod) | vzdump zstd compression spikes CPU to 91°C — dev: hard crash (no temp script), prod: graceful shutdown (80°C threshold too aggressive) |
 | 16 | [TS-PVE-016](reference/16-proxmox-memory-metrics-misleading.md) | 2026-04-11 | Proxmox shows 97% memory but actual is 54% | Linux cache counted as "used" — normal behavior |
-| 17 | [TS-PVE-017](17-proxmox-host-cpu-io-spike-vms-stuck.md) | 2026-04-19 | CPU/IO spike during DR testing — all VMs hung | Unknown — rebooted host to recover |
-| 18 | [TS-PVE-018](18-prod-server-complete-shutdown-during-backup.md) | 2026-04-23 | Prod server graceful shutdown during backup | temperature_monitor.sh 80°C threshold hit by vzdump zstd compression spike (91°C) |
+| 17 | [TS-PVE-017](17-proxmox-host-cpu-io-spike-vms-stuck.md) | 2026-04-19 | CPU/IO spike — all VMs hung, 8-hour root cause investigation | Zero IO isolation on shared NVMe + K8s cascade dynamics. Per-VM IO throttling applied via Terraform. |
+| 18 | — | — | Merged into TS-PVE-015 | Same root cause (vzdump thermal spike) |
 | 19 | [TS-PVE-019](19-worker3-vm-config-drift.md) | 2026-04-24 | Worker3 (1022) config drift — ide2/scsi0 changed between Apr 16-18 | qmrestore on LVM-thin renames cloud-init volume to disk-0 (loses CloudInit Drive type) |
 | 20 | [TS-PVE-020](20-vzdump-backup-destabilizes-k8s-cluster.md) | 2026-04-24 | vzdump backup destabilizes k8s cluster — IO 50-70%, control plane crashes | K8s VM disks have dense data (not sparse like IPA's 91% zeros) causing sustained NVMe IO contention |
 

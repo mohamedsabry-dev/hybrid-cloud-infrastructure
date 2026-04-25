@@ -37,6 +37,17 @@ resource "proxmox_virtual_environment_vm" "k8s_worker1" {
     ssd          = var.disks.os_disk.ssd
     discard      = var.disks.os_disk.discard
     file_format  = var.disks.os_disk.file_format
+
+    speed {
+      iops_read           = 500
+      iops_read_burstable = 1500
+      iops_write          = 300
+      iops_write_burstable = 800
+      read                = 30
+      read_burstable      = 80
+      write               = 20
+      write_burstable     = 40
+    }
   }
 
   # CPU (sockets=1 standard, type=host for CPU passthrough performance)
@@ -142,6 +153,17 @@ resource "proxmox_virtual_environment_vm" "k8s_worker2" {
     ssd          = var.disks.os_disk.ssd
     discard      = var.disks.os_disk.discard
     file_format  = var.disks.os_disk.file_format
+
+    speed {
+      iops_read           = 500
+      iops_read_burstable = 1500
+      iops_write          = 300
+      iops_write_burstable = 800
+      read                = 30
+      read_burstable      = 80
+      write               = 20
+      write_burstable     = 40
+    }
   }
 
   cpu {
@@ -246,6 +268,17 @@ resource "proxmox_virtual_environment_vm" "k8s_worker3" {
     ssd          = var.disks.os_disk.ssd
     discard      = var.disks.os_disk.discard
     file_format  = var.disks.os_disk.file_format
+
+    speed {
+      iops_read           = 500
+      iops_read_burstable = 1500
+      iops_write          = 300
+      iops_write_burstable = 800
+      read                = 30
+      read_burstable      = 80
+      write               = 20
+      write_burstable     = 40
+    }
   }
 
   cpu {

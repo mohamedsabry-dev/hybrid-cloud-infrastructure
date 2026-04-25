@@ -5,7 +5,7 @@ _____________________________________________________________________
 Domain: Proxmox VE / Backup / K8s Stability
 Sub-techs: vzdump, ZSTD, NVMe IO, NFS, etcd
 Environment: DEV Proxmox server (pve-dev)
-Related: TS-PVE-017 (IO storm), TS-PVE-018 (thermal shutdown during backup)
+Related: TS-PVE-017 (IO storm), TS-PVE-015 (thermal shutdown during backup)
 Re-opened: No
 
 _____________________________________________________________________
@@ -265,7 +265,7 @@ K8s nodes don't need vzdump — they're fully reproducible:
 The IO storm watchdog (TS-PVE-017) is safe — it triggers on CPU, not IO, so the backup
 IO won't cause false positives.
 
-The temperature monitor (TS-PVE-018) is also safe — it skips shutdown when vzdump or
+The temperature monitor (TS-PVE-015) is also safe — it skips shutdown when vzdump or
 qmrestore is running.
 
 _____________________________________________________________________

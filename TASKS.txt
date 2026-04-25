@@ -1,8 +1,5 @@
 What Pending to publish: //// 1 Days. == 26/April night
 
 deplymetn docs 10 to 15 manual redo 
-++ Mirror dev app to prod >> On it 
-    Aply tmp workround , clean pods restart to 0 after all storms done 
 ++ Final Review + Readme + Notes + Design of root level 
-++ update tf 
 ++ update the opened ts case with 1 review 

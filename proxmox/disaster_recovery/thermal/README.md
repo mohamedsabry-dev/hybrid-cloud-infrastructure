@@ -13,7 +13,7 @@ cause.
 
 The key safety: if `vzdump` or `qmrestore` is running, the script skips
 that reading entirely. Backup jobs spike CPU heat but that's expected
-behavior, not a thermal emergency. This came from TS-PVE-018 where the
+behavior, not a thermal emergency. This came from TS-PVE-015 where the
 original draft script shut down the host mid-backup.
 
 | Condition | Action |

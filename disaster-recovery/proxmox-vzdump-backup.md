@@ -98,7 +98,7 @@ What happened:
   - VM 1020 backup failed: "interrupted by signal"
   - All VMs shut down in order, system halted. Did not auto-restart.
   - Root cause: thermal script threshold too aggressive for backup I/O load
-  - Full investigation: TS-PVE-018
+  - Full investigation: TS-PVE-015
   - IO delay during backup: ~11% — NO master node impact, zero pod restarts,
     zero CrashLoopBackOff. Prod hardware handles backup I/O fine.
 
@@ -146,7 +146,7 @@ _____________________________________________________________________
 4. vzdump + zstd compression causes CPU thermal spikes on laptop hardware
    (idle 65°C → peak 92°C). The temperature_monitor.sh script with 80°C
    threshold will trigger shutdown on every backup run. Threshold must be
-   raised or backup-awareness added to the script (TS-PVE-018).
+   raised or backup-awareness added to the script (TS-PVE-015).
 
 5. K8s control plane impact is hardware-dependent, NOT backup-inherent:
    - Prod (stronger laptop): 11% IO delay, zero master impact, zero
@@ -166,6 +166,6 @@ _____________________________________________________________________
 [References]
 
 - TS-PVE-015 — mid-backup crash incident (dev) — likely same thermal root cause, no script = hard crash
-- TS-PVE-018 — prod graceful thermal shutdown during backup — root cause confirmed
+- TS-PVE-015 — prod graceful thermal shutdown during backup — root cause confirmed
 - nas-dev-data:/dump/ — dev backup storage
 - nas-prod-data:/dump/ — prod backup storage

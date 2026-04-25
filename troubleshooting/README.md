@@ -2,7 +2,7 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**100 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
+**99 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
@@ -42,7 +42,7 @@ Cascading failures, data loss risk, or full-service outages.
 | [TS-TF-002](terraform/2-aws-secrets-deletion-incident.md) | Terraform | Workflow nuked all AWS secrets, state file corrupted 14KB → 299 bytes |
 | [TS-TF-010](terraform/10-cloud-init-ssh-host-key-regeneration.md) | Terraform | Cloud-init regenerated host keys on every apply — broke SSH known_hosts across all VMs |
 | [TS-PVE-010](proxmox/10-vm-restore-hang-concurrent-nfs-operations.md) | Proxmox | 6 concurrent VM restores overwhelmed NFS — orphaned LVM volumes, hung processes |
-| [TS-PVE-015](proxmox/15-proxmox-crash-during-backup-unknown-cause.md) | Proxmox | Host crashed silently during backup — hardware-level, no logs, unresolved |
+| [TS-PVE-015](proxmox/15-vzdump-thermal-shutdown-during-backup.md) | Proxmox | vzdump thermal crash/shutdown during backup — zstd compression spikes CPU to 91°C |
 | [TS-PVE-017](proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md) | Proxmox | CPU/IO spike during DR testing — all VMs hung at boot, qemu-ga unresponsive |
 | [TS-VLT-003](vault/3-vault-kms-credentials-overwrite-empty-vars.md) | Vault | Manual playbook run rendered empty vars → AWS KMS credentials wiped → Vault can't unseal |
 | [TS-VLT-005](vault/5-vault-node-recovery-stale-raft-data.md) | Vault | Stale raft data after Proxmox crash — node can't rejoin cluster |
@@ -68,7 +68,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 13 | [master-resource-exhaustion](kubernetes/13-k8s-master-node-resource-exhaustion.md) | Master node unresponsive — 244MB available memory |
 | 14 | [vault-k8s-auth](kubernetes/14-vault-k8s-auth-service-account-not-authorized.md) | Grafana stuck Init — wrong ServiceAccount in Vault config |
 | 15 | [csi-nfs-stale-mount](kubernetes/15-csi-nfs-restart-stale-mount-mariadb-crash.md) | CSI NFS restart made mounts stale → MariaDB crash |
-| 16 | [pod-priority-classes](kubernetes/16-pod-priority-classes-dr-readiness.md) | No priority classes — wrong eviction order during pressure |
+| 16 | [pod-priority-classes](kubernetes/reference/16-pod-priority-classes-dr-readiness.md) | No priority classes — wrong eviction order during pressure |
 | 17 | [vault-injection-namespace](kubernetes/17-vault-injection-system-namespace-denied.md) | Vault webhook blocked kube-system deployment |
 | 18 | [csi-nfs-network-isolation](kubernetes/18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) | CSI controller on masters had no route to NFS |
 | 19 | [flux-kustomization-cascade](kubernetes/19-flux-kustomization-restructure-cascade-failure.md) | Kustomization rename + prune:true deleted all HelmReleases |
@@ -121,7 +121,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 12 | [vm-autostart-nfs](proxmox/12-vm-autostart-timeout-nfs-disk-not-ready.md) | VM autostart failed — NFS not ready at boot |
 | 13 | [ups-monitor](proxmox/13-ups-monitor-cronjob-misconfiguration.md) | UPS monitor running weekly instead of every 5min |
 | 14 | [worker-vm-crash](proxmox/14-worker-vm-crash-unknown-root-cause.md) | Worker VM crashed on autostart — remediation pod triggered reboot during boot |
-| 15 | [host-crash-backup](proxmox/15-proxmox-crash-during-backup-unknown-cause.md) | Host crashed silently during backup — unresolved |
+| 15 | [vzdump-thermal](proxmox/15-vzdump-thermal-shutdown-during-backup.md) | vzdump thermal crash/shutdown during backup (dev+prod merged, was also TS-PVE-018) |
 | 17 | [host-cpu-io-spike](proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md) | CPU/IO spike during DR testing — all VMs hung |
 
 ---
