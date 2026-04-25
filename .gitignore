@@ -59,3 +59,6 @@ git-workflow-guide.txt
 
 # Personal docs (not for public repo)
 personal-docs/
+
+# Ticket drafts (work-in-progress, not for public repo)
+drafts/
