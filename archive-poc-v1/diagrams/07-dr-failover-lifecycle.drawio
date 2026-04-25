@@ -1,0 +1,168 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 DR Failover and VM Lifecycle" id="poc-dr-failover">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== EMERGENCY SHUTDOWN CHAIN ==================== -->
+        <mxCell id="shutdown_layer" value="&lt;b&gt;Emergency Shutdown Chain — Battery-Triggered Automated Shutdown&lt;/b&gt;&lt;br&gt;BatteryMonitor.ps1 triggers at 75% battery → EmergencyLabShutdown.ps1 → 5-phase graceful shutdown → Laptop power-off" style="swimlane;startSize=40;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1520" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_battery" value="&lt;b&gt;BatteryMonitor.ps1&lt;/b&gt;&lt;br&gt;Scheduled task on host&lt;br&gt;Triggers at 75% battery&lt;br&gt;Windows Host" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="15" y="48" width="190" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_emergency" value="&lt;b&gt;EmergencyLabShutdown.ps1&lt;/b&gt;&lt;br&gt;Connects to vCenter API&lt;br&gt;Orchestrates all phases&lt;br&gt;Total: ~13 minutes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="225" y="48" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_p1" value="&lt;b&gt;Phase 1&lt;/b&gt;&lt;br&gt;Kill Veeam jobs&lt;br&gt;Stop active backups" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="455" y="48" width="150" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_p2" value="&lt;b&gt;Phase 2&lt;/b&gt;&lt;br&gt;Inner Veeam VM&lt;br&gt;Shutdown + wait" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="625" y="48" width="150" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_p3" value="&lt;b&gt;Phase 3&lt;/b&gt;&lt;br&gt;Nested ESXi shutdown&lt;br&gt;10 VMs auto-shutdown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="795" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_p4" value="&lt;b&gt;Phase 4&lt;/b&gt;&lt;br&gt;Master ESXi shutdown&lt;br&gt;6 VMs auto-shutdown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="985" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_p5" value="&lt;b&gt;Phase 5&lt;/b&gt;&lt;br&gt;Laptop shutdown&lt;br&gt;shutdown /s /t 120" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="shutdown_layer">
+          <mxGeometry x="1175" y="48" width="150" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="shut_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_battery" target="shut_emergency" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="shut_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_emergency" target="shut_p1" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="shut_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_p1" target="shut_p2" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="shut_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_p2" target="shut_p3" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="shut_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_p3" target="shut_p4" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="shut_e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="shut_p4" target="shut_p5" parent="shutdown_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== ESXI MASTER STARTUP ORDER ==================== -->
+        <mxCell id="master_startup" value="&lt;b&gt;ESXi Master Auto-Startup (10.0.20.100) — 6 VMs, ~8 min total&lt;/b&gt;&lt;br&gt;Dependency-ordered: DNS first → Network → Storage → Nested Hypervisor → Management → Backup" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="1520" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_ipa" value="&lt;b&gt;Tier 1: IPA&lt;/b&gt;&lt;br&gt;DNS + LDAP + Kerberos&lt;br&gt;MUST be first&lt;br&gt;60s startup delay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="15" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_pf" value="&lt;b&gt;Tier 2: pfSense&lt;/b&gt;&lt;br&gt;NAT gateway + FW&lt;br&gt;Needs IPA for DNS&lt;br&gt;60s after IPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="210" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_nas" value="&lt;b&gt;Tier 3: NAS&lt;/b&gt;&lt;br&gt;NFS shared storage&lt;br&gt;Needs network online&lt;br&gt;60s after pfSense" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="405" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_prod" value="&lt;b&gt;Tier 4: Prod ESXi&lt;/b&gt;&lt;br&gt;Nested hypervisor&lt;br&gt;Triggers 10 VM startup&lt;br&gt;60s after NAS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="600" y="48" width="180" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_vc" value="&lt;b&gt;Tier 5: vCenter&lt;/b&gt;&lt;br&gt;Cluster management&lt;br&gt;Not critical for boot&lt;br&gt;100s after Prod ESXi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="805" y="48" width="180" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_veeam" value="&lt;b&gt;Tier 6: Veeam&lt;/b&gt;&lt;br&gt;Backup server&lt;br&gt;Lowest priority&lt;br&gt;200s after vCenter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="master_startup">
+          <mxGeometry x="1010" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="ms_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ms_ipa" target="ms_pf" parent="master_startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ms_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ms_pf" target="ms_nas" parent="master_startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ms_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ms_nas" target="ms_prod" parent="master_startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ms_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ms_prod" target="ms_vc" parent="master_startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ms_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ms_vc" target="ms_veeam" parent="master_startup"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== NESTED ESXi STARTUP ORDER ==================== -->
+        <mxCell id="nested_startup" value="&lt;b&gt;Nested ESXi Auto-Startup (10.0.20.101) — 10 VMs, ~8 min total&lt;/b&gt;&lt;br&gt;Triggered by ESXi Master Tier 4 • Runs inside the nested hypervisor • 3 layers of dependencies" style="swimlane;startSize=40;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="390" width="1520" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_ansible" value="&lt;b&gt;L1: Ansible&lt;/b&gt;&lt;br&gt;Automation platform&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="15" y="48" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_v1" value="&lt;b&gt;L1: Vault-01&lt;/b&gt;&lt;br&gt;Raft leader&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="160" y="48" width="120" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_v2" value="&lt;b&gt;Vault-02&lt;/b&gt;&lt;br&gt;0s (parallel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="290" y="48" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_v3" value="&lt;b&gt;Vault-03&lt;/b&gt;&lt;br&gt;0s (parallel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="400" y="48" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_mon" value="&lt;b&gt;L1: Monitor&lt;/b&gt;&lt;br&gt;Prometheus+Grafana&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="515" y="48" width="140" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_jen" value="&lt;b&gt;L2: Jenkins&lt;/b&gt;&lt;br&gt;Needs Vault secrets&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="670" y="48" width="140" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_km" value="&lt;b&gt;L3: K8s Master&lt;/b&gt;&lt;br&gt;Control plane&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="825" y="48" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_kw1" value="&lt;b&gt;Worker-1&lt;/b&gt;&lt;br&gt;60s delay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="970" y="48" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_kw2" value="&lt;b&gt;Worker-2&lt;/b&gt;&lt;br&gt;0s (parallel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="1080" y="48" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_kw3" value="&lt;b&gt;Worker-3&lt;/b&gt;&lt;br&gt;0s (parallel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nested_startup">
+          <mxGeometry x="1190" y="48" width="100" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DR ACTIVATION PROCEDURE ==================== -->
+        <mxCell id="dr_activation" value="&lt;b&gt;DR Activation Procedure — 6 Steps, 15-20 min RTO&lt;/b&gt;&lt;br&gt;Manual activation of cold standby DR ESXi when Production ESXi fails" style="swimlane;startSize=40;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="570" width="1520" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_detect" value="&lt;b&gt;Step 1: Detect&lt;/b&gt;&lt;br&gt;Prod ESXi failure&lt;br&gt;Grafana alert or manual&lt;br&gt;Wait 5 min confirm" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="15" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_shutdown" value="&lt;b&gt;Step 2: Shutdown Prod&lt;/b&gt;&lt;br&gt;Power off Prod ESXi VM&lt;br&gt;Frees 25.5GB RAM&lt;br&gt;~2 min" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="205" y="48" width="180" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_poweron" value="&lt;b&gt;Step 3: Power On DR&lt;/b&gt;&lt;br&gt;Boot DR ESXi VM&lt;br&gt;Wait for network+NFS&lt;br&gt;~5 min" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="405" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_connect" value="&lt;b&gt;Step 4: Connect&lt;/b&gt;&lt;br&gt;Add DR ESXi to vCenter&lt;br&gt;Verify datastores+VMs&lt;br&gt;~2 min" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="595" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_startvms" value="&lt;b&gt;Step 5: Start VMs&lt;/b&gt;&lt;br&gt;4-phase manual startup&lt;br&gt;IPA→Vault→K8s→Services&lt;br&gt;~5-10 min" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="785" y="48" width="180" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_verify" value="&lt;b&gt;Step 6: Verify&lt;/b&gt;&lt;br&gt;DNS, LDAP, Vault health&lt;br&gt;K8s nodes Ready&lt;br&gt;Grafana dashboards up" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="dr_activation">
+          <mxGeometry x="985" y="48" width="180" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="dr_detect" target="dr_shutdown" parent="dr_activation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="dr_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="dr_shutdown" target="dr_poweron" parent="dr_activation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="dr_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="dr_poweron" target="dr_connect" parent="dr_activation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="dr_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="dr_connect" target="dr_startvms" parent="dr_activation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="dr_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="dr_startvms" target="dr_verify" parent="dr_activation"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== TESTING SCHEDULE ==================== -->
+        <mxCell id="testing_layer" value="&lt;b&gt;DR Testing Schedule&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="750" width="1520" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="test_monthly_dr" value="&lt;b&gt;Monthly: DR Activation&lt;/b&gt;&lt;br&gt;Boot DR ESXi, test 1 VM&lt;br&gt;Verify network + datastores&lt;br&gt;1-2 hours, no prod impact" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="testing_layer">
+          <mxGeometry x="15" y="38" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="test_monthly_backup" value="&lt;b&gt;Monthly: Backup Restore&lt;/b&gt;&lt;br&gt;Rotate: IPA → Vault → K8s&lt;br&gt;Full VM restore + verify&lt;br&gt;2 hours, test env only" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="testing_layer">
+          <mxGeometry x="265" y="38" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="test_quarterly_fo" value="&lt;b&gt;Quarterly: Full Failover&lt;/b&gt;&lt;br&gt;Complete DR scenario&lt;br&gt;Run apps 30min on DR&lt;br&gt;2-3 hours, planned window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="testing_layer">
+          <mxGeometry x="515" y="38" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="test_quarterly_em" value="&lt;b&gt;Quarterly: Emergency Drill&lt;/b&gt;&lt;br&gt;Trigger BatteryMonitor at 90%&lt;br&gt;Monitor shutdown sequence&lt;br&gt;Cancel before laptop off" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="testing_layer">
+          <mxGeometry x="775" y="38" width="240" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="test_quarterly_doc" value="&lt;b&gt;Quarterly: Doc Review&lt;/b&gt;&lt;br&gt;Verify IP addresses&lt;br&gt;Test command examples&lt;br&gt;Update timestamps" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="testing_layer">
+          <mxGeometry x="1035" y="38" width="220" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_shut_master" value="reverse of startup order" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;fontColor=#333;fontSize=10;" edge="1" source="shutdown_layer" target="master_startup" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_master_nested" value="Tier 4 triggers nested startup" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;" edge="1" source="master_startup" target="nested_startup" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_nested_dr" value="if production fails" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="nested_startup" target="dr_activation" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_dr_test" value="validated by" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="dr_activation" target="testing_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

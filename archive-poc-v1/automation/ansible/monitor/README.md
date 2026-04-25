@@ -1,6 +1,18 @@
-# Monitoring Setup - Ansible Playbooks
+# Monitoring Setup - Ansible Playbooks (PoC v1 — archived)
 
-Ansible playbooks for deploying and managing Prometheus monitoring infrastructure using Node Exporter.
+> **Archived PoC v1 material.** These playbooks deployed Prometheus + Node
+> Exporter on the VMware PoC infrastructure before it was retired. The content
+> below is preserved verbatim from that era as portfolio reference — but
+> everything is in *past* context even where the verbs read as present. IPs,
+> paths like `/03-AUTOMATION/`, and ongoing-maintenance instructions refer to
+> the retired PoC environment, not anything currently running.
+>
+> **In the current project**, monitoring runs as k8s workloads managed by Flux:
+> kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki for
+> logs. See [`/kubernetes/`](../../../../kubernetes/) for the live
+> implementation.
+>
+> See [`../../../README.md`](../../../README.md) for the full retirement story.
 
 ---
 
@@ -90,13 +102,13 @@ ansible-playbook 02-validate_node_exporter.yml
 
 **Expected Output:**
 ```
-Target: k8s-master.home.lab | Local Service: ✅ UP | Prometheus Connection: ✅ SUCCESS
-Target: vault-01.home.lab   | Local Service: ✅ UP | Prometheus Connection: ✅ SUCCESS
+Target: k8s-master.home.lab | Local Service:  UP | Prometheus Connection:  SUCCESS
+Target: vault-01.home.lab   | Local Service:  UP | Prometheus Connection:  SUCCESS
 ```
 
 **Failure Example:**
 ```
-Target: jenkins.home.lab | Local Service: ✅ UP | Prometheus Connection: ❌ BLOCKED (Check Firewall)
+Target: jenkins.home.lab | Local Service:  UP | Prometheus Connection:  BLOCKED (Check Firewall)
 ```
 
 **Troubleshooting Failed Connections:**
@@ -371,7 +383,7 @@ ansible-playbook 01-node_exporter-setup.yml --limit <hostname>
 
 **Symptoms:**
 ```
-Prometheus Connection: ❌ BLOCKED (Check Firewall)
+Prometheus Connection:  BLOCKED (Check Firewall)
 ```
 
 **Diagnosis:**

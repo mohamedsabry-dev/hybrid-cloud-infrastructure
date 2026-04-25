@@ -1,160 +1,144 @@
 # TS-LNX-002 | 2026-03-15 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: LXC / Chronyd / Systemd
-- Environment: DEV (lab.local)
-- Related components: All unprivileged LXC containers
-- **Related tickets:** [TS-IDN-008](../identity/8-freeipa-client-ntp-lxc-skip.md) - FreeIPA client NTP skip (same root cause, IPA enrollment config)
+[Info]
+Domain: Linux
+Sub-techs: LXC, Chronyd, adjtimex, CAP_SYS_TIME, Ansible, Proxmox
+Environment: DEV lab.local | all unprivileged LXC containers
+Re-opened: No
 
-## 2. Issue
-- Symptom: Ansible playbook fails when starting chronyd on LXC containers
-- Error:
-```
-fatal: [ex-nginx.lab.local]: FAILED! => {
-    "changed": false,
-    "msg": "Unable to start service chronyd: Job for chronyd.service failed because the control process exited with error code."
-}
-```
+_____________________________________________________________________
 
-Service status shows:
-```bash
-systemctl status chronyd.service
-```
-```
-× chronyd.service - NTP client/server
-     Active: failed (Result: exit-code)
-    Drop-In: /run/systemd/system/service.d
-             └─zzz-lxc-service.conf
+[Issue Description]
+Ansible playbook fails when trying to start chronyd on LXC containers.
 
-Fatal error : adjtimex(0x8001) failed : Operation not permitted
-```
+  fatal: [ex-nginx.lab.local]: FAILED!
+  Unable to start service chronyd: Job for chronyd.service failed because
+  the control process exited with error code.
 
-## 3. Analysis
+  systemctl status chronyd.service:
+  Fatal error: adjtimex(0x8001) failed: Operation not permitted
 
-**Check 1: What is adjtimex?**
-```
-adjtimex() - system call to read/adjust kernel time-keeping variables
-Used by chronyd to adjust system clock
-```
-Finding: chronyd is trying to adjust the system clock.
+Related ticket: TS-IDN-008 — FreeIPA client NTP skip (same root cause)
 
-**Check 2: Why "Operation not permitted"?**
-```bash
-# Check container capabilities
-cat /proc/self/status | grep Cap
-```
-Finding: Unprivileged LXC containers don't have `CAP_SYS_TIME` capability - stripped for security.
+_____________________________________________________________________
 
-**Check 3: Can we add the capability?**
-```
-Unprivileged LXC = UID namespace isolation
-CAP_SYS_TIME would allow container to change HOST time
-This is a security boundary - cannot be granted
-```
-Finding: By design, unprivileged containers cannot adjust time.
+[Analysis]
 
-**Check 4: Where does time come from in LXC?**
-```
-Proxmox Host (owns the kernel)
-    │
-    ├── chronyd (adjusts system clock)
-    │
-    └── LXC Containers (share kernel, inherit time)
-```
-Finding: LXC containers inherit time from host - they don't need their own chronyd.
+# Initial Check Notes:
+Checked what adjtimex is and why it is failing.
 
-## 4. Root Cause
-> Unprivileged LXC containers cannot adjust the system clock. The `adjtimex()` syscall requires `CAP_SYS_TIME` capability, which is stripped from unprivileged containers for security. LXC containers share the host kernel and must inherit time from Proxmox host.
+adjtimex() is a kernel syscall that reads and adjusts kernel time-keeping variables.
+Chronyd uses it to adjust the system clock.
 
-## 5. Solution
-> Skip chronyd on LXC containers, ensure Proxmox host runs chronyd.
+Checked container capabilities:
 
-**Why this works:** LXC containers automatically inherit correct time from host. No need for chronyd inside container.
+Command:
+  cat /proc/self/status | grep Cap
 
-**Step 1: Configure chrony on Proxmox host**
+Output:
+  CAP_SYS_TIME not present — stripped from unprivileged LXC containers for security.
 
-**Location:** On Proxmox host (pve-dev)
+Unprivileged LXC containers use UID namespace isolation. Granting CAP_SYS_TIME
+would allow the container to change the HOST system clock — that is a security
+boundary that cannot be crossed. By design, unprivileged containers cannot
+adjust time.
 
-```bash
-# Install chrony
-apt update && apt install chrony -y
+Checked where LXC containers get their time:
 
-# Enable and start
-systemctl enable chrony
-systemctl start chrony
+  Proxmox host owns the kernel and runs chronyd.
+  LXC containers share the host kernel and inherit time automatically.
+  LXC containers do not need their own chronyd — time is already correct.
 
-# Verify
-systemctl status chrony
-chronyc tracking
-```
+The systemd drop-in file visible in the error (zzz-lxc-service.conf) is LXC's
+systemd integration that modifies service behavior inside containers — it is
+expected, not a problem.
 
-**Step 2: Update Ansible playbook - skip chronyd on LXC**
 
-**File:** `ansible/dev/playbooks/common/ntp.yml` (or relevant playbook)
+# Suspected Root Cause
+Unprivileged LXC containers cannot run chronyd. The adjtimex() syscall requires
+CAP_SYS_TIME which is stripped for security. LXC containers share the host kernel
+and inherit time from the Proxmox host — they should not run their own NTP service.
 
-**Location:** Ansible playbook configuration
 
-```yaml
-- name: Enable and start chronyd
-  ansible.builtin.service:
-    name: chronyd
-    state: started
-    enabled: yes
-  when: ansible_virtualization_type != "lxc"
+# More Checks Notes:
+Confirmed time is already correct on LXC without chronyd:
 
-- name: Set timezone (works on all systems)
-  community.general.timezone:
-    name: Africa/Cairo
+Command:
+  timedatectl  (on LXC container)
 
-- name: Reminder for LXC host configuration
-  ansible.builtin.debug:
-    msg:
-      - "NOTE: LXC containers inherit time from the host."
-      - "Ensure chrony is installed and running on the Proxmox host."
-      - "Run on host: apt install chrony && systemctl enable --now chrony"
-  when: ansible_virtualization_type == "lxc"
-  run_once: true
-```
+Output:
+  System clock synchronized: yes
+  NTP service: inactive
 
-**Verification:**
+Time inherited from host, no NTP needed inside the container.
 
-On Proxmox host:
-```bash
-chronyc tracking
-# Reference ID    : A29FC801 (time.cloudflare.com)
-# Stratum         : 3
-# ...
-```
 
-On LXC container:
-```bash
-timedatectl
-# System clock synchronized: yes
-# NTP service: inactive (expected)
-```
+# Suspected Solution
+Skip chronyd on LXC containers in Ansible playbook using ansible_virtualization_type
+condition. Ensure Proxmox host runs chrony for all containers to inherit from.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: If Proxmox host time drifts, all LXC containers drift. Ensure chrony on host is working.
 
-## 7. Impact After Fix
-- Observed: Ansible playbooks run without chronyd errors on LXC
-- LXC containers have correct time inherited from host
-- No new issues caused
+# Test
+Added when: ansible_virtualization_type != "lxc" condition to chronyd task,
+re-ran playbook against all LXC containers.
 
-## 8. Notes
+Result: PASS — no chronyd errors, time correct on all LXC containers.
 
-**Detection in Ansible:**
-```yaml
-# ansible_virtualization_type == "lxc" for LXC containers
-# ansible_virtualization_type == "kvm" for VMs
-```
+_____________________________________________________________________
 
-**LXC drop-in file:**
-The error shows `Drop-In: /run/systemd/system/service.d └─zzz-lxc-service.conf` - this is LXC's systemd integration that modifies service behavior in containers.
+[Final Root Cause]
+Unprivileged LXC containers cannot adjust the system clock. adjtimex() requires
+CAP_SYS_TIME which is stripped from unprivileged containers by design — granting
+it would let the container modify the host clock. LXC containers share the host
+kernel and inherit time automatically from the Proxmox host. Running chronyd
+inside an LXC container is both unnecessary and impossible.
 
-## 9. Workaround (if any)
-> N/A - this IS the correct approach. LXC containers should not run chronyd.
+_____________________________________________________________________
 
-## Related Cases
-- [TS-IDN-008: FreeIPA Client NTP Skip](../identity/8-freeipa-client-ntp-lxc-skip.md)
+[Final Solution]
+Two changes — skip chronyd on LXC in Ansible, confirm chrony running on Proxmox host.
+
+Proxmox host (pve-dev):
+  apt update && apt install chrony -y
+  systemctl enable --now chrony
+  chronyc tracking  # verify sync
+
+Ansible playbook update (ansible/dev/playbooks/common/ntp.yml):
+  - name: Enable and start chronyd
+    ansible.builtin.service:
+      name: chronyd
+      state: started
+      enabled: yes
+    when: ansible_virtualization_type != "lxc"
+
+  - name: Reminder for LXC host configuration
+    ansible.builtin.debug:
+      msg: "LXC containers inherit time from host. Ensure chrony runs on Proxmox host."
+    when: ansible_virtualization_type == "lxc"
+    run_once: true
+
+Detection reference:
+  ansible_virtualization_type == "lxc"  → LXC container
+  ansible_virtualization_type == "kvm"  → VM
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: If Proxmox host time drifts, all LXC containers drift with it.
+Ensure chrony is monitored on the Proxmox host.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Related: TS-IDN-008 — FreeIPA client enrollment also needed NTP skipped on LXC,
+same root cause, handled via ipaclient_no_ntp: true.

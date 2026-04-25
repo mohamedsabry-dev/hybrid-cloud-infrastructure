@@ -1,543 +1,246 @@
 # TS-K8S-011 | 2026-04-04 | RESOLVED
+_____________________________________________________________________
+
+[Info]
+Domain: Kubernetes / WordPress
+Sub-techs: WordPress plugin compatibility, MariaDB, PHP fatal error, OPcache,
+           Vault Agent Injector, Nginx Ingress sticky sessions
+Environment: DEV k8s-dev cluster | apps namespace
+  Stack: Kubernetes v1.31, WordPress 6.4-php8.2-apache (3 replicas, sticky sessions),
+         MariaDB 10.11, Nginx Ingress, Vault Agent Injector sidecar
+Re-opened: No
 
-## 1. Context
-
-**System:** WordPress deployment on Kubernetes
-
-**Environment:**
-```
-+-----------------------------------------------------------------+
-|                      Kubernetes Cluster                         |
-|                                                                  |
-|   +----------------------------------------------------------+  |
-|   |                    apps namespace                         |  |
-|   |                                                           |  |
-|   |   wordpress-64487cb94-66s9v  --+                         |  |
-|   |   wordpress-64487cb94-8zrvc  --+-->  mariadb-svc         |  |
-|   |   wordpress-64487cb94-xsrkv  --+     (database ns)       |  |
-|   |                                                           |  |
-|   |   Image: wordpress:6.4-php8.2-apache                     |  |
-|   |   Replicas: 3 (with sticky sessions)                     |  |
-|   +----------------------------------------------------------+  |
-|                                                                  |
-|   +----------------------------------------------------------+  |
-|   |                  database namespace                       |  |
-|   |                                                           |  |
-|   |   mariadb-0 (StatefulSet)                                |  |
-|   |   Image: mariadb:10.11                                   |  |
-|   +----------------------------------------------------------+  |
-+-----------------------------------------------------------------+
-```
-
-**Stack:**
-- Kubernetes v1.31
-- WordPress 6.4 (Docker image)
-- MariaDB 10.11
-- Ingress: nginx with sticky sessions
-- Secrets: Vault Agent Injector
-
-**Related Components:**
-- WordPress deployment (3 replicas)
-- MariaDB StatefulSet
-- Vault Agent Injector (sidecar)
-- Nginx Ingress with sticky sessions
-
-**Discovered During:** Post-reboot system health check
-
-**Duration:** ~30 minutes troubleshooting
-
-**Note:** Password-related login issues are a separate problem documented in Case 10.
-
----
-
-## 2. Issue
-
-**Symptom:**
-After server reboot, WordPress displayed blank/empty pages in browser while `curl` returned HTML content.
-
-**Initial observation:**
-- Browser: Blank/empty white page
-- `curl`: Returns valid HTML content
-- Login page (`/wp-admin`): Loads but rejects correct password
-- Redirect loop when clicking any admin link
-
-**Pod status:**
-```bash
-$ kubectl get pods -n apps
-NAME                        READY   STATUS    RESTARTS        AGE
-wordpress-64487cb94-66s9v   2/2     Running   2 (7m57s ago)   51m
-wordpress-64487cb94-8zrvc   2/2     Running   2 (7m57s ago)   51m
-wordpress-64487cb94-xsrkv   2/2     Running   2 (8m55s ago)   51m
-
-$ kubectl get pods -n database
-NAME        READY   STATUS    RESTARTS        AGE
-mariadb-0   2/2     Running   2 (8m59s ago)   87m
-```
-
-**Curl test (works):**
-```bash
-$ curl http://wordpress-dev.lab.local
-<!doctype html>
-<html lang="en-US">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
-    <link rel="profile" href="https://gmpg.org/xfn/11">
-    <meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
-```
-
-**Browser DevTools (F12 -> Console):**
-```
-wp-login:1 Failed to load resource: the server responded with a status of 404 (Not Found)
-```
-
-**Impact:**
-- WordPress site completely inaccessible via browser
-- Admin dashboard unusable
-- All 3 replicas affected
-
----
-
-## 3. Analysis
-
-### Step 1: Verify Infrastructure is Running
+_____________________________________________________________________
 
-**Commands:**
-```bash
-kubectl get pods -n apps
-kubectl get pods -n database
-```
+[Issue Description]
+After server reboot, WordPress displays blank/empty pages in browser while curl
+returns HTML content. Login page loads but rejects correct password. Redirect
+loop on admin links.
 
-**Result:** All pods Running with 2/2 Ready (includes vault-agent sidecar)
+  Browser:  blank white page
+  curl:     returns valid HTML content
+  /wp-admin: loads but rejects password, redirect loops
 
-**Analysis:** Infrastructure is healthy - issue is application-level.
+  All pods Running 2/2 (includes vault-agent sidecar).
+  Browser DevTools: wp-login:1 Failed to load resource: 404 Not Found
 
----
+Note: password rejection is a separate issue documented in TS-K8S-010.
+This ticket covers the blank page / PHP fatal error issue only.
 
-### Step 2: Verify Database Connectivity
+_____________________________________________________________________
 
-**Command:**
-```bash
-kubectl exec -it mariadb-0 -n database -- mysqladmin ping -u root -p
-```
+[Analysis]
 
-**Result:**
-```
-Enter password:
-mysqld is alive
-```
+# Initial Check Notes:
+Verified infrastructure first — all pods running, MariaDB responsive.
 
-**Analysis:** Database is responsive.
+Step 1 — Verify pods:
+  kubectl get pods -n apps && kubectl get pods -n database
+  All Running 2/2. Not an infrastructure issue — application-level.
 
----
+Step 2 — Verify database:
+  kubectl exec -it mariadb-0 -n database -- mysqladmin ping -u root -p
+  → mysqld is alive
 
-### Step 3: Check WordPress Application Logs (CRITICAL)
+Step 3 — Check WordPress application logs (CRITICAL FINDING):
+  Command:
+    kubectl logs -n apps -l app=wordpress --tail=100
 
-**Command:**
-```bash
-kubectl logs -n apps -l app=wordpress --tail=100
-```
+  Output:
+    [Sat Apr 04 14:35:43.454793 2026] [php:error]
+    PHP Fatal error: Uncaught Error: Call to undefined function wp_is_serving_rest_request()
+    in .../plugins/wordpress-seo/src/integrations/front-end-integration.php:640
+    Stack trace:
+    #0 .../front-end-integration.php(550): maybe_remove_title_presenter(Array)
+    #1 .../front-end-integration.php(506): get_needed_presenters('Home_Page')
 
-**Result - THE SMOKING GUN:**
-```
-[Sat Apr 04 14:35:43.454793 2026] [php:error] [pid 70] [client 10.0.64.11:0]
-PHP Fatal error:  Uncaught Error: Call to undefined function wp_is_serving_rest_request()
-in /var/www/html/wp-content/plugins/wordpress-seo/src/integrations/front-end-integration.php:640
-Stack trace:
-#0 /var/www/html/wp-content/plugins/wordpress-seo/src/integrations/front-end-integration.php(550):
-   Yoast\WP\SEO\Integrations\Front_End_Integration->maybe_remove_title_presenter(Array)
-#1 /var/www/html/wp-content/plugins/wordpress-seo/src/integrations/front-end-integration.php(506):
-   Yoast\WP\SEO\Integrations\Front_End_Integration->get_needed_presenters('Home_Page')
-...
-```
+  wp_is_serving_rest_request() was introduced in WordPress 6.5.
+  Yoast SEO plugin requires this function.
+  WordPress image is 6.4 — function does not exist.
 
-**Key Error:**
-```
-Call to undefined function wp_is_serving_rest_request()
-```
+Step 4 — Verify WordPress version:
+  kubectl exec -it <pod> -n apps -c wordpress -- \
+    grep "wp_version =" /var/www/html/wp-includes/version.php
+  → $wp_version = '6.4'
 
-**Analysis:** The function `wp_is_serving_rest_request()` was introduced in **WordPress 6.5**. The Yoast SEO plugin requires this function, but the deployment uses **WordPress 6.4** image.
+Step 5 — Check active plugins in database:
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+    "SELECT option_value FROM wordpress.wp_options WHERE option_name = 'active_plugins';"
+  → a:1:{i:0;s:24:"wordpress-seo/wp-seo.php";}
+  Only Yoast SEO active — confirmed as the problematic plugin.
 
----
+Evidence summary:
+  PHP Fatal Error    kubectl logs -n apps -l app=wordpress
+                     Call to undefined function wp_is_serving_rest_request()
+  WordPress version  /var/www/html/wp-includes/version.php → 6.4
+  Active plugins     wp_options.active_plugins → wordpress-seo only
+  Plugin location    /var/www/html/wp-content/plugins/wordpress-seo/
 
-### Step 4: Verify WordPress Version
+Why browser shows blank but curl shows content:
+  PHP starts rendering HTML.
+  Fatal error occurs mid-render.
+  curl shows partial output up to the error point.
+  Browser requires a complete valid response to render — shows blank instead.
 
-**Command:**
-```bash
-kubectl exec -it wordpress-64487cb94-8zrvc -n apps -c wordpress -- grep "wp_version =" /var/www/html/wp-includes/version.php
-```
+Why it happened after reboot specifically:
+  Before reboot: plugin active, possibly masked by OPcache.
+  After reboot: fresh pod startup, plugin loaded clean, fatal error immediately.
 
-**Result:**
-```
-$wp_version = '6.4';
-```
 
-**Analysis:** Confirms WordPress 6.4 - missing the required function.
+# Suspected Root Cause
+Yoast SEO plugin (latest version installed via WordPress UI) requires
+wp_is_serving_rest_request() added in WordPress 6.5. WordPress image pinned
+to 6.4 — function does not exist. PHP fatal error on every page load.
 
----
 
-### Step 5: Check wp-config.php (Database Connection)
+# More Checks Notes:
+Confirmed wp-config.php database credentials injected correctly via Vault
+environment variables. DB connection not the issue.
 
-**Command:**
-```bash
-kubectl exec -it wordpress-64487cb94-8zrvc -n apps -c wordpress -- cat /var/www/html/wp-config.php | grep -i "db"
-```
 
-**Result:**
-```php
-define( 'DB_NAME', getenv_docker('WORDPRESS_DB_NAME', 'wordpress') );
-define( 'DB_USER', getenv_docker('WORDPRESS_DB_USER', 'example username') );
-define( 'DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'example password') );
-define( 'DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'mysql') );
-```
+# Suspected Solution
+Disable incompatible plugin via database. Restart pods to clear OPcache.
+Permanently update WordPress image to 6.5+.
 
-**Analysis:** Database configuration looks correct (uses environment variables from Vault).
 
----
+# Test
+Disabled Yoast SEO via database UPDATE, restarted deployment.
 
-### Step 6: Check Active Plugins in Database
+Command:
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+    "UPDATE wordpress.wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';"
+  kubectl rollout restart deployment wordpress -n apps
 
-**Command:**
-```bash
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
-  "SELECT option_value FROM wordpress.wp_options WHERE option_name = 'active_plugins';"
-```
+Result: PASS — WordPress loads correctly in browser, admin dashboard accessible.
 
-**Result:**
-```
-+--------------------------------------------+
-| option_value                               |
-+--------------------------------------------+
-| a:1:{i:0;s:24:"wordpress-seo/wp-seo.php";} |
-+--------------------------------------------+
-```
+Why pod restart is required after database change:
+  PHP OPcache still has compiled plugin code in memory.
+  Apache processes still running with old code loaded.
+  Database change alone is not enough — pods must restart to clear cache.
 
-**Analysis:** Only Yoast SEO (`wordpress-seo`) is active - confirms it's the problematic plugin.
+_____________________________________________________________________
 
----
+[Final Root Cause]
+Yoast SEO plugin (latest version) calls wp_is_serving_rest_request() which
+was introduced in WordPress 6.5. WordPress image is pinned to 6.4 — function
+does not exist. Every page load triggers a PHP fatal error mid-render. curl
+sees partial HTML output, browser shows blank. Error was masked before reboot
+(possibly OPcache). After reboot, fresh pod startup hit the error immediately.
 
-### Evidence Summary
+_____________________________________________________________________
 
-| Evidence | Location | Finding |
-|----------|----------|---------&|
-| PHP Fatal Error | `kubectl logs -n apps -l app=wordpress` | `Call to undefined function wp_is_serving_rest_request()` |
-| WordPress Version | `/var/www/html/wp-includes/version.php` | 6.4 (needs 6.5 for the function) |
-| Active Plugins | `wp_options.active_plugins` | Only `wordpress-seo` active |
-| Plugin File | `/var/www/html/wp-content/plugins/wordpress-seo/` | Yoast SEO (requires WP 6.5+) |
+[Final Solution]
 
----
+Immediate fix — disable plugin via database and restart pods:
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+    "UPDATE wordpress.wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';"
+  kubectl rollout restart deployment wordpress -n apps
 
-## 4. Root Cause
+Permanent fix — update WordPress image in deployment.yaml:
+  image: wordpress:6.5-php8.2-apache   (or wordpress:latest)
 
-### Primary Cause: Plugin Version Incompatibility
-
-```
-+-----------------------------------------------------------------+
-|                     VERSION MISMATCH                             |
-|                                                                  |
-|   WordPress Image: 6.4-php8.2-apache                            |
-|                    +--- Does NOT have wp_is_serving_rest_request()
-|                                                                  |
-|   Yoast SEO Plugin: Latest version (installed via web UI)       |
-|                     +--- REQUIRES wp_is_serving_rest_request()  |
-|                          (added in WordPress 6.5)               |
-|                                                                  |
-|   Result: PHP Fatal Error -> Blank page                          |
-+-----------------------------------------------------------------+
-```
-
-### Why It Happened After Reboot
-
-1. Before reboot: Plugin was active and somehow working (possibly cached)
-2. After reboot: Fresh pod startup, plugin loaded, fatal error triggered immediately
-3. PHP fatal error = no output = blank page in browser
-4. `curl` returns partial HTML (rendered before fatal error occurred)
-
-### Why Browser Shows Blank But Curl Shows Content
-
-- PHP starts rendering HTML
-- Fatal error occurs mid-render
-- `curl` shows partial output up to error point
-- Browser requires complete response to render properly
-
----
-
-## 5. Solution
-
-### Immediate Fix (Applied)
-
-**Step 7: Disable Plugin via Database**
-
-**Command:**
-```bash
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p
-
-# Then in MySQL:
-USE wordpress;
-UPDATE wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';
-```
-
-**Result:**
-```
-Query OK, 1 row affected (0.003 sec)
-Rows matched: 1  Changed: 1  Warnings: 0
-```
-
-**IMPORTANT: Restart pods after disabling plugins via database!**
-
-```bash
-kubectl rollout restart deployment wordpress -n apps
-```
-
-Why? PHP/Apache cache the plugin code in memory. Even after database update:
-- OPcache still has compiled plugin code
-- Apache processes still running with old code loaded
-- Changes won't fully take effect until pod restart
-
----
-
-### Step 8: Verify Fix
-
-**Action:** Refresh browser
-
-**Result:** WordPress loads correctly! Login works!
-
----
-
-### Permanent Fix Options
-
-**Option 1: Update WordPress Image (Recommended)**
-```yaml
-# deployment.yaml
-containers:
-  - name: wordpress
-    image: wordpress:6.5-php8.2-apache  # or wordpress:latest
-```
-
-**Option 2: Downgrade Plugin**
-- Install Yoast SEO version compatible with WordPress 6.4
-- Check plugin changelog for version requirements
-
-**Option 3: Use Alternative Plugin**
-- Simple SEO plugins that don't require latest WP functions
-
----
-
-### Prevention Measures
-
-- Pin plugin versions for stability
-- Add WordPress version check to monitoring/alerts
-- Test plugin updates in staging environment before production
-- Document WordPress image version requirements
-
----
-
-## 6. Solution Risk
-
-**Risk Level:** Low (for immediate fix), Medium (for permanent fix)
-
-**Potential Impact:**
-
-*Immediate Fix (disable plugin):*
-- SEO functionality temporarily lost
-- No site downtime during fix
-- Easily reversible
-
-*Permanent Fix (update WordPress image):*
-- Requires deployment update and pod restart
-- Brief downtime during rollout
-- Other plugins may have compatibility issues with new WP version
-- Test thoroughly in staging first
-
----
-
-## 7. Impact After Fix
-
-**Observed Results:**
-- WordPress site loads correctly in browser
-- Admin dashboard accessible
-- Login functionality restored
-- All 3 replicas serving traffic normally
-
-**Action Items:**
-- [x] Disable incompatible plugin via database
-- [ ] Update WordPress image to 6.5+ in deployment.yaml
-- [ ] Consider pinning plugin versions for stability
-- [ ] Add WordPress version check to monitoring/alerts
-
----
-
-## 8. Notes
-
-### Lessons Learned
-
-1. **Check application logs FIRST** - They usually contain the exact error
-2. **Version compatibility matters** - Plugin updates can break older WordPress versions
-3. **Database is shared state** - Changes to `wp_options` affect all pods immediately
-4. **`curl` vs browser difference** - Indicates partial render / fatal error scenario
-5. **Pin your versions** - Consider pinning plugin versions or using WP-CLI for updates
-
----
-
-### Systematic Troubleshooting Flow (For Future Reference)
-
-```
-Browser Issue (blank page, login fail, etc.)
-    |
-    v
-+------------------------------------------+
-| Step 1: curl vs Browser                   |
-| curl http://site  -> Compare output       |
-| If curl works, browser doesn't -> JS/CSS  |
-| If both fail -> Server-side issue         |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 2: Check Pod Status                  |
-| kubectl get pods -n <namespace>           |
-| All Running? Correct READY count?         |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 3: Check Database                    |
-| kubectl exec mariadb-0 -- mysqladmin ping |
-| Is DB alive and reachable?                |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 4: Check Application Logs *          |
-| kubectl logs -n <ns> -l app=<app>         |
-| Look for: error, fatal, exception         |
-| THIS USUALLY REVEALS ROOT CAUSE           |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 5: Check Configuration               |
-| - wp-config.php (WordPress)               |
-| - Environment variables                   |
-| - Vault secrets injection                 |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 6: Check Database State              |
-| - Active plugins                          |
-| - User accounts                           |
-| - Site URL settings                       |
-+------------------------------------------+
-    |
-    v
-+------------------------------------------+
-| Step 7: Apply Fix & Verify                |
-| - Disable plugins via DB                  |
-| - Update image version                    |
-| - Clear browser cache                     |
-+------------------------------------------+
-```
-
----
-
-### Commands Reference
-
-#### Check Pod Status
-```bash
-kubectl get pods -n apps
-kubectl get pods -n database
-kubectl describe pod <pod-name> -n <namespace>
-```
-
-#### Check Application Logs
-```bash
-# All pods with label
-kubectl logs -n apps -l app=wordpress --tail=100
-
-# Specific pod
-kubectl logs -n apps wordpress-xxxx -c wordpress --tail=100
-
-# Follow logs
-kubectl logs -n apps -l app=wordpress -f
-```
-
-#### Check Database
-```bash
-# Ping test
-kubectl exec -it mariadb-0 -n database -- mysqladmin ping -u root -p
-
-# Interactive MySQL
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p
-
-# One-liner query
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e "SELECT * FROM wordpress.wp_options WHERE option_name='active_plugins';"
-```
-
-#### WordPress Troubleshooting
-```bash
-# Check wp-config.php
-kubectl exec -it <wordpress-pod> -n apps -c wordpress -- cat /var/www/html/wp-config.php
-
-# Check WordPress version
-kubectl exec -it <wordpress-pod> -n apps -c wordpress -- grep "wp_version" /var/www/html/wp-includes/version.php
-
-# List plugins
-kubectl exec -it <wordpress-pod> -n apps -c wordpress -- ls /var/www/html/wp-content/plugins/
-```
-
-#### Disable Plugins via Database
-```bash
-# Disable ALL plugins
-kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
-  "UPDATE wordpress.wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';"
-
-# IMPORTANT: Restart pods after database change!
-kubectl rollout restart deployment wordpress -n apps
-
-# Or disable specific plugin by renaming folder
-kubectl exec -it <wordpress-pod> -n apps -c wordpress -- \
-  mv /var/www/html/wp-content/plugins/wordpress-seo /var/www/html/wp-content/plugins/wordpress-seo.disabled
-```
-
----
-
-### Related Files
-- WordPress deployment manifest
-- MariaDB StatefulSet manifest
-- Vault secrets configuration
-
----
-
-### References
-
-- [Stack Overflow: Fatal error on WordPress - Call to undefined function wp](https://stackoverflow.com/questions/31031133/fatal-error-on-wordpress-call-to-undefined-function-wp-in-wp-blog-header-php)
-- [WordPress 6.5 Release Notes - wp_is_serving_rest_request()](https://developer.wordpress.org/reference/functions/wp_is_serving_rest_request/)
-- [Yoast SEO Plugin Requirements](https://yoast.com/help/requirements-for-yoast-seo/)
-
----
-
-## 9. Workaround
-
-### Temporary Workaround (Applied)
-
-Disable the incompatible plugin via database update:
-
-```sql
--- Disable all plugins
-UPDATE wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';
-```
-
-Then restart pods:
-```bash
-kubectl rollout restart deployment wordpress -n apps
-```
-
-**Limitations:**
-- SEO functionality unavailable while plugin is disabled
-- Must re-enable plugin after WordPress upgrade
-- Alternative: Rename plugin folder to disable without database change:
-  ```bash
+Alternative disable without database (rename folder):
   kubectl exec -it <wordpress-pod> -n apps -c wordpress -- \
-    mv /var/www/html/wp-content/plugins/wordpress-seo /var/www/html/wp-content/plugins/wordpress-seo.disabled
-  ```
+    mv /var/www/html/wp-content/plugins/wordpress-seo \
+       /var/www/html/wp-content/plugins/wordpress-seo.disabled
+
+Action items:
+  [x] Disable incompatible plugin via database
+  [ ] Update WordPress image to 6.5+ in deployment.yaml
+  [ ] Pin plugin versions for stability
+  [ ] Add WordPress version check to monitoring
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW (immediate fix) / MEDIUM (image update)
+Note: Immediate fix — SEO functionality temporarily lost, easily reversible.
+Image update — brief downtime during rollout, test other plugin compatibility.
+
+_____________________________________________________________________
+
+[References]
+- https://developer.wordpress.org/reference/functions/wp_is_serving_rest_request/
+- https://yoast.com/help/requirements-for-yoast-seo/
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+_____________________________________________________________________
+TROUBLESHOOTING FLOW — WordPress blank page / browser issues
+_____________________________________________________________________
+
+Step 1 — curl vs browser:
+  curl http://site → if curl works but browser blank → partial render / fatal error
+  Both fail → server-side issue before any HTML rendered
+
+Step 2 — Check pod status:
+  kubectl get pods -n apps
+  kubectl get pods -n database
+  All Running? Correct READY count?
+
+Step 3 — Check database:
+  kubectl exec -it mariadb-0 -n database -- mysqladmin ping -u root -p
+  DB alive and reachable?
+
+Step 4 — Check application logs ← THIS USUALLY REVEALS ROOT CAUSE:
+  kubectl logs -n apps -l app=wordpress --tail=100
+  grep for: error, fatal, exception, undefined function
+
+Step 5 — Check configuration:
+  wp-config.php, environment variables, Vault secret injection
+
+Step 6 — Check database state:
+  Active plugins, user accounts, site URL settings in wp_options
+
+Step 7 — Apply fix and verify:
+  Disable plugins via DB, update image version, clear browser cache,
+  restart pods after any database change (OPcache)
+
+
+_____________________________________________________________________
+COMMANDS REFERENCE
+_____________________________________________________________________
+
+Pod status:
+  kubectl get pods -n apps
+  kubectl get pods -n database
+  kubectl describe pod <pod-name> -n <namespace>
+
+Application logs:
+  kubectl logs -n apps -l app=wordpress --tail=100    all pods
+  kubectl logs -n apps wordpress-xxxx -c wordpress --tail=100   specific pod
+  kubectl logs -n apps -l app=wordpress -f            follow
+
+Database checks:
+  kubectl exec -it mariadb-0 -n database -- mysqladmin ping -u root -p
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+    "SELECT option_value FROM wordpress.wp_options WHERE option_name='active_plugins';"
+
+WordPress inspection:
+  kubectl exec -it <pod> -n apps -c wordpress -- cat /var/www/html/wp-config.php
+  kubectl exec -it <pod> -n apps -c wordpress -- \
+    grep "wp_version" /var/www/html/wp-includes/version.php
+  kubectl exec -it <pod> -n apps -c wordpress -- \
+    ls /var/www/html/wp-content/plugins/
+
+Disable plugins via database:
+  kubectl exec -it mariadb-0 -n database -- mysql -u root -p -e \
+    "UPDATE wordpress.wp_options SET option_value = 'a:0:{}' WHERE option_name = 'active_plugins';"
+  kubectl rollout restart deployment wordpress -n apps   ← always restart after DB change
+
+Disable plugin by renaming folder (no DB required):
+  kubectl exec -it <pod> -n apps -c wordpress -- \
+    mv /var/www/html/wp-content/plugins/wordpress-seo \
+       /var/www/html/wp-content/plugins/wordpress-seo.disabled
+
+Notes:
+  1. Check application logs first — they contain the exact error
+  2. curl vs browser blank = partial render / PHP fatal error
+  3. Plugin updates can silently break older WordPress versions
+  4. wp_options is shared state — database change affects all pods immediately
+  5. Pod restart required after database change to clear PHP OPcache
+  6. Pin plugin versions or use WP-CLI for controlled updates

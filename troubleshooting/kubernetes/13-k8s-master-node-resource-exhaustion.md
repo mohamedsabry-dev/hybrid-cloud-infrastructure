@@ -1,232 +1,193 @@
 # TS-K8S-013 | 2026-04-05 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
+[Info]
+Domain: Kubernetes
+Sub-techs: Kubernetes control plane, kubelet, containerd, etcd, memory exhaustion,
+           Flux controllers, NFS storage, Terraform VM resources
+Environment: DEV k8s-dev cluster | Proxmox virtualization | k8s-master1/2/3
+Re-opened: No
 
-- **System:** Kubernetes control plane (master node)
-- **Environment:** Development cluster (dev), Proxmox virtualization
-- **Related Components:** kubelet, containerd, etcd, kube-apiserver, Flux controllers, NFS storage
-- **Discovered During:** kubectl commands hanging during cluster operations
+_____________________________________________________________________
 
-## 2. Issue
+[Issue Description]
+Kubernetes master node becomes unresponsive due to memory exhaustion. kubectl
+commands hang indefinitely, control plane components fail.
 
-**Symptom:** Kubernetes master node becomes unresponsive due to memory exhaustion, causing kubectl commands to hang and control plane components to fail.
+  kubectl get pods -n monitoring  → hangs, no response
+  kubectl get helmrelease -n monitoring → hangs, no response
 
-**Error - kubectl commands hang indefinitely:**
-```bash
-$ kubectl get pods -n monitoring
-# Command hangs, no response
-^C
-$ kubectl get helmrelease -n monitoring
-# Command hangs, no response
-^C
-```
+  journalctl -u kubelet:
+  E0405 20:10:50 kubelet: Status from runtime service failed:
+  rpc error: code = DeadlineExceeded desc = context deadline exceeded
+  E0405 20:10:50 kubelet: Container runtime sanity check failed
+  E0405 20:10:50 kubelet: Skipping pod synchronization: container runtime is down
 
-**Error - Container runtime becomes unresponsive:**
-```bash
-$ journalctl -u kubelet -f
-Apr 05 20:10:50 k8s-master1.lab.local kubelet[1825]: E0405 20:10:50.759597 1825 log.go:32] "Status from runtime service failed" err="rpc error: code = DeadlineExceeded desc = context deadline exceeded"
-Apr 05 20:10:50 k8s-master1.lab.local kubelet[1825]: E0405 20:10:50.759653 1825 kubelet.go:3115] "Container runtime sanity check failed" err="rpc error: code = DeadlineExceeded desc = context deadline exceeded"
-Apr 05 20:10:50 k8s-master1.lab.local kubelet[1825]: E0405 20:10:50.761182 1825 kubelet.go:2525] "Skipping pod synchronization" err="container runtime is down"
-```
+Impact: complete control plane unavailability. Cannot manage workloads,
+deploy applications, or monitor cluster state.
 
-**Impact:** Complete control plane unavailability. Unable to manage workloads, deploy applications, or monitor cluster state.
+_____________________________________________________________________
 
-## 3. Analysis
+[Analysis]
 
-### Step 1: Check system memory
-```bash
-$ free -h
-               total        used        free      shared  buff/cache   available
-Mem:           1.7Gi       1.4Gi        78Mi        42Mi       345Mi       244Mi
-Swap:             0B          0B          0B
-```
-**Red flag:** Only 244MB available with no swap.
+# Initial Check Notes:
+Checked system memory on master node first.
 
-### Step 2: Check kubelet status
-```bash
-$ systemctl status kubelet
-# May show active but with errors in journal
-```
+Command:
+  free -h
 
-### Step 3: Check container runtime
-```bash
-$ crictl ps
-# May timeout or show partial results
-```
+Output:
+  Mem:   total 1.7Gi   used 1.4Gi   free 78Mi   available 244Mi
+  Swap:  0B
 
-### Step 4: Check what's consuming memory
-```bash
-$ ps aux --sort=-%mem | head -20
-```
+Only 244MB available, no swap. Red flag — control plane components running
+with critically low memory headroom.
 
-### Step 5: Check for NFS issues (can compound the problem)
-```bash
-$ dmesg | grep -i nfs
-[48792.209093] NFS: 10.0.40.120: lost 2 locks
-[48853.649561] NFS: 10.0.40.120: lost 2 locks
-# Repeated NFS lock losses indicate storage server issues
-```
+Checked kubelet and container runtime:
+  systemctl status kubelet → active but errors in journal
+  crictl ps → timeout / partial results
 
-**Evidence from session:**
-```bash
-# Worker node kernel messages showed:
-[49198.508336] traps: mysqld[280069] general protection fault ip:7f81f14bc898
-[49259.133849] NFS: 10.0.40.120: lost 2 locks
-```
+Checked top memory consumers:
+  ps aux --sort=-%mem | head -20
 
-### Verify Worker Resources
-```bash
-$ ssh k8s-worker1 "free -h"
-               total        used        free      shared  buff/cache   available
-Mem:           2.4Gi       1.3Gi        97Mi        60Mi       1.3Gi       1.1Gi
-# Workers have more headroom (1.1GB available)
-```
+Checked for NFS issues compounding the problem:
+  dmesg | grep -i nfs
+  Output:
+    [48792.209093] NFS: 10.0.40.120: lost 2 locks
+    [48853.649561] NFS: 10.0.40.120: lost 2 locks
+    (repeated)
 
-## 4. Root Cause
+Worker node kernel messages also showed:
+  [49198.508336] traps: mysqld[280069] general protection fault
+  [49259.133849] NFS: 10.0.40.120: lost 2 locks
 
-The master node has insufficient memory (1.7GB total, only 244MB available) to run Kubernetes control plane components (API server, etcd, controller-manager, scheduler) plus Flux controllers.
+Checked worker node memory for comparison:
+  ssh k8s-worker1 "free -h"
+  Output: Mem total 2.4Gi, available 1.1Gi — workers have adequate headroom.
 
-Memory exhaustion caused:
-1. Container runtime (containerd) to become unresponsive
-2. kubelet to fail health checks
-3. API server to stop responding to requests
-4. All kubectl commands to hang
+Memory exhaustion on master caused:
+  1. containerd becoming unresponsive
+  2. kubelet failing health checks
+  3. API server stopping responses
+  4. All kubectl commands hanging
 
-NFS lock losses on worker nodes compounded the problem, causing additional stress on the cluster.
+NFS lock losses on workers compounded the problem — additional cluster stress.
 
-## 5. Solution
 
-### Immediate Recovery
+# Suspected Root Cause
+Master node has insufficient memory (1.7GB total, 244MB available) to run
+Kubernetes control plane components (API server, etcd, controller-manager,
+scheduler) plus Flux controllers simultaneously. No swap configured.
 
-**1. Restart container runtime:**
-```bash
-$ systemctl restart containerd
-# or for CRI-O:
-$ systemctl restart crio
-```
 
-**2. If still unresponsive, restart kubelet:**
-```bash
-$ systemctl restart kubelet
-```
+# More Checks Notes:
+N/A — memory exhaustion confirmed from free -h and kubelet errors.
 
-**3. If cluster is severely degraded, reboot nodes:**
-```bash
-# Reboot one master at a time to maintain etcd quorum
-$ reboot
-```
 
-**4. After reboot, verify cluster recovery:**
-```bash
-$ systemctl status kubelet containerd
-$ crictl ps | grep -E "etcd|kube-api"
-$ kubectl get nodes
-```
+# Suspected Solution
+Immediate: restart containerd and kubelet. If severely degraded, reboot master.
+Permanent: increase master node memory via Terraform.
 
-### Permanent Fix
 
-**1. Increase master node memory:**
-- Minimum: 2GB RAM
-- Recommended: 4GB RAM for control plane + Flux
+# Test
+Restarted containerd, restarted kubelet, verified cluster recovery.
+Applied Terraform memory increase to all 3 masters (+512MB each).
 
-**Terraform update (applied):**
-```hcl
-# terraform/dev/proxmox/vms/k8s_masters/variables.tf
-variable "k8s_master1" {
-  default = {
-    # ...
-    memory = 2560  # Increased from 2048 (+512MB)
-    # ...
-  }
-}
-# Same for k8s_master2 and k8s_master3
-```
+Command:
+  systemctl status kubelet containerd
+  crictl ps | grep -E "etcd|kube-api"
+  kubectl get nodes
 
-**2. Add swap (optional, not recommended for production):**
-```bash
-$ fallocate -l 2G /swapfile
-$ chmod 600 /swapfile
-$ mkswap /swapfile
-$ swapon /swapfile
-```
+Result: PASS — master nodes responsive, kubectl commands executing normally,
+no more context deadline exceeded errors in kubelet logs.
 
-**3. Set resource limits for Flux controllers:**
-```yaml
-# In Flux kustomization, patch controller resources
-patches:
-  - patch: |
-      - op: add
-        path: /spec/template/spec/containers/0/resources
-        value:
-          limits:
-            memory: 256Mi
-          requests:
-            memory: 128Mi
-```
+_____________________________________________________________________
 
-### Minimum Resource Requirements
+[Final Root Cause]
+Master nodes had insufficient memory (1.7GB total) to sustain Kubernetes control
+plane components plus Flux controllers under load. Memory exhaustion caused
+containerd to become unresponsive — kubelet failed health checks, API server
+stopped responding, all kubectl commands hung indefinitely. No swap configured
+meant no fallback. NFS lock losses on worker nodes added additional stress.
 
-| Component | Minimum RAM | Recommended RAM |
-|-----------|-------------|-----------------|
-| Master Node | 2GB | 4GB |
-| Worker Node | 2GB | 4GB+ |
-| etcd | 512MB | 1GB |
-| kube-prometheus-stack | 1GB | 2GB |
+_____________________________________________________________________
 
-### Prevention Measures
-- Monitor node resources with Prometheus/Grafana
-- Set up alerts for memory usage > 80%
-- Use resource requests/limits on all workloads
-- Schedule resource-heavy workloads (monitoring, logging) on workers only
-- Consider dedicated infrastructure nodes for control plane
+[Final Solution]
 
-## 6. Solution Risk
+Immediate recovery (in order):
+  # 1. Restart container runtime
+  systemctl restart containerd
 
-- **Risk Level:** Medium
-- **Potential Impact:**
-  - Restarting containerd/kubelet causes temporary pod disruption on that node
-  - Rebooting master nodes requires coordination to maintain etcd quorum (never reboot more than one master at a time in a 3-node cluster)
-  - Terraform memory changes require VM restart
+  # 2. If still unresponsive, restart kubelet
+  systemctl restart kubelet
 
-## 7. Impact After Fix
+  # 3. If severely degraded, reboot — one master at a time (maintain etcd quorum)
+  reboot
 
-**Observed Results:**
-- Master nodes responsive after memory increase
-- kubectl commands execute normally
-- Control plane components stable
-- No more "context deadline exceeded" errors in kubelet logs
+  # 4. Verify after recovery
+  systemctl status kubelet containerd
+  crictl ps | grep -E "etcd|kube-api"
+  kubectl get nodes
 
-## 8. Notes
+Permanent fix — increase master node memory in Terraform:
+  terraform/dev/proxmox/vms/k8s_masters/variables.tf:
+    memory = 2560   # increased from 2048 (+512MB) on all 3 masters
 
-### Lessons Learned
-- Always provision adequate resources for control plane nodes
-- Memory pressure on masters affects entire cluster availability
-- Monitor master node resources separately from worker nodes
-- NFS issues can cascade into cluster instability
+Minimum resource requirements:
+  Master node    2GB minimum   4GB recommended
+  Worker node    2GB minimum   4GB+ recommended
+  etcd           512MB min     1GB recommended
+  kube-prometheus-stack  1GB min  2GB recommended (schedule on workers only)
 
-### Commands Reference
-```bash
-free -h                                    # Check memory usage
-systemctl status kubelet containerd        # Check service status
-crictl ps                                  # List containers via CRI
-journalctl -u kubelet -f                   # Follow kubelet logs
-dmesg | grep -i nfs                        # Check for NFS issues
-ps aux --sort=-%mem | head -20             # Top memory consumers
-```
+Optional: set resource limits on Flux controllers to prevent unbounded growth:
+  patches:
+    - patch: |
+        - op: add
+          path: /spec/template/spec/containers/0/resources
+          value:
+            limits:
+              memory: 256Mi
+            requests:
+              memory: 128Mi
 
-### Related Files
-- `terraform/dev/proxmox/vms/k8s_masters/variables.tf`
+IMPORTANT — rebooting masters: never reboot more than one master at a time
+in a 3-node cluster. Rebooting two simultaneously loses etcd quorum.
 
-### References
-- Kubernetes resource requirements documentation
-- etcd hardware recommendations
+Verified: Yes
 
-## 9. Workaround
+_____________________________________________________________________
 
-**Temporary:** Restart containerd and kubelet to recover from immediate memory pressure:
-```bash
-systemctl restart containerd
-systemctl restart kubelet
-```
+[Risk Level] MEDIUM
+Note: Restarting containerd/kubelet causes temporary pod disruption on that node.
+Terraform memory changes require VM restart. Always reboot masters one at a time.
 
-**Note:** This is only a temporary measure. Without addressing the underlying resource constraints, the issue will recur under load.
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Notes:
+  1. Always provision adequate resources for control plane nodes — 2GB minimum,
+     4GB recommended when running Flux controllers alongside control plane
+  2. Memory pressure on masters affects entire cluster availability immediately
+  3. Monitor master node resources separately from worker nodes
+  4. NFS issues can cascade into broader cluster instability
+  5. Schedule resource-heavy workloads (monitoring, logging) on workers only
+  6. No swap on K8s nodes is recommended by default but leaves zero fallback
+     under memory pressure
+
+Commands reference:
+  free -h                                  check memory usage
+  systemctl status kubelet containerd      check service status
+  crictl ps                                list containers via CRI
+  journalctl -u kubelet -f                 follow kubelet logs
+  dmesg | grep -i nfs                      check for NFS issues
+  ps aux --sort=-%mem | head -20           top memory consumers
+
+Related files:
+  terraform/dev/proxmox/vms/k8s_masters/variables.tf

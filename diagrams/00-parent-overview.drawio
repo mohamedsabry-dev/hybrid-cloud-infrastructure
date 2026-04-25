@@ -1,0 +1,129 @@
+<mxfile host="65bd71144e">
+    <diagram name="Infrastructure Overview" id="overview">
+        <mxGraphModel dx="2087" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="gh" value="&lt;b&gt;GitHub Actions + Flux GitOps&lt;/b&gt;&lt;br&gt;31 Workflows • OIDC Auth • GitOps Source" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="30" width="340" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_dev" value="&lt;b&gt;AWS Dev Account&lt;/b&gt;&lt;br&gt;eu-west-1 • VPC 172.16.0.0/16" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="160" width="360" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_dev_svc" value="WireGuard EC2 :51820&lt;br&gt;KMS Vault-Unseal • S3 etcd-backup&lt;br&gt;Secrets Manager • OIDC Provider" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="aws_dev" vertex="1">
+                    <mxGeometry x="15" y="50" width="330" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_prod" value="&lt;b&gt;AWS Prod Account&lt;/b&gt;&lt;br&gt;eu-west-2 • VPC 172.17.0.0/16" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1020" y="160" width="360" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_prod_svc" value="WireGuard EC2 :51830&lt;br&gt;KMS Vault-Unseal • S3 etcd-backup&lt;br&gt;Secrets Manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="aws_prod" vertex="1">
+                    <mxGeometry x="15" y="50" width="330" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="router" value="&lt;b&gt;MikroTik L009UiGS-RM&lt;/b&gt;&lt;br&gt;10.0.5.1 • 13 VLANs • Firewall • WireGuard VPN Endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="340" width="560" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="pve_dev" value="&lt;b&gt;Proxmox Dev — pve-dev.lab.local&lt;/b&gt;&lt;br&gt;24GB Ryzen 7 • 10.0.5.110 • VLANs 60-65" style="swimlane;startSize=45;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="470" width="520" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;Identity • DNS • CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="15" y="55" width="235" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_vault" value="&lt;b&gt;Vault HA x3&lt;/b&gt;&lt;br&gt;Raft • KMS Unseal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="270" y="55" width="235" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_k8s" value="&lt;b&gt;Kubernetes HA — 3 Masters + 2 Workers&lt;/b&gt;&lt;br&gt;kubeadm • Calico CNI • Flux CD • Vault Agent Injector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="15" y="120" width="490" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_ansible" value="&lt;b&gt;Ansible&lt;/b&gt;&lt;br&gt;Control Node" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="15" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_runner" value="&lt;b&gt;GitHub Runner&lt;/b&gt;&lt;br&gt;Self-hosted" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="185" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_nginx" value="&lt;b&gt;Nginx Reverse Proxy&lt;/b&gt;&lt;br&gt;DMZ VLAN 65" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="355" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_apps" value="&lt;b&gt;Workloads:&lt;/b&gt; Prometheus • Grafana • Loki&lt;br&gt;MariaDB • WordPress • Remediation • etcd-backup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=0;" parent="pve_dev" vertex="1">
+                    <mxGeometry x="15" y="260" width="490" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="pve_prod" value="&lt;b&gt;Proxmox Prod — pve-prod.lab.local&lt;/b&gt;&lt;br&gt;64GB Ryzen 7 • 10.0.5.100 • VLANs 50-55" style="swimlane;startSize=45;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="470" width="520" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;Identity • DNS • CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="15" y="55" width="235" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_vault" value="&lt;b&gt;Vault HA x3&lt;/b&gt;&lt;br&gt;Raft • KMS Unseal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="270" y="55" width="235" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_k8s" value="&lt;b&gt;Kubernetes HA — 3 Masters + 3 Workers&lt;/b&gt;&lt;br&gt;kubeadm • Calico CNI • Flux CD • Vault Agent Injector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="15" y="120" width="490" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_ansible" value="&lt;b&gt;Ansible&lt;/b&gt;&lt;br&gt;Control Node" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="15" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_runner" value="&lt;b&gt;GitHub Runner&lt;/b&gt;&lt;br&gt;Self-hosted" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="185" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_nginx" value="&lt;b&gt;Nginx Reverse Proxy&lt;/b&gt;&lt;br&gt;DMZ VLAN 55" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="355" y="190" width="150" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_apps" value="&lt;b&gt;Workloads:&lt;/b&gt; Prometheus • Grafana • Loki&lt;br&gt;MariaDB • WordPress • Remediation • etcd-backup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=0;" parent="pve_prod" vertex="1">
+                    <mxGeometry x="15" y="260" width="490" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="nas" value="&lt;b&gt;Asustor NAS — VLAN 40 (L2 Isolated)&lt;/b&gt;&lt;br&gt;10.0.40.120 • NFS Server • Vzdump Backups • ISOs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="880" width="660" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="gh" target="aws_dev" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="gh" target="aws_prod" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="WireGuard VPN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="aws_dev_svc" target="router" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" value="WireGuard VPN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="aws_prod_svc" target="router" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" value="ether6 trunk" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="router" target="pve_dev" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" value="ether5 trunk" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="router" target="pve_prod" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" value="Flux GitOps (dev)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;fontColor=#333333;fontSize=10;dashed=1;strokeWidth=2;" parent="1" source="gh" target="dev_k8s" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="65"/>
+                            <mxPoint x="20" y="618"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e8" value="Flux GitOps (prod)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;fontColor=#333333;fontSize=10;dashed=1;strokeWidth=2;" parent="1" source="gh" target="prod_k8s" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" value="NFS CSI" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="dev_k8s" target="nas" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" value="NFS CSI" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;fontColor=#333333;fontSize=11;strokeWidth=2;" parent="1" source="prod_k8s" target="nas" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" value="Vault Inject" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;fontColor=#333333;fontSize=10;dashed=1;" parent="1" source="dev_k8s" target="dev_vault" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e12" value="Vault Inject" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;fontColor=#333333;fontSize=10;dashed=1;" parent="1" source="prod_k8s" target="prod_vault" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e13" value="KMS Unseal" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;fontColor=#333333;fontSize=10;dashed=1;" parent="1" source="dev_vault" target="aws_dev_svc" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e14" value="KMS Unseal" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;fontColor=#333333;fontSize=10;dashed=1;" parent="1" source="prod_vault" target="aws_prod_svc" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e15" value="&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;BLOCKED&lt;/b&gt; — Firewall Isolation&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#cc0000;fontSize=11;dashed=1;dashPattern=8 8;strokeWidth=2;" parent="1" source="pve_dev" target="pve_prod" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -1,0 +1,80 @@
+# Proxmox VM Golden Image — Operation Guide (PROD)
+
+One-time golden-image setup + infrastructure deploy + ongoing template
+refresh. Commands for the clone-then-template pattern documented in
+DESIGN.md.
+
+---
+
+## One-time: Golden image setup
+
+### 1. Create the source VM via Terraform
+
+  cd terraform/prod/proxmox/vms/golden-image
+  terraform apply
+
+This creates VM 9000 (source). Terraform stops here — OS install is manual.
+
+### 2. Install the OS via Proxmox console
+
+- Boot VM 9000 from the Rocky Linux ISO
+- Install Rocky Linux 10.1
+- Configure network, install base packages
+
+### 3. Run cleanup / hardening
+
+  ssh root@<vm-9000-ip> 'bash -s' < /path/to/cleanup-script.sh
+
+### 4. Shut down and clone to template VMID
+
+  qm shutdown 9000
+  qm clone 9000 9001 --name rocky10-golden-template --full
+
+### 5. Convert the clone to a template
+
+  qm template 9001
+
+VM 9000 stays in Terraform state as the source (stopped). VM 9001 is the
+template, NOT Terraform-managed.
+
+---
+
+## Deploy infrastructure VMs (cloned from template 9001)
+
+Run in dependency order — FreeIPA first, then K8s:
+
+  cd terraform/prod/proxmox/vms/freeipa      && terraform apply
+  cd terraform/prod/proxmox/vms/k8s_masters  && terraform apply
+  cd terraform/prod/proxmox/vms/k8s_workers  && terraform apply
+
+---
+
+## Refresh the golden image (patching, new packages)
+
+### 1. Boot the source VM
+
+  qm start 9000
+
+### 2. Make changes
+
+  ssh root@<vm-9000-ip>
+  # update packages, add software, etc.
+  poweroff
+
+### 3. Replace the template
+
+  qm destroy 9001
+  qm clone 9000 9001 --name rocky10-golden-template --full
+  qm template 9001
+
+Existing VMs are NOT affected (the `lifecycle { ignore_changes = [clone] }`
+block protects them — see DESIGN.md). Any NEW VM created after this
+refresh will use the updated template.
+
+---
+
+## Related
+
+- DESIGN.md                                              — why clone-then-template
+- ../../../../troubleshooting/terraform/                 — Proxmox VM TS cases
+- ../../../../deployment-docs/01-proxmox-setup-guide.md    — Proxmox host setup (prereq)

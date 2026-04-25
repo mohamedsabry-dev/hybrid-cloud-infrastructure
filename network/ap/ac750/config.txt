@@ -4,7 +4,11 @@
 
 Device: TP-Link Archer C24 (AC750)
 Mode: Access Point (Bridge)
-Connected to: ER605 Port 3
+Connected to: MikroTik router (Port 7, VLAN 5 untagged)
+
+Note: the on-prem router was previously a TP-Link ER605 (connected via
+ER605 Port 3). It was replaced with the MikroTik L009UiGS-RM — see
+/network/README.md for the full story. The AP itself was not changed.
 
 ================================================================================
                          NETWORK CONFIGURATION
@@ -17,11 +21,11 @@ Setting          │ Value
 IP Address       │ 10.0.5.10 (static)
 Subnet Mask      │ 255.255.255.0
 Gateway          │ 10.0.5.1
-VLAN             │ 5 (UNTAG on Port 3)
+VLAN             │ 5 (UNTAG on router port)
 Management UI    │ http://10.0.5.10
 
 Connection Path:
-└── AP (10.0.5.10) → ER605 Port 3 → VLAN 5 (untagged)
+└── AP (10.0.5.10) → MikroTik Port 7 → VLAN 5 (untagged)
 
 ================================================================================
                          WIFI CONFIGURATION
@@ -44,7 +48,7 @@ Connected Devices (via WiFi)
 ─────────────────────────────────────────────────────────────────────────────────
 Device               │ IP Address    │ Purpose
 ─────────────────────┼───────────────┼─────────────────────────────
-Gateway (ER605)      │ 10.0.5.1      │ Default gateway
+Gateway (MikroTik)   │ 10.0.5.1      │ Default gateway
 AP (Archer C24)      │ 10.0.5.10     │ Access point
 Prod Proxmox mgmt    │ 10.0.5.100    │ Production server management
 Dev Proxmox mgmt     │ 10.0.5.110    │ Development server management
@@ -80,8 +84,9 @@ Effect:
 
 Security Model:
 ├── Proxmox servers on same WiFi VLAN cannot reach each other directly
-├── All inter-server traffic must go through ER605 gateway
-└── ER605 ACLs control what traffic is allowed between devices
+├── All inter-server traffic must go through the router (MikroTik) gateway
+└── Router firewall rules control what traffic is allowed between devices
+    (MikroTik `/ip firewall filter`; previously ER605 ACL tables)
 
 ================================================================================
                          PROXMOX WIFI CLIENT CONFIGURATION

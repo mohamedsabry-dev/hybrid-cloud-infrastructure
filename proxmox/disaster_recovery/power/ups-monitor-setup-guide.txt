@@ -1,0 +1,65 @@
+# UPS Monitor — Setup & Operation Guide
+
+Install, schedule, verify, and troubleshoot `dr_ups_monitor.sh` on each
+Proxmox host.
+
+See DESIGN.md for why the script makes the decisions it does (thresholds,
+discharging check, network probe).
+
+---
+
+## Install (on each Proxmox host)
+
+  # 1. Create scripts directory
+  mkdir -p /root/scripts
+
+  # 2. Copy script from this folder to the Proxmox host
+  scp dr_ups_monitor.sh root@pve-dev:/root/scripts/
+  scp dr_ups_monitor.sh root@pve-prod:/root/scripts/
+
+  # 3. Make executable (on the host)
+  chmod +x /root/scripts/dr_ups_monitor.sh
+
+---
+
+## Schedule via cron (every 5 min)
+
+  crontab -e
+
+Add the line:
+
+  */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
+
+Verify:
+
+  crontab -l
+
+---
+
+## Manual test
+
+  /root/scripts/dr_ups_monitor.sh
+  tail -50 /var/log/dr_ups.log
+
+---
+
+## Troubleshooting
+
+  # Check battery status manually
+  cat /sys/class/power_supply/BAT*/status
+  cat /sys/class/power_supply/BAT*/capacity
+
+  # Check recent script runs
+  tail -50 /var/log/dr_ups.log
+
+  # Verify cron is running
+  crontab -l
+  systemctl status cron
+
+---
+
+## Related
+
+- README.md       — scope + file listing
+- DESIGN.md       — threshold model, discharging check, network probe rationale
+- dr_ups_monitor.sh — the monitor script

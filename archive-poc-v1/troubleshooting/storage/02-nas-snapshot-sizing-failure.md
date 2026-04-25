@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE #02: NAS VM SNAPSHOT SIZING FAILURE
 
 Category: Storage / Resource Allocation
 Severity: Critical
+Incident: Yes
 Environment: ESXi Master → NAS VM
 Source: Draft for Resource Allocation (Lines 347-371)
 
@@ -102,38 +103,38 @@ LESSONS LEARNED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Critical Insights:
-  ✓ Thick provisioned VMs need datastore capacity ≥ 2x disk size for snapshots
-  ✓ Always plan datastore sizing based on THICK disk requirements
-  ✓ vCenter snapshot space calculation includes full disk size
-  ✓ Insufficient space causes snapshot failure AND VM corruption risk
+  Yes Thick provisioned VMs need datastore capacity ≥ 2x disk size for snapshots
+  Yes Always plan datastore sizing based on THICK disk requirements
+  Yes vCenter snapshot space calculation includes full disk size
+  Yes Insufficient space causes snapshot failure AND VM corruption risk
 
 Storage Planning Best Practices:
-  ✓ Calculate snapshot overhead during design phase
-  ✓ Use dedicated datastores for thick provisioned critical VMs
-  ✓ Monitor datastore free space before snapshot operations
-  ✓ Consider thin provisioning for VMs requiring frequent snapshots
+  Yes Calculate snapshot overhead during design phase
+  Yes Use dedicated datastores for thick provisioned critical VMs
+  Yes Monitor datastore free space before snapshot operations
+  Yes Consider thin provisioning for VMs requiring frequent snapshots
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Calculate worst-case snapshot requirements
-  ✓ Use formula: Datastore = (VM Size × 2) + 20%
-  ✓ Allocate dedicated datastores for large thick VMs
-  ✓ Document datastore sizing decisions
+  Yes Calculate worst-case snapshot requirements
+  Yes Use formula: Datastore = (VM Size × 2) + 20%
+  Yes Allocate dedicated datastores for large thick VMs
+  Yes Document datastore sizing decisions
 
 Monitoring:
-  ✓ Set vCenter alarms for datastore capacity < 50%
-  ✓ Monitor snapshot chain length
-  ✓ Track snapshot age (delete old snapshots)
-  ✓ Regular datastore capacity reviews
+  Yes Set vCenter alarms for datastore capacity < 50%
+  Yes Monitor snapshot chain length
+  Yes Track snapshot age (delete old snapshots)
+  Yes Regular datastore capacity reviews
 
 Operational:
-  ✓ Verify free space before manual snapshots
-  ✓ Configure automated snapshot cleanup
-  ✓ Test snapshot operations in staging first
-  ✓ Always maintain 2x disk size free space for thick VMs
+  Yes Verify free space before manual snapshots
+  Yes Configure automated snapshot cleanup
+  Yes Test snapshot operations in staging first
+  Yes Always maintain 2x disk size free space for thick VMs
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED ISSUES

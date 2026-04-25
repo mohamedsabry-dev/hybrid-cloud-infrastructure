@@ -1,147 +1,153 @@
 # TS-TF-007 | 2026-03-21 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform with AWS provider
-- Environment: AWS EC2
-- Related components: Security groups, ENI (network interface), EC2 instances
+[Info]
+Domain: Terraform / AWS
+Sub-techs: Terraform AWS provider, security groups, ENI, EC2, create_before_destroy,
+           immutable attribute replacement
+Environment: AWS EC2
+Re-opened: No
 
-## 2. Issue
-- Symptom: `terraform apply` stuck on "Still destroying..." for security group, takes 2+ minutes without progress, eventually times out or fails
-- Error:
-```
-aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m30s elapsed]
-aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m40s elapsed]
-aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m50s elapsed]
-```
+_____________________________________________________________________
 
-## 3. Analysis
+[Issue Description]
+terraform apply stuck on "Still destroying..." for security group — no progress
+after 2+ minutes, eventually times out.
 
-**Check 1: What operation is Terraform attempting?**
+  aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m30s elapsed]
+  aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m40s elapsed]
+  aws_security_group.wireguard: Still destroying... [id=sg-07d51802e9ca80234, 01m50s elapsed]
 
-Terraform plan shows `-/+` (destroy and create replacement):
-```
--/+ resource "aws_security_group" "wireguard" {
-      ~ name = "dev-wireguard-sg" -> "wireguard-sg-dev" # forces replacement
-```
+_____________________________________________________________________
 
-Finding: Security group name is immutable - changing it forces replacement.
+[Analysis]
 
-**Check 2: Why is deletion stuck?**
+# Initial Check Notes:
+Checked what operation Terraform was attempting.
 
-AWS restriction: Cannot delete a security group that is attached to an ENI (network interface).
+Terraform plan showed -/+ (destroy and create replacement):
+  -/+ resource "aws_security_group" "wireguard" {
+        ~ name = "dev-wireguard-sg" -> "wireguard-sg-dev"  # forces replacement
 
-**The conflict:**
-1. Terraform tries to delete old SG first (default behavior)
-2. EC2 instance still references the old SG via its ENI
-3. AWS refuses deletion → Terraform stuck waiting
+Security group name is immutable — changing it forces resource replacement.
+Terraform default behaviour for replacement: destroy old first, then create new.
 
-## 4. Root Cause
-> When a security group name changes (immutable attribute), Terraform plans "destroy and then create replacement" (`-/+`). However, AWS cannot delete a security group that is attached to an ENI. The EC2 instance still references the old SG, causing Terraform to get stuck waiting for deletion that can never succeed.
+Why deletion is stuck:
+  AWS cannot delete a security group that is attached to an ENI.
+  The EC2 instance still references the old SG via its network interface.
+  AWS refuses the deletion request → Terraform stuck in a loop waiting.
 
-## 5. Solution
-> Manually detach SG during stuck apply, or use `create_before_destroy` lifecycle for future renames.
 
-### Manual Fix (During Stuck Apply)
+# Suspected Root Cause
+Security group name change triggers replace (-/+). Terraform attempts
+delete-before-create by default. AWS refuses deletion because the SG is still
+attached to the EC2 instance ENI. Terraform waits indefinitely for deletion
+that can never succeed while the instance holds the attachment.
 
-While Terraform is stuck destroying:
 
-**Option 1: AWS Console**
-1. Go to EC2 → Select the instance
-2. Actions → Security → Change Security Groups
-3. Temporarily assign the **default VPC security group**
-4. Terraform will complete (old SG deletes, new SG creates)
+# More Checks Notes:
+N/A — cause and fix direction clear from AWS behaviour.
 
-**Option 2: AWS CLI**
-```bash
-# Get default SG for the VPC
-DEFAULT_SG=$(aws ec2 describe-security-groups \
-  --filters "Name=vpc-id,Values=<vpc-id>" "Name=group-name,Values=default" \
-  --query 'SecurityGroups[0].GroupId' --output text)
 
-# Temporarily assign default SG
-aws ec2 modify-instance-attribute \
-  --instance-id i-xxxxxxxxxxxxx \
-  --groups $DEFAULT_SG
-```
+# Suspected Solution
+Manual fix for stuck apply: temporarily detach SG from instance so deletion
+can proceed. Prevention for future renames: create_before_destroy lifecycle.
 
-After running either option, Terraform continues and:
-- Deletes old security group
-- Creates new security group with new name
-- Updates EC2 to use new security group (replaces default SG)
 
-### Prevention: create_before_destroy
+# Test
+Assigned default VPC security group to EC2 instance while Terraform was stuck.
+Terraform immediately continued — deleted old SG, created new SG, updated EC2.
 
-Add lifecycle rule **before** renaming:
+Result: PASS — apply completed, EC2 using new security group.
 
-```hcl
-resource "aws_security_group" "wireguard" {
-  name = "wireguard-sg-${var.environment}"
-  # ...
+_____________________________________________________________________
 
-  lifecycle {
-    create_before_destroy = true
+[Final Root Cause]
+Security group name is an immutable AWS attribute. Renaming it forces Terraform
+to destroy the old SG and create a new one. Terraform default replacement order
+is delete-first. AWS blocks deletion because the SG is still attached to the EC2
+instance ENI. Terraform gets stuck waiting for a deletion AWS will never allow.
+
+_____________________________________________________________________
+
+[Final Solution]
+
+Manual fix during stuck apply:
+
+  Option 1 — AWS Console:
+    EC2 → select instance → Actions → Security → Change Security Groups
+    Temporarily assign the default VPC security group.
+    Terraform unblocks — old SG deletes, new SG creates, EC2 updated.
+
+  Option 2 — AWS CLI:
+    DEFAULT_SG=$(aws ec2 describe-security-groups \
+      --filters "Name=vpc-id,Values=<vpc-id>" "Name=group-name,Values=default" \
+      --query 'SecurityGroups[0].GroupId' --output text)
+    aws ec2 modify-instance-attribute \
+      --instance-id i-xxxxxxxxxxxxx \
+      --groups $DEFAULT_SG
+
+Prevention for future renames — add lifecycle block before renaming:
+  resource "aws_security_group" "wireguard" {
+    name = "wireguard-sg-${var.environment}"
+    lifecycle {
+      create_before_destroy = true
+    }
   }
-}
-```
 
-**How it works:**
-1. Creates NEW security group first (different name, so no conflict)
-2. Updates EC2 to reference new SG
-3. Deletes old SG (now detached, deletion succeeds)
+  How create_before_destroy works:
+    1. Creates NEW security group first (different name = no conflict)
+    2. Updates EC2 to reference new SG
+    3. Deletes old SG (now detached, deletion succeeds)
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Temporary assignment to default SG during apply (seconds)
+Decision: keep create_before_destroy commented in code — uncomment only when
+planning a rename. Rare operation, and leaving it active can cause issues if
+new name already exists.
 
-## 7. Impact After Fix
-- Observed: Terraform apply completes successfully
-- Security group renamed without stuck state
-- EC2 instance uses new security group
+  # Uncomment if planning to rename this SG while attached to EC2.
+  # Without this, Terraform tries delete-before-create which fails
+  # because the SG is still attached to the instance ENI.
+  # lifecycle {
+  #   create_before_destroy = true
+  # }
 
-## 8. Notes
+Files changed:
+  terraform/dev/aws/compute/main.tf   (commented lifecycle block added)
+  terraform/prod/aws/compute/main.tf  (same)
 
-### Why We Don't Enable create_before_destroy by Default
+Verified: Yes
 
-| Reason | Explanation |
-|--------|-------------|
-| Rare operation | Resources are rarely renamed after creation |
-| Naming conflicts | If new name already exists, create-before-destroy fails |
-| Manual awareness | Prefer explicit intervention for destructive operations |
-| AWS naming | Some AWS resources have unique name constraints |
+_____________________________________________________________________
 
-**Our approach:** Keep `create_before_destroy` commented in code. Uncomment only when planning a rename operation.
+[Risk Level] LOW
+Note: Temporary assignment to default VPC SG lasts only seconds during apply.
+EC2 is updated to correct SG once Terraform completes.
 
-```hcl
-# Uncomment if planning to rename this SG while attached to EC2.
-# Without this, Terraform tries delete-before-create which fails
-# because the SG is still attached to the instance ENI.
-# lifecycle {
-#   create_before_destroy = true
-# }
-```
+_____________________________________________________________________
 
-### Terraform Plan Indicators
+[References]
+-
+-
 
-**Warning sign - look for `-/+` with "forces replacement":**
-```
--/+ resource "aws_security_group" "wireguard" {
-      ~ name = "old-name" -> "new-name" # forces replacement
-```
+_____________________________________________________________________
 
-**Safe - update in-place (`~`):**
-```
-~ resource "aws_security_group" "wireguard" {
-    ~ tags = {
-        ~ "Name" = "old-tag" -> "new-tag"
-      }
-```
+[Draft Notes]
 
-### Files Changed
+Terraform plan indicators to watch for:
 
-- `terraform/dev/aws/compute/main.tf` - Added commented lifecycle block
-- `terraform/prod/aws/compute/main.tf` - Same
-- `terraform/dev/aws/compute/README.md` - Added troubleshooting section
-- `terraform/prod/aws/compute/README.md` - Same
+  WARNING — forces replacement (-/+):
+    -/+ resource "aws_security_group" "wireguard" {
+          ~ name = "old-name" -> "new-name"  # forces replacement
+    Action required: review if attached to EC2, consider create_before_destroy.
 
-## 9. Workaround (if any)
-> If stuck mid-apply: Manually assign default VPC security group to the instance via AWS Console or CLI, then Terraform will complete.
+  SAFE — in-place update (~):
+    ~ resource "aws_security_group" "wireguard" {
+        ~ tags = { ~ "Name" = "old-tag" -> "new-tag" }
+    No attachment concern — not a replacement.
+
+Why create_before_destroy is not enabled by default:
+  Rare operation — resources are rarely renamed after creation.
+  Risk of naming conflict if new name already exists in AWS.
+  Some AWS resources have unique name constraints.
+  Prefer explicit intervention for destructive operations.
+  Manual awareness = intentional review before rename.

@@ -2,6 +2,8 @@
 
 Multi-account architecture with OIDC authentication for GitHub Actions.
 
+Design rationale: see [`DESIGN.md`](DESIGN.md) for decisions behind accounts, state backends, IAM tiers, and regions. This file is the operational reference.
+
 ---
 
 ## Account Structure
@@ -11,7 +13,7 @@ Multi-account architecture with OIDC authentication for GitHub Actions.
 | Production | xxxxxxxxxxxx | eu-west-2 (London) | admin_prod | Enabled |
 | Development | xxxxxxxxxxxx | us-east-1 (N. Virginia) | admin_dev | Enabled |
 
-> **Note:** Dev was migrated to us-east-1 for cost optimization. Prod remains in eu-west-2 for lower latency.
+> Dev moved to us-east-1 for cost; prod's compute later followed for network stability. State/IAM/KMS stay in eu-west-2. See [`DESIGN.md`](DESIGN.md) and [`dev-account-migration.md`](dev-account-migration.md) for context.
 
 ---
 

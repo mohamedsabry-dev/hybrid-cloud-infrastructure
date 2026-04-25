@@ -1,326 +1,109 @@
-# Ansible PROD Environment
+# Ansible — PROD Environment
 
-This directory contains Ansible configuration for the PROD environment infrastructure.
+Ansible configuration for the PROD environment. Configures the full node
+lifecycle after Terraform provisioning — bootstrap (before FreeIPA exists),
+domain join, Vault HA cluster, Kubernetes node prep + cluster init + Flux
+bootstrap, Nginx reverse proxy, and the self-hosted GitHub Actions runner.
+
+For the dev/prod split rationale see [`../README.md`](../README.md).
+For day-to-day ops (keytab setup, git workflow, utility commands) see
+[`operation_guide.txt`](operation_guide.txt).
+For the Ansible Vault (encryption at rest) commands see
+[`../ansible-vault-guide.txt`](../ansible-vault-guide.txt).
 
 ---
 
-## Directory Structure
+## Directory layout
 
 ```
 ansible/prod/
-├── ansible.cfg                 # Ansible configuration
-├── README.md                   # This file
-├── operation_guide.txt         # Day-to-day operations guide
+├── README.md                        # this file — scope + navigation
+├── ansible.cfg                      # default inventory + vault password file path
+├── operation_guide.txt              # day-to-day ops (kinit, SSH cleanup, testing)
 ├── inventory/
-│   ├── inventory.ini           # Main inventory (FQDN, FreeIPA DNS)
-│   ├── first_setup_inventory.ini  # Bootstrap inventory (IP-based, root)
+│   ├── inventory.ini                # Production inventory (FQDN, Kerberos, super_bot)
+│   ├── first_setup_inventory.ini    # Bootstrap inventory (IP, root + SSH key)
 │   └── group_vars/
-│       ├── all.yml             # Variables for all hosts
-│       ├── freeipa.yml         # FreeIPA server/domain config
-│       ├── vault_cluster.yml   # HashiCorp Vault cluster config
-│       ├── k8s_masters.yml     # K8s master nodes (reserved)
-│       ├── k8s_workers.yml     # K8s worker nodes (reserved)
-│       ├── ansible.yml         # Ansible control node (reserved)
-│       ├── local_runner.yml    # CI/CD runners (reserved)
-│       └── nginx.yml           # Nginx proxy (reserved)
-├── examples/                   # Manual operations & usage examples
-│   └── vault/
-│       └── usage.md            # Vault CLI and API examples
+│       ├── all.yml                  # shared vars (ipaclient_*, ipaadmin_password, etc.)
+│       ├── freeipa.yml              # FreeIPA host groups + bot/admin users + encrypted passwords
+│       ├── vault_cluster.yml        # AWS KMS creds + bindpass (env-var lookup OR ansible-vault)
+│       └── k8s_masters.yml          # k8s master-specific vars
 └── playbooks/
-    ├── ansible/                # Ansible node setup
-    │   ├── README.md
-    │   ├── ansible_setup.yml
-    │   ├── test.yml
-    │   └── templates/
-    │       └── requirements.yml
-    ├── common/                 # Cross-platform tasks
-    │   ├── README.md
-    │   ├── pre_setup.yml       # Combined: mirror fix + SSH auth + packages
-    │   ├── ntp.yml
-    │   ├── setup_breakglass.yml  # TODO
-    │   └── templates/
-    ├── freeipa/                # Identity management
-    │   ├── README.md
-    │   ├── freeipa_setup.yml
-    │   ├── domain_config.yml
-    │   ├── add_hosts_to_ipa.yml
-    │   └── fix_lxc_krb5_keyring.yml
-    ├── vault/                  # HashiCorp Vault
-    │   ├── README.md           # Includes decision log
-    │   ├── vault_setup.yml
-    │   ├── vault_config.yml    # TODO
-    │   └── templates/
-    └── local-runner/           # CI/CD runners
-        ├── README.md
-        └── setup_tools.yml
+    ├── ansible/                     # set up the Ansible control node
+    ├── common/                      # cross-platform tasks (pre_setup, ntp)
+    ├── freeipa/                     # identity / domain / DNS / LXC krb5 fix
+    ├── vault/                       # Vault HA cluster deploy + config
+    ├── k8s/                         # K8s cluster bootstrap + Flux + Vault-K8s trust
+    ├── nginx/                       # external Nginx reverse proxy
+    └── local-runner/                # self-hosted GH runner tooling
 ```
 
----
-
-## Inventory Files
-
-### Two-Phase Approach
-
-We use two inventory files for different stages of infrastructure lifecycle:
-
-| File | Phase | User | Resolution | Use Case |
-|------|-------|------|------------|----------|
-| `first_setup_inventory.ini` | Bootstrap | root | IP addresses | Before FreeIPA exists |
-| `inventory.ini` | Production | super_bot | FQDN hostnames | After FreeIPA configured |
-
-### Why Two Inventories?
-
-**first_setup_inventory.ini (Bootstrap)**
-- Uses IP addresses because FreeIPA DNS doesn't exist yet
-- Uses root user because domain users (super_bot) don't exist yet
-- SSH keys pre-copied during Terraform provisioning
-- Usage: `ansible-playbook -i inventory/first_setup_inventory.ini playbooks/...`
-
-**inventory.ini (Production)**
-- Uses FQDN hostnames because FreeIPA provides DNS
-- Uses super_bot domain user with HBAC rules and sudo
-- Kerberos/GSSAPI authentication requires hostnames (not IPs)
-- Requires `kinit super_bot` before running Ansible
-- Usage: `ansible-playbook playbooks/...` (default from ansible.cfg)
-
-### Special Cases
-
-**FreeIPA Server uses root, not super_bot**
-- FreeIPA is the identity provider, not a client
-- SSSD/sudo rules don't apply to the IPA server itself
-- Avoids dependency loop (can't use IPA auth to manage IPA)
-
-**Ansible Group is local connection**
-- Ansible node runs playbooks locally
-- Uses `ansible_connection=local`
-- No SSH needed for self-management
-
-### Host Groups
+## Host groups
 
 | Group | Type | VLAN | Purpose |
 |-------|------|------|---------|
-| `freeipa` | VM | 50 | Identity/DNS server |
+| `freeipa` | VM | 50 | Identity / DNS server |
 | `k8s_masters` | VM | 51 | Kubernetes control plane |
-| `k8s_workers` | VM | 54 | Kubernetes worker nodes |
+| `k8s_workers` | VM | 54 | Kubernetes workers |
 | `vault_cluster` | LXC | 52 | HashiCorp Vault HA cluster |
-| `ansible` | LXC | 53 | Ansible control node |
-| `local_runners` | LXC | 53 | GitHub Actions runners |
-| `nginx` | LXC | 55 | Reverse proxy |
+| `ansible` | LXC | 53 | Ansible control node (local connection) |
+| `local_runners` | LXC | 53 | GitHub Actions self-hosted runners |
+| `nginx` | LXC | 55 | External reverse proxy |
 
-**Meta Groups:**
-- `k8s` - All Kubernetes nodes (masters + workers)
-- `managed_hosts` - All hosts managed by super_bot (excludes freeipa)
-- `vms` - All virtual machines
-- `lxc` - All LXC containers
+**Meta groups:** `k8s` (masters + workers), `managed_hosts` (all except freeipa), `vms`, `lxc`.
 
----
+## Two inventories
 
-## Group Variables
+| File | User | Addressing | When |
+|------|------|------------|------|
+| `inventory.ini` | `super_bot` + Kerberos | FQDN via FreeIPA DNS | Normal operation after FreeIPA is up |
+| `first_setup_inventory.ini` | `root` + SSH key | Raw IPs | Bootstrap (before FreeIPA) AND DR fallback when FreeIPA is down |
 
-### all.yml
-Variables applied to all hosts:
-- `initial_packages` - Base packages installed on all nodes
-- `ipaclient_*` - FreeIPA client enrollment settings
-- `ipaadmin_principal/password` - FreeIPA admin credentials (vault encrypted)
-- `ipa_managed_hosts` - List of all hosts for FreeIPA host groups
-- `k8s_api_vip` - Kubernetes API virtual IP (reserved)
+Workflows that use the bootstrap inventory: `{env}-freeipa-full-setup.yml`,
+`{env}-ansible-full-setup.yml`, `{env}-local-runner-full-setup.yml`.
 
-### freeipa.yml
-FreeIPA server and domain configuration:
-- `ipa_host_groups` - Logical host groupings for HBAC/sudo rules
-- `domain_bot_users` - Automation service accounts (super_bot)
-- `ipa_admin_users` - Human admin accounts per service
-- `default_*_password` - Default passwords (vault encrypted)
-- `hashicorp_vault_users` - Users for Vault UI/API access
+Rationale (dual-inventory pattern, LXC Kerberos fixes, NTP-skipped-on-LXC, UID range 60001-65500) lives in [`../../deployment-docs/freeipa-overview.md`](../../deployment-docs/freeipa-overview.md).
 
-### vault_cluster.yml
-HashiCorp Vault cluster settings:
-- `vault_aws_access_key_id` - AWS KMS access key for auto-unseal
-- `vault_aws_secret_access_key` - AWS KMS secret key for auto-unseal
+## Playbook folders
 
-**Two approaches available:**
-1. Environment lookup (active) - Used by GitHub workflows
-2. Ansible Vault encrypted (commented) - For manual/local testing
+Each has its own README:
 
----
+| Folder | Focus |
+|--------|-------|
+| [`playbooks/ansible/`](playbooks/ansible/) | Ansible node setup, Galaxy collections |
+| [`playbooks/common/`](playbooks/common/) | `pre_setup.yml` (mirror fix + SSH auth + packages), `ntp.yml` |
+| [`playbooks/freeipa/`](playbooks/freeipa/) | FreeIPA install + domain config + host enrollment + LXC krb5 fix + DNS fallback |
+| [`playbooks/vault/`](playbooks/vault/) | 3-node Vault HA cluster with TLS + KMS unseal + VIP |
+| [`playbooks/k8s/`](playbooks/k8s/) | K8s cluster init, HAProxy+Keepalived, Flux bootstrap, NFS mounts |
+| [`playbooks/nginx/`](playbooks/nginx/) | Catch-all reverse proxy forwarding `*.lab.local` to workers:30080 |
+| [`playbooks/local-runner/`](playbooks/local-runner/) | Runner LXC tools (Docker, kubectl, etc.) |
 
-## Ansible Vault Encrypted Values
+## Secrets split
 
-We use Ansible Vault (not HashiCorp Vault) for encrypting sensitive values at this stage because HashiCorp Vault isn't deployed yet during initial infrastructure setup.
+- **Ansible Vault** — encrypted values in `group_vars/` (`ipaadmin_password`, `default_admin_user_password`, `default_bot_user_password`, `vault_aws_*_key` fallback). Used at bootstrap time before HashiCorp Vault is running.
+- **AWS Secrets Manager** — runtime creds fetched by GitHub workflows (Proxmox tokens, Vault KMS unseal keys, super_bot keytab).
 
-### Encrypted Variables Summary
+Encrypt/view/edit commands: see [`../ansible-vault-guide.txt`](../ansible-vault-guide.txt).
 
-| Variable | File | Purpose |
-|----------|------|---------|
-| `ipaadmin_password` | all.yml | FreeIPA admin password |
-| `default_admin_user_password` | freeipa.yml | Default password for admin users |
-| `default_bot_user_password` | freeipa.yml | Default password for bot users |
-| `vault_aws_access_key_id` | vault_cluster.yml | AWS KMS key (commented, backup) |
-| `vault_aws_secret_access_key` | vault_cluster.yml | AWS KMS secret (commented, backup) |
-
-### Vault Password Setup
-
-The vault password file location is configured in `ansible.cfg`:
-```ini
-vault_password_file = ~/.ansible_vault
-```
-
-**Create the password file on ansible node:**
-```bash
-echo 'YOUR_VAULT_PASSWORD' > ~/.ansible_vault
-chmod 600 ~/.ansible_vault
-```
-
-### Common Commands
-
-**Encrypt a new value:**
-```bash
-ansible-vault encrypt_string 'SECRET_VALUE' --name 'variable_name'
-```
-
-**View encrypted value:**
-```bash
-ansible localhost -m debug -a "var=ipaadmin_password" -e @inventory/group_vars/all.yml
-```
-
-**Edit encrypted file:**
-```bash
-ansible-vault edit inventory/group_vars/all.yml
-```
-
-**Re-encrypt with new password:**
-```bash
-ansible-vault rekey inventory/group_vars/all.yml
-```
-
----
-
-## Day-to-Day Operations
-
-### Running Playbooks
-
-**With FreeIPA (normal operation):**
-```bash
-# Get Kerberos ticket first
-kinit super_bot
-
-# Run playbook (uses default inventory)
-ansible-playbook playbooks/freeipa/domain_config.yml
-
-# Target specific hosts
-ansible-playbook playbooks/common/ntp.yml --limit vault_cluster
-```
-
-**Before FreeIPA (bootstrap):**
-```bash
-# Use first_setup inventory with root
-ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/freeipa_setup.yml
-```
-
-### Testing Connectivity
-
-```bash
-# Test all managed hosts
-kinit super_bot
-ansible managed_hosts -m ping
-
-# Test specific group
-ansible vault_cluster -m command -a "hostname"
-
-# Test FreeIPA server (uses root)
-ansible freeipa -m ping
-```
-
-### Common Tasks
-
-**Clear SSH known_hosts after recreating nodes:**
-```bash
-for ip in 10.0.50.10 10.0.51.10 10.0.51.11 10.0.51.12 10.0.52.10 10.0.52.11 10.0.52.12 10.0.53.10 10.0.53.20 10.0.54.10 10.0.54.11 10.0.54.12 10.0.55.10; do
-  ssh-keygen -R "$ip" 2>/dev/null
-done
-```
-
-**Check Ansible config:**
-```bash
-ansible --version  # Shows config file path
-ansible-config dump --only-changed
-```
-
----
-
-## Configuration Decisions
-
-### NTP Disabled for FreeIPA Client
-
-NTP configuration via `ipaclient_configure_ntp` is disabled because:
-- VMs: Chronyd works normally
-- LXC containers: Chronyd fails - containers share kernel time with Proxmox host
-
-Settings in `all.yml`:
-```yaml
-ipaclient_configure_ntp: false
-ipaclient_no_ntp: true
-```
-
-NTP is configured separately via `playbooks/common/ntp.yml` with different templates for VMs vs LXC.
-
-### FreeIPA UID Range
-
-FreeIPA configured with custom UID range (60001-65500) to fit within LXC unprivileged container UID mapping:
-- Must be > UID_MAX (60000) from /etc/login.defs
-- Must be < 65536 for unprivileged LXC container compatibility
-- See /troubleshooting/identity/6-freeipa-lxc-uid-range-investigation.md for full explanation
-
-### Credential Approaches
-
-**vault_cluster.yml** supports two credential approaches:
-1. **Environment lookup** (active) - Credentials from AWS Secrets Manager via workflow
-2. **Ansible Vault** (commented) - Encrypted in file for manual testing
-
-This allows flexibility between CI/CD and local development.
-
-### Playbook Consolidation
-
-**common/pre_setup.yml** combines three small playbooks into one:
-1. Mirror fix (required due to old Rocky Linux repo issues)
-2. SSH password auth (cloud-init overrides this during TF template creation)
-3. Initial packages (vim, git, curl, htop, unzip)
-
-**Decision:** Single playbook is cleaner for initial node setup workflow.
-
----
-
-## Playbooks Documentation
-
-Each playbook folder has its own README.md with specific documentation:
-
-| Folder | README Contents |
-|--------|----------------|
-| `playbooks/ansible/` | Collections installed, test playbook usage |
-| `playbooks/common/` | Pre-setup details, NTP configuration, LXC notes |
-| `playbooks/freeipa/` | Deployment order, playbook details, troubleshooting refs |
-| `playbooks/vault/` | Decision log, architectural principles, setup steps |
-| `playbooks/local-runner/` | Tools installed, workflow integration |
-
----
-
-## Related Documentation
-
-- **operation_guide.txt** - Day-to-day operations, keytab setup, git workflow
-- **ansible.cfg** - Ansible configuration settings (with detailed comments)
-- **examples/** - Manual operations and usage examples (Vault, K8s, etc.)
-- **/troubleshooting/** - Troubleshooting cases (identity, linux, vault, etc.)
-- **.github/workflows/** - GitHub Actions workflows that run these playbooks
-
----
-
-## Network Reference
+## VLAN reference
 
 | VLAN | Subnet | Purpose |
 |------|--------|---------|
-| 50 | 10.0.50.0/24 | FreeIPA/Identity |
+| 50 | 10.0.50.0/24 | FreeIPA / Identity |
 | 51 | 10.0.51.0/24 | K8s Masters |
 | 52 | 10.0.52.0/24 | Vault Cluster |
-| 53 | 10.0.53.0/24 | Ansible/Runners |
+| 53 | 10.0.53.0/24 | Ansible / Runners |
 | 54 | 10.0.54.0/24 | K8s Workers |
-| 55 | 10.0.55.0/24 | Nginx/Proxy |
+| 55 | 10.0.55.0/24 | Nginx / Proxy |
+
+Dev equivalents are in VLANs 60-65. Full plan: [`../../network/ip-planning.txt`](../../network/ip-planning.txt).
+
+## Related
+
+- [`operation_guide.txt`](operation_guide.txt) — day-to-day (kinit, testing, SSH known_hosts cleanup)
+- [`../ansible-vault-guide.txt`](../ansible-vault-guide.txt) — ansible-vault CLI commands
+- [`../README.md`](../README.md) — Ansible parent scope (both envs)
+- [`../../deployment-docs/freeipa-overview.md`](../../deployment-docs/freeipa-overview.md) — full identity-layer story
+- [`../../deployment-docs/vault-overview.md`](../../deployment-docs/vault-overview.md) — full Vault system story
+- [`../../troubleshooting/identity/`](../../troubleshooting/identity/) — identity / Kerberos / LDAP TS cases
+- [`../../.github/workflows/`](../../.github/workflows/) — workflows that invoke these playbooks

@@ -1,6 +1,6 @@
 ---
 - name: Phase 4 - Retire Legacy 'ansible' User
-  # ⚠️ SAFETY: Strictly target K8s and Controllers. NEVER target 'ipa'.
+  #  SAFETY: Strictly target K8s and Controllers. NEVER target 'ipa'.
   hosts: k8s, controllers
   become: yes
 

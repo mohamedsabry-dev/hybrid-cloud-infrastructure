@@ -1,0 +1,190 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Troubleshooting Incident Map" id="poc-troubleshooting">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== OVERVIEW ==================== -->
+        <mxCell id="overview_layer" value="&lt;b&gt;Troubleshooting Incident Map — 25 Cases + 6 Reference Guides&lt;/b&gt;&lt;br&gt;7 critical incidents (cascading failures / data loss risk / full outages) across 4 categories" style="swimlane;startSize=40;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1520" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_storage" value="&lt;b&gt;Storage&lt;/b&gt;&lt;br&gt;7 cases + 3 ref guides&lt;br&gt;5 critical" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="overview_layer">
+          <mxGeometry x="15" y="48" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_platform" value="&lt;b&gt;Platform&lt;/b&gt;&lt;br&gt;13 cases + 2 ref guides&lt;br&gt;2 critical" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="overview_layer">
+          <mxGeometry x="240" y="48" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_network" value="&lt;b&gt;Network&lt;/b&gt;&lt;br&gt;4 cases + 1 ref guide&lt;br&gt;0 critical" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="overview_layer">
+          <mxGeometry x="465" y="48" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_app" value="&lt;b&gt;Application&lt;/b&gt;&lt;br&gt;1 case&lt;br&gt;0 critical" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="overview_layer">
+          <mxGeometry x="690" y="48" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STORAGE INCIDENTS ==================== -->
+        <mxCell id="storage_layer" value="&lt;b&gt;Storage — 7 Cases (5 Critical) + 3 Reference Guides&lt;/b&gt;&lt;br&gt;Progressive failure pattern: same class of problem (snapshot mgmt on constrained hardware) hit repeatedly, each time deeper" style="swimlane;startSize=40;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="1520" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_01" value="&lt;b&gt;ST-01 CRITICAL&lt;/b&gt;&lt;br&gt;VMDK Snapshot Corruption&lt;br&gt;Snapshots on different&lt;br&gt;partitions = broken chain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="15" y="48" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_02" value="&lt;b&gt;ST-02 CRITICAL&lt;/b&gt;&lt;br&gt;NAS Snapshot Sizing&lt;br&gt;980GB thick, 450GB free&lt;br&gt;Snapshot failed, maint mode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="230" y="48" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_03" value="&lt;b&gt;ST-03 CRITICAL&lt;/b&gt;&lt;br&gt;Disk Race Condition&lt;br&gt;/dev/sdX names swapped&lt;br&gt;ALL VMs inaccessible" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="455" y="48" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_05" value="&lt;b&gt;ST-05 CRITICAL&lt;/b&gt;&lt;br&gt;NAS Memory Starvation&lt;br&gt;5GB to 4GB + 2x VMs&lt;br&gt;31-47s CPU stalls" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="670" y="48" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_07" value="&lt;b&gt;ST-07 CRITICAL&lt;/b&gt;&lt;br&gt;Snapshot Chain Corruption&lt;br&gt;Parent-child VMDK broken&lt;br&gt;Cross-drive snapshots" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="885" y="48" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_09" value="&lt;b&gt;ST-09&lt;/b&gt;&lt;br&gt;Veeam AAP Loop Device&lt;br&gt;I/O errors during backup&lt;br&gt;Hidden resource costs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="1110" y="48" width="190" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_10" value="&lt;b&gt;ST-10 CRITICAL&lt;/b&gt;&lt;br&gt;Sleep-Mode Corruption&lt;br&gt;Laptop slept mid-Veeam&lt;br&gt;98GB to 1TB inflation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="1315" y="48" width="190" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="st_progression_label" value="&lt;b&gt;Progressive Failure Pattern (same root cause class):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="storage_layer">
+          <mxGeometry x="15" y="125" width="350" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_prog1" value="&lt;b&gt;ST-01&lt;/b&gt;&lt;br&gt;Snapshot corruption" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="15" y="148" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_prog2" value="&lt;b&gt;ST-03&lt;/b&gt;&lt;br&gt;Full outage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="195" y="148" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_prog3" value="&lt;b&gt;ST-07&lt;/b&gt;&lt;br&gt;Major recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="365" y="148" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_prog4" value="&lt;b&gt;ST-10&lt;/b&gt;&lt;br&gt;Catastrophic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="535" y="148" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_lesson" value="&lt;b&gt;Each failure led to architectural&lt;/b&gt;&lt;br&gt;&lt;b&gt;hardening carried forward&lt;/b&gt;&lt;br&gt;into current Proxmox iteration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="storage_layer">
+          <mxGeometry x="705" y="140" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_ref" value="&lt;b&gt;Reference Guides:&lt;/b&gt; Thick-to-Thin Conversion • NAS Backup Optimization • Thick Snapshot Sizing" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="storage_layer">
+          <mxGeometry x="985" y="148" width="520" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="st_pe1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" source="st_prog1" target="st_prog2" parent="storage_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="st_pe2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" source="st_prog2" target="st_prog3" parent="storage_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="st_pe3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" source="st_prog3" target="st_prog4" parent="storage_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="st_pe4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;dashed=1;" edge="1" source="st_prog4" target="st_lesson" parent="storage_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== PLATFORM INCIDENTS ==================== -->
+        <mxCell id="platform_layer" value="&lt;b&gt;Platform — 13 Cases (2 Critical) + 2 Reference Guides&lt;/b&gt;&lt;br&gt;vCenter lifecycle, certificates, FreeIPA auth, Windows host stability" style="swimlane;startSize=40;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="1520" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_vcenter_label" value="&lt;b&gt;vCenter Issues (8):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="platform_layer">
+          <mxGeometry x="15" y="48" width="150" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_01" value="&lt;b&gt;PL-01&lt;/b&gt; Install hang&lt;br&gt;Stage 2 DNS failure" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="15" y="68" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_02" value="&lt;b&gt;PL-02&lt;/b&gt; SSO auth error&lt;br&gt;Alias whitelist" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="165" y="68" width="130" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_03" value="&lt;b&gt;PL-03&lt;/b&gt; LCM depot&lt;br&gt;Deprecated URLs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="305" y="68" width="120" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_05" value="&lt;b&gt;PL-05&lt;/b&gt; Cert replace fail&lt;br&gt;Service health issues" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="435" y="68" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_06" value="&lt;b&gt;PL-06&lt;/b&gt; API SSL error&lt;br&gt;Trust store out of sync" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="585" y="68" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_10" value="&lt;b&gt;PL-10&lt;/b&gt; vApp config reset&lt;br&gt;DB transaction bug" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="735" y="68" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_13" value="&lt;b&gt;PL-13&lt;/b&gt; Backup fail after&lt;br&gt;IP/hostname change" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="885" y="68" width="140" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_14_15" value="&lt;b&gt;PL-14/15&lt;/b&gt; LCM plugin +&lt;br&gt;FW interface errors" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="platform_layer">
+          <mxGeometry x="1035" y="68" width="150" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pl_critical_label" value="&lt;b&gt;Critical Platform Issues (2):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="platform_layer">
+          <mxGeometry x="15" y="118" width="200" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_08" value="&lt;b&gt;PL-08 CRITICAL&lt;/b&gt;&lt;br&gt;Windows Host Sleep → Network Break&lt;br&gt;ESXi uplink down after sleep/wake&lt;br&gt;All VMs lose network, vCenter unresponsive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="platform_layer">
+          <mxGeometry x="15" y="138" width="310" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_11" value="&lt;b&gt;PL-11 CRITICAL&lt;/b&gt;&lt;br&gt;FreeIPA Time Sync Clock Skew&lt;br&gt;VMware Tools fighting chrony&lt;br&gt;Cascading Kerberos auth failures" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="platform_layer">
+          <mxGeometry x="345" y="138" width="310" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_12" value="&lt;b&gt;PL-12&lt;/b&gt; SSSD Cache&lt;br&gt;Sudo rule changes&lt;br&gt;not reflecting" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="platform_layer">
+          <mxGeometry x="675" y="138" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_16" value="&lt;b&gt;PL-16&lt;/b&gt; ESXi AutoProtect&lt;br&gt;12 accumulated snapshots&lt;br&gt;6min of 1-8s disk latency" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="platform_layer">
+          <mxGeometry x="855" y="138" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="pl_ref" value="&lt;b&gt;References:&lt;/b&gt; Windows NAT vs Bridge • vCenter Cert Browser Error" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="platform_layer">
+          <mxGeometry x="1075" y="138" width="430" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== NETWORK INCIDENTS ==================== -->
+        <mxCell id="network_layer" value="&lt;b&gt;Network — 4 Cases + 1 Reference Guide&lt;/b&gt;&lt;br&gt;Promiscuous mode, packet duplication, routing loops — all tied to nested virtualization complexity" style="swimlane;startSize=40;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="1520" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="net_04" value="&lt;b&gt;NET-04&lt;/b&gt;&lt;br&gt;Promiscuous Mode&lt;br&gt;Nested VMs isolated&lt;br&gt;vSwitch not enabled" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="network_layer">
+          <mxGeometry x="15" y="48" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="net_05" value="&lt;b&gt;NET-05&lt;/b&gt;&lt;br&gt;Duplicate Packets (3x)&lt;br&gt;Promiscuous + redundant&lt;br&gt;uplinks causing loops" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="network_layer">
+          <mxGeometry x="225" y="48" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="net_07" value="&lt;b&gt;NET-07&lt;/b&gt;&lt;br&gt;Windows Host Loops&lt;br&gt;IP forwarding + ARP&lt;br&gt;corruption from host" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="network_layer">
+          <mxGeometry x="445" y="48" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="net_08" value="&lt;b&gt;NET-08&lt;/b&gt;&lt;br&gt;Static Route Loop&lt;br&gt;SSH hangs from duplicate&lt;br&gt;routes causing loops" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="network_layer">
+          <mxGeometry x="665" y="48" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="net_theme" value="&lt;b&gt;Common Theme:&lt;/b&gt; Nested virtualization creates unique network&lt;br&gt;challenges not seen in bare-metal deployments. Every network&lt;br&gt;issue traced back to VMware Workstation and ESXi interaction." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="network_layer">
+          <mxGeometry x="900" y="48" width="350" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== APPLICATION INCIDENTS ==================== -->
+        <mxCell id="app_layer" value="&lt;b&gt;Application — 1 Case&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="900" width="740" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_01" value="&lt;b&gt;APP-01: Prometheus Setup&lt;/b&gt;&lt;br&gt;Port 9090 conflict (Cockpit default on Rocky Linux)&lt;br&gt;+ YAML indentation from Ansible blockinfile&lt;br&gt;Fix: Disable Cockpit, switch to Jinja2 templates" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="app_layer">
+          <mxGeometry x="15" y="38" width="400" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== LESSONS LEARNED ==================== -->
+        <mxCell id="lessons_layer" value="&lt;b&gt;Key Lessons Applied to Current Proxmox Architecture&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="900" width="740" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="les_storage" value="&lt;b&gt;Storage&lt;/b&gt;&lt;br&gt;No more nested snapshots&lt;br&gt;ZFS on Proxmox (native)&lt;br&gt;NAS: separate physical box" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lessons_layer">
+          <mxGeometry x="15" y="38" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="les_network" value="&lt;b&gt;Network&lt;/b&gt;&lt;br&gt;No more nested ESXi&lt;br&gt;Direct Proxmox bridges&lt;br&gt;No promiscuous hacks" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lessons_layer">
+          <mxGeometry x="200" y="38" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="les_platform" value="&lt;b&gt;Platform&lt;/b&gt;&lt;br&gt;No Windows host dependency&lt;br&gt;Bare-metal Proxmox&lt;br&gt;No sleep/wake issues" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lessons_layer">
+          <mxGeometry x="385" y="38" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="les_dr" value="&lt;b&gt;DR&lt;/b&gt;&lt;br&gt;2 physical hosts now&lt;br&gt;True HA possible&lt;br&gt;No memory ballooning" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lessons_layer">
+          <mxGeometry x="570" y="38" width="155" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_ov_st" value="highest incident density" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;fontColor=#333;fontSize=10;" edge="1" source="overview_layer" target="storage_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_st_pl" value="storage failures trigger platform issues" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;" edge="1" source="storage_layer" target="platform_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_pl_net" value="platform instability exposes network edge cases" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;" edge="1" source="platform_layer" target="network_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_net_lessons" value="all incidents informed architecture decisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="network_layer" target="lessons_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,37 +1,52 @@
-# AWS Secrets Module
+# AWS Secrets Module — DEV
 
-Manages AWS Secrets Manager secrets for infrastructure automation.
+Provisions AWS Secrets Manager entries consumed by infrastructure automation.
+Terraform creates the secret resources with placeholder values; the actual
+secret values are populated out-of-band (AWS CLI or console) — see the
+setup guide in deployment-docs.
 
-## Resources Created
+For the "why" — create/populate split, lifecycle ignore_changes, single
+module — see [`DESIGN.md`](DESIGN.md).
 
-| Resource | Name | Purpose |
-|----------|------|---------|
-| Secret | `dev/proxmox/terraform-token` | Proxmox API token for Terraform |
-| Secret | `dev/proxmox/ssh-admin-dev-password` | Proxmox SSH admin password |
-| Secret | `dev/golden-image/vm-root-password` | VM cloud-init root password |
-| Secret | `dev/vm/break-glass-password` | Emergency VM recovery password |
-| Secret | `dev/golden-image/lxc-root-password` | LXC root password |
-| Secret | `dev/ansible/ssh-public-key` | Ansible SSH public key |
-| Secret | `dev/local-runner/ssh-public-key` | GitHub runner SSH key |
-| Secret | `dev/freeipa/admin-password` | FreeIPA admin password |
-| Secret | `dev/freeipa/dm-password` | FreeIPA LDAP password |
-| Secret | `dev/super_bot/keytab` | Kerberos keytab (base64) |
-| Secret | `dev/ansible/vault-password` | Ansible vault password |
+---
 
-## Usage
+## Secrets created
 
-Secrets are created with placeholder values. Update via AWS CLI:
+| Secret ID | Purpose |
+|-----------|---------|
+| `dev/proxmox/terraform-token` | Proxmox API token for Terraform |
+| `dev/proxmox/ssh-admin-dev-password` | Proxmox SSH admin password |
+| `dev/golden-image/vm-root-password` | VM cloud-init root password |
+| `dev/vm/break-glass-password` | Emergency VM recovery password |
+| `dev/golden-image/lxc-root-password` | LXC root password |
+| `dev/ansible/ssh-public-key` | Ansible SSH public key |
+| `dev/local-runner/ssh-public-key` | GitHub runner SSH key |
+| `dev/freeipa/admin-password` | FreeIPA admin password |
+| `dev/freeipa/dm-password` | FreeIPA Directory Manager password |
+| `dev/super_bot/keytab` | super_bot Kerberos keytab (base64) |
+| `dev/ansible/vault-password` | Ansible Vault password |
 
-```bash
-aws secretsmanager put-secret-value \
-  --secret-id dev/proxmox/terraform-token \
-  --secret-string '{"token_id":"xxx","token_secret":"xxx"}'
-```
-
-## File Structure
+## File structure
 
 | File | Purpose |
 |------|---------|
 | `main.tf` | Secret resources (identical dev/prod) |
 | `outputs.tf` | Secret ARNs and names (identical dev/prod) |
-| `variables.tf` | Environment-specific configuration |
+| `variables.tf` | Env-specific configuration |
+
+## Populating secret values
+
+After `terraform apply`, the secrets exist with placeholder values.
+Populate them using the procedure in:
+
+  deployment-docs/04-aws-secrets-setup-guide.md
+
+That guide has the AWS CLI commands + the canonical secret-by-secret
+reference.
+
+## Related
+
+- [`DESIGN.md`](DESIGN.md) — why Terraform creates but doesn't populate, lifecycle pattern
+- [`../../../../deployment-docs/04-aws-secrets-setup-guide.md`](../../../../deployment-docs/04-aws-secrets-setup-guide.md) — value-population commands
+- [`../../../../.github/workflows/dev-aws-secrets.yml`](../../../../.github/workflows/dev-aws-secrets.yml) — apply workflow
+- [`../../../../github/variables-secrets.md`](../../../../github/variables-secrets.md) — which GitHub workflows consume which secret

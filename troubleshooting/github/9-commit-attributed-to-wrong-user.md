@@ -1,122 +1,155 @@
 # TS-GH-009 | 2026-04-10 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Git / GitHub
-- Environment: Multi-device development (Mac + Tablet)
-- Related components: Git config, GitHub commit attribution
+[Info]
+Domain: Git / GitHub
+Sub-techs: Git config, commit attribution, git filter-branch
+Environment: Multi-device development (Mac + Tablet)
+Re-opened: No
 
-## 2. Issue
-- Symptom: Commits in private repo showing another GitHub user (baluluyakalulu) as the author
-- Error:
-```
-Commits on GitHub displayed with wrong user avatar and profile link
-Example: "baluluyakalulu committed 3 days ago" instead of "mohamedsabry-dev committed"
-```
+_____________________________________________________________________
 
-**Observed behavior:**
-- 23 commits attributed to `baluluyakalulu` account
-- Private repo with no collaborators
-- User confirmed they made all commits themselves
+[Issue Description]
+Commits in private repo showing a different GitHub user (baluluyakalulu) as author.
+23 commits attributed to the wrong account despite being made personally.
 
-## 3. Analysis
+  Expected: "mohamedsabry-dev committed 3 days ago"
+  Actual:   "baluluyakalulu committed 3 days ago"
 
-**Check 1: Local git log author info**
-```bash
-git log --all --format="%H %ae %an | %ce %cn" | head -50
-```
-Finding: All commits used same email (`mohamedsabry.dev@gmail.com`) OR `admin@localhost.localdomain`
+Private repo, no collaborators — all commits were made by me.
 
-**Check 2: Identify commits with strange attribution**
-```bash
-git log --all --format="%H %an <%ae>" | grep -i "admin@localhost"
-```
-Finding: 23 commits made with `admin <admin@localhost.localdomain>`
+_____________________________________________________________________
 
-**Check 3: Verify tablet git config**
-```bash
-git config user.email  # Empty
-git config user.name   # Empty
-hostname               # localhost.localdomain
-```
-Finding: Tablet had no git config - git fell back to system defaults
+[Analysis]
 
-**Check 4: Check if baluluyakalulu is real account**
-```bash
-gh api users/baluluyakalulu
-```
-Finding: Real GitHub account (created 2018) with `admin@localhost.localdomain` registered as email
+# Initial Check Notes:
+Checked commit author info in local git log to find what email was being used.
 
-## 4. Root Cause
-> Two factors combined:
-> 1. Tablet had no git user config, so git used system defaults: `admin@localhost.localdomain`
-> 2. A random GitHub user (baluluyakalulu) had registered that common default email to their account
->
-> When commits with `admin@localhost.localdomain` are pushed to GitHub, GitHub attributes them to whichever account has that email registered - in this case, baluluyakalulu.
+Command:
+  git log --all --format="%H %ae %an | %ce %cn" | head -50
 
-## 5. Solution
-> Configure git identity on all development devices.
+Output:
+  Mix of commits — some with mohamedsabry.dev@gmail.com, some with admin@localhost.localdomain
 
-**Location:** Tablet (or any unconfigured device)
+Command:
+  git log --all --format="%H %an <%ae>" | grep -i "admin@localhost"
 
-**Step 1: Set git config**
-```bash
-git config --global user.name "mohamedsabry-dev"
-git config --global user.email "mohamedsabry.dev@gmail.com"
-```
+Output:
+  23 commits made with: admin <admin@localhost.localdomain>
 
-**Step 2: Verify**
-```bash
-git config --global --list | grep user
-```
+Checked tablet git config:
 
-**Optional: Rewrite history to fix old commits**
-```bash
-git filter-branch --env-filter '
-if [ "$GIT_AUTHOR_EMAIL" = "admin@localhost.localdomain" ]; then
-    export GIT_AUTHOR_NAME="mohamedsabry-dev"
-    export GIT_AUTHOR_EMAIL="mohamedsabry.dev@gmail.com"
-fi
-' --tag-name-filter cat -- --all
+Command:
+  git config user.email
+  git config user.name
+  hostname
 
-# Then force push
-git push --force --all
-```
+Output:
+  user.email  — empty
+  user.name   — empty
+  hostname    — localhost.localdomain
 
-## 6. Solution Risk
-- Risk level: LOW (for config fix) / MEDIUM (for history rewrite)
-- Potential impact: Force push required if rewriting history - coordinate with any collaborators
+Tablet had no git identity configured. Git fell back to system defaults and
+used admin@localhost.localdomain as the commit email.
 
-## 7. Impact After Fix
-- Observed: New commits from tablet now correctly attributed to mohamedsabry-dev
-- Old commits still show baluluyakalulu (unless history is rewritten)
+Checked if baluluyakalulu is a real account:
 
-## 8. Notes
+Command:
+  gh api users/baluluyakalulu
 
-**How GitHub email attribution works:**
-- GitHub matches commit email to registered GitHub account emails
-- Common default emails like `admin@localhost.localdomain`, `root@localhost`, `user@localhost` may be registered by random accounts
-- This is NOT a security breach - commits are still yours, just displayed wrong
+Output:
+  Real GitHub account created in 2018 with admin@localhost.localdomain
+  registered as their email address.
 
-**Prevention checklist for new devices:**
-```bash
-# Always run these on new dev machines
-git config --global user.name "your-github-username"
-git config --global user.email "your-github-email@example.com"
+GitHub matches commit email to registered account emails. When commits with
+admin@localhost.localdomain were pushed, GitHub found that email registered to
+baluluyakalulu and attributed the commits to that account.
 
-# Verify
-git config --global --list | grep user
-```
 
-**Test before committing:**
-```bash
-# Check what identity will be used
-git config user.name
-git config user.email
-```
+# Suspected Root Cause
+Two factors combined. Tablet had no git user config — git used system default
+admin@localhost.localdomain. A random GitHub user (baluluyakalulu) had that exact
+common default email registered on their account. GitHub attributed all 23 commits
+to them.
 
-## 9. Workaround (if any)
-> If history rewrite is not desired, the old commits remain with wrong attribution but this is cosmetic only - no security impact.
 
-## 10. References
+# More Checks Notes:
+N/A — root cause fully confirmed from git log and GitHub API check.
+
+
+# Suspected Solution
+Set git identity on the tablet. Optionally rewrite history to fix the 23 misattributed commits.
+
+
+# Test
+Configured git identity on tablet, made a new commit, pushed.
+
+Command:
+  git config --global user.name "mohamedsabry-dev"
+  git config --global user.email "mohamedsabry.dev@gmail.com"
+  git config --global --list | grep user
+
+Result: PASS — new commits correctly attributed to mohamedsabry-dev on GitHub.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Tablet had no git user config. Git fell back to system defaults and used
+admin@localhost.localdomain as the commit email. That common default email
+happened to be registered by a real GitHub account (baluluyakalulu, created 2018).
+GitHub attributed all 23 commits from the tablet to that account. Not a security
+breach — commits are still mine, attribution was just displayed wrong.
+
+_____________________________________________________________________
+
+[Final Solution]
+Set git identity on all development devices:
+
+  git config --global user.name "mohamedsabry-dev"
+  git config --global user.email "mohamedsabry.dev@gmail.com"
+
+  Verify: git config --global --list | grep user
+
+Optional — rewrite history to fix the 23 old misattributed commits:
+
+  git filter-branch --env-filter '
+  if [ "$GIT_AUTHOR_EMAIL" = "admin@localhost.localdomain" ]; then
+      export GIT_AUTHOR_NAME="mohamedsabry-dev"
+      export GIT_AUTHOR_EMAIL="mohamedsabry.dev@gmail.com"
+  fi
+  ' --tag-name-filter cat -- --all
+
+  git push --force --all
+
+Verified: Yes (new commits — old commits left as-is, cosmetic only)
+
+_____________________________________________________________________
+
+[Risk Level] LOW (config fix) / MEDIUM (history rewrite)
+Note: History rewrite requires force push. Old misattributed commits are
+cosmetic only — no security impact if left as-is.
+
+_____________________________________________________________________
+
+[References]
 - https://github.com/orgs/community/discussions/181821
 - https://stackoverflow.com/questions/64303220/my-commits-appear-as-another-user-in-github
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+How GitHub email attribution works:
+  GitHub matches commit email to registered account emails.
+  Common default emails like admin@localhost.localdomain, root@localhost,
+  user@localhost may already be registered by random accounts worldwide.
+  Whoever registered that email first gets the attribution.
+
+Prevention checklist for new devices:
+  # Always run on any new machine before first commit
+  git config --global user.name "your-github-username"
+  git config --global user.email "your-github-email@example.com"
+
+  # Verify before committing
+  git config user.name
+  git config user.email

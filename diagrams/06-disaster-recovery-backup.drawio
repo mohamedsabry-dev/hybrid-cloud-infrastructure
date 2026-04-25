@@ -1,0 +1,144 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Disaster Recovery and Backup Architecture" id="dr-backup">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1350" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="s1" value="&lt;b&gt;ETCD BACKUP PIPELINE — K8s State → S3&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="etcd_cj" value="&lt;b&gt;etcd-backup CronJob&lt;/b&gt;&lt;br&gt;Nightly schedule&lt;br&gt;Runs on K8s master" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="15" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="etcd_snap" value="&lt;b&gt;etcdctl snapshot&lt;/b&gt;&lt;br&gt;Save cluster state&lt;br&gt;/tmp/etcd-snapshot.db" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="290" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_sts" value="&lt;b&gt;Vault AWS STS&lt;/b&gt;&lt;br&gt;Short-lived creds&lt;br&gt;K8s auth → Vault role" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="555" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3_upload" value="&lt;b&gt;S3 Upload&lt;/b&gt;&lt;br&gt;KMS encrypted&lt;br&gt;Off-site backup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="820" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="docker_img" value="&lt;b&gt;Custom Docker Image&lt;/b&gt;&lt;br&gt;Built via GH Actions&lt;br&gt;Pushed to GHCR" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="1065" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="eb1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="etcd_cj" target="etcd_snap" parent="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="etcd_snap" target="vault_sts" parent="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="vault_sts" target="s3_upload" parent="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a12" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="153" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s2" value="&lt;b&gt;VM / LXC WORKLOAD BACKUPS — Proxmox → NAS&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="185" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="vzdump" value="&lt;b&gt;vzdump&lt;/b&gt;&lt;br&gt;Proxmox backup engine&lt;br&gt;Snapshot mode (no downtime)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="15" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="backup_sched" value="&lt;b&gt;Scheduled Jobs&lt;/b&gt;&lt;br&gt;All VMs + LXCs&lt;br&gt;Retention: N days local" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="310" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas_store" value="&lt;b&gt;NAS Storage&lt;/b&gt;&lt;br&gt;/volume1/backups&lt;br&gt;650GB allocated" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="575" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas_raid" value="&lt;b&gt;RAID1 Redundancy&lt;/b&gt;&lt;br&gt;Mirrored disks&lt;br&gt;+ snapshot protection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="820" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ev1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="vzdump" target="backup_sched" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="backup_sched" target="nas_store" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ev3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="nas_store" target="nas_raid" parent="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a23" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="308" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s3" value="&lt;b&gt;HOST CONFIG BACKUP — Proxmox Hypervisor State&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="host_tar" value="&lt;b&gt;Config Tarball&lt;/b&gt;&lt;br&gt;/etc/pve + network&lt;br&gt;+ grub + interfaces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="15" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="host_nas" value="&lt;b&gt;Archive → NAS&lt;/b&gt;&lt;br&gt;Timestamped backup&lt;br&gt;Enables full host rebuild" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="290" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="host_rebuild" value="&lt;b&gt;Rebuild Path&lt;/b&gt;&lt;br&gt;Fresh Proxmox install&lt;br&gt;→ bootstrap network&lt;br&gt;→ restore /etc/pve → restore VMs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="565" y="40" width="300" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="eh1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="host_tar" target="host_nas" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eh2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="host_nas" target="host_rebuild" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a34" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="463" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s4" value="&lt;b&gt;PROXMOX HOST PROTECTION — Automated Safety Nets&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="495" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="ups_mon" value="&lt;b&gt;UPS Monitor&lt;/b&gt;&lt;br&gt;Daemon watches battery&lt;br&gt;Graceful shutdown on&lt;br&gt;sustained discharge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="15" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="temp_mon" value="&lt;b&gt;Temperature Monitor&lt;/b&gt;&lt;br&gt;Shutdown after 5min&lt;br&gt;sustained 90°C&lt;br&gt;vzdump-aware (waits)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="290" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="io_storm" value="&lt;b&gt;IO Storm Watchdog&lt;/b&gt;&lt;br&gt;Detects source VM by&lt;br&gt;CPU+IO fingerprint&lt;br&gt;Auto-resets offender" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="575" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="hw_runbook" value="&lt;b&gt;Hardware Failure&lt;/b&gt;&lt;br&gt;USB-Ethernet replacement&lt;br&gt;MAC mapping + safe order" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="860" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="email_alert" value="&lt;b&gt;Email Alert&lt;/b&gt;&lt;br&gt;Recovery notification&lt;br&gt;to operator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="1135" y="40" width="170" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="a45" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="618" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s5" value="&lt;b&gt;RECOVERY PATHS — Restore Procedures&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="rec_etcd" value="&lt;b&gt;etcd Restore&lt;/b&gt;&lt;br&gt;Download from S3&lt;br&gt;etcdctl snapshot restore&lt;br&gt;Full cluster state recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="15" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="rec_vm" value="&lt;b&gt;VM/LXC Restore&lt;/b&gt;&lt;br&gt;qmrestore / pct restore&lt;br&gt;From NAS vzdump archive" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="310" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="rec_host" value="&lt;b&gt;Host Rebuild&lt;/b&gt;&lt;br&gt;Fresh Proxmox → bootstrap.sh&lt;br&gt;→ network-setup.sh → restore" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="595" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="rec_k8s" value="&lt;b&gt;K8s Cluster Rebuild&lt;/b&gt;&lt;br&gt;Ansible re-run + Flux&lt;br&gt;auto-reconciles workloads" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="900" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="er1a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="rec_etcd" target="rec_vm" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er2a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="rec_vm" target="rec_host" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="er3a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="rec_host" target="rec_k8s" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a56" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="773" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s6" value="&lt;b&gt;TESTED DR SCENARIOS — 16 Validated Playbooks&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="805" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_k8s" value="&lt;b&gt;K8s Scenarios&lt;/b&gt;&lt;br&gt;Worker 1-of-3 down&lt;br&gt;Worker 2-of-3 down&lt;br&gt;Master failure + VIP failover" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="15" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_vault" value="&lt;b&gt;Vault Scenarios&lt;/b&gt;&lt;br&gt;Node failure + auto-unseal&lt;br&gt;Full cluster loss&lt;br&gt;Seal event recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="310" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_net" value="&lt;b&gt;Network Scenarios&lt;/b&gt;&lt;br&gt;VPN tunnel down&lt;br&gt;Router failure&lt;br&gt;VLAN isolation break" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="595" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_pve" value="&lt;b&gt;Proxmox Scenarios&lt;/b&gt;&lt;br&gt;Host crash + rebuild&lt;br&gt;Storage failure&lt;br&gt;Power loss + UPS" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="860" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_full" value="&lt;b&gt;Full Stack&lt;/b&gt;&lt;br&gt;Complete env rebuild&lt;br&gt;from scratch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="1125" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

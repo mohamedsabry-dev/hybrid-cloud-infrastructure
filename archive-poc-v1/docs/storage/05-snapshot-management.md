@@ -7,18 +7,18 @@
 ## Snapshot Best Practices
 
 **DO:**
-- ✅ Take snapshots before risky operations
-- ✅ Delete snapshots within 24-48 hours
-- ✅ Calculate required space before creating
-- ✅ Test VM boot after snapshot deletion
-- ✅ Use Veeam for long-term backups (not snapshots)
+- Take snapshots before risky operations
+- Delete snapshots within 24-48 hours
+- Calculate required space before creating
+- Test VM boot after snapshot deletion
+- Use Veeam for long-term backups (not snapshots)
 
 **DON'T:**
-- ❌ Keep snapshots longer than 1 week
-- ❌ Accumulate more than 2-3 snapshots per VM
-- ❌ Use snapshots as backups
-- ❌ Take snapshots without verifying free space
-- ❌ Ignore datastore space warnings
+- Keep snapshots longer than 1 week
+- Accumulate more than 2-3 snapshots per VM
+- Use snapshots as backups
+- Take snapshots without verifying free space
+- Ignore datastore space warnings
 
 ---
 
@@ -42,7 +42,7 @@ Required Space = Provisioned Capacity × 1.5
 Example:
   NAS VM: 905GB thick provisioned (data disks only)
   Snapshot: 905GB × 1.5 = 1358GB required
-  Datastore: DS_NVME_2 = 2TB ✓ (sufficient space)
+  Datastore: DS_NVME_2 = 2TB Yes (sufficient space)
 ```
 
 **Why 1.5x Multiplier?**
@@ -61,7 +61,7 @@ Example:
 2. Snapshots > Take Snapshot
 3. Name: "Before_RAID_Config" (descriptive)
 4. Description: Purpose and date
-5. ✓ Snapshot VM memory (optional, for running VMs)
+5. Yes Snapshot VM memory (optional, for running VMs)
 6. Click OK
 ```
 
@@ -141,9 +141,9 @@ Compression: Enabled (dedupe + compression)
 - **Retention**: 4 weeks on external
 
 **Benefits:**
-- ✅ Offsite protection (removable drive)
-- ✅ Survives laptop failure
-- ✅ 3-2-1 backup rule compliance
+- Offsite protection (removable drive)
+- Survives laptop failure
+- 3-2-1 backup rule compliance
 
 ---
 
@@ -152,11 +152,11 @@ Compression: Enabled (dedupe + compression)
 ### VMware Snapshots
 
 **Characteristics:**
-- ⚠️ For short-term testing/rollback (hours to days)
-- ⚠️ Depend on original VM and datastore
-- ⚠️ Cannot survive datastore corruption
-- ⚠️ Performance degrades with long snapshot chains
-- ✓ Fast rollback (seconds to minutes)
+-  For short-term testing/rollback (hours to days)
+-  Depend on original VM and datastore
+-  Cannot survive datastore corruption
+-  Performance degrades with long snapshot chains
+- Yes Fast rollback (seconds to minutes)
 
 **Use Cases:**
 - Before applying system updates
@@ -167,12 +167,12 @@ Compression: Enabled (dedupe + compression)
 ### Veeam Backups
 
 **Characteristics:**
-- ✓ For long-term protection (weeks to months)
-- ✓ Compressed, space-efficient
-- ✓ Independent from source datastore
-- ✓ Restore to different infrastructure
-- ✓ Incremental backup chains
-- ⚠️ Slower restore (minutes to hours)
+- Yes For long-term protection (weeks to months)
+- Yes Compressed, space-efficient
+- Yes Independent from source datastore
+- Yes Restore to different infrastructure
+- Yes Incremental backup chains
+-  Slower restore (minutes to hours)
 
 **Use Cases:**
 - Daily production VM protection
@@ -224,7 +224,7 @@ Action: Send email, log event
 ```
 1. Calculate: vCenter 500GB allocated, 350GB used
 2. Required: 350GB × 1.5 = 525GB
-3. Check: DS_NVME_1 has 500GB free ✓
+3. Check: DS_NVME_1 has 500GB free Yes
 4. Create snapshot: "Before_vCenter_8_Upgrade"
 5. Perform upgrade
 6. Test: 24-48 hours
@@ -236,7 +236,7 @@ Action: Send email, log event
 ```
 1. Calculate: NAS VM 905GB thick provisioned
 2. Required: 905GB × 1.5 = 1358GB
-3. Check: DS_NVME_2 has 1065GB free ✓
+3. Check: DS_NVME_2 has 1065GB free Yes
 4. Create snapshot: "Before_NFS_Export_Change"
 5. Make changes
 6. Test: 2-3 days
@@ -248,7 +248,7 @@ Action: Send email, log event
 ```
 1. Calculate: K8s Master 110GB, 3 Workers 60GB each
 2. Required: (110 + 180) × 1.5 = 435GB
-3. Check: NAS_DS_1 has 120GB free ✗ (insufficient)
+3. Check: NAS_DS_1 has 120GB free No (insufficient)
 4. Alternative: Use Veeam backup instead
 5. Take Veeam backup before upgrade
 6. Proceed with upgrade

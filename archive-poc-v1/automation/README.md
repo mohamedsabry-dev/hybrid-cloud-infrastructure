@@ -1,6 +1,10 @@
 # Automation
 
-Scripts and playbooks for infrastructure automation.
+> **Archived PoC v1 material** — retired infrastructure, not the current project.
+> See [`../README.md`](../README.md) for the retirement story and the current stack.
+> Kept as-is for portfolio reference.
+
+Scripts and playbooks for infrastructure automation (PoC v1 era — VMware-based).
 
 ## Structure
 

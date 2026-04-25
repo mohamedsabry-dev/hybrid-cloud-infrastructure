@@ -1,0 +1,127 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Storage Architecture" id="poc-storage">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== PHYSICAL STORAGE ==================== -->
+        <mxCell id="physical" value="&lt;b&gt;Physical Storage — 4.5TB Total&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="nvme0" value="&lt;b&gt;NVME0 (2TB)&lt;/b&gt;&lt;br&gt;Windows 11 + personal data" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="physical">
+          <mxGeometry x="15" y="38" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="nvme1" value="&lt;b&gt;NVME1 (2TB)&lt;/b&gt;&lt;br&gt;VMware Workstation VMs&lt;br&gt;DS_NVME_1 + DS_NVME_2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="physical">
+          <mxGeometry x="300" y="38" width="280" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="nvme2" value="&lt;b&gt;NVME2 (500GB)&lt;/b&gt;&lt;br&gt;External DR backups (SMB)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="physical">
+          <mxGeometry x="615" y="38" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="over_prov" value="&lt;b&gt;Over-provisioning: 2.3x&lt;/b&gt;&lt;br&gt;4.2TB allocated / 1.8TB actual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="physical">
+          <mxGeometry x="900" y="38" width="250" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DS_NVME_1 ==================== -->
+        <mxCell id="ds1" value="&lt;b&gt;DS_NVME_1 — ESXi Datastore (2TB Thin)&lt;/b&gt;&lt;br&gt;Provisioned: 1.52TB • Free: 600GB" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="690" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_vc" value="&lt;b&gt;vCenter&lt;/b&gt;&lt;br&gt;500GB thin" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ds1">
+          <mxGeometry x="10" y="48" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_veeam" value="&lt;b&gt;Veeam&lt;/b&gt;&lt;br&gt;80GB OS&lt;br&gt;600GB repo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="ds1">
+          <mxGeometry x="130" y="48" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_pf" value="&lt;b&gt;pfSense&lt;/b&gt;&lt;br&gt;40GB thin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="ds1">
+          <mxGeometry x="250" y="48" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_prod" value="&lt;b&gt;ESXi Prod&lt;/b&gt;&lt;br&gt;150GB thin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="ds1">
+          <mxGeometry x="360" y="48" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_dr" value="&lt;b&gt;ESXi DR&lt;/b&gt;&lt;br&gt;150GB thin" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;dashed=1;" vertex="1" parent="ds1">
+          <mxGeometry x="470" y="48" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds1_iso" value="&lt;b&gt;ISOs&lt;/b&gt;&lt;br&gt;50GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ds1">
+          <mxGeometry x="580" y="48" width="100" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DS_NVME_2 ==================== -->
+        <mxCell id="ds2" value="&lt;b&gt;DS_NVME_2 — NAS Dedicated (2TB)&lt;/b&gt;&lt;br&gt;Provisioned: 935GB • Free: 1TB" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="770" y="180" width="400" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds2_os" value="&lt;b&gt;NAS VM OS&lt;/b&gt;&lt;br&gt;30GB thin" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ds2">
+          <mxGeometry x="15" y="48" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ds2_data" value="&lt;b&gt;NAS VM Data&lt;/b&gt;&lt;br&gt;900GB + 5GB&lt;br&gt;THICK provisioned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ds2">
+          <mxGeometry x="185" y="48" width="200" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== NAS NFS EXPORTS ==================== -->
+        <mxCell id="nfs_layer" value="&lt;b&gt;NAS_DS — NFS Export from NAS VM (900GB)&lt;/b&gt;&lt;br&gt;Shared storage for all production VMs • Enables vMotion" style="swimlane;startSize=40;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="1420" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="nfs_vault_label" value="&lt;b&gt;Vault Cluster:&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="10" y="48" width="120" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_v1" value="&lt;b&gt;vault-01&lt;/b&gt;&lt;br&gt;30GB OS + 10GB RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="10" y="68" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_v2" value="&lt;b&gt;vault-02&lt;/b&gt;&lt;br&gt;30GB OS + 10GB RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="170" y="68" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_v3" value="&lt;b&gt;vault-03&lt;/b&gt;&lt;br&gt;30GB OS + 10GB RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="330" y="68" width="150" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="nfs_k8s_label" value="&lt;b&gt;Kubernetes:&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="510" y="48" width="120" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_km" value="&lt;b&gt;k8s-master&lt;/b&gt;&lt;br&gt;90GB OS + 120GB data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="510" y="68" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_kw" value="&lt;b&gt;k8s-workers ×3&lt;/b&gt;&lt;br&gt;50GB OS + 60GB data each" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="680" y="68" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="nfs_svc_label" value="&lt;b&gt;Support Services:&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="890" y="48" width="150" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_ans" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;90GB OS + 120GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="890" y="68" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_jen" value="&lt;b&gt;jenkins&lt;/b&gt;&lt;br&gt;90GB OS + 60GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="1040" y="68" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_mon" value="&lt;b&gt;monitor&lt;/b&gt;&lt;br&gt;90GB OS + 60GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="1180" y="68" width="130" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="nfs_total" value="&lt;b&gt;Total Allocated:&lt;/b&gt; 780GB / 900GB • &lt;b&gt;Free:&lt;/b&gt; 120GB • &lt;b&gt;NAS_DS_2 (5GB):&lt;/b&gt; HA Heartbeat datastore • &lt;b&gt;Thick provisioned:&lt;/b&gt; NAS data disks only (predictable NFS I/O)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="nfs_layer">
+          <mxGeometry x="10" y="125" width="1100" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== PROVISIONING STRATEGY ==================== -->
+        <mxCell id="strategy" value="&lt;b&gt;Provisioning Strategy&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="590" width="1420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="strat_thin" value="&lt;b&gt;Thin Provisioned (default)&lt;/b&gt;&lt;br&gt;Most VMs • Grows on demand&lt;br&gt;Risk: snapshot captures full allocated size" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="strategy">
+          <mxGeometry x="15" y="38" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="strat_thick" value="&lt;b&gt;Thick Provisioned (NAS only)&lt;/b&gt;&lt;br&gt;Predictable NFS performance&lt;br&gt;Rule: 2x disk for snapshot safety" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="strategy">
+          <mxGeometry x="370" y="38" width="320" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="strat_snap" value="&lt;b&gt;Snapshot Risk&lt;/b&gt;&lt;br&gt;Thick disk snapshots capture entire allocation&lt;br&gt;980GB thick + snapshot = disk full disaster" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="strategy">
+          <mxGeometry x="725" y="38" width="340" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_phys_ds1" value="hosts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" edge="1" source="physical" target="ds1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_phys_ds2" value="hosts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" edge="1" source="physical" target="ds2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_ds2_nfs" value="NFS export" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;" edge="1" source="ds2" target="nfs_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_nfs_strat" value="provisioning rules" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666;fontSize=10;" edge="1" source="nfs_layer" target="strategy" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

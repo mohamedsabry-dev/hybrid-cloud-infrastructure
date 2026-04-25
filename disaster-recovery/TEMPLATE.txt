@@ -1,0 +1,112 @@
+DR Test: <test name>
+Date: <YYYY-MM-DD>
+Result: <PASS / PARTIAL / FAIL / PLANNED REPEAT>
+_____________________________________________________________________
+
+[Info]
+Domain:
+Environment:
+Triggered by:
+
+_____________________________________________________________________
+
+[Planned Scope]
+
+Goal here is to break <X> and see what happens downstream.
+Components expected to be affected: <list>
+
+_____________________________________________________________________
+
+[Pre-State]
+
+Everything healthy before starting — baseline snapshot:
+<nodes, pods, services — keep it short, just proof of clean start>
+
+_____________________________________________________________________
+
+[Test 1.1 — <what I broke>]
+
+Action:
+  <command or physical action>
+
+What happened:
+  - <component>: <alive/dead/degraded> — <one evidence line>
+  - <component>: <alive/dead/degraded> — <one evidence line>
+
+Cascade:
+  <X down> → <Y couldn't reach X because ...> → <Z broke because Y ...>
+
+What this tells me:
+  <the actual takeaway — not "X broke" but what it reveals about the system>
+
+_____________________________________________________________________
+
+[Test 1.2 — <next thing I tried based on 1.1>]
+
+Why this test: <what I saw in 1.1 that made me want to push further>
+
+Action:
+  <command or action>
+
+What happened:
+  - <component>: <status> — <evidence>
+  - <component>: <status> — <evidence>
+
+Cascade:
+  <how this builds on 1.1>
+
+What this tells me:
+  <finding — what got worse, what survived, what surprised me>
+
+Fix applied:
+  <what I changed and why>
+  <file path if relevant>
+
+_____________________________________________________________________
+
+[Test 1.3 — re-run 1.2 after fix]
+
+Same scenario, fix in place.
+
+Result:
+  <evidence it worked or didn't>
+
+Before vs After:
+  <the comparison that proves it>
+
+_____________________________________________________________________
+
+[Recovery]
+
+How I brought everything back:
+  1. <action> — <how long>
+  2. <action> — <how long>
+
+Timeline:
+  T+0:00  <first step>
+  T+0:30  <first sign of life>
+  T+X:00  <full health>
+
+_____________________________________________________________________
+
+[Findings]
+
+1. <what this test revealed about how the system actually behaves
+   under this failure — the thing I didn't know before running it>
+
+2. <anything that survived or failed unexpectedly>
+
+3. <open weakness — what still needs mitigation and why>
+
+_____________________________________________________________________
+
+[Planned Next]
+
+- <follow-up test this one opened up>
+- <deeper scenario to try>
+
+_____________________________________________________________________
+
+[References]
+
+- <related DR tests, TS docs, config files>

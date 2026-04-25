@@ -22,9 +22,9 @@ Before starting the lab environment build, ensure you have the required hardware
 * **ESXi ISO:** [VMware ESXi 8.0.3](https://knowledge.broadcom.com/external/article/399823/vmware-esxi-80-update-3e-now-available-a.html)
 * **vCenter ISO:** [VMware vCenter 8.0.3](https://knowledge.broadcom.com/external/article/387785/download-vcenter-server-patches-and-isos.html)
 
-> **⚠️ Planning Note:** Create a local Low-Level Design (LLD) file to track IPs, credentials, and resource assignments. **Never upload files containing passwords to this repository.**
+> ** Planning Note:** Create a local Low-Level Design (LLD) file to track IPs, credentials, and resource assignments. **Never upload files containing passwords to this repository.**
 
-> **📋 Why these versions?** ESXi 8.0.3 and vCenter 8.0.3 are tested stable versions that work well on VMware Workstation without licensing headaches. Avoid mixing versions between ESXi and vCenter.
+> ** Why these versions?** ESXi 8.0.3 and vCenter 8.0.3 are tested stable versions that work well on VMware Workstation without licensing headaches. Avoid mixing versions between ESXi and vCenter.
 
 ---
 

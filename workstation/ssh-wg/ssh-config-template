@@ -1,16 +1,20 @@
-MAC-Mini ~/.ssh/config
+# Mac Mini ~/.ssh/config template
+# Replace <DEV_EIP> and <PROD_EIP> with the actual Elastic IPs from AWS
+# after `dev-aws-compute` / `prod-aws-compute` workflows complete.
 
 Host wg-dev
-      HostName EIP
-      User ec2-user
-      IdentityFile ~/WorkSpace/vpn-key-pair-dev.pem
-                                                                                                            
-Host wg-prod 
-      HostName EIP
-      User ec2-user
-      IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
+    HostName <DEV_EIP>
+    User ec2-user
+    IdentityFile ~/WorkSpace/vpn-key-pair-dev.pem
 
+Host wg-prod
+    HostName <PROD_EIP>
+    User ec2-user
+    IdentityFile ~/WorkSpace/vpn-key-pair-prod.pem
+
+# GitHub via port 443 — used when corporate / hotel / restrictive networks
+# block outbound SSH on 22 but allow HTTPS (443) through.
 Host github.com
-  Hostname ssh.github.com
-  Port 443
-  User git
+    Hostname ssh.github.com
+    Port 443
+    User git

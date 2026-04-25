@@ -1,0 +1,147 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Compute Resource Allocation" id="poc-compute">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== PHYSICAL HARDWARE ==================== -->
+        <mxCell id="phys_layer" value="&lt;b&gt;Physical Hardware — Single Laptop&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1520" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="phys_ram" value="&lt;b&gt;RAM: 64GB&lt;/b&gt;&lt;br&gt;DDR5 4800MHz&lt;br&gt;90-95% utilized" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="phys_layer">
+          <mxGeometry x="15" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="phys_cpu" value="&lt;b&gt;CPU: 16 vCPU&lt;/b&gt;&lt;br&gt;@ 3.1GHz+ base&lt;br&gt;~30% avg, 40% peak" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="phys_layer">
+          <mxGeometry x="235" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="phys_stor" value="&lt;b&gt;Storage: 4.5TB&lt;/b&gt;&lt;br&gt;3x NVMe drives&lt;br&gt;2.3x over-provisioned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="phys_layer">
+          <mxGeometry x="455" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="phys_host" value="&lt;b&gt;Windows 11 Host&lt;/b&gt;&lt;br&gt;11GB RAM reserved&lt;br&gt;VMware Workstation" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="phys_layer">
+          <mxGeometry x="675" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="phys_warn" value="&lt;b&gt;Swap Warning&lt;/b&gt;&lt;br&gt;Full env + dev tools = 59-61GB demand&lt;br&gt;Forces 6-7GB to swap on single laptop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="phys_layer">
+          <mxGeometry x="895" y="38" width="280" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ESXi MASTER INFRASTRUCTURE ==================== -->
+        <mxCell id="infra_layer" value="&lt;b&gt;ESXi Master — Infrastructure Layer (24GB RAM, 14 vCPU)&lt;/b&gt;&lt;br&gt;Always running • Core services that all production VMs depend on" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="1520" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_nas" value="&lt;b&gt;NAS&lt;/b&gt;&lt;br&gt;8GB RAM • 4 vCPU&lt;br&gt;10.0.20.90&lt;br&gt;NFS 900GB • bond0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="15" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_vc" value="&lt;b&gt;vCenter&lt;/b&gt;&lt;br&gt;7GB RAM • 3 vCPU&lt;br&gt;10.0.20.89&lt;br&gt;Cluster orchestration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="200" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_veeam" value="&lt;b&gt;Veeam&lt;/b&gt;&lt;br&gt;5GB RAM • 3 vCPU&lt;br&gt;10.0.20.195&lt;br&gt;Win Server 2022" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="385" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;2GB RAM • 2 vCPU&lt;br&gt;10.0.20.184&lt;br&gt;DNS+LDAP+Kerberos" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="570" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_pf" value="&lt;b&gt;pfSense&lt;/b&gt;&lt;br&gt;2GB RAM • 2 vCPU&lt;br&gt;10.0.20.170&lt;br&gt;NAT + Firewall" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="755" y="48" width="170" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_overhead" value="&lt;b&gt;ESXi Master Overhead&lt;/b&gt;&lt;br&gt;3GB RAM&lt;br&gt;Virtualization mgmt layer&lt;br&gt;CPU O/C: 194% (31/16)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="940" y="48" width="200" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== PRODUCTION ESXi ==================== -->
+        <mxCell id="prod_layer" value="&lt;b&gt;Nested ESXi Production — 25.5GB RAM, 10 vCPU allocated (24 vCPU committed)&lt;/b&gt;&lt;br&gt;10 VMs • CPU over-commitment: 240% • Running on NAS_DS shared NFS storage" style="swimlane;startSize=40;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="1520" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_vault_label" value="&lt;b&gt;Vault HA Cluster (5.25GB, 6 vCPU):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="prod_layer">
+          <mxGeometry x="15" y="48" width="250" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_v1" value="&lt;b&gt;vault-01&lt;/b&gt;&lt;br&gt;1.75GB • 2 vCPU&lt;br&gt;.191 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="15" y="68" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_v2" value="&lt;b&gt;vault-02&lt;/b&gt;&lt;br&gt;1.75GB • 2 vCPU&lt;br&gt;.192 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="165" y="68" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_v3" value="&lt;b&gt;vault-03&lt;/b&gt;&lt;br&gt;1.75GB • 2 vCPU&lt;br&gt;.193 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="315" y="68" width="140" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_k8s_label" value="&lt;b&gt;Kubernetes Cluster (9.75GB, 9 vCPU):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="prod_layer">
+          <mxGeometry x="490" y="48" width="250" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_km" value="&lt;b&gt;k8s-master&lt;/b&gt;&lt;br&gt;3GB • 3 vCPU&lt;br&gt;.181 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="490" y="68" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_kw1" value="&lt;b&gt;worker-1&lt;/b&gt;&lt;br&gt;2.25GB • 2 vCPU&lt;br&gt;.182" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="640" y="68" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_kw2" value="&lt;b&gt;worker-2&lt;/b&gt;&lt;br&gt;2.25GB • 2 vCPU&lt;br&gt;.183" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="770" y="68" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_kw3" value="&lt;b&gt;worker-3&lt;/b&gt;&lt;br&gt;2.25GB • 2 vCPU&lt;br&gt;.187" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="900" y="68" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_svc_label" value="&lt;b&gt;Support Services (7.5GB, 9 vCPU):&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#666666;align=left;" vertex="1" parent="prod_layer">
+          <mxGeometry x="1050" y="48" width="250" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_mon" value="&lt;b&gt;monitor&lt;/b&gt;&lt;br&gt;2GB • 3 vCPU&lt;br&gt;.186 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="1050" y="68" width="130" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_ans" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;2.5GB • 3 vCPU&lt;br&gt;.185 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="1190" y="68" width="130" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_jen" value="&lt;b&gt;jenkins&lt;/b&gt;&lt;br&gt;3GB • 3 vCPU&lt;br&gt;.196 • RAID1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="prod_layer">
+          <mxGeometry x="1330" y="68" width="130" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_summary" value="&lt;b&gt;Production Totals:&lt;/b&gt; 22.5GB VMs + 3GB ESXi overhead = 25.5GB • 24 vCPU committed / 10 allocated = 240% over-commit • &lt;b&gt;Safe because:&lt;/b&gt; complementary workloads, measured host CPU 20-30% avg" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="prod_layer">
+          <mxGeometry x="15" y="140" width="1100" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DR COLD STANDBY ==================== -->
+        <mxCell id="dr_layer" value="&lt;b&gt;DR ESXi — Cold Standby (POWERED OFF)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="610" width="740" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_status" value="&lt;b&gt;Current: 0GB RAM&lt;/b&gt;&lt;br&gt;Powered OFF&lt;br&gt;No memory consumption&lt;br&gt;Manual activation only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;dashed=1;" vertex="1" parent="dr_layer">
+          <mxGeometry x="15" y="38" width="200" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_active" value="&lt;b&gt;When Activated: 25.5GB&lt;/b&gt;&lt;br&gt;Mirror of Production ESXi&lt;br&gt;Requires Prod shutdown first&lt;br&gt;RTO: 15-20 minutes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="dr_layer">
+          <mxGeometry x="235" y="38" width="220" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dr_why" value="&lt;b&gt;Why Cold Standby?&lt;/b&gt;&lt;br&gt;ESXi nested reserves 3GB on boot&lt;br&gt;and NEVER releases after migration&lt;br&gt;Active HA = memory exhaustion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="dr_layer">
+          <mxGeometry x="475" y="38" width="250" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== KEY DECISIONS ==================== -->
+        <mxCell id="decisions_layer" value="&lt;b&gt;Key Architectural Decisions&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="610" width="740" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="dec_cold" value="&lt;b&gt;Cold DR = 3 K8s Workers&lt;/b&gt;&lt;br&gt;Active HA: only 2 workers (22GB each)&lt;br&gt;Cold standby: 3 workers (27GB prod)&lt;br&gt;App-layer HA over infra-layer HA" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="decisions_layer">
+          <mxGeometry x="15" y="38" width="230" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dec_dedicated" value="&lt;b&gt;Dedicated Vault/Jenkins VMs&lt;/b&gt;&lt;br&gt;Original: containers on Ansible (5GB)&lt;br&gt;Final: separate VMs (11GB total)&lt;br&gt;Better isolation + failure domains" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="decisions_layer">
+          <mxGeometry x="260" y="38" width="230" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="dec_overcommit" value="&lt;b&gt;CPU Over-Commitment&lt;/b&gt;&lt;br&gt;L2: 194% (ESXi Master)&lt;br&gt;L3: 240% (Prod ESXi)&lt;br&gt;Safe: complementary, bursty workloads" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="decisions_layer">
+          <mxGeometry x="505" y="38" width="220" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_phys_infra" value="53GB allocated to ESXi Master" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" edge="1" source="phys_layer" target="infra_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_infra_prod" value="25.5GB nested ESXi + 10 vCPU" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;" edge="1" source="infra_layer" target="prod_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_prod_dr" value="failover (manual, requires prod shutdown)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#666666;fontColor=#666;fontSize=10;dashed=1;" edge="1" source="prod_layer" target="dr_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_dr_dec" value="design trade-offs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="dr_layer" target="decisions_layer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

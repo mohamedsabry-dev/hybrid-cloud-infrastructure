@@ -1,150 +1,180 @@
 # TS-GH-005 | 2026-03-14 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: GitHub Actions self-hosted runner
-- Environment: LXC container on Proxmox
-- Related components: Chrony NTP, DNS resolution, OAuth authentication
+[Info]
+Domain: GitHub Actions
+Sub-techs: Self-hosted runner, OAuth token, Chrony NTP, DNS, LXC time inheritance
+Environment: LXC container on Proxmox
+Re-opened: No
 
-## 2. Issue
-- Symptom: Runner shows "Offline" in GitHub Actions
-- Error:
-```
-Failed to create a session. The runner registration has been deleted
-from the server, please re-configure. Runner registrations are
-automatically deleted for runners that have not connected to the
-service recently.
-```
+_____________________________________________________________________
 
-**Real error (in runner logs):**
-```bash
-cat /opt/actions-runner/_diag/Runner_*.log | tail -50
-```
-```
-VssOAuthTokenRequestException: The token is not valid until
-03/14/2026 15:02:29. Current server time is 03/14/2026 13:02:56.
-```
-**Translation:** Runner clock is 2 hours ahead of GitHub servers.
+[Issue Description]
+Runner shows Offline in GitHub Actions with a misleading error message about
+registration being deleted. Real cause was clock skew — runner clock was 2 hours
+ahead of GitHub servers.
 
-## 3. Analysis
+Displayed error:
+  Failed to create a session. The runner registration has been deleted from the
+  server, please re-configure. Runner registrations are automatically deleted for
+  runners that have not connected to the service recently.
 
-**Check 1: Runner logs**
-```bash
-journalctl -u actions.runner.* -n 50 --no-pager
-cat /opt/actions-runner/_diag/Runner_*.log | tail -50
-```
-Finding: OAuth token timestamp error - clock is ahead.
+Actual error in runner diagnostic logs:
+  VssOAuthTokenRequestException: The token is not valid until 03/14/2026 15:02:29.
+  Current server time is 03/14/2026 13:02:56.
 
-**Check 2: Host time**
-```bash
-timedatectl
-# System clock synchronized: no
-```
-Finding: System clock not synchronized.
+Runner clock was 2 hours ahead — OAuth tokens appeared to GitHub as coming from
+the future.
 
-**Check 3: NTP sources**
-```bash
-chronyc sources -v
-# Empty = no NTP servers reachable
-```
-Finding: No NTP servers reachable.
+_____________________________________________________________________
 
-**Check 4: DNS**
-```bash
-cat /etc/resolv.conf
-# nameserver 192.168.0.1  ← old/wrong nameserver
+[Analysis]
 
-ping google.com  # Hangs
-ping 8.8.8.8     # Works
-```
-Finding: DNS broken - can't resolve NTP pool hostnames.
+# Initial Check Notes:
+The displayed error pointed at registration but it felt wrong — checked runner
+diagnostic logs directly instead of trusting the UI message.
 
-## 4. Root Cause
-> DNS misconfiguration (old nameserver 192.168.0.1) broke NTP resolution. Chrony couldn't sync time, host clock drifted 2 hours, LXC inherited wrong time. Runner OAuth tokens appeared "from the future" to GitHub servers.
+Command:
+  cat /opt/actions-runner/_diag/Runner_*.log | tail -50
 
-**Chain:**
-```
-DNS broken (old nameserver)
-    ↓
-NTP can't resolve pool.ntp.org
-    ↓
-Chrony can't sync time
-    ↓
-Host clock drifts 2 hours
-    ↓
-LXC inherits wrong time
-    ↓
-Runner OAuth tokens "from the future"
-    ↓
-GitHub rejects authentication
-```
+Output:
+  VssOAuthTokenRequestException: token not valid until 15:02:29,
+  current server time 13:02:56 — clock 2 hours ahead.
 
-## 5. Solution
-> Fix DNS, sync time, restart runner.
+Checked system time sync:
 
-**Step 1: Fix DNS**
-```bash
-cat > /etc/resolv.conf << 'EOF'
-search lab.local
-nameserver 192.168.100.1
-nameserver 8.8.8.8
-EOF
-```
+Command:
+  timedatectl
 
-**Step 2: Sync time**
-```bash
-timedatectl set-ntp true
-systemctl restart chrony
-chronyc makestep
-chronyc sources
-timedatectl
-# Verify: System clock synchronized: yes
-```
+Output:
+  System clock synchronized: no
 
-**Step 3: Restart runner**
-```bash
-cd /opt/actions-runner
-./svc.sh stop
-./svc.sh start
-./svc.sh status
-```
+Checked NTP sources:
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - fixing DNS and NTP is standard maintenance
+Command:
+  chronyc sources -v
 
-## 7. Impact After Fix
-- Observed: Runner back online
-- Time synchronized correctly
-- OAuth authentication working
+Output:
+  Empty — no NTP servers reachable at all.
 
-## 8. Notes
+Checked DNS since NTP pool hostnames need to resolve:
 
-**Quick manual time fix (if NTP not working):**
-```bash
-# Disable NTP first
-timedatectl set-ntp false
+Command:
+  cat /etc/resolv.conf
+  ping google.com
+  ping 8.8.8.8
 
-# Set correct time manually
-timedatectl set-time "HH:MM:00"
+Output:
+  nameserver 192.168.0.1  ← old/wrong nameserver
+  ping google.com hangs
+  ping 8.8.8.8 works
 
-# Restart runner
-cd /opt/actions-runner && ./svc.sh stop && ./svc.sh start
-```
+DNS broken — NTP pool hostnames cannot resolve, chrony cannot sync,
+host clock drifted, LXC inherited the wrong time.
 
-**For isolated hosts (no internet) - sync from local NTP server:**
-```bash
-# On host with internet (e.g., pve-dev)
-echo "allow 10.0.0.0/8" >> /etc/chrony/chrony.conf
-systemctl restart chrony
+Failure chain:
+  DNS broken (old nameserver 192.168.0.1)
+    → NTP cannot resolve pool.ntp.org
+    → Chrony cannot sync time
+    → Host clock drifts 2 hours
+    → LXC inherits wrong time
+    → Runner OAuth tokens appear "from the future"
+    → GitHub rejects authentication
 
-# On isolated host (e.g., pve-prod)
-echo "server 10.0.5.110 iburst" >> /etc/chrony/chrony.conf
-systemctl restart chrony
-```
 
-**Key lesson:** "Runner registration deleted" error is often NOT about registration - check clock skew first. OAuth tokens have timestamps; if clock is ahead, tokens appear "not valid yet" to the server.
+# Suspected Root Cause
+DNS misconfiguration (stale nameserver 192.168.0.1) broke NTP hostname resolution.
+Chrony could not sync. Host clock drifted 2 hours. LXC inherited the wrong time.
+Runner OAuth tokens had timestamps ahead of GitHub server time — rejected.
 
-**Related:** TS-GH-001 (runner stuck after reboot)
 
-## 9. Workaround (if any)
-> Manually set correct time with `timedatectl set-time` if NTP cannot be fixed immediately.
+# More Checks Notes:
+Confirmed NTP works after DNS is fixed:
+
+Command:
+  chronyc sources -v  (after fixing resolv.conf)
+
+Output:
+  NTP sources visible and reachable.
+
+
+# Suspected Solution
+Fix DNS in resolv.conf, force time sync via chronyc makestep, restart runner.
+
+
+# Test
+Fixed resolv.conf, ran chronyc makestep, restarted runner service.
+
+Command:
+  timedatectl
+  ./svc.sh status
+
+Result: PASS — System clock synchronized: yes, runner back online.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Stale nameserver (192.168.0.1) in /etc/resolv.conf broke DNS resolution.
+Chrony could not resolve pool.ntp.org, stopped syncing, host clock drifted
+2 hours forward. LXC container inherited wrong time from host. Runner OAuth
+tokens appeared timestamped in the future — GitHub rejected authentication
+and surfaced a misleading "registration deleted" error instead of a clock error.
+
+_____________________________________________________________________
+
+[Final Solution]
+Three steps — fix DNS, sync time, restart runner:
+
+  # 1. Fix DNS
+  cat > /etc/resolv.conf << 'EOF'
+  search lab.local
+  nameserver 192.168.100.1
+  nameserver 8.8.8.8
+  EOF
+
+  # 2. Sync time
+  timedatectl set-ntp true
+  systemctl restart chrony
+  chronyc makestep
+  timedatectl  # verify: System clock synchronized: yes
+
+  # 3. Restart runner
+  cd /opt/actions-runner
+  ./svc.sh stop && ./svc.sh start
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Standard DNS and NTP maintenance — no infrastructure impact.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Key lesson: "Runner registration deleted" is often NOT about registration.
+Check clock skew first — OAuth tokens have timestamps and GitHub will reject
+tokens that appear to come from the future.
+
+Quick fix if NTP cannot be restored immediately:
+  timedatectl set-ntp false
+  timedatectl set-time "HH:MM:00"
+  cd /opt/actions-runner && ./svc.sh stop && ./svc.sh start
+
+For isolated hosts with no internet — sync from local NTP server:
+  # On host with internet (e.g. pve-dev)
+  echo "allow 10.0.0.0/8" >> /etc/chrony/chrony.conf
+  systemctl restart chrony
+
+  # On isolated host (e.g. pve-prod)
+  echo "server 10.0.5.110 iburst" >> /etc/chrony/chrony.conf
+  systemctl restart chrony
+
+Related: TS-GH-001 — runner stuck after reboot (different root cause, same runner)

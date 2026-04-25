@@ -1,0 +1,104 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Security and Identity" id="poc-security">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== FREEIPA DOMAIN ==================== -->
+        <mxCell id="ipa_layer" value="&lt;b&gt;FreeIPA Domain — home.lab (Realm: HOME.LAB)&lt;/b&gt;&lt;br&gt;Server: ipa.home.lab (10.0.20.184) • Rocky Linux 10 • DNS + LDAP + Kerberos + NTP" style="swimlane;startSize=40;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1420" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ipa_groups_label" value="&lt;b&gt;User Groups (8):&lt;/b&gt;" style="text;html=1;fontSize=11;fontColor=#666666;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="15" y="48" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_ops" value="&lt;b&gt;operators&lt;/b&gt;&lt;br&gt;operator1, operator2&lt;br&gt;SSH + restricted sudo" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="15" y="73" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_k8s" value="&lt;b&gt;k8s_admins&lt;/b&gt;&lt;br&gt;admin1, admin2&lt;br&gt;Full sudo on K8s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="195" y="73" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_vault" value="&lt;b&gt;vault_admins&lt;/b&gt;&lt;br&gt;vault_admin1, admin2&lt;br&gt;Full sudo on Vault" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="365" y="73" width="165" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_ansible" value="&lt;b&gt;ansible_admins&lt;/b&gt;&lt;br&gt;ansible_admin&lt;br&gt;Full sudo on Ansible" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="540" y="73" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_cicd" value="&lt;b&gt;cicd_admins&lt;/b&gt;&lt;br&gt;cicd_admin1, admin2&lt;br&gt;Full sudo on Jenkins" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="710" y="73" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_super" value="&lt;b&gt;super_users&lt;/b&gt;&lt;br&gt;super_ansible&lt;br&gt;Passwordless sudo ALL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="880" y="73" width="170" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_backup" value="&lt;b&gt;backup_admins&lt;/b&gt;&lt;br&gt;veeam&lt;br&gt;Backup servers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="1060" y="73" width="150" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="grp_monitors" value="&lt;b&gt;monitors&lt;/b&gt;&lt;br&gt;monitor1, 2&lt;br&gt;API-only, no shell" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="1220" y="73" width="150" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="hbac_note" value="&lt;b&gt;HBAC Rules (6):&lt;/b&gt; allow_k8s_ssh • allow_controller_ssh • allow_automation_ssh • allow_backup_ssh • allow_vault_ssh • allow_cicd_ssh — &lt;b&gt;NTP:&lt;/b&gt; All VMs → IPA (VMware Tools sync DISABLED to prevent Kerberos clock skew)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="15" y="140" width="1100" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VAULT CLUSTER ==================== -->
+        <mxCell id="vault_layer" value="&lt;b&gt;HashiCorp Vault — 3-Node Raft Cluster&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="700" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_nodes" value="&lt;b&gt;Nodes&lt;/b&gt;&lt;br&gt;vault-01 (.191) • vault-02 (.192) • vault-03 (.193)&lt;br&gt;1.75GB RAM • 2vCPU each" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="15" y="38" width="310" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_config" value="&lt;b&gt;Config&lt;/b&gt;&lt;br&gt;Raft storage (/var/lib/vault)&lt;br&gt;API: 0.0.0.0:8200&lt;br&gt;Cluster: 0.0.0.0:8201&lt;br&gt;TLS: disabled (lab phase)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="340" y="38" width="200" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_fw" value="&lt;b&gt;Firewall&lt;/b&gt;&lt;br&gt;Source: 10.0.20.0/24 only&lt;br&gt;Port: 8200/tcp&lt;br&gt;Zone: public" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="555" y="38" width="130" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_policies" value="&lt;b&gt;Policies:&lt;/b&gt; admin-policy.hcl (full) • operator-policy.hcl (limited) • &lt;b&gt;Secrets:&lt;/b&gt; Infra/veeam_emergency SSH keys" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="15" y="120" width="670" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EMERGENCY ACCESS ==================== -->
+        <mxCell id="emergency" value="&lt;b&gt;Emergency Access — When FreeIPA is Down&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="280" width="680" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="emerg_inner" value="&lt;b&gt;Inner VMs&lt;/b&gt;&lt;br&gt;veeam_emergency user&lt;br&gt;SSH key from Vault&lt;br&gt;Deployed by Ansible" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="emergency">
+          <mxGeometry x="15" y="38" width="200" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="emerg_outer" value="&lt;b&gt;Outer VMs&lt;/b&gt;&lt;br&gt;Password stored on Windows Host&lt;br&gt;Avoids circular Vault dependency" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="emergency">
+          <mxGeometry x="235" y="38" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="emerg_auto" value="&lt;b&gt;Automation&lt;/b&gt;&lt;br&gt;super_ansible user&lt;br&gt;Keytab-based auth&lt;br&gt;Passwordless sudo ALL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="emergency">
+          <mxGeometry x="465" y="38" width="200" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== NETWORK SECURITY ==================== -->
+        <mxCell id="net_sec" value="&lt;b&gt;Network Security&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="1420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_pfsense" value="&lt;b&gt;pfSense NAT/FW&lt;/b&gt;&lt;br&gt;WAN ↔ Internal isolation&lt;br&gt;All outbound via NAT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="net_sec">
+          <mxGeometry x="15" y="38" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_vmotion" value="&lt;b&gt;vMotion Isolated&lt;/b&gt;&lt;br&gt;Dedicated VMnet3&lt;br&gt;No routing to LAN/WAN" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="net_sec">
+          <mxGeometry x="255" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_promisc" value="&lt;b&gt;Promiscuous Mode&lt;/b&gt;&lt;br&gt;ESXi Master only&lt;br&gt;Required for nested VMs&lt;br&gt;MAC changes + forged transmits" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="net_sec">
+          <mxGeometry x="475" y="38" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_vault_fw" value="&lt;b&gt;Vault Firewall&lt;/b&gt;&lt;br&gt;Port 8200 restricted&lt;br&gt;10.0.20.0/24 source only" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="net_sec">
+          <mxGeometry x="725" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ns_vcenter_ssl" value="&lt;b&gt;vCenter SSL&lt;/b&gt;&lt;br&gt;Manual cert replacement&lt;br&gt;Trust store sync issues&lt;br&gt;(frequent troubleshooting)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="net_sec">
+          <mxGeometry x="945" y="38" width="220" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_ipa_vault" value="LDAP auth + Kerberos" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;" edge="1" source="ipa_layer" target="vault_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_ipa_emerg" value="fallback when down" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="ipa_layer" target="emergency" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_vault_net" value="firewall + network controls" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666;fontSize=10;" edge="1" source="vault_layer" target="net_sec" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

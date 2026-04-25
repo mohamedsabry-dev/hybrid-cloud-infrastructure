@@ -1,28 +1,20 @@
-# Storage Troubleshooting
+# Storage — 7 cases
 
-VMware snapshots, NAS, and disk issues.
+VMware snapshots, NAS, and disk issues from the PoC v1 era.
 
-## Cases (10)
+[reference/](reference/) has 3 guides
 
-| Case | Issue | Root Cause |
-|------|-------|------------|
-| 01 | VMDK Snapshot Corruption | Snapshot chain breakage |
-| 02 | NAS Snapshot Sizing Failure | Insufficient space |
-| 03 | Disk Race Condition Disaster | /dev/sdX vs UUID mounting |
-| 04 | Thick to Thin Conversion | Provisioning type conversion |
-| 05 | NAS Memory Starvation | I/O performance degradation |
-| 06 | NAS Backup Strategy Optimization | Backup job optimization |
-| 07 | VMware Snapshot Chain Corruption | Parent VMDK link breakage |
-| 08 | Thick Provisioned Snapshot Size | Massive snapshots from thick disks |
-| 09 | Application-Aware Backup Errors | Veeam AAP causing I/O errors |
-| 10 | Snapshot Chain Corruption Sleep | Laptop sleep during I/O |
+| # | File | What Happened |
+|---|------|---------------|
+| 01 | [vmdk-snapshot-corruption](01-vmdk-snapshot-corruption.md) | Snapshot chain breakage from cross-partition vDisks |
+| 02 | [nas-snapshot-sizing](02-nas-snapshot-sizing-failure.md) | 980GB thick disk, 450GB free — snapshot failed, NAS VM entered maintenance mode |
+| 03 | [disk-race-condition](03-disk-race-condition-disaster.md) | /dev/sdX names swapped on reboot — ALL VMs inaccessible |
+| 05 | [nas-memory-starvation](05-nas-memory-starvation.md) | NAS RAM cut while doubling VMs — kernel soft lockups, 31-47s CPU stalls |
+| 07 | [snapshot-chain-corruption](07-vmware-snapshot-chain-corruption.md) | Parent-child VMDK links broken from cross-drive snapshots |
+| 09 | [veeam-aap-loop-device](09-application-aware-backup-loop-device-errors.md) | Loop device I/O errors during Veeam application-aware backup |
+| 10 | [snapshot-corruption-sleep](10-snapshot-chain-corruption-sleep-mode.md) | Laptop slept mid-Veeam backup — thin disk inflated 98GB → 1TB |
 
-## Key Lessons
-
-- Always use UUID mounting, never /dev/sdX
-- Monitor snapshot chain depth
-- Test Veeam application-aware backups before production
-- Never sleep host during VM I/O operations
+---
 
 ## Related
 

@@ -1,210 +1,194 @@
 # TS-TF-011 | 2026-03-27 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform with bpg/proxmox provider
-- Environment: Dev/Prod (pve-dev, pve-prod), NFS storage
-- Related components: K8s workers (1020, 1021, 1022), disk management
+[Info]
+Domain: Terraform / Proxmox
+Sub-techs: Terraform bpg/proxmox provider, disk removal, orphaned disks,
+           NFS storage, pvesm, qm, storage audit
+Environment: DEV & PROD | pve-dev, pve-prod | K8s workers (VM 1020, 1021, 1022)
+             NAS storage: nas-dev-data, nas-prod-data
+Re-opened: No
 
-## 2. Issue
-- Symptom: After removing a disk block from Terraform configuration, Terraform updated its state file but did NOT:
-  1. Detach the disk from the VM
-  2. Delete the disk image from storage
-- Error: No Terraform error - operation appeared successful but left orphaned disks attached to VMs and consuming storage space
+_____________________________________________________________________
 
-**Affected Systems:**
-- K8s workers (1020, 1021, 1022) in both dev and prod
-- NAS storage (nas-dev-data, nas-prod-data)
+[Issue Description]
+After removing a disk block from Terraform configuration, terraform apply ran
+successfully and updated the state file — but did NOT detach the disk from the
+VM or delete the disk image from storage. Silent orphan creation.
 
-## 3. Analysis
+  No Terraform error. Apply reported success.
+  Disks remained attached to VMs as scsi1.
+  Disk images remained on NAS storage consuming space.
 
-**What Happened:**
-1. Original Terraform config had two disks per worker (OS 25GB + data 80GB)
-2. Data disk was removed from Terraform configuration
-3. `terraform apply` ran successfully, updated state file
-4. State file no longer contained disk-1 reference
-5. However, the actual disk remained:
-   - Still attached to VM as scsi1
-   - Still existed on NAS storage as `vm-XXXX-disk-1.raw`
+Additional discovery during cleanup: orphaned disks from a previous storage
+migration (NAS to local-lvm) were also found on NAS.
 
-**Why Terraform Didn't Clean Up:**
+Related ticket: TS-TF-008 — disk update behaviour (the change that led to this)
 
-1. **Provider Limitation**: The bpg/proxmox provider doesn't always handle disk removal properly. It updates state but may not issue the API call to detach.
+_____________________________________________________________________
 
-2. **Data Safety**: Terraform providers are conservative about deleting storage to prevent accidental data loss.
+[Analysis]
 
-3. **Hot-Remove Limitations**: Disks often can't be hot-removed from running VMs via API. Terraform may skip rather than fail.
+# Initial Check Notes:
+Checked state file vs actual VM config vs storage after apply.
 
-4. **No Explicit Destroy**: Removing a block from config is different from `terraform destroy`. The provider may not interpret removal as "delete this resource."
+  terraform state show proxmox_virtual_environment_vm.k8s_worker1 | grep -A5 disk
+  → only scsi0 (OS disk) in state — data disk removed from state.
 
-**Detection Methods:**
+  qm config 1020 | grep -E "scsi|virtio|ide"
+  → scsi1 still present with 80GB disk — still attached despite state removal.
 
-**Verify State File Doesn't Contain Disk:**
-```bash
-cd terraform/dev/proxmox/vms/k8s_workers
-terraform state show proxmox_virtual_environment_vm.k8s_worker1 | grep -A5 disk
-```
-If only one disk block appears (scsi0/OS disk), the data disk was removed from state.
+  pvesm list nas-dev-data | grep -E "1020|1021|1022"
+  → vm-1020-disk-1.raw still exists — disk file not deleted.
 
-**Check VM Still Has Disk Attached:**
-```bash
-# On Proxmox host
-qm config 1020 | grep -E "scsi|virtio|ide"
-```
-If `scsi1` appears with an 80GB disk, it's still attached despite being removed from Terraform.
+Why Terraform did not clean up:
+  Provider limitation — bpg/proxmox does not reliably issue API calls to
+  detach and delete disk files when a disk block is removed from config.
+  This is partly by design (data safety) and partly because hot-removal via
+  API is unreliable. Removing a block from config ≠ terraform destroy on
+  that resource.
 
-**List Orphaned Disk Files on Storage:**
-```bash
-# List all disk images
-pvesm list nas-dev-data | grep -E "1020|1021|1022"
+Additional orphaned disks discovered during cleanup — from a previous storage
+migration where VMs were moved from NAS to local-lvm:
 
-# Compare with what should exist (only disk-0 for OS)
-```
+  On nas-prod-data:
+    1020/vm-1020-disk-0.raw  80GB  (orphaned)
+    1020/vm-1020-disk-2.raw  80GB  (orphaned)
+    1021/vm-1021-disk-0.raw  80GB  (orphaned)
+    1021/vm-1021-disk-2.raw  80GB  (orphaned)
+    1022/vm-1022-disk-0.raw  80GB  (orphaned)
+    1022/vm-1022-disk-2.raw  80GB  (orphaned)
 
-**Additional Discovery: Old Storage Migration Orphans**
+  On nas-dev-data:
+    1020/vm-1020-disk-0.raw  80GB  (orphaned)
+    1021/vm-1021-disk-0.raw  80GB  (orphaned)
+    1022/vm-1022-disk-0.raw  80GB  (orphaned)
 
-During cleanup, we also found additional orphaned disks from a previous storage migration (NAS to local-lvm):
-```
-nas-prod-data:1020/vm-1020-disk-0.raw  80GB  (orphaned - VM boots from local-lvm)
-nas-prod-data:1020/vm-1020-disk-2.raw  80GB  (orphaned)
-nas-prod-data:1021/vm-1021-disk-0.raw  80GB  (orphaned)
-nas-prod-data:1021/vm-1021-disk-2.raw  80GB  (orphaned)
-nas-prod-data:1022/vm-1022-disk-0.raw  80GB  (orphaned)
-nas-prod-data:1022/vm-1022-disk-2.raw  80GB  (orphaned)
-```
+  Verified VMs boot from local-lvm not NAS:
+    qm config 1020 | grep scsi0
+    → scsi0: local-lvm:vm-1020-disk-0,size=25G
+  NAS images confirmed orphaned and safe to delete.
 
-**Verify Current Boot Disk Location:**
-```bash
-qm config 1020 | grep scsi0
-# Output: scsi0: local-lvm:vm-1020-disk-0,size=25G
-```
-If VMs boot from `local-lvm`, NAS disk images are orphaned and safe to delete.
 
-## 4. Root Cause
-> Terraform state removal != actual resource deletion for Proxmox disks. The bpg/proxmox provider updates state but doesn't reliably issue API calls to detach and delete disk files. This is by design (data safety) but causes orphaned resources.
+# Suspected Root Cause
+bpg/proxmox provider updates Terraform state when a disk block is removed from
+config but does not reliably issue the Proxmox API calls to detach and delete
+the actual disk. Removing a disk block from Terraform config does not trigger
+resource destruction for Proxmox disks — it only removes the state reference.
 
-## 5. Solution
-> Manually detach disks from VMs and delete orphaned disk files from storage.
 
-### Step 1: Detach Disks from VMs
-```bash
-# On pve-dev
-qm set 1020 --delete scsi1
-qm set 1021 --delete scsi1
-qm set 1022 --delete scsi1
+# More Checks Notes:
+N/A — cause confirmed from VM config and storage listing.
 
-# On pve-prod
-qm set 1020 --delete scsi1
-qm set 1021 --delete scsi1
-qm set 1022 --delete scsi1
-```
 
-### Step 2: Delete Orphaned Disk Files
-```bash
-# On pve-dev
-pvesm free nas-dev-data:1020/vm-1020-disk-1.raw
-pvesm free nas-dev-data:1021/vm-1021-disk-1.raw
-pvesm free nas-dev-data:1022/vm-1022-disk-1.raw
+# Suspected Solution
+Manually detach orphaned disks from VMs (qm set --delete) and delete disk
+image files from storage (pvesm free).
 
-# On pve-prod
-pvesm free nas-prod-data:1020/vm-1020-disk-1.raw
-pvesm free nas-prod-data:1021/vm-1021-disk-1.raw
-pvesm free nas-prod-data:1022/vm-1022-disk-1.raw
-```
 
-### Step 3: Clean Up Storage Migration Orphans
-```bash
-# On pve-prod (~480GB freed)
-pvesm free nas-prod-data:1020/vm-1020-disk-0.raw
-pvesm free nas-prod-data:1020/vm-1020-disk-2.raw
-pvesm free nas-prod-data:1021/vm-1021-disk-0.raw
-pvesm free nas-prod-data:1021/vm-1021-disk-2.raw
-pvesm free nas-prod-data:1022/vm-1022-disk-0.raw
-pvesm free nas-prod-data:1022/vm-1022-disk-2.raw
+# Test
+Detached and deleted all orphaned disks on dev and prod.
+Ran terraform plan afterward.
 
-# On pve-dev (~240GB freed)
-pvesm free nas-dev-data:1020/vm-1020-disk-0.raw
-pvesm free nas-dev-data:1021/vm-1021-disk-0.raw
-pvesm free nas-dev-data:1022/vm-1022-disk-0.raw
-```
+Result: PASS — terraform plan shows No changes. ~720GB storage freed.
 
-### Step 4: Verify Terraform State is Clean
-```bash
-terraform plan
-# Should show "No changes"
-```
+_____________________________________________________________________
 
-## 6. Solution Risk
-- Risk level: MEDIUM
-- Potential impact: Data loss if wrong disks are deleted. Always verify VM boot disk location before deleting.
+[Final Root Cause]
+Terraform state removal does not equal actual resource deletion for Proxmox
+disks. The bpg/proxmox provider updates state when disk blocks are removed from
+config but does not reliably issue API calls to detach disks or delete disk
+image files. This is a provider limitation combined with conservative data-safety
+behaviour. Disk removal requires explicit manual cleanup.
 
-## 7. Impact After Fix
-- Observed: Orphaned disks removed from VMs and storage
-- ~720GB storage freed (480GB prod + 240GB dev)
-- Terraform state matches actual VM configuration
+_____________________________________________________________________
 
-## 8. Notes
+[Final Solution]
 
-### Prevention Measures
+Step 1 — Detach disks from VMs:
 
-**1. Always Verify After Disk Removal**
+  On pve-dev:
+    qm set 1020 --delete scsi1
+    qm set 1021 --delete scsi1
+    qm set 1022 --delete scsi1
 
-After any Terraform apply that removes disks:
-```bash
-# Check VM config
-qm config <vmid> | grep scsi
+  On pve-prod:
+    qm set 1020 --delete scsi1
+    qm set 1021 --delete scsi1
+    qm set 1022 --delete scsi1
 
-# List storage
-pvesm list <storage-name> | grep <vmid>
-```
+Step 2 — Delete orphaned disk files (Terraform removal, dev):
+    pvesm free nas-dev-data:1020/vm-1020-disk-1.raw
+    pvesm free nas-dev-data:1021/vm-1021-disk-1.raw
+    pvesm free nas-dev-data:1022/vm-1022-disk-1.raw
 
-**2. Stop VMs Before Disk Changes**
-```bash
-# Stop VM first
-qm stop 1020
+  On pve-prod:
+    pvesm free nas-prod-data:1020/vm-1020-disk-1.raw
+    pvesm free nas-prod-data:1021/vm-1021-disk-1.raw
+    pvesm free nas-prod-data:1022/vm-1022-disk-1.raw
 
-# Apply Terraform
-terraform apply
+Step 3 — Delete storage migration orphans (~720GB total):
 
-# Start VM
-qm start 1020
-```
+  On pve-prod (~480GB freed):
+    pvesm free nas-prod-data:1020/vm-1020-disk-0.raw
+    pvesm free nas-prod-data:1020/vm-1020-disk-2.raw
+    pvesm free nas-prod-data:1021/vm-1021-disk-0.raw
+    pvesm free nas-prod-data:1021/vm-1021-disk-2.raw
+    pvesm free nas-prod-data:1022/vm-1022-disk-0.raw
+    pvesm free nas-prod-data:1022/vm-1022-disk-2.raw
 
-**3. Consider Manual Disk Management**
+  On pve-dev (~240GB freed):
+    pvesm free nas-dev-data:1020/vm-1020-disk-0.raw
+    pvesm free nas-dev-data:1021/vm-1021-disk-0.raw
+    pvesm free nas-dev-data:1022/vm-1022-disk-0.raw
 
-For disk removal operations, consider:
-1. Remove disk block from Terraform
-2. Run `terraform apply`
-3. Manually detach: `qm set <vmid> --delete <disk>`
-4. Manually delete: `pvesm free <storage>:<vmid>/<disk-file>`
+Step 4 — Verify Terraform state is clean:
+  terraform plan  → No changes.
 
-**4. Regular Storage Audits**
+Verified: Yes
 
-Periodically check for orphaned disks:
-```bash
-# List all disk images
-pvesm list <storage> | grep images
+_____________________________________________________________________
 
-# Compare against running VM configs
-for vmid in $(qm list | awk 'NR>1 {print $1}'); do
-  echo "=== VM $vmid ==="
-  qm config $vmid | grep -E "scsi|virtio|ide" | grep -v net
-done
-```
+[Risk Level] MEDIUM
+Note: Data loss risk if wrong disks are deleted. Always verify VM boot disk
+location before deleting. Confirm qm config shows VM boots from local-lvm
+before freeing any NAS disk images.
 
-### Lessons Learned
+_____________________________________________________________________
 
-1. Terraform state removal != actual resource deletion for Proxmox disks
-2. Always verify disk cleanup manually after Terraform changes
-3. Storage migrations can leave orphaned disk images
-4. Regular storage audits prevent wasted space
-5. The bpg/proxmox provider is better at adding than removing disks
-6. vzdump backups are self-contained and independent of disk images
+[References]
+- TS-TF-008 — disk update behaviour (change that led to this discovery)
 
-**Related:** TS-TF-008 (disk update behavior) - the change that led to this discovery
+_____________________________________________________________________
 
-## 9. Workaround (if any)
-> For disk removal: Always manually verify and clean up after Terraform apply. Use `qm set --delete` to detach and `pvesm free` to delete disk files.
+[Draft Notes]
 
-## Related Files
-- `terraform/dev/proxmox/vms/k8s_workers/main.tf`
-- `terraform/prod/proxmox/vms/k8s_workers/main.tf`
+Always verify after any Terraform apply that removes disks:
+  qm config <vmid> | grep scsi           check what is still attached
+  pvesm list <storage> | grep <vmid>     check for orphaned files on storage
+
+Workflow for reliable disk removal:
+  1. Stop VM: qm stop <vmid>
+  2. Remove disk block from Terraform config
+  3. terraform apply
+  4. Verify: qm config <vmid> | grep scsi
+  5. If still attached: qm set <vmid> --delete <disk>
+  6. If file still on storage: pvesm free <storage>:<vmid>/<disk-file>
+
+Regular storage audit to detect orphaned disks:
+  pvesm list <storage> | grep images
+  for vmid in $(qm list | awk 'NR>1 {print $1}'); do
+    echo "=== VM $vmid ==="
+    qm config $vmid | grep -E "scsi|virtio|ide" | grep -v net
+  done
+
+Notes:
+  1. Terraform state removal ≠ actual resource deletion for Proxmox disks
+  2. Always manually verify disk cleanup after Terraform changes
+  3. Storage migrations can leave orphaned disk images — audit periodically
+  4. The bpg/proxmox provider is more reliable at adding than removing disks
+  5. vzdump backups are self-contained and independent of disk images
+
+Related files:
+  terraform/dev/proxmox/vms/k8s_workers/main.tf
+  terraform/prod/proxmox/vms/k8s_workers/main.tf

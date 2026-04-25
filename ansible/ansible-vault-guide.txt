@@ -1,0 +1,66 @@
+# Ansible Vault — Encrypt/View/Edit/Rekey Commands
+
+Ansible Vault (the encryption tool — not HashiCorp Vault) is used for
+encrypting sensitive values at rest inside `inventory/group_vars/*.yml`
+during the bootstrap phase, before HashiCorp Vault is deployed.
+
+Vault password file is configured in `ansible.cfg`:
+  vault_password_file = ~/.ansible_vault
+
+---
+
+## One-time: create the password file on the Ansible node
+
+  echo 'YOUR_VAULT_PASSWORD' > ~/.ansible_vault
+  chmod 600 ~/.ansible_vault
+
+The vault password itself is stored in AWS Secrets Manager at
+`{env}/ansible/vault-password`. Pull it from there on each new Ansible node,
+don't commit it anywhere.
+
+---
+
+## Encrypt a new value (inline encrypted string)
+
+  ansible-vault encrypt_string 'SECRET_VALUE' --name 'variable_name'
+
+Paste the output into the appropriate `group_vars/*.yml` file.
+
+---
+
+## View an encrypted value
+
+  ansible localhost -m debug -a "var=ipaadmin_password" \
+    -e @inventory/group_vars/all.yml
+
+---
+
+## Edit a fully-encrypted file
+
+  ansible-vault edit inventory/group_vars/all.yml
+
+---
+
+## Re-encrypt with a new password (rotation)
+
+  ansible-vault rekey inventory/group_vars/all.yml
+
+---
+
+## Encrypted variables reference
+
+| Variable | File | Purpose |
+|----------|------|---------|
+| `ipaadmin_password` | `all.yml` | FreeIPA admin password |
+| `default_admin_user_password` | `freeipa.yml` | Initial password for admin-role users |
+| `default_bot_user_password` | `freeipa.yml` | Initial password for bot users (super_bot) |
+| `vault_aws_access_key_id` | `vault_cluster.yml` | AWS KMS key (commented — fallback only) |
+| `vault_aws_secret_access_key` | `vault_cluster.yml` | AWS KMS secret (commented — fallback only) |
+
+---
+
+## Related
+
+- {env}/README.md                                  — folder scope + secrets split
+- {env}/operation_guide.txt                        — kinit + daily ops
+- ../../github/variables-secrets.md                — AWS Secrets Manager entries (runtime creds)

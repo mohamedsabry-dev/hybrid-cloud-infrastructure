@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE: SNAPSHOT CHAIN CORRUPTION FROM LAPTOP SLEEP MODE
 
 Category: Storage / VMware Workstation / Power Management / Snapshot Corruption
 Severity: CRITICAL
+Incident: Yes
 Environment: VMware Workstation, Nested ESXi, NAS VM
 Impact: System-wide instability, data accessibility loss, 1TB storage inflation
 Status: Resolved
@@ -136,9 +137,9 @@ Step 1: Prevent Further Corruption
     powercfg /change monitor-timeout-ac 30
 
   Verification:
-    ✓ Power settings persist after reboot
-    ✓ Armoury Crate no longer overrides settings
-    ✓ Laptop stays on during I/O operations
+    Yes Power settings persist after reboot
+    Yes Armoury Crate no longer overrides settings
+    Yes Laptop stays on during I/O operations
 
 Step 2: Temporary VM Boot Access
   Problem: VM won't boot due to missing snapshot 000006
@@ -174,9 +175,9 @@ Step 1: Use vmware-vdiskmanager to Merge Snapshots
     └── Output: 250MB thin-provisioned disk (grows to max 98.4GB)
 
   Important Notes:
-    ⚠️ Requires PowerShell prefix .\ to execute binaries in current directory
-    ⚠️ Ensure sufficient space on target drive (need 2× disk size free)
-    ⚠️ Do NOT interrupt this process (close lid, sleep, shutdown)
+     Requires PowerShell prefix .\ to execute binaries in current directory
+     Ensure sufficient space on target drive (need 2× disk size free)
+     Do NOT interrupt this process (close lid, sleep, shutdown)
 
 Step 2: Verify Consolidated Disk Integrity
 
@@ -189,9 +190,9 @@ Step 2: Verify Consolidated Disk Integrity
     └── No snapshot delta files
 
   Validation:
-    ✓ File size reasonable (not 1TB)
-    ✓ Descriptor file readable
-    ✓ No errors in vmware.log
+    Yes File size reasonable (not 1TB)
+    Yes Descriptor file readable
+    Yes No errors in vmware.log
 
 Phase 3: ESXi Datastore Recovery
 
@@ -222,9 +223,9 @@ Step 2: Force Resignature and Mount
     ls /vmfs/volumes/ | grep DS_NVME_02
 
   Result:
-    ✓ Datastore visible in vSphere/vCenter
-    ✓ All VMs show in inventory
-    ✓ Can browse datastore files
+    Yes Datastore visible in vSphere/vCenter
+    Yes All VMs show in inventory
+    Yes Can browse datastore files
 
 Phase 4: VM Reconfiguration
 
@@ -272,10 +273,10 @@ Step 4: Power On VM
     vim-cmd vmsvc/power.on <vmid>
 
   Result:
-    ✓ VM boots successfully
-    ✓ No consolidation warnings
-    ✓ All data accessible
-    ✓ Performance normalized
+    Yes VM boots successfully
+    Yes No consolidation warnings
+    Yes All data accessible
+    Yes Performance normalized
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 POST-RESOLUTION VALIDATION
@@ -327,9 +328,9 @@ Critical Insights:
    sleep when plugged in."
 
 2. Never Delete Snapshot Files Manually
-   ✗ Deleting snapshot delta files (000001.vmdk, 000002.vmdk, etc.)
-   ✓ ALWAYS use VMware tools: vmware-vdiskmanager or vSphere consolidation
-   ✓ Manual deletion breaks the chain and makes automatic recovery impossible
+   No Deleting snapshot delta files (000001.vmdk, 000002.vmdk, etc.)
+   Yes ALWAYS use VMware tools: vmware-vdiskmanager or vSphere consolidation
+   Yes Manual deletion breaks the chain and makes automatic recovery impossible
 
 3. Thin Provisioning Can Inflate as Protection Mechanism
    "When VMware detects snapshot metadata corruption, it force-expands
@@ -337,9 +338,9 @@ Critical Insights:
    measure. A 100GB thin disk can instantly become 1TB."
 
 4. Nested Virtualization Amplifies Sleep Mode Risks
-   ✗ Hardware sleep during I/O is catastrophic in nested environments
-   ✓ Sleep propagates through all virtualization layers
-   ✓ Each layer has different suspend timing, causing race conditions
+   No Hardware sleep during I/O is catastrophic in nested environments
+   Yes Sleep propagates through all virtualization layers
+   Yes Each layer has different suspend timing, causing race conditions
 
 5. PowerShell Execution Context Matters
    "To execute vmware-vdiskmanager.exe from PowerShell, you MUST use the .\
@@ -375,12 +376,12 @@ ESXi Storage Commands:
 FINAL OUTCOME
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ VM fully operational with zero data loss (except 1-hour window)
-✅ Performance restored to baseline levels
-✅ 110GB storage space reclaimed
-✅ Preventive measures implemented
-✅ Power management conflicts resolved
-✅ Snapshot chain permanently fixed
+- VM fully operational with zero data loss (except 1-hour window)
+- Performance restored to baseline levels
+- 110GB storage space reclaimed
+- Preventive measures implemented
+- Power management conflicts resolved
+- Snapshot chain permanently fixed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED DOCUMENTATION
