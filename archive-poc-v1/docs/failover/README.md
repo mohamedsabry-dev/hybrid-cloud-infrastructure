@@ -56,10 +56,10 @@ ARCHITECTURE SUMMARY
 - Manual failover required (15-20 min RTO)
 
 **Trade-offs:**
-- ✅ Saves 30GB RAM for production workloads
-- ✅ Enables 3 K8s workers instead of 2
-- ❌ Manual failover (not automatic)
-- ❌ 15-20 minute recovery time
+- Saves 30GB RAM for production workloads
+- Enables 3 K8s workers instead of 2
+- Manual failover (not automatic)
+- 15-20 minute recovery time
 
 See [Design Decisions](../backup/04-design-decisions.md) for full rationale.
 

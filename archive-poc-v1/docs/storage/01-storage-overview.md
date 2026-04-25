@@ -103,10 +103,10 @@ External Drive (USB/Thunderbolt)
 ```
 
 **Benefits:**
-- ✅ Offsite protection (removable drive)
-- ✅ Survives laptop failure
-- ✅ Fast restore from local repository
-- ✅ Slower restore from external if needed
+- Offsite protection (removable drive)
+- Survives laptop failure
+- Fast restore from local repository
+- Slower restore from external if needed
 
 ---
 

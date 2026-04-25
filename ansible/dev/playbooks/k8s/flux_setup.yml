@@ -1,9 +1,8 @@
 ---
-- name: Install Flux on K8s
-  hosts: k8s-master1.lab.local
+- name: Install Flux CLI on all masters
+  hosts: k8s_masters
   become: true
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
+  tags: [install]
   tasks:
     - name: Check if Flux is already installed
       ansible.builtin.stat:
@@ -15,6 +14,13 @@
         cmd: curl -s https://fluxcd.io/install.sh | sudo bash
       when: not flux_binary.stat.exists
 
+- name: Bootstrap Flux
+  hosts: k8s-master1.lab.local
+  become: true
+  tags: [bootstrap]
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
     - name: Check flux pre flight
       ansible.builtin.shell:
         cmd: /usr/local/bin/flux check --pre
@@ -41,12 +47,13 @@
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
         GITHUB_TOKEN: "{{ gh_admin_pat_token_flux }}"
-
+      register: flux_bootstrap
 
     - name: Wait for Flux to be ready
       ansible.builtin.pause:
         prompt: "Waiting for Flux to be ready..."
         minutes: 2
+      when: flux_bootstrap is changed
 
     - name: Check flux status
       ansible.builtin.shell: kubectl -n flux-system get all

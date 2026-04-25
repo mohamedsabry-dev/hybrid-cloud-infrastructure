@@ -13,9 +13,9 @@ SYMPTOM
 - vApp startup order and shutdown behavior settings configured through vCenter
   GUI fail to persist after vCenter restart
 - Settings appear to save initially but randomly disappear or revert to defaults
-- Startup order persists correctly ✓
-- Shutdown behavior (Guest Shutdown, Suspend) reverts to "Power Off" ✗
-- Startup delay settings revert to default (120s) ✗
+- Startup order persists correctly Yes
+- Shutdown behavior (Guest Shutdown, Suspend) reverts to "Power Off" No
+- Startup delay settings revert to default (120s) No
 - Changes appear saved in GUI but don't persist after vCenter service restart
 - Behavior is random and inconsistent
 
@@ -533,23 +533,23 @@ PREVENTION & BEST PRACTICES
 ================================================================================
 
 DO:
-✅ Always backup before database edits
-✅ Test changes in non-production first (if possible)
-✅ Make incremental changes and verify each
-✅ Use precise REPLACE strings to avoid unintended changes
-✅ Stop vApp before editing database
-✅ Document VM IDs and configuration
-✅ Monitor for configuration drift
-✅ Test persistence after every change
+- Always backup before database edits
+- Test changes in non-production first (if possible)
+- Make incremental changes and verify each
+- Use precise REPLACE strings to avoid unintended changes
+- Stop vApp before editing database
+- Document VM IDs and configuration
+- Monitor for configuration drift
+- Test persistence after every change
 
 DON'T:
-❌ Edit database while vApp is running
-❌ Use generic REPLACE strings (could modify wrong VMs)
-❌ Skip verification steps
-❌ Skip backups
-❌ Edit production without testing
-❌ Trust GUI alone - always verify in database
-❌ Assume settings will persist without testing
+- Edit database while vApp is running
+- Use generic REPLACE strings (could modify wrong VMs)
+- Skip verification steps
+- Skip backups
+- Edit production without testing
+- Trust GUI alone - always verify in database
+- Assume settings will persist without testing
 
 ================================================================================
 VMWARE KB AND SUPPORT
@@ -644,7 +644,7 @@ Transaction Flow (What Goes Wrong):
 1. User saves vApp config via GUI
 2. GUI sends UPDATE to vpxd service
 3. vpxd executes: UPDATE VPX_RESOURCE_POOL SET VAPP_CONFIG=? WHERE ID=?
-4. ❌ Database connection destroyed before COMMIT issued
+4.  Database connection destroyed before COMMIT issued
 5. PostgreSQL automatically rolls back uncommitted work
 6. GUI shows "saved" but database unchanged
 7. vCenter restart loads old config from database
@@ -664,12 +664,12 @@ SOLUTION COMPARISON & DECISION
 
 Option 1: Direct SQL Injection (Previous Workaround)
 -----------------------------------------------------
-✅ Pros:
+- Pros:
   - Immediate fix
   - Works around the bug
   - Configuration persists correctly
 
-❌ Cons:
+- Cons:
   - Requires manual database intervention for every change
   - Database schema may change with vCenter patches/upgrades
   - Risk of data corruption if XML format incorrect
@@ -681,11 +681,11 @@ Risk Assessment: HIGH for long-term production use
 
 Option 2: PowerCLI Scripted Workaround
 ---------------------------------------
-✅ Pros:
+- Pros:
   - Automated configuration updates
   - Repeatable process
 
-❌ Cons:
+- Cons:
   - Still fighting against the underlying bug
   - Requires maintaining custom scripts
   - May break with vCenter updates
@@ -693,9 +693,9 @@ Option 2: PowerCLI Scripted Workaround
 
 Risk Assessment: MEDIUM-HIGH
 
-Option 3: ESXi Native VM Autostart (RECOMMENDED) ⭐
+Option 3: ESXi Native VM Autostart (RECOMMENDED) 
 ---------------------------------------------------
-✅ Pros:
+- Pros:
   - No vCenter database dependency
   - Configuration stored on ESXi host (survives vCenter issues)
   - Works even when vCenter is offline
@@ -706,7 +706,7 @@ Option 3: ESXi Native VM Autostart (RECOMMENDED) ⭐
   - No ongoing maintenance burden
   - Suitable for single-server production deployments
 
-❌ Cons:
+- Cons:
   - Requires migrating away from vApp construct
   - Must update automation scripts/documentation
   - Loss of vApp-specific features (if used)
@@ -746,18 +746,18 @@ When to Use Each Solution:
 --------------------------
 
 USE ESXi VM AUTOSTART when:
-  ✓ Single ESXi host or simple cluster
-  ✓ Basic startup/shutdown sequencing needed
-  ✓ vApp features not actively used
-  ✓ Production environment with stability priority
-  ✓ Want to avoid vCenter database dependencies
+  Yes Single ESXi host or simple cluster
+  Yes Basic startup/shutdown sequencing needed
+  Yes vApp features not actively used
+  Yes Production environment with stability priority
+  Yes Want to avoid vCenter database dependencies
 
 USE SQL INJECTION WORKAROUND when:
-  ✓ Complex vApp orchestration genuinely needed
-  ✓ Multi-tier applications with interdependencies
-  ✓ Temporary fix while awaiting vendor patch
-  ✓ Non-production or lab environments
-  ✓ Team has strong PostgreSQL expertise
+  Yes Complex vApp orchestration genuinely needed
+  Yes Multi-tier applications with interdependencies
+  Yes Temporary fix while awaiting vendor patch
+  Yes Non-production or lab environments
+  Yes Team has strong PostgreSQL expertise
 
 Migration Path (vApp to ESXi Autostart):
 -----------------------------------------

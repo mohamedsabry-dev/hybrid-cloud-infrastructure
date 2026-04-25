@@ -1,189 +1,179 @@
 # TS-VLT-002 | 2026-03-29 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: FreeIPA / Certmonger / TLS Certificates
-- Environment: Vault HA cluster with Keepalived VIP
-- Related components: vault1/2/3.lab.local, VIP vault.lab.local (10.0.62.100), FreeIPA CA
-- Related tickets: [TS-VLT-001](1-vault-cluster-initial-setup-investigation.md) - Initial Vault setup
+[Info]
+Domain: Vault / Identity
+Sub-techs: FreeIPA CA, Certmonger, ipa-getcert, TLS certificates, Keepalived VIP,
+           managedby relationships, Ansible
+Environment: DEV lab.local | Vault HA cluster | vault1/2/3.lab.local |
+             VIP vault.lab.local (10.0.62.100) | FreeIPA CA
+Re-opened: No
 
-## 2. Issue
-- Symptom: Certificate request rejected when adding VIP hostname as additional SAN
-- Error:
-```
-status: CA_REJECTED
-ca-error: Server at https://freeipa.lab.local/ipa/json denied our request, giving up:
-2100 (Insufficient access: Insufficient privilege to create a certificate with subject alt name 'vault.lab.local'.).
-stuck: yes
-```
+_____________________________________________________________________
 
-**Goal:** Add Keepalived VIP (`vault.lab.local → 10.0.62.100`) as single HA entry point. K8s pods connecting via `https://vault.lab.local:8200` failed TLS because existing certs only contained individual node hostnames.
+[Issue Description]
+Certificate request rejected when adding VIP hostname (vault.lab.local) as an
+additional SAN. K8s pods connecting via https://vault.lab.local:8200 failed TLS
+because existing certs only contained individual node hostnames.
 
-## 3. Analysis
+  curl https://vault.lab.local:8200
+  curl: (60) SSL: no alternative certificate subject name matches target hostname 'vault.lab.local'
 
-**Error Trail - 6 distinct errors encountered during investigation:**
+Goal: add Keepalived VIP vault.lab.local as single HA entry point with TLS coverage.
 
----
+Related ticket: TS-VLT-001 — initial Vault cluster setup
 
-**Error 1: Initial TLS failure from K8s**
-```bash
-curl https://vault.lab.local:8200
-# curl: (60) SSL: no alternative certificate subject name matches target hostname 'vault.lab.local'
-```
-Finding: Certificate SAN missing VIP hostname. ✓
+_____________________________________________________________________
 
----
+[Analysis]
 
-**Error 2: After adding `-D vault.lab.local` to cert request**
-```
-status: CA_UNREACHABLE
-ca-error: 4001 (The service principal for subject alt name vault.lab.local in certificate request does not exist)
-```
-Finding: FreeIPA requires service principal for every SAN. `vault/vault.lab.local` didn't exist. ✓
+# Initial Check Notes:
 
----
+6 distinct errors encountered in sequence during investigation:
 
-**Error 3: After adding VIP host + service principal**
-```
-status: CA_REJECTED
-ca-error: 2100 (Insufficient access: Insufficient privilege to create a certificate with subject alt name 'vault.lab.local')
-stuck: yes
-```
-Finding: Service principal exists but vault nodes don't have permission to request certs for it. ✓
+Error 1 — Initial TLS failure from K8s:
+  curl https://vault.lab.local:8200
+  SSL: no alternative certificate subject name matches target hostname 'vault.lab.local'
+  Finding: certificate SAN missing VIP hostname.
 
----
+Error 2 — After adding -D vault.lab.local to cert request:
+  status: CA_UNREACHABLE
+  ca-error: 4001 (The service principal for subject alt name vault.lab.local
+  in certificate request does not exist)
+  Finding: FreeIPA requires a service principal for every SAN.
+  vault/vault.lab.local did not exist yet.
 
-**Error 4: Wrong IPA command**
-```bash
-ipa service-add-managedby vault/vault.lab.local --hosts=vault1.lab.local
-# ipa: ERROR: unknown command 'service-add-managedby'
-```
-Finding: Command doesn't exist in this FreeIPA version. ✓
+Error 3 — After adding VIP host and service principal:
+  status: CA_REJECTED
+  ca-error: 2100 (Insufficient access: Insufficient privilege to create a
+  certificate with subject alt name 'vault.lab.local')
+  stuck: yes
+  Finding: service principal exists but vault nodes have no permission to
+  request certs for it.
 
----
+Error 4 — Wrong IPA command for service managedby:
+  ipa service-add-managedby vault/vault.lab.local --hosts=vault1.lab.local
+  ipa: ERROR: unknown command 'service-add-managedby'
+  Finding: command does not exist in this FreeIPA version.
 
-**Error 5: Comma-separated hosts syntax**
-```bash
-# WRONG - accepted but created one invalid entry
-ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local,vault2.lab.local,vault3.lab.local
-```
-Finding: Must use separate calls per host. ✓
+Error 5 — Comma-separated hosts syntax:
+  ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local,vault2.lab.local,vault3.lab.local
+  Accepted but created one invalid entry.
+  Finding: must use separate calls per host.
 
----
+Error 6 — -w timeout misleading failure:
+  rc: 2 — "New signing request added" but Ansible reported FAILED.
+  Finding: -w flag waits for issuance. If IPA takes longer than timeout,
+  rc:2 returned even though request was submitted. Check ipa-getcert list
+  for actual status — do not trust rc alone.
 
-**Error 6: `-w` timeout misleading failure**
-```
-rc: 2 — "New signing request added" but Ansible reported FAILED
-```
-Finding: `-w` flag waits for issuance. If IPA takes longer, rc:2 returned even though request submitted. Check `ipa-getcert list` for actual status. ✓
-
----
-
-**Check 1: Initial playbook configuration**
-```yaml
-- name: Request signed certificate from FreeIPA
-  ansible.builtin.command: >
-    ipa-getcert request
-    -w
-    -f /opt/vault/tls/tls.crt
-    -k /opt/vault/tls/tls.key
+Check 1 — Initial playbook configuration that caused failures:
+  ipa-getcert request
     -K vault/{{ inventory_hostname }}
     -N CN={{ inventory_hostname }}
     -D {{ inventory_hostname }}
-    -D vault.lab.local        # <-- This caused the failure
-    -C "systemctl reload vault"
-```
+    -D vault.lab.local        ← this triggered the permission errors
+    -f /opt/vault/tls/tls.crt
+    -k /opt/vault/tls/tls.key
 
----
+Check 2 — Existing managedby permissions on FreeIPA:
+  Command:
+    ipa host-show vault.lab.local --all | grep -i "managed by"
+    ipa service-show vault/vault.lab.local --all | grep -i "managed by"
+  Output:
+    Managed by: vault.lab.local   (self only)
+    vault1/2/3 NOT listed as managers.
 
-**Check 2: Existing permissions**
-```bash
-[root@freeipa ~]# ipa host-show vault.lab.local --all | grep -i "managed by"
-  Managed by: vault.lab.local
+  For vault nodes to request a cert with vault.lab.local as SAN, they need
+  BOTH host AND service managedby relationships on the VIP.
 
-[root@freeipa ~]# ipa service-show vault/vault.lab.local --all | grep -i "managed by"
-  Managed by: vault.lab.local
-```
-Finding: Only self-managed. vault1/2/3 NOT listed as managers. ✓
+Check 3 — Adding host managedby (correct syntax):
+  WRONG — comma-separated does not work:
+    ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local,vault2.lab.local,vault3.lab.local
 
----
+  CORRECT — separate calls required:
+    ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
+    ipa host-add-managedby vault.lab.local --hosts=vault2.lab.local
+    ipa host-add-managedby vault.lab.local --hosts=vault3.lab.local
 
-**Check 3: Fix attempt - host managedby (partial)**
-```bash
-# WRONG - comma-separated doesn't work
-ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local,vault2.lab.local,vault3.lab.local
+Check 4 — Adding service managedby (correct command):
+  ipa service-add-managedby does not exist.
+  Must use service-mod --addattr:
+    ipa service-mod vault/vault.lab.local \
+      --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+    ipa service-mod vault/vault.lab.local \
+      --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+    ipa service-mod vault/vault.lab.local \
+      --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
 
-# CORRECT - separate calls
-ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
-ipa host-add-managedby vault.lab.local --hosts=vault2.lab.local
-ipa host-add-managedby vault.lab.local --hosts=vault3.lab.local
-```
+Check 5 — Verification after adding both relationships:
+  ipa host-show vault.lab.local --all | grep -i "managed by"
+  Output: Managed by: vault.lab.local, vault1.lab.local, vault2.lab.local, vault3.lab.local
 
----
+  ipa service-show vault/vault.lab.local --all | grep -i "managed by"
+  Output: Managed by: vault.lab.local, vault1.lab.local, vault2.lab.local, vault3.lab.local
 
-**Check 4: Service managedby - command discovery**
-```bash
-# This command doesn't exist
-ipa service-add-managedby vault/vault.lab.local --hosts=vault1.lab.local
+Check 6 — Resubmit and verify:
+  ssh vault1 "ipa-getcert resubmit -i 20260329180348 && sleep 2 && ipa-getcert list"
+  Output:
+    status: MONITORING
+    stuck: no
+    dns: vault1.lab.local,vault.lab.local   ← both SANs present
 
-# Must use service-mod --addattr instead
-ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-```
+  openssl x509 -in /opt/vault/tls/tls.crt -noout -text | grep -A2 "Subject Alternative"
+  Output:
+    X509v3 Subject Alternative Name:
+      DNS:vault1.lab.local, DNS:vault.lab.local, othername: UPN:vault/vault1.lab.local@LAB.LOCAL
 
----
+  curl https://vault.lab.local:8200
+  Output: <a href="/ui/">Temporary Redirect</a>. ← TLS working via VIP
 
-**Check 5: Verification after fix**
-```bash
-[root@freeipa ~]# ipa host-show vault.lab.local --all | grep -i "managed by"
-  Managed by: vault.lab.local, vault1.lab.local, vault2.lab.local, vault3.lab.local
 
-[root@freeipa ~]# ipa service-show vault/vault.lab.local --all | grep -i "managed by"
-  Managed by: vault.lab.local, vault1.lab.local, vault2.lab.local, vault3.lab.local
-```
-Finding: All nodes now have managedby permissions. ✓
+# Suspected Root Cause
+FreeIPA requires BOTH host AND service managedby relationships for a node to
+request a certificate containing a SAN for another host/VIP. Neither relationship
+alone is sufficient. Additionally, service managedby must be added AFTER the
+service principal exists, and must use service-mod --addattr syntax (not a
+dedicated command that does not exist).
 
----
 
-**Check 6: Resubmit certificate request**
-```bash
-[root@ansible ~]# ssh vault1 "ipa-getcert resubmit -i 20260329180348 && sleep 2 && ipa-getcert list"
-Resubmitting "20260329180348" to "IPA".
-Request ID '20260329180348':
-        status: MONITORING
-        stuck: no
-        dns: vault1.lab.local,vault.lab.local    # <-- SUCCESS: Both SANs present
-```
+# More Checks Notes:
+Task ordering is critical:
+  1. Create service principals first (vault/vault.lab.local must exist)
+  2. Add host managedby (separate call per host)
+  3. Add service managedby AFTER service principal exists
 
----
 
-**Check 7: Final verification**
-```bash
-[root@ansible ~]# ssh vault1 "openssl x509 -in /opt/vault/tls/tls.crt -noout -text | grep -A2 'Subject Alternative'"
-            X509v3 Subject Alternative Name:
-                DNS:vault1.lab.local, DNS:vault.lab.local, othername: UPN:vault/vault1.lab.local@LAB.LOCAL
+# Suspected Solution
+Configure both host and service managedby relationships via Ansible playbook
+in correct order, then resubmit certificate requests.
 
-[root@ansible ~]# curl https://vault.lab.local:8200
-<a href="/ui/">Temporary Redirect</a>.
-```
-Finding: Certificate has both SANs, TLS works via VIP. ✓
 
-## 4. Root Cause
-> For a certificate to include a SAN for another host/VIP, FreeIPA requires **BOTH** host AND service managedby relationships configured. Additionally:
-> 1. `ipa host-add-managedby --hosts=` doesn't accept comma-separated values
-> 2. `ipa service-add-managedby` doesn't exist - must use `ipa service-mod --addattr`
-> 3. Task ordering critical: service principals must exist BEFORE adding managedby
+# Test
+Added both managedby relationships, resubmitted cert request on vault1.
 
-## 5. Solution
-> Configure both HOST and SERVICE managedby relationships allowing vault nodes to request certs with VIP SAN.
+Result: PASS — status MONITORING, dns shows vault1.lab.local and vault.lab.local,
+TLS working via vault.lab.local:8200.
 
-**File:** `ansible/dev/playbooks/vault/vault_setup.yml`
+_____________________________________________________________________
 
-**Task order matters:**
-```yaml
-# 1. First create the service principals
-- name: Create Vault service principals in FreeIPA
+[Final Root Cause]
+FreeIPA certificate SAN permissions require BOTH host AND service managedby
+relationships to be configured. vault nodes (vault1/2/3) only had self-managed
+relationships — no permission to request certs containing vault.lab.local as SAN.
+Additionally: ipa service-add-managedby does not exist in this FreeIPA version,
+ipa host-add-managedby does not accept comma-separated hosts, and service managedby
+must be added after the service principal exists.
+
+_____________________________________________________________________
+
+[Final Solution]
+Configured both host and service managedby relationships in correct task order.
+
+Playbook: ansible/dev/playbooks/vault/vault_setup.yml
+
+Step 1 — Create service principals first:
   freeipa.ansible_freeipa.ipaservice:
-    ipaadmin_principal: "{{ ipaadmin_principal }}"
-    ipaadmin_password: "{{ ipaadmin_password }}"
     name: "vault/{{ item }}"
     state: present
   loop:
@@ -192,87 +182,68 @@ Finding: Certificate has both SANs, TLS works via VIP. ✓
     - vault3.lab.local
     - vault.lab.local
 
-# 2. Then add host managedby
-- name: Add managedby relationship for Vault VIP
-  ansible.builtin.shell: |
-    echo "{{ ipaadmin_password }}" | kinit admin
-    ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
-    ipa host-add-managedby vault.lab.local --hosts=vault2.lab.local
-    ipa host-add-managedby vault.lab.local --hosts=vault3.lab.local
-    kdestroy
-  failed_when: false
-  no_log: true
+Step 2 — Add host managedby (one call per host):
+  echo "{{ ipaadmin_password }}" | kinit admin
+  ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
+  ipa host-add-managedby vault.lab.local --hosts=vault2.lab.local
+  ipa host-add-managedby vault.lab.local --hosts=vault3.lab.local
+  kdestroy
 
-# 3. Finally add service managedby (AFTER service exists!)
-- name: Add service managedby for VIP service
-  ansible.builtin.shell: |
-    echo "{{ ipaadmin_password }}" | kinit admin
-    ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-    ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-    ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
-    kdestroy
-  failed_when: false
-  no_log: true
-```
+Step 3 — Add service managedby AFTER service principal exists:
+  echo "{{ ipaadmin_password }}" | kinit admin
+  ipa service-mod vault/vault.lab.local \
+    --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+  ipa service-mod vault/vault.lab.local \
+    --addattr=managedby=fqdn=vault2.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+  ipa service-mod vault/vault.lab.local \
+    --addattr=managedby=fqdn=vault3.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+  kdestroy
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - just permission configuration for certificate requests
+Verified: Yes
 
-## 7. Impact After Fix
-- Observed: All vault nodes have certificates with both individual hostname AND VIP SAN
-- K8s pods can connect via `https://vault.lab.local:8200`
-- No new issues caused
+_____________________________________________________________________
 
-## 8. Notes
+[Risk Level] LOW
+Note: Permission configuration only — no impact on existing infrastructure.
 
-**Key Lessons:**
-1. FreeIPA certificate SAN permissions require BOTH host AND service managedby relationships
-2. Always verify IPA commands exist in your version before using in automation
-3. `--addattr=managedby=fqdn=HOSTNAME,cn=computers,cn=accounts,dc=DOMAIN,dc=TLD` syntax required for service managedby
-4. Use separate calls for multiple hosts instead of comma-separated lists
-5. Task ordering critical: service managedby must be added AFTER service principals created
+_____________________________________________________________________
 
-**Commands Reference:**
-```bash
-# Check host managedby relationships
-ipa host-show vault.lab.local --all | grep -i "managed by"
+[References]
+-
+-
 
-# Check service managedby relationships
-ipa service-show vault/vault.lab.local --all | grep -i "managed by"
+_____________________________________________________________________
 
-# Add host managedby (one per host)
-ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
+[Draft Notes]
 
-# Add service managedby (using service-mod)
-ipa service-mod vault/vault.lab.local --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+Notes:
+  1. FreeIPA cert SAN permissions require BOTH host AND service managedby
+  2. ipa service-add-managedby does not exist — use service-mod --addattr
+  3. ipa host-add-managedby does not accept comma-separated — separate calls per host
+  4. Task ordering: service principals must exist BEFORE adding service managedby
+  5. -w flag on ipa-getcert can return rc:2 even on success — check ipa-getcert list
+  6. Always verify IPA commands exist in your version before using in automation
 
-# Check certmonger request status
-ipa-getcert list
+Commands reference:
+  ipa host-show vault.lab.local --all | grep -i "managed by"
+  ipa service-show vault/vault.lab.local --all | grep -i "managed by"
+  ipa host-add-managedby vault.lab.local --hosts=vault1.lab.local
+  ipa service-mod vault/vault.lab.local \
+    --addattr=managedby=fqdn=vault1.lab.local,cn=computers,cn=accounts,dc=lab,dc=local
+  ipa-getcert list
+  ipa-getcert resubmit -i REQUEST_ID
+  openssl x509 -in /opt/vault/tls/tls.crt -noout -text | grep -A2 "Subject Alternative"
 
-# Resubmit failed certificate request
-ipa-getcert resubmit -i REQUEST_ID
+Recovering from stuck certificate requests:
+  # Stop tracking on all vault nodes
+  ansible vault_cluster -m command -a "ipa-getcert stop-tracking -f /opt/vault/tls/tls.crt" -b
 
-# Verify certificate SANs
-openssl x509 -in /opt/vault/tls/tls.crt -noout -text | grep -A2 "Subject Alternative"
-```
+  # Remove old files
+  ansible vault_cluster -m file -a "path=/opt/vault/tls/tls.crt state=absent" -b
+  ansible vault_cluster -m file -a "path=/opt/vault/tls/tls.key state=absent" -b
 
-**Recovering from Stuck Certificate Requests:**
-```bash
-# 1. Stop tracking the stuck certificate on all vault nodes
-ansible vault_cluster -m command -a "ipa-getcert stop-tracking -f /opt/vault/tls/tls.crt" -b
+  # Re-run playbook to request new certificates
+  ansible-playbook playbooks/vault/vault_setup.yml
 
-# 2. Remove old certificate files
-ansible vault_cluster -m file -a "path=/opt/vault/tls/tls.crt state=absent" -b
-ansible vault_cluster -m file -a "path=/opt/vault/tls/tls.key state=absent" -b
-
-# 3. Re-run vault_setup.yml to request new certificates
-ansible-playbook playbooks/vault/vault_setup.yml
-
-# 4. Restart vault to load new certificates
-ansible vault_cluster -m systemd -a "name=vault state=restarted" -b
-```
-
-## 9. Workaround (if any)
-> Use `tls-skip-verify` temporarily (NOT recommended for production).
-
+  # Restart vault to load new certificates
+  ansible vault_cluster -m systemd -a "name=vault state=restarted" -b

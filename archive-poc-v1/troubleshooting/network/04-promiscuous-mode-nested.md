@@ -19,10 +19,10 @@ Initial Design:
   └── Default Security Settings
 
 Symptoms:
-  ❌ Nested VMs can't communicate with each other
-  ❌ Nested VMs can't reach external networks
-  ❌ "Network unreachable" errors when pinging
-  ❌ ESXi host works, but VMs inside it are isolated
+  - Nested VMs can't communicate with each other
+  - Nested VMs can't reach external networks
+  - "Network unreachable" errors when pinging
+  - ESXi host works, but VMs inside it are isolated
 
 Configuration at Time of Issue:
   ├── Promiscuous Mode: OFF (default)
@@ -58,10 +58,10 @@ Why required for nested virtualization:
   └── Without this, outer vSwitch drops packets for nested VMs
 
 What happens if disabled:
-  ❌ Nested VMs can't communicate with each other
-  ❌ Nested VMs can't reach external networks
-  ❌ "Network unreachable" errors when pinging
-  ❌ ESXi host works, but VMs inside it are isolated
+  - Nested VMs can't communicate with each other
+  - Nested VMs can't reach external networks
+  - "Network unreachable" errors when pinging
+  - ESXi host works, but VMs inside it are isolated
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -77,10 +77,10 @@ Why required for nested virtualization:
   └── Outer vSwitch must allow these "forged" MACs
 
 What happens if disabled:
-  ❌ Outbound traffic from nested VMs dropped at vSwitch
-  ❌ Nested VMs can't send any traffic out
-  ❌ Ping requests sent but never reach destination
-  ❌ One-way communication (can receive, can't send)
+  - Outbound traffic from nested VMs dropped at vSwitch
+  - Nested VMs can't send any traffic out
+  - Ping requests sent but never reach destination
+  - One-way communication (can receive, can't send)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -95,7 +95,7 @@ Why required for nested virtualization:
   └── Network failover and load balancing
 
 What happens if disabled:
-  ⚠️  Less critical, but causes issues during:
+    Less critical, but causes issues during:
   • VM migration (vMotion)
   • Network failover scenarios
   • Advanced nested networking
@@ -137,12 +137,12 @@ APPLIED SETTINGS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ESXi Master:
-  ✓ vSwitch0: Promiscuous ON, Forged Transmits ON
-  ✓ vSwitch_Internal: Promiscuous ON, Forged Transmits ON
+  Yes vSwitch0: Promiscuous ON, Forged Transmits ON
+  Yes vSwitch_Internal: Promiscuous ON, Forged Transmits ON
 
 ESXi Production & DR Servers (Nested):
-  ✗ Promiscuous OFF (not needed inside nested ESXi)
-  ✗ Forged Transmits OFF (not needed inside nested ESXi)
+  No Promiscuous OFF (not needed inside nested ESXi)
+  No Forged Transmits OFF (not needed inside nested ESXi)
 
 Rationale:
   ├── Only OUTER layer (ESXi Master) needs these settings
@@ -154,10 +154,10 @@ LESSONS LEARNED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Key Insights:
-  ✓ Nested virtualization requires relaxed security policies
-  ✓ Promiscuous mode is MANDATORY for nested ESXi networking
-  ✓ Forged transmits is MANDATORY for outbound traffic
-  ✓ Only enable on outer hypervisor, not nested ESXi
+  Yes Nested virtualization requires relaxed security policies
+  Yes Promiscuous mode is MANDATORY for nested ESXi networking
+  Yes Forged transmits is MANDATORY for outbound traffic
+  Yes Only enable on outer hypervisor, not nested ESXi
 
 Security Considerations:
   ├── These settings reduce network security
@@ -170,22 +170,22 @@ PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Research nested virtualization requirements BEFORE deployment
-  ✓ Document security policy changes required
-  ✓ Plan vSwitch architecture with security settings in mind
-  ✓ Understand impact of promiscuous mode on network security
+  Yes Research nested virtualization requirements BEFORE deployment
+  Yes Document security policy changes required
+  Yes Plan vSwitch architecture with security settings in mind
+  Yes Understand impact of promiscuous mode on network security
 
 Documentation:
-  ✓ Document why security settings are relaxed
-  ✓ Clearly mark vSwitches with special security policies
-  ✓ Include troubleshooting steps for network connectivity
-  ✓ Maintain change log for security policy modifications
+  Yes Document why security settings are relaxed
+  Yes Clearly mark vSwitches with special security policies
+  Yes Include troubleshooting steps for network connectivity
+  Yes Maintain change log for security policy modifications
 
 Testing:
-  ✓ Test nested VM connectivity immediately after ESXi creation
-  ✓ Verify both inbound and outbound traffic
-  ✓ Test cross-host communication
-  ✓ Document baseline connectivity tests
+  Yes Test nested VM connectivity immediately after ESXi creation
+  Yes Verify both inbound and outbound traffic
+  Yes Test cross-host communication
+  Yes Document baseline connectivity tests
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED ISSUES

@@ -1,38 +1,47 @@
 # Proxmox Backup Configuration
 
-## How to Create/Edit Backup Job (Web UI)
+How to create/edit backup jobs via the PVE web UI, plus the current
+jobs.cfg for both environments.
+
+> **Important — DEV backup scope changed 2026-04-25:**
+> K8s VMs (masters + workers) are now excluded from the DEV backup job
+> after TS-PVE-020 proved that vzdump on dense k8s disks saturates the
+> consumer NVMe and crashes the cluster. Only FreeIPA, LXCs, and golden
+> templates are backed up on dev. K8s nodes are cattle — Ansible rebuilds
+> them, etcd-backup CronJob has cluster state in S3, Flux resyncs workloads.
+>
+> Prod server has better hardware and handles backup IO fine (< 8% IO).
+> If your hardware is similar to dev (single consumer NVMe carrying 13+
+> guests), follow the same exclusion pattern. See:
+> troubleshooting/proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md
+
+---
+
+## Create/Edit Backup Job (Web UI)
 
 ### Create New Backup Job
 
-1. Go to **Datacenter** → **Backup** → Click **Add**
+1. Go to **Datacenter** > **Backup** > Click **Add**
 2. Configure:
    - **Node:** Select target node (pve-dev or pve-prod)
    - **Storage:** Select backup storage (nas-dev-data or nas-prod-data)
    - **Schedule:** Set days and time (e.g., thu,sat 21:00)
-   - **Selection mode:** All (to backup everything on node)
+   - **Selection mode:** All or Include/Exclude specific VMs
    - **Mode:** Snapshot
    - **Compression:** ZSTD
-3. Click **Retention** tab → Set retention policy if needed
+3. Click **Retention** tab > Set retention policy if needed
 4. Click **Create**
 
 ### Enable repeat-missed (Critical for Laptops)
 
-1. Go to **Datacenter** → **Backup**
-2. Select the backup job → Click **Edit**
-3. Scroll down → Check **Repeat missed** checkbox
+1. Go to **Datacenter** > **Backup**
+2. Select the backup job > Click **Edit**
+3. Scroll down > Check **Repeat missed** checkbox
 4. Click **OK**
-
-### Verify Backup Includes All Disks
-
-1. Go to **Datacenter** → **Backup**
-2. Select backup job → Click **Job Detail**
-3. Check **Included disks** section
-4. All disks should show **Yes** under "Backup Job"
-5. If mp0 shows "No - Disabled" → See LXC mount point fix below
 
 ### Enable Backup on LXC Mount Points
 
-1. Go to **Datacenter** → Select LXC container
+1. Go to **Datacenter** > Select LXC container
 2. Click **Resources** tab
 3. Double-click **mp0** (or other mount point)
 4. Check **Backup** checkbox
@@ -50,7 +59,7 @@ Note: This is now managed via Terraform (`backup = true` in mount_point block)
 ```
 vzdump: backup-769f8091-c41c
         schedule thu,sat 21:00
-        all 1
+        all 0
         compress zstd
         enabled 1
         fleecing 0
@@ -62,7 +71,12 @@ vzdump: backup-769f8091-c41c
         notification-mode legacy-sendmail
         repeat-missed 1
         storage nas-dev-data
+        bwlimit 153600
+        vmid 1001,2001,2002,2003,2004,2005,9001,9010
 ```
+
+Note: `all 0` + explicit `vmid` list — k8s nodes (1010-1012, 1020-1022) excluded.
+bwlimit 150 MiB/s kept as safety margin for remaining VMs.
 
 ---
 
@@ -88,74 +102,40 @@ vzdump: backup-23446773-fa34
         storage nas-prod-data
 ```
 
+Note: `all 1` — prod hardware handles backup IO fine, all VMs included.
+
 ---
 
-## Key Settings Explained
+## Key Settings
 
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `schedule` | `thu,sat 21:00` | Runs Thursday and Saturday at 9 PM |
-| `all` | `1` | Backup all VMs/LXCs on the node |
-| `compress` | `zstd` | Use zstd compression (fast + good ratio) |
-| `mode` | `snapshot` | Live snapshot backup (no downtime) |
-| `repeat-missed` | `1` | **CRITICAL** - Retry backup if node was offline |
-| `storage` | `nas-*-data` | Backup to NAS storage |
+| Setting | Value | Why |
+|---------|-------|-----|
+| `schedule` | `thu,sat 21:00` | Runs Thu/Sat at 9 PM |
+| `compress` | `zstd` | Fast + good compression ratio |
+| `mode` | `snapshot` | Live backup, no VM downtime |
+| `repeat-missed` | `1` | Laptop may be asleep at backup time — retries on wake |
 | `mailnotification` | `always` | Email on success and failure |
 
 ---
 
-## Storage Locations
-
-| Environment | Storage | Path |
-|-------------|---------|------|
-| DEV | nas-dev-data | NFS mount to ASUSTOR NAS |
-| PROD | nas-prod-data | NFS mount to ASUSTOR NAS |
-
----
-
-## Important Notes
-
-### repeat-missed Setting
-
-This is **critical** for laptop-based Proxmox hosts:
-- Laptops may be closed/sleeping during scheduled backup time
-- Without `repeat-missed 1`, backup is simply skipped
-- With `repeat-missed 1`, backup runs when laptop wakes up
-
-**Always ensure this is enabled!**
-
-### Restore Commands
+## Restore Commands
 
 ```bash
-# List containers
-pct list
-
 # List available backups
 ls -la /mnt/nas-dev-data/dump/ | grep vzdump
 
-# Stop container before restore
-pct stop <ctid>
+# Restore VM
+qmrestore /path/to/backup.vma.zst <vmid> --storage local-lvm
 
-# Restore from backup
+# Restore LXC
 pct restore <ctid> /path/to/backup.tar.zst --storage local-lvm
 
-# Or via Web UI
-# Datacenter → Storage → nas-*-data → Backups → Select → Restore
-```
-
-### Manual Backup
-
-```bash
-# Backup single container
-vzdump <ctid> --storage nas-dev-data --compress zstd --mode snapshot
-
-# Backup all
-vzdump --all --storage nas-dev-data --compress zstd --mode snapshot
+# Or via Web UI: Datacenter > Storage > nas-*-data > Backups > Select > Restore
 ```
 
 ---
 
-## Troubleshooting
+## Related
 
-- Backup missed and not retried: `troubleshooting/proxmox/37-proxmox-backup-missed-not-retried.md`
-- LXC mount points not backed up: `troubleshooting/proxmox/38-lxc-mount-point-backup-disabled.md`
+- troubleshooting/proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md — why k8s excluded on dev
+- troubleshooting/proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md — IO storm root cause

@@ -1,152 +1,138 @@
-# TS-IDN-008 | 2026-03-05 | RESOLVED
+# TS-IDN-007 | 2026-03-05 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: FreeIPA / LXC / Chronyd
-- Environment: DEV (lab.local)
-- Related components: FreeIPA client enrollment, all LXC containers
-- **Related tickets:** [TS-LNX-002](../linux/2-lxc-chronyd-adjtimex-failure.md) - Chronyd adjtimex failure (same root cause, OS-level symptom)
+[Info]
+Domain: Identity / FreeIPA
+Sub-techs: FreeIPA client enrollment, Chronyd, NTP, LXC kernel sharing, Ansible
+Environment: DEV lab.local | all LXC containers
+Re-opened: No
 
-## 2. Issue
-- Symptom: NTP/Chronyd configuration fails or behaves inconsistently on LXC containers during FreeIPA domain join
-- Error: Various - chronyd fails to start, time sync issues, ansible task failures
+_____________________________________________________________________
 
-## 3. Analysis
+[Issue Description]
+NTP/Chronyd configuration fails or behaves inconsistently on LXC containers
+during FreeIPA domain join. Chronyd fails to start, time sync errors, Ansible
+enrollment tasks fail.
 
-**Check 1: How does time sync work on LXC vs VM?**
+Related ticket: TS-LNX-002 — Chronyd adjtimex failure (same root cause, OS-level symptom)
 
-| Type | Time Management |
-|------|-----------------|
-| **VMs** | Run their own kernel, chronyd works normally |
-| **LXC** | Share Proxmox host kernel, inherit time from host |
+_____________________________________________________________________
 
-Finding: LXC containers share the host kernel including system clock.
+[Analysis]
 
-**Check 2: What happens when FreeIPA tries to configure NTP on LXC?**
-```bash
-# FreeIPA client enrollment tries to start chronyd
-systemctl start chronyd
-# Fails with various errors (see TS-LNX-002)
-```
-Finding: chronyd cannot run in unprivileged LXC - requires `CAP_SYS_TIME` capability.
+# Initial Check Notes:
+Investigated how time sync works differently between VMs and LXC containers.
 
-**Check 3: Where should time sync happen?**
-```
-Proxmox Host
-    │
-    ├── chronyd → External NTP servers (pool.ntp.org)
-    │
-    └── LXC Containers (inherit time automatically)
-            │
-            └── No NTP config needed
-```
-Finding: Time sync must happen at host level, not container level.
+  VMs  → run their own kernel, chronyd works normally
+  LXC  → share Proxmox host kernel, inherit time directly from host
 
-## 4. Root Cause
-> LXC containers **share the host kernel**, including the system clock. They cannot run their own time synchronization services. When FreeIPA client enrollment tries to configure NTP, it fails because:
-> 1. LXC containers inherit time directly from Proxmox host
-> 2. Chronyd requires capabilities not available in unprivileged containers
-> 3. Time sync must happen at the host level
+LXC containers share the host kernel including the system clock.
+They have no independent clock to sync.
 
-**Analogy:** LXC containers are like apartments in a building - they share the building's clock (host kernel). You can't set a different time in your apartment. VMs are like separate houses - each has its own clock.
+Checked what happens when FreeIPA client enrollment tries to configure NTP on LXC:
 
-## 5. Solution
-> Disable NTP configuration during FreeIPA client enrollment for LXC containers.
+Command:
+  systemctl start chronyd  (during FreeIPA enrollment on LXC)
 
-**Why this works:** LXC containers automatically inherit correct time from Proxmox host. No NTP needed inside container.
+Output:
+  various failures — chronyd requires CAP_SYS_TIME capability which is not
+  available in unprivileged LXC containers.
 
-**File:** `ansible/dev/inventory/group_vars/all.yml`
+Checked Proxmox host chrony config:
 
-**Location:** Ansible inventory configuration (applies to all hosts)
+Command:
+  cat /etc/chrony/chrony.conf
 
-**Configuration:**
-```yaml
-ipaclient_no_ntp: true                # Correct variable - skips NTP during enrollment
-ipaclient_configure_ntp: false        # Also set for completeness
-# ipaclient_ntp_servers:              # Must be commented out
-#   - freeipa.lab.local
-```
+Output:
+  pool 0.pool.ntp.org iburst
+  pool 1.pool.ntp.org iburst
+  server time.cloudflare.com iburst
 
-**Important:** The FreeIPA ansible role uses `ipaclient_no_ntp: true` (not `ipaclient_configure_ntp: false`) to actually skip NTP configuration.
+Host is syncing correctly. LXC containers inherit this time automatically.
 
-**Verification:**
-```bash
-# On LXC container - check time status
-timedatectl
-# System clock synchronized: yes
-# NTP service: inactive (expected for LXC)
 
-# On Proxmox host - verify chrony is running
-systemctl status chrony
-chronyc tracking
-chronyc sources -v
-```
+# Suspected Root Cause
+LXC containers share the host kernel including the system clock. They cannot run
+their own time sync services — chronyd requires CAP_SYS_TIME which unprivileged
+containers do not have. FreeIPA client enrollment tries to configure NTP by default,
+which fails on LXC. Time sync must happen at the Proxmox host level only.
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: If Proxmox host time drifts, all LXC containers will have wrong time. Ensure chrony is configured on Proxmox host.
 
-## 7. Impact After Fix
-- Observed: FreeIPA client enrollment succeeds without NTP errors
-- LXC containers have correct time inherited from host
-- No new issues caused
+# More Checks Notes:
+Confirmed time is correct on LXC containers without any NTP config.
 
-## 8. Notes
+Command:
+  timedatectl  (on LXC container)
 
-**Proper NTP architecture:**
-- **Proxmox Host:** External NTP sources (no link between SVC and MGMT plane)
-- **FreeIPA:** External NTP sources + serves as NTP for domain (allows 10.0.0.0/16)
-- **LXC Containers:** Skip NTP config (inherits from Proxmox host)
-- **VMs:** Can use FreeIPA as NTP source
+Output:
+  System clock synchronized: yes
+  NTP service: inactive
 
-**Time consistency:** Both Proxmox and FreeIPA use the same external NTP sources, ensuring consistent time across the environment.
+Time is already correct inherited from host. No NTP needed inside the container.
 
-**Evidence - Proxmox host config:**
-```bash
-root@pve-dev:~# cat /etc/chrony/chrony.conf
-# Use Debian vendor zone.
-pool 0.pool.ntp.org iburst
-pool 1.pool.ntp.org iburst
 
-server time.cloudflare.com iburst
-```
+# Suspected Solution
+Disable NTP configuration during FreeIPA client enrollment for LXC containers.
+Set ipaclient_no_ntp: true in group_vars.
 
-**Evidence - FreeIPA config:**
-```bash
-[root@freeipa ~]# cat /etc/chrony.conf
-##### Deploy Against FreeIPA #####
-## Create As config ansible/dev/config_files/chrony_ipa.conf
 
-# Use public NTP servers from the pool.ntp.org project.
-# The 'iburst' option allows for faster initial synchronization.
+# Test
+Set ipaclient_no_ntp: true in ansible/dev/inventory/group_vars/all.yml and
+re-ran FreeIPA client enrollment playbook on LXC containers.
 
-# 1. Reliable secondary public sources (For redundancy)
-pool 0.pool.ntp.org iburst
-pool 1.pool.ntp.org iburst
+Result: PASS — enrollment completes without NTP errors, time correct on all LXC containers.
 
-# 2. Cloudflare
-server time.cloudflare.com iburst
+_____________________________________________________________________
 
-allow 10.0.0.0/16
-```
+[Final Root Cause]
+LXC unprivileged containers share the Proxmox host kernel and system clock.
+They cannot run chronyd because it requires CAP_SYS_TIME capability which
+unprivileged containers do not have. FreeIPA client enrollment tries to configure
+NTP by default — this fails on LXC. The fix is to skip NTP during enrollment since
+LXC containers already have correct time inherited from the host.
 
-**Commands reference:**
-```bash
-# Check time on LXC container
-timedatectl
-timedatectl show --property=Timezone
+_____________________________________________________________________
 
-# Set timezone on container
-timedatectl set-timezone Africa/Cairo
+[Final Solution]
+Disabled NTP configuration during FreeIPA client enrollment via Ansible group_vars.
 
-# Check NTP on Proxmox host
-systemctl status chrony
-chronyc tracking
-chronyc sources -v
-```
+  ansible/dev/inventory/group_vars/all.yml:
+    ipaclient_no_ntp: true          # this is the one that actually skips NTP
+    ipaclient_configure_ntp: false  # set for completeness
+    # ipaclient_ntp_servers:        # must be commented out, not just false
 
-## 9. Workaround (if any)
-> N/A - this IS the correct approach for LXC containers.
+IMPORTANT: The correct variable is ipaclient_no_ntp: true — not ipaclient_configure_ntp: false.
+The role checks for no_ntp to skip the NTP setup step entirely.
 
-## References
-- [LXC Container Limitations](https://linuxcontainers.org/lxc/introduction/)
-- [FreeIPA Client NTP Options](https://freeipa.readthedocs.io/)
+NTP architecture going forward:
+  Proxmox host   → syncs from external NTP (pool.ntp.org, time.cloudflare.com)
+  FreeIPA server → syncs from external NTP + serves as NTP for domain (allow 10.0.0.0/16)
+  LXC containers → skip NTP config, inherit time from Proxmox host automatically
+  VMs            → can use FreeIPA as NTP source
+
+Both Proxmox and FreeIPA use the same external sources — consistent time across
+the whole environment.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: If Proxmox host time drifts, all LXC containers drift with it. Ensure
+chrony is properly configured and monitored on the Proxmox host.
+
+_____________________________________________________________________
+
+[References]
+
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Commands for time verification:
+  timedatectl                          check time status on any host
+  timedatectl set-timezone Africa/Cairo  set timezone on container
+  systemctl status chrony              check NTP on Proxmox host
+  chronyc tracking                     check sync status
+  chronyc sources -v                   check NTP sources

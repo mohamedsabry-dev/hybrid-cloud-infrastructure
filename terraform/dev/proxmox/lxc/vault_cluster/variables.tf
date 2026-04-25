@@ -34,7 +34,7 @@ variable "vault1" {
     ctid            = 2004
     name            = "vault1"
     cores           = 1
-    memory          = 768
+    memory          = 512
     swap            = 512
     ip              = "10.0.62.10/24"
     gateway         = "10.0.62.1"
@@ -74,7 +74,7 @@ variable "vault2" {
     ctid            = 2005
     name            = "vault2"
     cores           = 1
-    memory          = 768
+    memory          = 512
     swap            = 512
     ip              = "10.0.62.11/24"
     gateway         = "10.0.62.1"
@@ -114,7 +114,7 @@ variable "vault3" {
     ctid            = 2006
     name            = "vault3"
     cores           = 1
-    memory          = 768
+    memory          = 512
     swap            = 512
     ip              = "10.0.62.12/24"
     gateway         = "10.0.62.1"

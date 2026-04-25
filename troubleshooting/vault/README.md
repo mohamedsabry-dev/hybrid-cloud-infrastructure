@@ -12,6 +12,7 @@ Documentation of HashiCorp Vault issues encountered in the hybrid cloud infrastr
 | 2 | [freeipa-vip-certificate-san-managedby](2-freeipa-vip-certificate-san-managedby.md) | 2026-03-29 | VIP SAN cert request rejected | Missing managedby permissions for both host AND service |
 | 3 | [vault-kms-credentials-overwrite-empty-vars](3-vault-kms-credentials-overwrite-empty-vars.md) | 2026-03-29 | Vault fails to start - KMS credentials empty | Manual playbook run bypassed secret injection |
 | 4 | [vault-agent-injector-k8s-tls-ca-setup](4-vault-agent-injector-k8s-tls-ca-setup.md) | 2026-03-30 | Vault Agent TLS and template errors | Wrong annotations, Go template hyphen handling |
+| 5 | [vault-node-recovery-stale-raft-data](5-vault-node-recovery-stale-raft-data.md) | 2026-04-11 | Node can't rejoin cluster after crash | Stale vault.db retained old cluster identity |
 
 ---
 
@@ -55,6 +56,18 @@ vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"  # NOT /vault/secrets/
 
 # Hyphenated keys in templates
 {{ index .Data.data "login-password" }}           # NOT .Data.data.login-password
+```
+
+### Node Recovery - Stale Raft Data (Case 5)
+```bash
+# If node shows wrong cluster ID after crash, remove ALL data:
+systemctl stop vault
+rm -rf /opt/vault/data/raft
+rm -f /opt/vault/data/vault.db    # CRITICAL - contains cluster identity
+mkdir -p /opt/vault/data/raft
+chown -R vault:vault /opt/vault/data
+systemctl start vault
+vault operator raft join https://vault1.lab.local:8200
 ```
 
 ---

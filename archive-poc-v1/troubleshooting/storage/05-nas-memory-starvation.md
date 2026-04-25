@@ -4,6 +4,7 @@ TROUBLESHOOTING CASE #07: NAS VM MEMORY STARVATION & I/O STORM
 
 Category: Storage / Resource Allocation / Performance
 Severity: CRITICAL
+Incident: Yes
 Environment: NAS VM (NFS Server)
 Impact: Complete environment instability, kernel soft lockups
 
@@ -200,29 +201,29 @@ Critical Insights:
    cascades to ALL VMs using that storage."
 
 2. Infrastructure VMs Are Not Negotiable
-   ✗ Don't reduce infrastructure VM resources to fit more workload VMs
-   ✓ Infrastructure supports everything - must be adequately resourced
-   ✓ NAS VM is single point of failure for storage - needs headroom
-   ✓ Saving 1GB on NAS breaks 12 VMs worth 26GB total
+   No Don't reduce infrastructure VM resources to fit more workload VMs
+   Yes Infrastructure supports everything - must be adequately resourced
+   Yes NAS VM is single point of failure for storage - needs headroom
+   Yes Saving 1GB on NAS breaks 12 VMs worth 26GB total
 
 3. Minimum VM RAM Standards Are Essential
-   ✗ 1GB VMs create memory pressure → excessive I/O
-   ✓ 2GB minimum allows services to run in memory
-   ✓ Reduces NFS I/O pressure across entire environment
-   ✓ Small investment with huge stability returns
+   No 1GB VMs create memory pressure → excessive I/O
+   Yes 2GB minimum allows services to run in memory
+   Yes Reduces NFS I/O pressure across entire environment
+   Yes Small investment with huge stability returns
 
 4. Test Under Realistic Workload
-   ✗ Don't assume resource reduction is safe without testing
-   ✓ Boot all VMs simultaneously (realistic scenario)
-   ✓ Run typical services on all VMs
-   ✓ Monitor for kernel warnings and I/O latency
-   ✓ Test for sustained period (hours, not minutes)
+   No Don't assume resource reduction is safe without testing
+   Yes Boot all VMs simultaneously (realistic scenario)
+   Yes Run typical services on all VMs
+   Yes Monitor for kernel warnings and I/O latency
+   Yes Test for sustained period (hours, not minutes)
 
 5. Monitor Infrastructure Health
-   ✓ Set up alerts for kernel soft lockup warnings
-   ✓ Monitor NFS cache hit ratios (should be >90%)
-   ✓ Track I/O latency on NAS VM
-   ✓ Alert on memory pressure indicators
+   Yes Set up alerts for kernel soft lockup warnings
+   Yes Monitor NFS cache hit ratios (should be >90%)
+   Yes Track I/O latency on NAS VM
+   Yes Alert on memory pressure indicators
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BEST PRACTICES
@@ -240,58 +241,58 @@ NFS Server Sizing Formula:
     • 20 VMs: 2GB + (20 × 0.5GB) = 12GB minimum
 
 Minimum VM RAM Standards:
-  ✓ All VMs: 2GB absolute minimum
-  ✓ Database VMs: 4GB minimum
-  ✓ Application servers: 3GB minimum
-  ✓ Utility VMs (monitoring, etc.): 2GB minimum
+  Yes All VMs: 2GB absolute minimum
+  Yes Database VMs: 4GB minimum
+  Yes Application servers: 3GB minimum
+  Yes Utility VMs (monitoring, etc.): 2GB minimum
 
 Infrastructure VM Protection:
-  ✓ Never reduce infrastructure VM resources to fit workload
-  ✓ Infrastructure VMs get first priority on resources
-  ✓ NAS, vCenter, PfSense: Non-negotiable resource allocations
-  ✓ Test infrastructure changes in isolation first
+  Yes Never reduce infrastructure VM resources to fit workload
+  Yes Infrastructure VMs get first priority on resources
+  Yes NAS, vCenter, PfSense: Non-negotiable resource allocations
+  Yes Test infrastructure changes in isolation first
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Calculate NFS server RAM based on client VM count
-  ✓ Use sizing formula: Base (2GB) + (0.5GB × clients)
-  ✓ Establish and document minimum VM RAM standards
-  ✓ Plan for growth: Add 20% buffer to calculations
+  Yes Calculate NFS server RAM based on client VM count
+  Yes Use sizing formula: Base (2GB) + (0.5GB × clients)
+  Yes Establish and document minimum VM RAM standards
+  Yes Plan for growth: Add 20% buffer to calculations
 
 Deployment:
-  ✓ Enforce minimum VM RAM through templates/policies
-  ✓ Document resource allocation decisions
-  ✓ Test environment stability under full load
-  ✓ Verify NFS cache hit ratio >90% before production
+  Yes Enforce minimum VM RAM through templates/policies
+  Yes Document resource allocation decisions
+  Yes Test environment stability under full load
+  Yes Verify NFS cache hit ratio >90% before production
 
 Monitoring:
-  ✓ Monitor NFS server memory usage:
+  Yes Monitor NFS server memory usage:
       └── Command: free -h && cat /proc/meminfo | grep -E "Cached|Buffers"
 
-  ✓ Monitor NFS cache statistics:
+  Yes Monitor NFS cache statistics:
       └── Command: nfsstat -m (on clients)
 
-  ✓ Watch for kernel warnings:
+  Yes Watch for kernel warnings:
       └── Command: dmesg -T | grep -E "lockup|hung_task"
 
-  ✓ Track I/O latency:
+  Yes Track I/O latency:
       └── Command: iostat -x 1
 
-  ✓ Set up alerts for:
+  Yes Set up alerts for:
       • Kernel soft lockup warnings
       • NFS cache hit ratio < 85%
       • I/O await time > 50ms
       • Memory usage > 90%
 
 Operational:
-  ✓ Test resource changes in staging first
-  ✓ Monitor for 24 hours after resource changes
-  ✓ Never reduce infrastructure VM resources without testing
-  ✓ Keep infrastructure resource decisions documented
-  ✓ Regular capacity planning reviews
+  Yes Test resource changes in staging first
+  Yes Monitor for 24 hours after resource changes
+  Yes Never reduce infrastructure VM resources without testing
+  Yes Keep infrastructure resource decisions documented
+  Yes Regular capacity planning reviews
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TROUBLESHOOTING GUIDE

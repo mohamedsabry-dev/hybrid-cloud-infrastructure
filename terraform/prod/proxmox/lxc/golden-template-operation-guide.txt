@@ -1,0 +1,82 @@
+# Proxmox LXC Golden Template — Operation Guide (PROD)
+
+Commands for the vzdump template-file pattern (not clone-from-ID — see
+DESIGN.md for why). One-time setup + infrastructure deploy + ongoing
+template refresh.
+
+---
+
+## One-time: Golden template setup
+
+### 1. Create the source container via Terraform
+
+  cd terraform/prod/proxmox/lxc/golden-template
+  terraform apply
+
+This creates LXC 9010 (source).
+
+### 2. Configure the container
+
+  pct enter 9010
+  # install packages, harden, customize
+  exit
+
+### 3. Stop and back up to a template file
+
+  pct stop 9010
+  vzdump 9010 --compress gzip --storage local --mode stop
+
+### 4. Move the backup to the template directory
+
+  mv /var/lib/vz/dump/vzdump-lxc-9010-*.tar.gz \
+     /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
+
+### 5. Verify template is available
+
+  pveam list nas-iso
+
+### 6. (Optional) Destroy the source container
+
+The template file is self-contained. The source container is no longer
+needed, so it can be removed from Terraform state + destroyed:
+
+  terraform state rm proxmox_virtual_environment_container.lxc_golden
+  pct destroy 9010
+
+---
+
+## Deploy infrastructure containers
+
+All downstream containers reference the template file — no dependency order
+between them (each is independent):
+
+  cd terraform/prod/proxmox/lxc/ansible       && terraform apply
+  cd terraform/prod/proxmox/lxc/local_runner  && terraform apply
+  cd terraform/prod/proxmox/lxc/nginx         && terraform apply
+  cd terraform/prod/proxmox/lxc/vault_cluster && terraform apply
+
+---
+
+## Refresh the golden template (patching, new packages)
+
+### 1. Recreate the source container via Terraform
+
+  cd terraform/prod/proxmox/lxc/golden-template
+  terraform apply
+
+### 2. Repeat steps 2–5 from "One-time setup" above
+
+The template file at `/mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz`
+gets overwritten with the refreshed version. New containers created after
+this refresh use the updated template. Existing containers are unchanged
+(they booted from the OLD template file and are now just running
+containers — the .tar.gz is only read at creation time).
+
+---
+
+## Related
+
+- DESIGN.md                                              — vzdump template-file pattern + provider limitation
+- ../../../../troubleshooting/proxmox/41-lxc-clone-vs-template-file-ssh-keys.md — the provider-limitation TS case
+- ../../../../troubleshooting/terraform/                 — broader Terraform-Proxmox TS cases
+- ../../../../deployment-docs/01-proxmox-setup-guide.md    — Proxmox host setup (prereq)

@@ -1,118 +1,73 @@
-# AWS IAM Module
+# AWS IAM Module — DEV
 
-Provisions IAM roles, policies, and instance profiles for GitHub Actions CI/CD and EC2 instances.
+Provisions the `GitHubActions-Infrastructure-dev` role (the unprivileged
+tier used by day-to-day infra workflows), its supporting policies, and the
+WireGuard SSM role + instance profile.
 
-## Resources Created
+For the "why" — 2-tier IAM split, DENY-based SecurityBoundary, branch-scoped
+OIDC trust — see [`DESIGN.md`](DESIGN.md). For apply/migration commands see
+[`iam-operation-guide.txt`](iam-operation-guide.txt).
 
-| Resource | Name Pattern | Description |
-|----------|--------------|-------------|
-| `aws_iam_role` | `GitHubActions-Infrastructure-{env}` | GitHub Actions deployment role |
-| `aws_iam_role` | `wireguard-ssm-role-{env}` | EC2 role for SSM Session Manager |
-| `aws_iam_instance_profile` | `wireguard-ssm-profile-{env}` | Instance profile for WireGuard EC2 |
-| `aws_iam_policy` | `TerraformState-{env}` | S3/DynamoDB state access |
-| `aws_iam_policy` | `SecurityBoundary-{env}` | Deny IAM/CloudTrail/Billing |
+---
 
-## Architecture
+## Resources
 
-```
-GitHub Actions
-      │
-      ▼
-GitHubActions-Infrastructure-{env}
-      │
-      ├── PowerUserAccess (AWS managed)
-      ├── TerraformState-{env} (custom)
-      └── SecurityBoundary-{env} (custom - DENY policy)
-            │
-            └── Permissions Boundary: TerraformPermissionsBoundary
-```
+| Resource | Name | Description |
+|----------|------|-------------|
+| `aws_iam_role` | `GitHubActions-Infrastructure-dev` | OIDC-federated role for infra workflows |
+| `aws_iam_role` | `wireguard-ssm-role-dev` | EC2 role for SSM Session Manager |
+| `aws_iam_instance_profile` | `wireguard-ssm-profile-dev` | Instance profile attached to the WireGuard EC2 |
+| `aws_iam_policy` | `TerraformState-dev` | S3/DynamoDB state access scoped to this env |
+| `aws_iam_policy` | `SecurityBoundary-dev` | DENY policy (blocks IAM mutation, CloudTrail, billing) |
 
-## Policies
+## Policy scope
 
-### TerraformState-{env}
-- S3: ListBucket, GetObject, PutObject, DeleteObject on `{bucket}/{env}/*`
-- DynamoDB: GetItem, PutItem, DeleteItem for state locking
+### `TerraformState-dev`
+- S3: `ListBucket`, `GetObject`, `PutObject`, `DeleteObject` on `{bucket}/dev/*`
+- DynamoDB: `GetItem`, `PutItem`, `DeleteItem` on the lock table
 
-### SecurityBoundary-{env}
-**DENY** policy that blocks:
+### `SecurityBoundary-dev`
+DENY on:
 - IAM mutation (create/delete/attach roles, policies, users)
 - CloudTrail modifications
-- Billing/Cost Management access
-- PassRole except for allowed EC2 roles
+- Billing / Cost Management
+- `PassRole` except for specifically allowed EC2 roles
+
+## OIDC trust
+
+The role trusts `token.actions.githubusercontent.com` with the condition:
+
+  repo:{github_repo}:ref:refs/heads/dev
+
+Only workflows running on the `dev` branch can assume this role. Other
+branches (including feature branches, `main`, `prod`) cannot.
 
 ## Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `environment` | Environment name | `dev` |
-| `account_id` | AWS Account ID | *sensitive* |
-| `github_repo` | GitHub repo (owner/repo) | `mohamedsabry-dev/hybrid-cloud-infrastructure` |
-| `state_bucket_name` | S3 bucket for TF state | - |
-| `lock_table_name` | DynamoDB lock table | - |
+| `environment` | Env name | `dev` |
+| `account_id` | AWS account ID | *sensitive, passed via workflow* |
+| `github_repo` | GitHub repo (`owner/repo`) | — |
+| `state_bucket_name` | S3 bucket holding Terraform state | — |
+| `lock_table_name` | DynamoDB state-lock table | — |
 | `region` | AWS region | `us-east-1` |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `terraform_state_policy_arn` | ARN of TerraformState policy |
-| `security_boundary_policy_arn` | ARN of SecurityBoundary policy |
-| `infrastructure_role_arn` | ARN of GitHub Actions role |
-| `infrastructure_role_name` | Name of GitHub Actions role |
-| `wireguard_instance_profile_name` | Instance profile for EC2 |
+| `terraform_state_policy_arn` | ARN of the `TerraformState-dev` policy |
+| `security_boundary_policy_arn` | ARN of the `SecurityBoundary-dev` policy |
+| `infrastructure_role_arn` | ARN of the GitHub Actions infra role |
+| `infrastructure_role_name` | Name of the GitHub Actions infra role |
+| `wireguard_instance_profile_name` | Instance profile name for the WireGuard EC2 |
 
-## OIDC Trust
+## Related
 
-GitHub Actions role trusts:
-- Provider: `token.actions.githubusercontent.com`
-- Condition: `repo:{github_repo}:ref:refs/heads/{environment}`
-
-Only workflows running on the matching branch can assume the role.
-
-## Usage
-
-```bash
-cd terraform/dev/aws/iam
-terraform init
-terraform plan -var="account_id=123456789012"
-terraform apply -var="account_id=123456789012"
-```
-
-## Security Notes
-
-- Infrastructure role has PowerUserAccess but is constrained by SecurityBoundary
-- Cannot create/modify IAM resources (prevents privilege escalation)
-- Cannot disable CloudTrail (audit protection)
-- PassRole limited to specific EC2 roles only
-
-## Post-IAM Workflow: Run Compute Workflow
-
-**IMPORTANT:** After IAM workflow completes, run the Compute workflow.
-
-The compute module references the instance profile via remote state:
-```hcl
-iam_instance_profile = data.terraform_remote_state.iam.outputs.wireguard_instance_profile_name
-```
-
-If IAM resources are recreated (e.g., naming change), the EC2 loses its instance profile until compute workflow runs and reattaches it.
-
-## State Migration History
-
-### 2026-03-21: Consolidation - Prefix to Suffix Naming
-
-Changed Terraform resource block names for consistency between dev/prod:
-
-```bash
-# Executed via workflow, then removed from workflow
-terraform state mv aws_iam_role.dev_wireguard_ssm aws_iam_role.wireguard_ssm
-terraform state mv aws_iam_role_policy_attachment.dev_wireguard_ssm_core aws_iam_role_policy_attachment.wireguard_ssm_core
-terraform state mv aws_iam_instance_profile.dev_wireguard_ssm aws_iam_instance_profile.wireguard_ssm
-terraform state mv aws_iam_policy.terraform_state_dev aws_iam_policy.terraform_state
-terraform state mv aws_iam_policy.security_boundary_dev aws_iam_policy.security_boundary
-```
-
-This also triggered AWS resource name changes (forces replacement):
-- `dev-wireguard-ssm-role` → `wireguard-ssm-role-dev`
-- `dev-wireguard-ssm-profile` → `wireguard-ssm-profile-dev`
-- `SecurityBoundary-Dev` → `SecurityBoundary-dev`
-- `TerraformState-Dev` → `TerraformState-dev`
+- [`DESIGN.md`](DESIGN.md) — why this shape (2-tier IAM, DENY SecurityBoundary, branch-scoped OIDC)
+- [`iam-operation-guide.txt`](iam-operation-guide.txt) — apply, post-apply compute re-run, historical state migrations
+- [`../../../../aws/DESIGN.md`](../../../../aws/DESIGN.md) — broader 2-tier IAM model + dev-security branch rationale
+- [`../../../../aws/bootstrap.md`](../../../../aws/bootstrap.md) — CloudFormation bootstrap (source of the TerraformAdmin role that runs this module)
+- [`../../../../.github/workflows/dev-aws-iam.yml`](../../../../.github/workflows/dev-aws-iam.yml) — the workflow that applies this module
+- [`../compute/`](../compute/) — consumes `wireguard_instance_profile_name` via remote state

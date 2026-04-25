@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/managed-by: flux
+    environment: dev
+spec:
+  replicas: 1
+  serviceName: alertmanager
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+        app.kubernetes.io/name: alertmanager
+        environment: dev
+      annotations:
+        # Vault agent injection
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "alertmanager"
+        vault.hashicorp.com/agent-inject-secret-alertmanager.yaml: "secret/data/alertmanager/config"
+        vault.hashicorp.com/agent-inject-template-alertmanager.yaml: |
+          {{- with secret "secret/data/alertmanager/config" -}}
+          global:
+            resolve_timeout: 5m
+            smtp_smarthost: 'smtp.gmail.com:587'
+            smtp_require_tls: true
+            smtp_from: '{{ .Data.data.smtp_from }}'
+            smtp_auth_username: '{{ .Data.data.smtp_from }}'
+            smtp_auth_password: '{{ .Data.data.smtp_password }}'
+          inhibit_rules:
+          - equal:
+            - namespace
+            - alertname
+            source_matchers:
+            - severity = critical
+            target_matchers:
+            - severity =~ warning|info
+          - equal:
+            - namespace
+            - alertname
+            source_matchers:
+            - severity = warning
+            target_matchers:
+            - severity = info
+          - equal:
+            - namespace
+            source_matchers:
+            - alertname = InfoInhibitor
+            target_matchers:
+            - severity = info
+          - target_matchers:
+            - alertname = InfoInhibitor
+          receivers:
+          - name: "null"
+          - name: "email-alerts"
+            email_configs:
+            - to: '{{ .Data.data.alert_email }}'
+              send_resolved: true
+          route:
+            group_by:
+            - namespace
+            group_interval: 5m
+            group_wait: 30s
+            receiver: "email-alerts"
+            repeat_interval: 4h
+            routes:
+            - matchers:
+              - alertname = "Watchdog"
+              receiver: "null"
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+    spec:
+      serviceAccountName: alertmanager-sa
+      # Run on master - survives if all workers are down
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: alertmanager
+          image: quay.io/prometheus/alertmanager:v0.27.0
+          args:
+            - --config.file=/vault/secrets/alertmanager.yaml
+            - --storage.path=/alertmanager
+            - --web.listen-address=:9093
+            - --web.external-url=http://alertmanager.monitoring.svc:9093
+          ports:
+            - name: web
+              containerPort: 9093
+            - name: mesh
+              containerPort: 9094
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: web
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: alertmanager-data
+              mountPath: /alertmanager
+      volumes:
+        - name: alertmanager-data
+          emptyDir: {}

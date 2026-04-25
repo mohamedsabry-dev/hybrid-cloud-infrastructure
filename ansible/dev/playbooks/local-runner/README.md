@@ -17,13 +17,15 @@ Installs tools required by the GitHub Actions runner:
 
 **Used by:** `dev-local-runner-full-setup.yml` workflow
 
-## Usage
+## When it runs
 
-```bash
-# Run via workflow (automatic)
-# Or manually:
-ansible-playbook -i inventory/first_setup_inventory.ini playbooks/local-runner/setup_tools.yml
-```
+Invoked by `{env}-local-runner-full-setup.yml` after the runner LXC is
+provisioned. Uses the bootstrap inventory (IP + root + SSH key) because the
+runner LXC is configured BEFORE FreeIPA enrollment.
+
+Manual re-run: executed via the workflow, not via ad-hoc command. If a new
+tool is added to this playbook, trigger the workflow instead of running
+ansible-playbook by hand.
 
 ## Notes
 

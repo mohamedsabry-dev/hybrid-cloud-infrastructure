@@ -84,32 +84,32 @@ LESSONS LEARNED
 Make it stable, clean, easy to manage, and easy to troubleshoot later."
 
 Principles:
-  ✓ Keep all related files in the same location
-  ✓ Use clear, descriptive naming conventions
-  ✓ Standardize provisioning types (all thin or all thick)
-  ✓ Always take snapshots before risky operations
-  ✓ Test thoroughly before deleting old infrastructure
-  ✓ Document your architecture for future reference
+  Yes Keep all related files in the same location
+  Yes Use clear, descriptive naming conventions
+  Yes Standardize provisioning types (all thin or all thick)
+  Yes Always take snapshots before risky operations
+  Yes Test thoroughly before deleting old infrastructure
+  Yes Document your architecture for future reference
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Plan storage architecture before creating vDisks
-  ✓ All vDisks for a VM should be in same directory
-  ✓ Use consistent provisioning (all thin OR all thick)
-  ✓ Avoid mixing storage locations
+  Yes Plan storage architecture before creating vDisks
+  Yes All vDisks for a VM should be in same directory
+  Yes Use consistent provisioning (all thin OR all thick)
+  Yes Avoid mixing storage locations
 
 Naming Convention:
-  ✓ Use descriptive names that indicate purpose
-  ✓ Bad: "datastore1", "datastore2"
-  ✓ Good: "DS_NVME_01", "NAS_DS_1"
+  Yes Use descriptive names that indicate purpose
+  Yes Bad: "datastore1", "datastore2"
+  Yes Good: "DS_NVME_01", "NAS_DS_1"
 
 Snapshot Management:
-  ✓ Always consolidate snapshots before deletion
-  ✓ Never delete snapshot files manually from filesystem
-  ✓ Use vCenter/VMware Workstation snapshot manager only
+  Yes Always consolidate snapshots before deletion
+  Yes Never delete snapshot files manually from filesystem
+  Yes Use vCenter/VMware Workstation snapshot manager only
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED ISSUES

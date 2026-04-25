@@ -1,0 +1,151 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Storage and Data Architecture" id="storage">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="s1" value="&lt;b&gt;NAS PHYSICAL LAYER — Asustor Storage&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas_hw" value="&lt;b&gt;Asustor NAS&lt;/b&gt;&lt;br&gt;1.8TB total capacity&lt;br&gt;RAID1 mirrored disks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="15" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vol_iso" value="&lt;b&gt;/shared-iso&lt;/b&gt;&lt;br&gt;50GB&lt;br&gt;Golden templates" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="270" y="40" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vol_dev" value="&lt;b&gt;/k8s-dev&lt;/b&gt;&lt;br&gt;300GB&lt;br&gt;Dev PVCs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="465" y="40" width="150" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vol_prod" value="&lt;b&gt;/k8s-prod&lt;/b&gt;&lt;br&gt;300GB&lt;br&gt;Prod PVCs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="650" y="40" width="150" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vol_backup" value="&lt;b&gt;/backups&lt;/b&gt;&lt;br&gt;650GB&lt;br&gt;vzdump archives" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="835" y="40" width="160" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="vol_buffer" value="&lt;b&gt;Buffer&lt;/b&gt;&lt;br&gt;500GB&lt;br&gt;Unallocated reserve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s1">
+          <mxGeometry x="1030" y="40" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="a12" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="153" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s2" value="&lt;b&gt;KUBERNETES STORAGE CLASSES — Mount Behavior Selection&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="185" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="sc_retain" value="&lt;b&gt;nfs-retain&lt;/b&gt;&lt;br&gt;Soft mount, 30s timeout&lt;br&gt;Returns IO errors fast&lt;br&gt;Good for stateless apps&lt;br&gt;&lt;i&gt;Prometheus, Grafana, Loki, WordPress&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="15" y="38" width="310" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="sc_db" value="&lt;b&gt;nfs-database&lt;/b&gt;&lt;br&gt;Hard mount, 600s timeout&lt;br&gt;Hangs until NAS recovers&lt;br&gt;Required for InnoDB integrity&lt;br&gt;&lt;i&gt;MariaDB only&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="370" y="38" width="310" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="sc_delete" value="&lt;b&gt;nfs-delete&lt;/b&gt;&lt;br&gt;Soft mount, 30s timeout&lt;br&gt;PV + NAS data removed on PVC delete&lt;br&gt;Ephemeral / test workloads" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="725" y="38" width="310" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="nfs_ver" value="&lt;b&gt;NFSv3 Pinned&lt;/b&gt;&lt;br&gt;nfsvers=3, nolock&lt;br&gt;v4.2 lock manager&lt;br&gt;flaky across VLANs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s2">
+          <mxGeometry x="1080" y="38" width="210" height="75" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="a23" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="318" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s3" value="&lt;b&gt;CSI-NFS DRIVER — Dynamic Provisioning&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="350" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="csi_ds" value="&lt;b&gt;NFS CSI DaemonSet&lt;/b&gt;&lt;br&gt;Runs on all K8s nodes&lt;br&gt;HelmRelease via Flux" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="15" y="40" width="230" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="csi_ctrl" value="&lt;b&gt;CSI Controller&lt;/b&gt;&lt;br&gt;Provisions PVs on demand&lt;br&gt;Creates NFS subdirectories" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="290" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="csi_mount" value="&lt;b&gt;Mount Path&lt;/b&gt;&lt;br&gt;NAS:10.0.40.4 → VLAN 40&lt;br&gt;Worker 2nd NIC (storage-only)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="585" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="csi_tf" value="&lt;b&gt;Terraform Provisioned&lt;/b&gt;&lt;br&gt;NAS mount points created&lt;br&gt;by proxmox/storage/nas module" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s3">
+          <mxGeometry x="890" y="40" width="260" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ec1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="csi_ds" target="csi_ctrl" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="csi_ctrl" target="csi_mount" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="csi_mount" target="csi_tf" parent="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a34" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="473" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s4" value="&lt;b&gt;PVC LIFECYCLE — Claim → Provision → Mount → Reclaim&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="505" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="pvc_claim" value="&lt;b&gt;PVC Created&lt;/b&gt;&lt;br&gt;StatefulSet volumeClaimTemplate&lt;br&gt;or standalone PVC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="15" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="pvc_prov" value="&lt;b&gt;PV Provisioned&lt;/b&gt;&lt;br&gt;CSI creates NFS subdir&lt;br&gt;on NAS volume" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="310" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="pvc_mount" value="&lt;b&gt;Pod Mount&lt;/b&gt;&lt;br&gt;kubelet mounts NFS&lt;br&gt;via CSI node plugin" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="575" y="40" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="pvc_retain" value="&lt;b&gt;Retain Policy&lt;/b&gt;&lt;br&gt;PVC deleted → PV Released&lt;br&gt;NAS data preserved&lt;br&gt;Manual cleanup required" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="830" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="pvc_immut" value="&lt;b&gt;Immutable after create&lt;/b&gt;&lt;br&gt;StatefulSet PVCs can't&lt;br&gt;change StorageClass" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s4">
+          <mxGeometry x="1115" y="40" width="190" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ep1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="pvc_claim" target="pvc_prov" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ep2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="pvc_prov" target="pvc_mount" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ep3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="pvc_mount" target="pvc_retain" parent="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a45" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="628" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s5" value="&lt;b&gt;NETWORK ISOLATION — VLAN 40 Storage Path&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="660" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="vlan40" value="&lt;b&gt;VLAN 40 (Storage)&lt;/b&gt;&lt;br&gt;L2 isolated&lt;br&gt;10.0.40.0/24" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="15" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="worker_nic" value="&lt;b&gt;Worker 2nd NIC&lt;/b&gt;&lt;br&gt;Dedicated storage NIC&lt;br&gt;Bypasses hypervisor in data path" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="260" y="40" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas_ip" value="&lt;b&gt;NAS: 10.0.40.4&lt;/b&gt;&lt;br&gt;NFS exports on VLAN 40&lt;br&gt;Direct L2 path to workers" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="575" y="40" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="fw_block" value="&lt;b&gt;Firewall Rules&lt;/b&gt;&lt;br&gt;svc → storage: BLOCKED&lt;br&gt;Only K8s workers access NAS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s5">
+          <mxGeometry x="860" y="40" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="en1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="vlan40" target="worker_nic" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="en2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="worker_nic" target="nas_ip" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="en3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="nas_ip" target="fw_block" parent="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="a56" value="▼" style="text;html=1;fontSize=16;fontColor=#999999;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="783" width="40" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s6" value="&lt;b&gt;PVC SIZING — Workload Storage Allocation&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="815" width="1320" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_prom" value="&lt;b&gt;Prometheus&lt;/b&gt;&lt;br&gt;20Gi dev / 50Gi prod&lt;br&gt;nfs-retain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="15" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_graf" value="&lt;b&gt;Grafana&lt;/b&gt;&lt;br&gt;5Gi dev / 10Gi prod&lt;br&gt;nfs-retain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="230" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_loki" value="&lt;b&gt;Loki&lt;/b&gt;&lt;br&gt;50Gi dev / 100Gi prod&lt;br&gt;nfs-retain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="445" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_maria" value="&lt;b&gt;MariaDB&lt;/b&gt;&lt;br&gt;15Gi dev / 50Gi prod&lt;br&gt;nfs-database (hard)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="660" y="40" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_wp" value="&lt;b&gt;WordPress&lt;/b&gt;&lt;br&gt;5Gi dev / 10Gi prod&lt;br&gt;nfs-retain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="895" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="sz_total" value="&lt;b&gt;Total Dev: ~95Gi&lt;/b&gt;&lt;br&gt;&lt;b&gt;Total Prod: ~220Gi&lt;/b&gt;&lt;br&gt;Thin provisioned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="s6">
+          <mxGeometry x="1110" y="40" width="190" height="60" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

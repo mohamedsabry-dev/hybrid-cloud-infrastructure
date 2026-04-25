@@ -1,155 +1,50 @@
 # Kubernetes Troubleshooting Cases
 
-This directory contains documented troubleshooting cases for our Kubernetes infrastructure. Each case follows a standardized 9-point template for consistency and completeness.
+41 cases + 11 reference guides in [reference/](reference/)
 
----
-
-## Template Structure
-
-Each case document follows this format:
-
-| Section | Description |
-|---------|-------------|
-| **1. Context** | System, environment, related components, discovery context |
-| **2. Issue** | Symptom, error messages, impact |
-| **3. Analysis** | Investigation steps with commands and outputs |
-| **4. Root Cause** | Detailed explanation of why the issue occurred |
-| **5. Solution** | Fix steps, files changed, prevention measures |
-| **6. Solution Risk** | Risk level, potential impact of the fix |
-| **7. Impact After Fix** | Observed results after applying the solution |
-| **8. Notes** | Lessons learned, commands reference, related files |
-| **9. Workaround** | Temporary fixes if permanent solution isn't immediately available |
-
-**Header Format:** `# TS-K8S-XXX | YYYY-MM-DD | STATUS`
-
----
-
-## Cases Index (Chronological)
-
-| # | Date | Status | Title | Category |
-|---|------|--------|-------|----------|
-| [001](1-k8s-pod-eviction-race-condition-router-outage.md) | 2026-03-25 | RESOLVED | Pod Eviction Race Condition (Router Outage) | Scheduling |
-| [002](2-calico-bgp-wrong-interface-multi-nic.md) | 2026-03-28 | RESOLVED | Calico BGP Wrong Interface (Multi-NIC) | Networking |
-| [003](3-nfs-hard-mount-pod-unresponsiveness.md) | 2026-03-31 | RESOLVED | NFS Hard Mount Pod Unresponsiveness | Storage |
-| [004](4-nfs-pv-reclaimpolicy-delete-failed-no-provisioner.md) | 2026-04-01 | RESOLVED | NFS PV ReclaimPolicy Delete Failed | Storage |
-| [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) | 2026-04-01 | RESOLVED | NFS CSI StorageClass Invalid Parameter + Flux Stuck | Storage / GitOps |
-| [006](6-nfs-storage-complete-guide-static-to-dynamic.md) | 2026-04-02 | RESOLVED | NFS Storage Complete Guide (Static to Dynamic) | Storage |
-| [007](7-mariadb-innodb-nfs-table-creation-failure.md) | 2026-04-02 | RESOLVED | MariaDB InnoDB NFS Table Creation Failure | Database / Storage |
-| [008](8-k8s-dev-memory-overcommit-strategy.md) | 2026-04-03 | RESOLVED | K8s Dev Memory Over-Commitment Strategy | Resources |
-| [009](9-k8s-scheduler-limitations-and-advanced-scheduling.md) | 2026-04-04 | IN PROGRESS | Kubernetes Scheduler Limitations | Scheduling |
-| [010](10-wordpress-admin-password-hash-reset.md) | 2026-04-04 | MONITORING | WordPress Admin Password Hash Reset | Application |
-| [011](11-wordpress-plugin-version-incompatibility-blank-page.md) | 2026-04-04 | RESOLVED | WordPress Plugin Version Incompatibility | Application |
-| [012](12-flux-kustomization-crd-dependency-failure.md) | 2026-04-05 | RESOLVED | Flux Kustomization CRD Dependency Failure | GitOps |
-| [013](13-k8s-master-node-resource-exhaustion.md) | 2026-04-05 | RESOLVED | K8s Master Node Resource Exhaustion | Resources |
-| [014](14-vault-k8s-auth-service-account-not-authorized.md) | 2026-04-05 | RESOLVED | Vault K8s Auth Service Account Not Authorized | Security |
-| [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) | 2026-04-06 | RESOLVED | CSI NFS Restart Stale Mount (MariaDB Crash) | Storage / Database |
-| [016](16-pod-priority-classes-dr-readiness.md) | 2026-04-06 | RESOLVED | Pod Priority Classes (DR Readiness) | Scheduling |
-| [017](17-vault-injection-system-namespace-denied.md) | 2026-04-07 | RESOLVED | Vault Injection System Namespace Denied | Security |
-| [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) | 2026-04-08 | RESOLVED | CSI NFS Controller Network Isolation | Storage / Networking |
-| [019](19-flux-kustomization-restructure-cascade-failure.md) | 2026-04-09 | RESOLVED | Flux Kustomization Restructure Cascade Failure | GitOps |
-| [020](20-grafana-loki-version-incompatibility.md) | 2026-04-10 | RESOLVED | Grafana + Loki Version Incompatibility | Monitoring |
-
----
-
-## Cases by Category
-
-### Storage (NFS / CSI)
-- [003](3-nfs-hard-mount-pod-unresponsiveness.md) - NFS Hard Mount Pod Unresponsiveness
-- [004](4-nfs-pv-reclaimpolicy-delete-failed-no-provisioner.md) - NFS PV ReclaimPolicy Delete Failed
-- [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) - NFS CSI StorageClass Invalid Parameter
-- [006](6-nfs-storage-complete-guide-static-to-dynamic.md) - **Complete NFS Storage Guide**
-- [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB NFS Table Creation Failure
-- [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) - CSI NFS Restart Stale Mount
-- [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) - CSI NFS Controller Network Isolation
-
-### GitOps (Flux)
-- [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) - Flux Stuck on Old Revision
-- [012](12-flux-kustomization-crd-dependency-failure.md) - Flux CRD Dependency Failure
-- [019](19-flux-kustomization-restructure-cascade-failure.md) - Flux Restructure Cascade Failure
-
-### Scheduling / Resources
-- [001](1-k8s-pod-eviction-race-condition-router-outage.md) - Pod Eviction Race Condition
-- [008](8-k8s-dev-memory-overcommit-strategy.md) - Memory Over-Commitment Strategy
-- [009](9-k8s-scheduler-limitations-and-advanced-scheduling.md) - Scheduler Limitations
-- [013](13-k8s-master-node-resource-exhaustion.md) - Master Node Resource Exhaustion
-- [016](16-pod-priority-classes-dr-readiness.md) - Pod Priority Classes
-
-### Security (Vault)
-- [014](14-vault-k8s-auth-service-account-not-authorized.md) - Vault K8s Auth Not Authorized
-- [017](17-vault-injection-system-namespace-denied.md) - Vault Injection System Namespace Denied
-
-### Networking
-- [002](2-calico-bgp-wrong-interface-multi-nic.md) - Calico BGP Wrong Interface
-- [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) - Network Isolation Issue
-
-### Applications
-- [010](10-wordpress-admin-password-hash-reset.md) - WordPress Password Reset
-- [011](11-wordpress-plugin-version-incompatibility-blank-page.md) - WordPress Plugin Incompatibility
-- [020](20-grafana-loki-version-incompatibility.md) - Grafana + Loki Version Incompatibility
-
-### Database
-- [007](7-mariadb-innodb-nfs-table-creation-failure.md) - MariaDB InnoDB on NFS
-- [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) - MariaDB Crash from Stale Mount
-
----
-
-## Quick Reference
-
-### Status Definitions
-| Status | Meaning |
-|--------|---------|
-| RESOLVED | Issue fixed, root cause identified, prevention in place |
-| IN PROGRESS | Investigation or fix ongoing |
-| MONITORING | Workaround applied, monitoring for recurrence |
-
-### Common Commands
-
-```bash
-# Check pod status
-kubectl get pods -A -o wide
-
-# Check node resources
-kubectl describe nodes | grep -E "(Name:|memory|cpu)"
-
-# Check PVC status
-kubectl get pvc -A
-
-# Check Flux status
-flux get kustomizations
-flux get helmreleases -A
-
-# Check CSI driver
-kubectl get pods -n kube-system | grep csi
-
-# Check Vault status
-kubectl get pods -n vault
-kubectl logs -n vault vault-agent-injector-xxx
-```
-
----
-
-## Environment
-
-| Component | Version |
-|-----------|---------|
-| Kubernetes | v1.31.x (kubeadm) |
-| CNI | Calico v3.27.x |
-| Storage | NFS CSI Driver |
-| GitOps | Flux v2 |
-| Secrets | HashiCorp Vault |
-| Monitoring | Prometheus + Grafana + Loki |
-
-**Clusters:**
-- `k8s-dev` - Development/testing
-- `k8s-prod` - Production
-
----
-
-## Contributing
-
-When adding a new case:
-1. Use the next sequential number based on date
-2. Follow the 9-point template structure
-3. Include all commands and outputs from investigation
-4. Update this README with the new case
-5. Cross-reference related cases where applicable
+| # | Date | Status | Title |
+|---|------|--------|-------|
+| [001](1-k8s-pod-eviction-race-condition-router-outage.md) | 2026-03-25 | RESOLVED | Pod Eviction Race Condition (Router Outage) |
+| [002](2-calico-bgp-wrong-interface-multi-nic.md) | 2026-03-28 | RESOLVED | Calico BGP Wrong Interface (Multi-NIC) |
+| [003](3-nfs-hard-mount-pod-unresponsiveness.md) | 2026-03-31 | RESOLVED | NFS Hard Mount Pod Unresponsiveness |
+| [004](4-nfs-pv-reclaimpolicy-delete-failed-no-provisioner.md) | 2026-04-01 | RESOLVED | NFS PV ReclaimPolicy Delete Failed |
+| [005](5-nfs-csi-storageclass-invalid-parameter-flux-stuck.md) | 2026-04-01 | RESOLVED | NFS CSI StorageClass Invalid Parameter + Flux Stuck |
+| [007](7-mariadb-innodb-nfs-table-creation-failure.md) | 2026-04-02 | RESOLVED | MariaDB InnoDB NFS Table Creation Failure |
+| [010](10-wordpress-admin-password-hash-reset.md) | 2026-04-04 | TEMP CLOSED | WordPress Admin Password Hash Reset |
+| [011](11-wordpress-plugin-version-incompatibility-blank-page.md) | 2026-04-04 | RESOLVED | WordPress Plugin Version Incompatibility |
+| [012](12-flux-kustomization-crd-dependency-failure.md) | 2026-04-05 | RESOLVED | Flux Kustomization CRD Dependency Failure |
+| [013](13-k8s-master-node-resource-exhaustion.md) | 2026-04-05 | RESOLVED | Master Node Resource Exhaustion |
+| [014](14-vault-k8s-auth-service-account-not-authorized.md) | 2026-04-05 | RESOLVED | Vault K8s Auth Service Account Not Authorized |
+| [015](15-csi-nfs-restart-stale-mount-mariadb-crash.md) | 2026-04-06 | RESOLVED | CSI NFS Restart Stale Mount (MariaDB Crash) |
+| [016](reference/16-pod-priority-classes-dr-readiness.md) | 2026-04-06 | RESOLVED | Pod Priority Classes (DR Readiness) |
+| [017](17-vault-injection-system-namespace-denied.md) | 2026-04-07 | RESOLVED | Vault Injection System Namespace Denied |
+| [018](18-csi-nfs-controller-cannot-provision-pvc-network-isolation.md) | 2026-04-08 | RESOLVED | CSI NFS Controller Network Isolation |
+| [019](19-flux-kustomization-restructure-cascade-failure.md) | 2026-04-09 | RESOLVED | Flux Kustomization Restructure Cascade Failure |
+| [020](20-grafana-loki-version-incompatibility.md) | 2026-04-10 | RESOLVED | Grafana + Loki Version Incompatibility |
+| [021](21-remediation-pod-stopped-vm-api-error.md) | 2026-04-11 | RESOLVED | Remediation Pod Cannot Reboot Stopped VM |
+| [022](22-worker-node-failure-cascading-pod-failures.md) | 2026-04-11 | RESOLVED | Worker Node Failure Cascading Pod Failures |
+| [023](23-kustomization-resource-not-removed.md) | 2026-04-11 | RESOLVED | Kustomization Resource Not Removed |
+| [025](25-promtail-vault-namespace-logs.md) | 2026-04-11 | SUSPENDED | Promtail Vault Namespace Logs |
+| [026](26-released-pvs-cleanup.md) | 2026-04-13 | RESOLVED | Released PVs Cleanup (Orphaned Storage) |
+| [027](27-wordpress-php-upload-limits.md) | 2026-04-13 | RESOLVED | WordPress PHP Upload Limits |
+| [028](28-nginx-proxy-body-size-413-error.md) | 2026-04-13 | RESOLVED | External Nginx Proxy 413 Body Size Error |
+| [029](29-wordpress-readiness-probe-nfs-detection.md) | 2026-04-13 | RESOLVED | WordPress Readiness Probe NFS Detection |
+| [030](30-worker3-memory-exhaustion-vm-crash.md) | 2026-04-14 | RESOLVED | Worker3 Memory Exhaustion VM Crash |
+| [033](33-vault-agent-dns-failure-new-pod-blocking.md) | 2026-04-16 | RESOLVED | Vault Agent DNS Failure New Pod Blocking |
+| [034](34-wordpress-external-dns-slowness.md) | 2026-04-16 | RESOLVED | WordPress External DNS Slowness |
+| [036](36-grafana-antiaffinity-rollout-stuck.md) | 2026-04-18 | RESOLVED | Grafana Anti-Affinity Rollout Stuck |
+| [037](37-grafana-dashboards-missing-sqlite-corruption.md) | 2026-04-18 | RESOLVED | Grafana Dashboards Missing (SQLite Corruption) |
+| [038](38-qemu-guest-agent-cpu-loop.md) | 2026-04-17 | TRIGGER NOT IDENTIFIED | QEMU Guest Agent CPU Busy Loop |
+| [039](39-kube-system-targetdown-false-positives.md) | 2026-04-18 | SUSPENDED | kube-system TargetDown False Positives |
+| [040](40-hpa-memory-scaling-behavior.md) | 2026-04-18 | RESOLVED | HPA Memory-Based Scaling Behavior |
+| [041](41-prometheusrule-not-picked-up.md) | 2026-04-18 | RESOLVED | PrometheusRule Not Picked Up |
+| [042](42-flux-retry-storm-cluster-outage.md) | 2026-04-18 | RESOLVED | Flux Retry Storm Cluster-Wide Outage |
+| [043](43-noexecute-taint-not-applied.md) | 2026-04-18 | RESOLVED | NoExecute Taint Not Applied to Unreachable Nodes |
+| [044](44-coredns-ha-masters.md) | 2026-04-18 | RESOLVED | CoreDNS Not HA — Should Run on Masters |
+| [045](45-csi-nfs-controller-port-conflict.md) | 2026-04-18 | RESOLVED | CSI NFS Controller Port Conflict (Same Node) |
+| [046](46-kustomization-stale-resource-reference.md) | 2026-04-20 | RESOLVED | Kustomization Stale Resource Reference |
+| [047](47-csi-nfs-podlabels-silent-accept.md) | 2026-04-20 | RESOLVED | CSI NFS podLabels Silent Accept + Near-Miss |
+| [048](48-prometheus-pvc-nfsv4-version-mismatch.md) | 2026-04-20 | RESOLVED | Prometheus PVC NFSv4 Version Mismatch |
+| [049](49-git-history-rewrite-flux-prune-cascade.md) | 2026-04-23 | RESOLVED | Git History Rewrite → Flux Prune Cascade (CoreDNS Lost) |
+| [050](reference/50-remediation-pod-backup-window-race-condition.md) | 2026-04-24 | PENDING | Remediation Pod vs Backup Window Race Condition |
+| [051](reference/51-worker1-rollout-restart-micro-cascade.md) | 2026-04-25 | RESOLVED | Worker1 Rollout Restart Micro-Cascade → 2-Worker Drift |

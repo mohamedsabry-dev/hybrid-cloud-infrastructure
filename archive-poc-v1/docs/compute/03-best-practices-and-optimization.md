@@ -9,17 +9,17 @@
 ### General Guidelines
 
 **DO:**
-- ✅ Leave 1-2GB headroom for unexpected spikes
-- ✅ Monitor actual usage vs allocated (adjust as needed)
-- ✅ Calculate worst-case memory requirements before deployment
-- ✅ Test resource allocation under realistic workloads
-- ✅ Reserve adequate memory for Windows host (8GB minimum)
+- Leave 1-2GB headroom for unexpected spikes
+- Monitor actual usage vs allocated (adjust as needed)
+- Calculate worst-case memory requirements before deployment
+- Test resource allocation under realistic workloads
+- Reserve adequate memory for Windows host (8GB minimum)
 
 **DON'T:**
-- ❌ Don't assume ESXi releases memory after VM migration
-- ❌ Don't run production without buffer memory
-- ❌ Don't allocate 100% without testing first
-- ❌ Don't ignore swap usage on Windows host
+- Don't assume ESXi releases memory after VM migration
+- Don't run production without buffer memory
+- Don't allocate 100% without testing first
+- Don't ignore swap usage on Windows host
 
 ### Memory Monitoring
 
@@ -102,14 +102,14 @@ htop
 ### Provisioning Strategy
 
 **Use Thick Provisioning When:**
-- ✅ Critical storage infrastructure (NAS VM)
-- ✅ Predictable performance required
-- ✅ Dedicated datastore available for snapshots
+- Critical storage infrastructure (NAS VM)
+- Predictable performance required
+- Dedicated datastore available for snapshots
 
 **Use Thin Provisioning When:**
-- ✅ Most VMs (flexibility + efficiency)
-- ✅ Snapshots needed frequently
-- ✅ Space efficiency important
+- Most VMs (flexibility + efficiency)
+- Snapshots needed frequently
+- Space efficiency important
 
 ### Snapshot Planning
 
@@ -119,9 +119,9 @@ htop
 3. Plan deletion within 24-48 hours
 
 **DON'T:**
-- ❌ Keep snapshots longer than 1 week
-- ❌ Use snapshots as backups (use Veeam)
-- ❌ Take snapshot without verifying free space
+- Keep snapshots longer than 1 week
+- Use snapshots as backups (use Veeam)
+- Take snapshot without verifying free space
 
 ---
 
@@ -139,7 +139,7 @@ Hibernation: DISABLED
   └─ Reduces cache inconsistencies
 ```
 
-### ⚠️ IMPORTANT: Windows Host Stability Warning
+###  IMPORTANT: Windows Host Stability Warning
 
 **Issue:** When running the full environment alongside development tools, the Windows host experiences significant memory pressure and swap usage.
 
@@ -174,9 +174,9 @@ Result: Windows forces 6-7GB to SWAP
 Laptop 1: Run full DC-K8s environment only
 Laptop 2: Run VSCode, browsers, development tools
 Benefits:
-  ✓ No swap usage on either system
-  ✓ Stable environment performance
-  ✓ No interference between workloads
+  Yes No swap usage on either system
+  Yes Stable environment performance
+  Yes No interference between workloads
 ```
 
 **When to Use:**
@@ -196,9 +196,9 @@ If using single laptop, consider reducing:
   │   └─ Jenkins, Grafana, or 1 K8s worker
   └─ Close heavy applications when not needed
 Benefits:
-  ✓ Reduces swap pressure
-  ✓ Maintains core functionality
-  ⚠️ Loses some production-like environment features
+  Yes Reduces swap pressure
+  Yes Maintains core functionality
+   Loses some production-like environment features
 ```
 
 **When to Use:**
@@ -217,8 +217,8 @@ When testing full production environment:
   ├─ Stop MobaXterm when not actively using
   └─ Stop Wireshark captures
 Benefits:
-  ✓ Full environment can run without swap
-  ⚠️ Cannot develop/monitor simultaneously
+  Yes Full environment can run without swap
+   Cannot develop/monitor simultaneously
 ```
 
 **When to Use:**
@@ -270,16 +270,16 @@ Benefits:
 ### Resource Usage Testing Results
 
 **Full Environment Running:**
-- ✅ Host CPU usage: ~30% average
-- ✅ Host CPU during backups: 35-40%
-- ✅ Memory balloon: Stable, no swapping
-- ✅ Storage I/O: No bottlenecks observed
+- Host CPU usage: ~30% average
+- Host CPU during backups: 35-40%
+- Memory balloon: Stable, no swapping
+- Storage I/O: No bottlenecks observed
 
 **DR Testing:**
-- ✅ Power on DR for maintenance windows
-- ✅ Live migrate VMs to DR (manual process)
-- ✅ Enter Production into maintenance mode
-- ✅ Return to normal after testing
+- Power on DR for maintenance windows
+- Live migrate VMs to DR (manual process)
+- Enter Production into maintenance mode
+- Return to normal after testing
 
 ### Performance Benchmarks
 

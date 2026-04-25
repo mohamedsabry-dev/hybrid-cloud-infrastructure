@@ -15,10 +15,10 @@ This guide configures HashiCorp Vault with:
 PREREQUISITES
 ================================================================================
 
-✓ Vault cluster initialized (see 07-vault_init_guide.txt)
-✓ All vault nodes unsealed
-✓ Root token available
-✓ Policy files prepared:
+Yes Vault cluster initialized (see 07-vault_init_guide.txt)
+Yes All vault nodes unsealed
+Yes Root token available
+Yes Policy files prepared:
   - admin-policy.hcl
   - operator-policy.hcl
 
@@ -116,8 +116,8 @@ vault write auth/userpass/users/super_ansible \
     password="<SUPER_SECURE_PASSWORD>" \
     policies="admin"
 
-⚠️  Store this password in secure password manager!
-⚠️  Use ONLY for emergencies and major configuration changes
+  Store this password in secure password manager!
+  Use ONLY for emergencies and major configuration changes
 
 
 5.2 - Create Operator Users (Safe Mode)
@@ -135,7 +135,7 @@ vault write auth/userpass/users/admin2 \
     password="<USER_PASSWORD_2>" \
     policies="operator"
 
-⚠️  Use these accounts for day-to-day vault operations
+  Use these accounts for day-to-day vault operations
 
 
 ================================================================================
@@ -197,11 +197,11 @@ USER ROLES AND RESPONSIBILITIES
 
 Access Control Principles:
 --------------------------
-✓ Use operator accounts (admin1/admin2) for routine operations
-✓ Reserve super_ansible for emergency access and major changes
-✓ Store root token offline - use ONLY as last resort break-glass
-✓ Rotate passwords regularly
-✓ Audit user actions through vault logs
+Yes Use operator accounts (admin1/admin2) for routine operations
+Yes Reserve super_ansible for emergency access and major changes
+Yes Store root token offline - use ONLY as last resort break-glass
+Yes Rotate passwords regularly
+Yes Audit user actions through vault logs
 
 
 ================================================================================
@@ -212,16 +212,16 @@ Why Local Users (userpass) Instead of LDAP/IPA?
 ------------------------------------------------
 
 Advantages of Local Users:
-✓ Simplicity - No external dependencies
-✓ Availability - Vault accessible even if IPA/LDAP is down
-✓ Security - No single sign-on (SSO) risk
-✓ Isolation - Vault credentials separate from system accounts
+Yes Simplicity - No external dependencies
+Yes Availability - Vault accessible even if IPA/LDAP is down
+Yes Security - No single sign-on (SSO) risk
+Yes Isolation - Vault credentials separate from system accounts
 
 Concerns with IPA/LDAP Integration:
-✗ Dependency on IPA/LDAP availability
-✗ SSO complexity - same username for both vault VM and vault application
-✗ Potential security risk if system account compromised
-✗ Additional configuration and maintenance overhead
+No Dependency on IPA/LDAP availability
+No SSO complexity - same username for both vault VM and vault application
+No Potential security risk if system account compromised
+No Additional configuration and maintenance overhead
 
 Initial Consideration:
 We initially considered using vault_admin1 and vault_admin2 (IPA domain users)
@@ -328,15 +328,15 @@ Solution: vault write auth/userpass/users/<username> policies="admin"
 SECURITY BEST PRACTICES
 ================================================================================
 
-✓ Never share user credentials between team members
-✓ Use operator accounts for daily tasks, not admin
-✓ Store passwords in secure password manager (not plain text)
-✓ Enable audit logging to track user actions
-✓ Regularly review and rotate credentials
-✓ Remove users who no longer need access
-✓ Use MFA (multi-factor authentication) for production environments
-✓ Keep root token offline and use only for emergencies
-✓ Document all policy changes in version control
+Yes Never share user credentials between team members
+Yes Use operator accounts for daily tasks, not admin
+Yes Store passwords in secure password manager (not plain text)
+Yes Enable audit logging to track user actions
+Yes Regularly review and rotate credentials
+Yes Remove users who no longer need access
+Yes Use MFA (multi-factor authentication) for production environments
+Yes Keep root token offline and use only for emergencies
+Yes Document all policy changes in version control
 
 
 ================================================================================

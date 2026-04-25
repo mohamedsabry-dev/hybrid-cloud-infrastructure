@@ -1,0 +1,120 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Network Architecture" id="poc-network">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== WAN NETWORK ==================== -->
+        <mxCell id="wan_layer" value="&lt;b&gt;WAN — 192.168.0.x/24 (VMnet0 Bridged)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="700" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="wan_router" value="&lt;b&gt;Home Router&lt;/b&gt;&lt;br&gt;192.168.0.1&lt;br&gt;Internet Gateway" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="wan_layer">
+          <mxGeometry x="15" y="38" width="180" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="wan_pfsense" value="&lt;b&gt;pfSense WAN&lt;/b&gt;&lt;br&gt;192.168.0.##&lt;br&gt;DHCP from home router" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="wan_layer">
+          <mxGeometry x="240" y="38" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="wan_esxi" value="&lt;b&gt;ESXi Master vmk0&lt;/b&gt;&lt;br&gt;192.168.0.##&lt;br&gt;Management via bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="wan_layer">
+          <mxGeometry x="485" y="38" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ew1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="wan_router" target="wan_pfsense" parent="wan_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== INTERNAL LAN ==================== -->
+        <mxCell id="lan_layer" value="&lt;b&gt;Internal LAN — 10.0.20.x/24 (VMnet2 Host-Only)&lt;/b&gt;&lt;br&gt;All VM management traffic • Gateway: pfSense 10.0.20.170" style="swimlane;startSize=40;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="1420" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_pf" value="&lt;b&gt;pfSense LAN&lt;/b&gt;&lt;br&gt;10.0.20.170&lt;br&gt;Gateway + NAT + FW&lt;br&gt;Secondary DNS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="15" y="50" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_vcenter" value="&lt;b&gt;vCenter&lt;/b&gt;&lt;br&gt;10.0.20.89&lt;br&gt;Cluster Orchestration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="200" y="50" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;10.0.20.184&lt;br&gt;Primary DNS&lt;br&gt;LDAP/Kerberos&lt;br&gt;NTP (Stratum 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="375" y="50" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_nas" value="&lt;b&gt;NAS VM&lt;/b&gt;&lt;br&gt;10.0.20.90&lt;br&gt;NFS 900GB&lt;br&gt;bond0 active-backup" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="550" y="50" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_veeam" value="&lt;b&gt;Veeam (Inner)&lt;/b&gt;&lt;br&gt;10.0.20.195&lt;br&gt;Win Server 2022" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="725" y="50" width="150" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="lan_label2" value="&lt;b&gt;Production VMs (10.0.20.x):&lt;/b&gt;" style="text;html=1;fontSize=11;fontColor=#666666;align=left;" vertex="1" parent="lan_layer">
+          <mxGeometry x="15" y="135" width="250" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_v1" value="&lt;b&gt;vault-01&lt;/b&gt;&lt;br&gt;.191" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="15" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_v2" value="&lt;b&gt;vault-02&lt;/b&gt;&lt;br&gt;.192" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="115" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_v3" value="&lt;b&gt;vault-03&lt;/b&gt;&lt;br&gt;.193" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="215" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_km" value="&lt;b&gt;k8s-master&lt;/b&gt;&lt;br&gt;.181" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="320" y="160" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_kw1" value="&lt;b&gt;worker1&lt;/b&gt;&lt;br&gt;.182" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="430" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_kw2" value="&lt;b&gt;worker2&lt;/b&gt;&lt;br&gt;.183" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="530" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_kw3" value="&lt;b&gt;worker3&lt;/b&gt;&lt;br&gt;.187" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="630" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_ans" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;.185" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="735" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_jen" value="&lt;b&gt;jenkins&lt;/b&gt;&lt;br&gt;.196" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="835" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="lan_mon" value="&lt;b&gt;monitor&lt;/b&gt;&lt;br&gt;.186" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="935" y="160" width="90" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="dns_note" value="&lt;b&gt;DNS:&lt;/b&gt; Primary: IPA (10.0.20.184) • Secondary: pfSense (10.0.20.170) • Domain: home.lab • &lt;b&gt;NTP:&lt;/b&gt; All VMs → IPA (VMware Tools time sync DISABLED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="15" y="215" width="900" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="promiscuous" value="&lt;b&gt;CRITICAL:&lt;/b&gt; Promiscuous mode + MAC changes + Forged transmits ENABLED on ESXi Master vSwitch (required for nested VM traffic)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="lan_layer">
+          <mxGeometry x="15" y="260" width="900" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VMOTION ==================== -->
+        <mxCell id="vmotion_layer" value="&lt;b&gt;vMotion — 10.0.30.x/24 (VMnet3 Host-Only, Isolated)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="570" width="700" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="vm_master" value="&lt;b&gt;ESXi Master vmk2&lt;/b&gt;&lt;br&gt;10.0.30.100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="vmotion_layer">
+          <mxGeometry x="15" y="38" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="vm_prod" value="&lt;b&gt;ESXi Prod vmk&lt;/b&gt;&lt;br&gt;10.0.30.101" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="vmotion_layer">
+          <mxGeometry x="200" y="38" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="vm_dr" value="&lt;b&gt;ESXi DR vmk&lt;/b&gt;&lt;br&gt;10.0.30.102 (powered off)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;dashed=1;" vertex="1" parent="vmotion_layer">
+          <mxGeometry x="385" y="38" width="190" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VMWARE VSWITCHES ==================== -->
+        <mxCell id="vswitch_layer" value="&lt;b&gt;VMware vSwitch Configuration&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="570" width="650" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="vs0" value="&lt;b&gt;vSwitch0 (WAN)&lt;/b&gt;&lt;br&gt;VMnet0 Bridge&lt;br&gt;pfSense WAN uplink" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vswitch_layer">
+          <mxGeometry x="15" y="38" width="190" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="vs_int" value="&lt;b&gt;vSwitch_Internal (LAN)&lt;/b&gt;&lt;br&gt;VMnet2 Host-Only&lt;br&gt;All VM traffic • Promiscuous" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="vswitch_layer">
+          <mxGeometry x="225" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="vs_vmot" value="&lt;b&gt;vSwitch_vMotion&lt;/b&gt;&lt;br&gt;VMnet3 Host-Only&lt;br&gt;Isolated (no routing)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="vswitch_layer">
+          <mxGeometry x="445" y="38" width="190" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_wan_lan" value="NAT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;" edge="1" source="wan_layer" target="lan_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_lan_vmot" value="isolated" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="lan_layer" target="vmotion_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

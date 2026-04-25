@@ -37,22 +37,22 @@ DNS: 10.0.20.184 (IPA)
 
 | Mode | Distribution | Failover | Switch Config | Lab Suitable |
 |------|--------------|----------|---------------|--------------|
-| **0 (Balance-RR)** | Round-robin | Yes | Required | ❌ |
-| **1 (Active-Backup)** | One active | Yes | Not required | ✅ **PERFECT** |
-| **2 (Balance-XOR)** | Hash-based | Yes | Optional | ✅ |
-| **4 (LACP)** | Dynamic | Yes | LACP switch | ❌ |
+| **0 (Balance-RR)** | Round-robin | Yes | Required |  |
+| **1 (Active-Backup)** | One active | Yes | Not required |  **PERFECT** |
+| **2 (Balance-XOR)** | Hash-based | Yes | Optional |  |
+| **4 (LACP)** | Dynamic | Yes | LACP switch |  |
 
 ### Selected: Mode 1 (Active-Backup)
 
 **Advantages:**
-- ✅ No switch configuration required (ideal for home lab)
-- ✅ Simple failover logic (one active, one standby)
-- ✅ Sub-second failover with miimon=100
-- ✅ Compatible with VMware virtual networking
+- No switch configuration required (ideal for home lab)
+- Simple failover logic (one active, one standby)
+- Sub-second failover with miimon=100
+- Compatible with VMware virtual networking
 
 **Trade-offs:**
-- ⚠️ No bandwidth aggregation (only one NIC active)
-- ⚠️ Standby NIC idle (no load balancing)
+-  No bandwidth aggregation (only one NIC active)
+-  Standby NIC idle (no load balancing)
 
 **Why this works for NAS:**
 - NFS traffic fits within single 1 Gbps link
@@ -152,18 +152,18 @@ cat /proc/net/bonding/bond0
 ### Results
 
 **Single Interface Failure (ens33):**
-- ✅ Failover time: Sub-second (<200ms)
-- ✅ Zero packet loss during failover
-- ✅ Automatic failover to ens35
-- ✅ Fast recovery when ens33 reconnected
+- Failover time: Sub-second (<200ms)
+- Zero packet loss during failover
+- Automatic failover to ens35
+- Fast recovery when ens33 reconnected
 
 **Single Interface Failure (ens35):**
-- ✅ No impact (already using ens33 as primary)
-- ✅ Zero packet loss
+- No impact (already using ens33 as primary)
+- Zero packet loss
 
 **Both Interfaces Disconnected:**
-- ❌ Packet loss (expected - total network failure)
-- ✅ Fast recovery when either interface reconnected
+- Packet loss (expected - total network failure)
+- Fast recovery when either interface reconnected
 
 **Statistics:**
 ```

@@ -92,9 +92,9 @@ Wait 2-3 minutes for service to fully initialize.
 VERIFICATION
 ================================================================================
 After applying fix, you can access vCenter via any whitelisted alias:
-- https://vsphere.local ✓
-- https://vsphere ✓
-- https://192.168.0.101 ✓
+- https://vsphere.local Yes
+- https://vsphere Yes
+- https://192.168.0.101 Yes
 
 Test each URL to confirm authentication works.
 

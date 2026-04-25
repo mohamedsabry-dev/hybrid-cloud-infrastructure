@@ -38,11 +38,11 @@ TABLE OF CONTENTS
 
 **Trade-offs:**
 
-✗ **Lost:**
+No **Lost:**
 - Automatic HA failover
 - Live migration between hosts
 
-✓ **Gained:**
+Yes **Gained:**
 - 30GB for Production (vs 22GB with active HA)
 - Ability to run 3 K8s workers
 - Application-layer HA compensates
@@ -165,10 +165,10 @@ esxcli storage filesystem list | grep NAS_DS
 ```
 
 **Success Criteria:**
-- ✓ DR ESXi responds to ping
-- ✓ SSH access available
-- ✓ NAS_DS datastore mounted
-- ✓ Management network online
+- Yes DR ESXi responds to ping
+- Yes SSH access available
+- Yes NAS_DS datastore mounted
+- Yes Management network online
 
 ---
 
@@ -191,9 +191,9 @@ esxcli storage filesystem list | grep NAS_DS
 - Network: vMotion network connected
 
 **Success Criteria:**
-- ✓ DR ESXi shows "Connected" status
-- ✓ All VMs from Production visible in inventory
-- ✓ Shared datastores accessible
+- Yes DR ESXi shows "Connected" status
+- Yes All VMs from Production visible in inventory
+- Yes Shared datastores accessible
 
 ---
 
@@ -329,11 +329,11 @@ User: admin
 ```
 
 **Success Criteria:**
-- ✓ All VMs pingable
-- ✓ All services responding on expected ports
-- ✓ Kubernetes cluster fully operational
-- ✓ Monitoring dashboards showing data
-- ✓ No critical errors in logs
+- Yes All VMs pingable
+- Yes All services responding on expected ports
+- Yes Kubernetes cluster fully operational
+- Yes Monitoring dashboards showing data
+- Yes No critical errors in logs
 
 ================================================================================
 3. FAILBACK PROCEDURE (DR → PRODUCTION)
@@ -355,10 +355,10 @@ ssh root@10.0.20.101
 ```
 
 **Checks:**
-- Network connectivity: ✓
-- Datastores mounted: ✓
-- vCenter connection: ✓
-- Memory available: ✓
+- Network connectivity: Yes
+- Datastores mounted: Yes
+- vCenter connection: Yes
+- Memory available: Yes
 
 ---
 
@@ -588,10 +588,10 @@ journalctl -xe
 ```
 
 **Success Criteria:**
-- ✓ All VMs booted successfully
-- ✓ All services operational
-- ✓ No data corruption detected
-- ✓ Backups can resume normally
+- Yes All VMs booted successfully
+- Yes All services operational
+- Yes No data corruption detected
+- Yes Backups can resume normally
 
 ================================================================================
 5. DR TESTING SCHEDULE & PROCEDURES
@@ -626,10 +626,10 @@ journalctl -xe
 10. Document results
 
 **Success Criteria**:
-- ✓ DR ESXi boots successfully
-- ✓ Datastores mount correctly
-- ✓ Test VM runs without issues
-- ✓ Network connectivity verified
+- Yes DR ESXi boots successfully
+- Yes Datastores mount correctly
+- Yes Test VM runs without issues
+- Yes Network connectivity verified
 
 ---
 
@@ -650,10 +650,10 @@ journalctl -xe
 10. Document lessons learned
 
 **Success Criteria**:
-- ✓ RTO achieved (15-20 minutes)
-- ✓ All critical services operational on DR
-- ✓ Failback successful
-- ✓ No data loss
+- Yes RTO achieved (15-20 minutes)
+- Yes All critical services operational on DR
+- Yes Failback successful
+- Yes No data loss
 
 ---
 
@@ -702,10 +702,10 @@ journalctl -xe
 9. Document results
 
 **Success Criteria**:
-- ✓ All phases execute in order
-- ✓ Veeam jobs stopped
-- ✓ ESXi hosts shutdown gracefully
-- ✓ Total time < 13 minutes
+- Yes All phases execute in order
+- Yes Veeam jobs stopped
+- Yes ESXi hosts shutdown gracefully
+- Yes Total time < 13 minutes
 
 ---
 

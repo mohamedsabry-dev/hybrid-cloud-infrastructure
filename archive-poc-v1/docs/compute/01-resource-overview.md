@@ -97,11 +97,11 @@ Physical CPU: 16 vCPU
 ```
 
 **Why This Works:**
-- ✅ High-frequency CPU (3.1GHz+) handles over-commitment efficiently
-- ✅ Most VMs idle or <40% utilization during normal operations
-- ✅ Measured host CPU usage: ~30% average, 40-45% during backups
-- ✅ ESXi scheduler intelligently distributes CPU cycles
-- ✅ Workloads are complementary (not all peak simultaneously)
+- High-frequency CPU (3.1GHz+) handles over-commitment efficiently
+- Most VMs idle or <40% utilization during normal operations
+- Measured host CPU usage: ~30% average, 40-45% during backups
+- ESXi scheduler intelligently distributes CPU cycles
+- Workloads are complementary (not all peak simultaneously)
 
 #### Layer 3 - Production ESXi Level
 ```
@@ -123,10 +123,10 @@ Over-commitment: 24/10 = 240%
 ```
 
 **Safe Because:**
-- ✅ IPA, Vault: Low CPU usage (mostly idle)
-- ✅ K8s workloads: Moderate, bursty (not sustained)
-- ✅ Ansible: High during playbook runs, idle otherwise
-- ✅ Testing confirmed stable operation under realistic load
+- IPA, Vault: Low CPU usage (mostly idle)
+- K8s workloads: Moderate, bursty (not sustained)
+- Ansible: High during playbook runs, idle otherwise
+- Testing confirmed stable operation under realistic load
 
 ---
 
@@ -181,13 +181,13 @@ NVME2: 500GB (External - DR)
 - Capacity: ~2TB
 - Usage: ~1.5TB allocated (thin)
 - Headroom: 500GB available
-- Safe for snapshots: ✓ (all thin provisioned)
+- Safe for snapshots: Yes (all thin provisioned)
 
 **DS_NVME_2** (NAS Dedicated):
 - Capacity: 2TB
 - Usage: 935GB (30GB OS thin + 905GB thick data disks)
 - Rule: 2x disk size for snapshot safety (thick disks only)
-- Calculation: 2TB > 2×905GB ✓ (sufficient space)
+- Calculation: 2TB > 2×905GB Yes (sufficient space)
 
 **NAS_DS_1** (NFS from NAS VM):
 - Capacity: 900GB

@@ -1,0 +1,95 @@
+# Vault Playbooks — Setup & Init Guide (PROD)
+
+Deploy + initialize the 3-node Vault HA cluster via the playbooks in this
+folder. The workflow prod-vault-full-setup.yml runs vault_setup automatically;
+vault_config is manual after `vault operator init`.
+
+See README.md for scope + decisions. The Vault system overview lives in:
+  deployment-docs/vault-overview.md
+
+---
+
+## Prerequisites
+
+- FreeIPA running (DNS for vault{1,2,3}.lab.local + vault.lab.local VIP)
+- Vault nodes provisioned via Terraform and IPA-joined
+- AWS KMS key + IAM user created (alias/vault-unseal) via
+  terraform/prod/aws/kms-vault-unseal/
+
+---
+
+## Step 1 — Run vault_setup (normally via workflow)
+
+Deploys Vault, requests IPA TLS certs, configures KMS unseal env, starts service.
+
+From the Ansible node (or GitHub workflow):
+
+  cd ansible/prod/
+  ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_setup.yml
+
+---
+
+## Step 2 — Initialize Vault (MANUAL, one-time, on vault1 only)
+
+This step is deliberately manual because it generates the root token + recovery
+keys that must be captured and stored in AWS Secrets Manager. Automating it
+risks accidental re-initialization.
+
+  ssh super_bot@vault1.lab.local
+  source /etc/profile.d/vault.sh
+  vault operator init -recovery-shares=5 -recovery-threshold=3
+
+Capture the output (5 recovery keys + root token). Store them immediately in
+AWS Secrets Manager:
+  aws secretsmanager put-secret-value \
+    --secret-id prod/vault/unseal-keys \
+    --secret-string '{"key1":"...","key2":"...","key3":"...","key4":"...","key5":"...","root":"..."}'
+
+---
+
+## Step 3 — Check cluster status
+
+  vault status
+  vault operator raft list-peers
+
+Expected: 3 peers, leader elected, Sealed: false (because KMS auto-unsealed).
+
+---
+
+## Step 4 — Run vault_config (MANUAL, from Ansible node)
+
+Configures auth methods, policies, LDAP, FreeIPA group bindings. Requires root
+token from step 2.
+
+  export VAULT_TOKEN=<root-token-from-step-2>
+  ansible-playbook -i inventory/inventory.ini playbooks/vault/vault_config.yml
+
+---
+
+## Step 5 — Revoke root token (security hygiene)
+
+After LDAP is verified and admins can log in with super_admin policy:
+
+  vault token revoke <root-token>
+
+---
+
+## VAULT_ADDR environment
+
+Deployed system-wide via /etc/profile.d/vault.sh on each Vault node:
+  export VAULT_ADDR="https://<hostname>:8200"
+  export VAULT_CACERT="/etc/ipa/ca.crt"
+
+Sourced for interactive logins. For Ansible tasks, use the `environment:` key
+in the playbook task explicitly — profile.d is not sourced in non-interactive
+shells.
+
+---
+
+## Troubleshooting
+
+- TS-VLT-001 — initial setup issues (GPG, certmonger, CSR, TLS)
+- TS-VLT-002 — VIP SAN managedby trap
+- TS-VLT-003 — KMS credentials empty on manual playbook run
+
+See troubleshooting/vault/ for the full case writeups.

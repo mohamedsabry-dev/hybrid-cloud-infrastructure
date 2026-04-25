@@ -1,6 +1,14 @@
 # Network Architecture
 
-> **Three-tier network design with security segmentation and nested virtualization support**
+> **Archived PoC v1 material** — retired infrastructure, not the current project.
+> See [`../../README.md`](../../README.md) for the retirement story and the current
+> network stack (MikroTik + FS308GP + physical cabling). The three-tier design
+> described below is the **PoC v1 network layout**, based on pfSense + VMware
+> virtual networking, which has been fully replaced.
+
+---
+
+> **Three-tier network design with security segmentation and nested virtualization support** *(PoC v1 era)*
 
 ---
 
@@ -69,12 +77,12 @@ Security best practices and common issues
 
 ### Key Design Principles
 
-✅ **Network segmentation** for security and performance isolation
-✅ **Dedicated vMotion network** prevents I/O contention
-✅ **NAS network bonding** for high availability
-✅ **DNS redundancy** (IPA primary, pfSense backup)
-✅ **Nested virtualization support** with promiscuous mode
-✅ **Future hybrid cloud ready** (VPN, AWS integration)
+- **Network segmentation** for security and performance isolation
+- **Dedicated vMotion network** prevents I/O contention
+- **NAS network bonding** for high availability
+- **DNS redundancy** (IPA primary, pfSense backup)
+- **Nested virtualization support** with promiscuous mode
+- **Future hybrid cloud ready** (VPN, AWS integration)
 
 ---
 

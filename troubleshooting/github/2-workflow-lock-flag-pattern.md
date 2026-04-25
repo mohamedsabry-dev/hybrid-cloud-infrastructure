@@ -1,100 +1,118 @@
 # TS-GH-002 | 2026-03 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: GitHub Actions workflows
-- Environment: Terraform automation for Proxmox infrastructure
-- Related components: Golden image templates, test clone workflows, repository variables
+[Info]
+Domain: GitHub Actions
+Sub-techs: Terraform workflows, repository variables, workflow conditions, workflow_dispatch
+Environment: DEV | Proxmox infrastructure automation
+Re-opened: No
 
-## 2. Issue
-- Symptom: Terraform workflows triggered on push accidentally destroy or recreate resources
-- Error:
-```
-# Golden image template recreated after manual post-setup
-# Resources destroyed due to unrelated file changes matching workflow paths
-```
+_____________________________________________________________________
 
-**Scenarios causing problems:**
-- Making small edits to terraform files triggers full apply
-- Pushing unrelated changes that match workflow path filters
-- Golden image templates being recreated after manual setup (DNS, packages, etc.)
+[Issue Description]
+Terraform workflows triggered on push accidentally destroy or recreate resources.
+No mechanism to pause push triggers after initial infrastructure setup is complete.
 
-## 3. Analysis
+Scenarios causing problems:
+  - Small edits to terraform files trigger full apply unexpectedly
+  - Unrelated file changes match workflow path filters and kick off runs
+  - Golden image templates recreated after manual post-setup (DNS, packages, etc.)
 
-**Check 1: Why are workflows running unexpectedly?**
-```yaml
-on:
-  push:
-    paths:
-      - 'terraform/dev/**'
-```
-Finding: Any push matching paths triggers workflow - no way to "pause" after initial setup.
+_____________________________________________________________________
 
-**Check 2: Can we stop push triggers but allow manual runs?**
-```
-workflow_dispatch always works
-Need a way to conditionally skip push triggers
-GitHub Actions supports repository variables in conditions
-```
-Finding: Repository variables can act as feature flags in workflow conditions.
+[Analysis]
 
-## 4. Root Cause
-> No mechanism to "lock" workflows after initial infrastructure setup. Push triggers run unconditionally when path filters match, risking destruction of manually configured resources.
+# Initial Check Notes:
+Checked how workflows were being triggered and whether there was a way to pause them.
 
-## 5. Solution
-> Use repository variables as lock flags to disable push triggers while allowing manual runs.
+Workflow trigger config:
+  on:
+    push:
+      paths:
+        - 'terraform/dev/**'
 
-**Location:** GitHub repository settings + workflow files
+Any push matching the path filter triggers the workflow — no conditional skip,
+no way to pause after initial setup without removing the trigger entirely.
 
-**Step 1: Add condition to workflow job**
+Checked if GitHub Actions supports conditional execution based on repository variables:
 
-File: `.github/workflows/<workflow>.yml`
-```yaml
-jobs:
-  create-vm:
-    name: "Create VM"
-    runs-on: mac-mini
-    # Skip if locked (unless manual trigger)
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.WORKFLOW_LOCKED != 'true' }}
-```
+  workflow_dispatch always works regardless of conditions.
+  Repository variables can be referenced in job if: conditions.
+  This can act as a feature flag — lock flag pattern.
 
-**Step 2: Create repository variable**
-1. Go to: **Settings → Secrets and variables → Actions → Variables tab**
-2. Click **"New repository variable"**
-3. Name: `WORKFLOW_LOCKED` (or specific name like `GOLDEN_IMAGE_DEV_LOCKED`)
-4. Value: `true`
 
-**How it works:**
+# Suspected Root Cause
+No lock mechanism on push-triggered workflows. Once infrastructure is set up and
+manually configured, any matching push risks triggering a full apply that overwrites
+or recreates resources. Push triggers run unconditionally when path filters match.
 
-| Trigger | Variable Value | Job Runs? |
-|---------|----------------|-----------|
-| Push | not set | Yes |
-| Push | `false` | Yes |
-| Push | `true` | **No (skipped)** |
-| Manual (workflow_dispatch) | any | Yes |
 
-**Current lock variables:**
+# More Checks Notes:
+N/A — GitHub Actions behavior confirmed from docs and testing.
 
-| Workflow | Variable Name |
-|----------|---------------|
-| dev-proxmox-golden-image | `GOLDEN_IMAGE_DEV_LOCKED` |
-| dev-proxmox-test-clones | `TEST_CLONES_DEV_LOCKED` |
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - variable only affects job execution decision
+# Suspected Solution
+Use a repository variable as a lock flag in the job condition.
+Push triggers check the variable — if locked, job is skipped.
+Manual runs (workflow_dispatch) always bypass the lock.
 
-## 7. Impact After Fix
-- Observed: Push triggers skipped when locked, manual runs always work
-- Golden images protected after initial setup
-- No accidental resource recreation
 
-## 8. Notes
+# Test
+Added condition to workflow job, created GOLDEN_IMAGE_DEV_LOCKED variable set to true,
+pushed a change matching the path filter.
 
-**Usage:**
-- **Lock workflow (after setup complete):** Set variable to `true` - push triggers skipped
-- **Unlock workflow (need changes):** Set variable to `false` or delete it - push triggers run again
+Result: PASS — push trigger skipped when locked, manual run executed normally.
 
-**Related:** TS-TF-002 (AWS secrets deletion incident in terraform/) led to implementing approval gates as additional safety measure.
+_____________________________________________________________________
 
-## 9. Workaround (if any)
-> Review windows (sleep delays) provide additional safety but don't prevent the workflow from starting. The lock flag pattern is the proper solution.
+[Final Root Cause]
+Push-triggered workflows had no conditional skip mechanism. After initial
+infrastructure setup, any file change matching the path filter would trigger
+a full Terraform apply risking destruction or recreation of manually configured
+resources like golden image templates.
+
+_____________________________________________________________________
+
+[Final Solution]
+Added repository variable lock flag pattern to all affected workflows.
+
+Job condition in .github/workflows/<workflow>.yml:
+  jobs:
+    create-vm:
+      if: ${{ github.event_name == 'workflow_dispatch' || vars.WORKFLOW_LOCKED != 'true' }}
+
+Behavior:
+  Push + variable not set  → runs
+  Push + variable = false  → runs
+  Push + variable = true   → skipped
+  Manual trigger (any)     → always runs
+
+To lock:   Settings → Secrets and variables → Actions → Variables → set to true
+To unlock: set to false or delete the variable
+
+Current lock variables:
+  dev-proxmox-golden-image  → GOLDEN_IMAGE_DEV_LOCKED
+  dev-proxmox-test-clones   → TEST_CLONES_DEV_LOCKED
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Variable only affects job execution decision. No infrastructure impact.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Related: TS-TF-002 — AWS secrets deletion incident in terraform/ led to
+implementing approval gates as an additional safety layer on top of this.
+
+Sleep delays in workflows provide a review window but do not prevent the
+workflow from starting — lock flag is the proper solution for this.

@@ -3,6 +3,7 @@ CASE: VMware Snapshot Chain Corruption - Parent VMDK Link Broken
 ================================================================================
 Category: Storage - VMware Workstation Snapshots
 Severity: Critical (Data Loss Risk)
+Incident: Yes
 Date: Snapshot Deletion Operation
 Environment: VMware Workstation, ESXi Master with Multiple Datastores
 Error: "Parent virtual disk has been modified"
@@ -346,11 +347,11 @@ REFINED DESIGN: PREVENT SNAPSHOT CORRUPTION
 
 Storage Best Practices:
 -----------------------
-✅ All VMDKs in one folder - No broken links
-✅ Consistent thin provisioning - No mixed types
-✅ Clear naming convention - Purpose obvious from filename
-✅ Planned capacity upfront - No ad-hoc additions
-✅ Separate datastores by workload - Easier management
+- All VMDKs in one folder - No broken links
+- Consistent thin provisioning - No mixed types
+- Clear naming convention - Purpose obvious from filename
+- Planned capacity upfront - No ad-hoc additions
+- Separate datastores by workload - Easier management
 
 Example Correct Layout:
 ------------------------
@@ -366,13 +367,13 @@ All disks in same directory - snapshot consolidation will work.
 
 Snapshot Management Rules:
 ---------------------------
-✅ Maximum 2-3 snapshots at a time
-✅ Delete snapshots after testing completes
-✅ Never accumulate snapshots long-term
-✅ One snapshot deletion at a time (allow consolidation to finish)
-✅ Backup before risky snapshot operations
-✅ Test VM boot after snapshot deletion
-✅ Document snapshot purpose and expiration
+- Maximum 2-3 snapshots at a time
+- Delete snapshots after testing completes
+- Never accumulate snapshots long-term
+- One snapshot deletion at a time (allow consolidation to finish)
+- Backup before risky snapshot operations
+- Test VM boot after snapshot deletion
+- Document snapshot purpose and expiration
 
 ================================================================================
 PREVENTION

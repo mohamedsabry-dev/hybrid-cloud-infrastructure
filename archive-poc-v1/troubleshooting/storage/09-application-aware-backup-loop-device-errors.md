@@ -186,9 +186,9 @@ Part 2: Increase Veeam VM Memory
     └── Note: Stable with VSCode/MobaXterm/Wireshark CLOSED
 
   Verification:
-    ✓ Backup jobs complete without delays
-    ✓ No memory pressure warnings
-    ✓ Guest processing coordination smooth
+    Yes Backup jobs complete without delays
+    Yes No memory pressure warnings
+    Yes Guest processing coordination smooth
 
 Part 3: Reduce Production ESXi Allocation
   Change: 30GB → 29GB RAM
@@ -210,8 +210,8 @@ Part 4: Reduce vCenter Memory
     └── Reduce vCenter memory reservation to 7GB
 
   Result:
-    ✓ vCenter operates normally with reduced footprint
-    ✓ Additional 1GB freed for other infrastructure
+    Yes vCenter operates normally with reduced footprint
+    Yes Additional 1GB freed for other infrastructure
 
 Final Resource Allocation After Changes:
 ```
@@ -238,7 +238,7 @@ Test 1: Standard Backups (AAP Disabled)
   ├── Run 2 concurrent backup jobs
   ├── Monitor NAS memory usage
   ├── Monitor Veeam performance
-  └── Result: ✓ Stable, no errors, acceptable performance
+  └── Result: Yes Stable, no errors, acceptable performance
 
 Test 2: Resource Monitoring During Backups
   Commands Used:
@@ -247,10 +247,10 @@ Test 2: Resource Monitoring During Backups
     └── On vault-01: dmesg -T | grep -i error
 
   Results:
-    ✓ NAS memory usage: ~7GB during backups (9GB total)
-    ✓ Veeam memory usage: ~4.2GB during backups (5GB total)
-    ✓ No I/O errors on any VM
-    ✓ NFS operations responsive
+    Yes NAS memory usage: ~7GB during backups (9GB total)
+    Yes Veeam memory usage: ~4.2GB during backups (5GB total)
+    Yes No I/O errors on any VM
+    Yes NFS operations responsive
 
 Test 3: Full Environment Stability
   Scenario: All VMs running + 2 concurrent backups
@@ -258,11 +258,11 @@ Test 3: Full Environment Stability
   Duration: 2 hours
 
   Results:
-    ✓ No kernel warnings or errors
-    ✓ All services responsive
-    ✓ Backups complete successfully
-    ✓ No swap usage on VMs
-    ✓ NFS latency < 10ms average
+    Yes No kernel warnings or errors
+    Yes All services responsive
+    Yes Backups complete successfully
+    Yes No swap usage on VMs
+    Yes NFS latency < 10ms average
 
 Important Note on Application-Aware Processing:
   Status: DISABLED for current environment
@@ -287,17 +287,17 @@ Critical Insights:
    application consistency (databases, etc.), not as a default setting."
 
 2. Infrastructure Must Support Backup Operations
-   ✗ Don't size infrastructure for normal operations only
-   ✓ Calculate resource needs during backup windows
-   ✓ Backup operations add 20-30% overhead to storage I/O
-   ✓ NAS must cache both normal ops AND backup reads
+   No Don't size infrastructure for normal operations only
+   Yes Calculate resource needs during backup windows
+   Yes Backup operations add 20-30% overhead to storage I/O
+   Yes NAS must cache both normal ops AND backup reads
 
 3. Test Features in Isolation Before Production Use
-   ✗ Don't enable all Veeam features at once
-   ✓ Test Application-Aware on single VM first
-   ✓ Monitor resource impact before expanding
-   ✓ Verify infrastructure can handle additional load
-   ✓ Have rollback plan if issues occur
+   No Don't enable all Veeam features at once
+   Yes Test Application-Aware on single VM first
+   Yes Monitor resource impact before expanding
+   Yes Verify infrastructure can handle additional load
+   Yes Have rollback plan if issues occur
 
 4. Loop Device Errors Indicate I/O Bottlenecks
    "When you see loop device I/O errors during Veeam backups, it's not a
@@ -328,9 +328,9 @@ Critical Insights:
      Result: 6-7GB swapped to disk
 
    Lesson:
-     ✓ During backup testing, close development tools
-     ✓ Or use separate laptop for operations
-     ✓ Windows host stability matters for nested environment
+     Yes During backup testing, close development tools
+     Yes Or use separate laptop for operations
+     Yes Windows host stability matters for nested environment
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BEST PRACTICES
@@ -339,18 +339,18 @@ BEST PRACTICES
 Veeam Application-Aware Processing Guidelines:
 
 When to Enable AAP:
-  ✓ VMs running databases (PostgreSQL, MySQL, SQL Server)
-  ✓ VMs running Microsoft Exchange
-  ✓ VMs running SharePoint
-  ✓ VMs running Active Directory Domain Controllers
-  ✓ Any application requiring transaction consistency
+  Yes VMs running databases (PostgreSQL, MySQL, SQL Server)
+  Yes VMs running Microsoft Exchange
+  Yes VMs running SharePoint
+  Yes VMs running Active Directory Domain Controllers
+  Yes Any application requiring transaction consistency
 
 When to Disable AAP:
-  ✓ Stateless application servers
-  ✓ Kubernetes worker nodes (app-level HA handles consistency)
-  ✓ Development/test VMs
-  ✓ VMs with minimal/no stateful applications
-  ✓ When infrastructure resources are constrained
+  Yes Stateless application servers
+  Yes Kubernetes worker nodes (app-level HA handles consistency)
+  Yes Development/test VMs
+  Yes VMs with minimal/no stateful applications
+  Yes When infrastructure resources are constrained
 
 Resource Sizing for Application-Aware Backups:
 
@@ -374,10 +374,10 @@ Veeam VM Sizing:
   Per concurrent job: +1GB
 
 Backup Job Scheduling:
-  ✓ Avoid scheduling backups during production peak hours
-  ✓ Stagger backup start times (don't start all jobs simultaneously)
-  ✓ Limit concurrent jobs to 2-3 on resource-constrained environments
-  ✓ Monitor backup windows and adjust if nearing maintenance window end
+  Yes Avoid scheduling backups during production peak hours
+  Yes Stagger backup start times (don't start all jobs simultaneously)
+  Yes Limit concurrent jobs to 2-3 on resource-constrained environments
+  Yes Monitor backup windows and adjust if nearing maintenance window end
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TROUBLESHOOTING GUIDE
@@ -441,67 +441,67 @@ If Veeam resources constrained:
   └── Disable AAP if not required
 
 Prevention:
-  ✓ Only enable AAP for VMs that need it
-  ✓ Test AAP on single VM before enabling globally
-  ✓ Monitor resources during first backup with AAP
-  ✓ Size infrastructure for backup operations, not just normal ops
+  Yes Only enable AAP for VMs that need it
+  Yes Test AAP on single VM before enabling globally
+  Yes Monitor resources during first backup with AAP
+  Yes Size infrastructure for backup operations, not just normal ops
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PREVENTION MEASURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Design Phase:
-  ✓ Calculate infrastructure resources for backup windows
-  ✓ Don't assume backup operations are "free" resource-wise
-  ✓ Add 20-30% headroom for backup overhead
-  ✓ Plan NAS sizing with backup I/O in mind
+  Yes Calculate infrastructure resources for backup windows
+  Yes Don't assume backup operations are "free" resource-wise
+  Yes Add 20-30% headroom for backup overhead
+  Yes Plan NAS sizing with backup I/O in mind
 
 Veeam Configuration:
-  ✓ Disable AAP by default for all VMs
-  ✓ Enable AAP only for specific VMs requiring it:
+  Yes Disable AAP by default for all VMs
+  Yes Enable AAP only for specific VMs requiring it:
       • Database servers
       • Domain controllers
       • Exchange/mail servers
-  ✓ Document which VMs have AAP enabled and why
-  ✓ Create separate backup jobs for AAP vs non-AAP VMs
+  Yes Document which VMs have AAP enabled and why
+  Yes Create separate backup jobs for AAP vs non-AAP VMs
 
 Backup Job Scheduling:
-  ✓ Stagger backup job start times by 15-30 minutes
-  ✓ Limit concurrent jobs based on available resources:
+  Yes Stagger backup job start times by 15-30 minutes
+  Yes Limit concurrent jobs based on available resources:
       • 2 jobs: NAS 9GB minimum, Veeam 5GB minimum
       • 3 jobs: NAS 11GB minimum, Veeam 6GB minimum
-  ✓ Schedule intensive operations during off-hours
-  ✓ Monitor backup job duration and adjust if needed
+  Yes Schedule intensive operations during off-hours
+  Yes Monitor backup job duration and adjust if needed
 
 Monitoring:
-  ✓ Monitor NAS resources during backup windows:
+  Yes Monitor NAS resources during backup windows:
       └── Command: free -h && iostat -x 1
 
-  ✓ Monitor Veeam resource usage:
+  Yes Monitor Veeam resource usage:
       └── Command: free -h && top
 
-  ✓ Check for loop device errors after AAP backups:
+  Yes Check for loop device errors after AAP backups:
       └── Command: dmesg -T | grep -i "loop.*error"
 
-  ✓ Set up alerts for:
+  Yes Set up alerts for:
       • NAS memory > 90%
       • I/O latency > 50ms during backups
       • VM loop device errors
       • Backup job failures
 
 Testing:
-  ✓ Test Application-Aware backup on single VM first
-  ✓ Monitor resource impact for full backup cycle
-  ✓ Verify no loop device errors in VMs
-  ✓ Confirm backup restoration works
-  ✓ Only then expand to multiple VMs
+  Yes Test Application-Aware backup on single VM first
+  Yes Monitor resource impact for full backup cycle
+  Yes Verify no loop device errors in VMs
+  Yes Confirm backup restoration works
+  Yes Only then expand to multiple VMs
 
 Operational:
-  ✓ Close development tools on Windows host during backup testing
-  ✓ Don't enable new Veeam features without testing impact
-  ✓ Review backup job settings quarterly
-  ✓ Document any AAP-enabled VMs and justification
-  ✓ Regular capacity planning for backup infrastructure
+  Yes Close development tools on Windows host during backup testing
+  Yes Don't enable new Veeam features without testing impact
+  Yes Review backup job settings quarterly
+  Yes Document any AAP-enabled VMs and justification
+  Yes Regular capacity planning for backup infrastructure
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELATED ISSUES

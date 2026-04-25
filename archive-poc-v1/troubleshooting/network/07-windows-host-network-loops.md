@@ -116,8 +116,8 @@ Get-NetIPInterface | Select InterfaceAlias, AddressFamily, Forwarding
 Expected output after fix:
 InterfaceAlias    AddressFamily Forwarding
 --------------    ------------- ----------
-Wi-Fi             IPv4          Disabled     ✓
-Ethernet          IPv4          Disabled     ✓
+Wi-Fi             IPv4          Disabled     Yes
+Ethernet          IPv4          Disabled     Yes
 VMware Network... IPv4          Enabled      (Leave VMware adapters alone)
 
 Note: Only disable forwarding on physical adapters (Wi-Fi, Ethernet).
