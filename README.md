@@ -2,6 +2,8 @@
 
 Production-grade hybrid cloud lab running on two physical Proxmox servers connected to AWS via WireGuard VPN. Every component deploys from code, every incident is documented, every design choice has a reason behind it.
 
+This started as a VMware PoC on a single laptop with nested ESXi — that version hit its ceiling and got killed. The current stack was rebuilt from scratch on Proxmox with dedicated hardware, and the 25 troubleshooting cases from the PoC are preserved in [`archive-poc-v1/`](archive-poc-v1/) as a learning record.
+
 The infrastructure provisions, configures, monitors, alerts, and heals itself. The reasoning behind each decision lives in [`DESIGN.md`](DESIGN.md).
 
 ---
