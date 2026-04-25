@@ -1,0 +1,204 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Infrastructure Topology" id="infra">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== PROXMOX DEV HOST ==================== -->
+        <mxCell id="pve_dev" value="&lt;b&gt;Proxmox Dev — pve-dev.lab.local&lt;/b&gt;&lt;br&gt;24GB RAM • Ryzen 7 • 10.0.5.110" style="swimlane;startSize=45;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=13;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="820" height="620" as="geometry"/>
+        </mxCell>
+
+        <!-- Dev VMs Label -->
+        <mxCell id="dev_vm_label" value="&lt;b&gt;Virtual Machines&lt;/b&gt;" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="50" width="150" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="dev_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;10.0.60.10&lt;br&gt;Identity • DNS • Kerberos • CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="75" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_m1" value="&lt;b&gt;k8s-master1&lt;/b&gt;&lt;br&gt;10.0.61.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_m2" value="&lt;b&gt;k8s-master2&lt;/b&gt;&lt;br&gt;10.0.61.11" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="280" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_m3" value="&lt;b&gt;k8s-master3&lt;/b&gt;&lt;br&gt;10.0.61.12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="545" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_w1" value="&lt;b&gt;k8s-worker1&lt;/b&gt;&lt;br&gt;10.0.64.10 + VLAN40: 10.0.40.201" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="210" width="380" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_w2" value="&lt;b&gt;k8s-worker2&lt;/b&gt;&lt;br&gt;10.0.64.11 + VLAN40: 10.0.40.202" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="415" y="210" width="380" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Dev LXCs Label -->
+        <mxCell id="dev_lxc_label" value="&lt;b&gt;LXC Containers&lt;/b&gt;" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="275" width="150" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="dev_v1" value="&lt;b&gt;vault1&lt;/b&gt;&lt;br&gt;10.0.62.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_v2" value="&lt;b&gt;vault2&lt;/b&gt;&lt;br&gt;10.0.62.11" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="200" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_v3" value="&lt;b&gt;vault3&lt;/b&gt;&lt;br&gt;10.0.62.12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="385" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_api_vip" value="&lt;b&gt;K8s API VIP&lt;/b&gt;&lt;br&gt;10.0.61.100:16443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;dashed=1;" vertex="1" parent="pve_dev">
+          <mxGeometry x="570" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_ansible" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;10.0.63.10&lt;br&gt;Control Node" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="360" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_runner" value="&lt;b&gt;local-runner&lt;/b&gt;&lt;br&gt;10.0.63.20&lt;br&gt;GitHub Self-hosted Runner" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="280" y="360" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_vault_vip" value="&lt;b&gt;Vault VIP&lt;/b&gt;&lt;br&gt;10.0.62.100 (Keepalived)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;" vertex="1" parent="pve_dev">
+          <mxGeometry x="545" y="360" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_nginx" value="&lt;b&gt;ex-nginx&lt;/b&gt;&lt;br&gt;10.0.65.10&lt;br&gt;Reverse Proxy (DMZ)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="425" width="250" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- K8s Dev Workloads -->
+        <mxCell id="dev_workloads" value="&lt;b&gt;K8s Workloads (Flux-managed):&lt;/b&gt; Prometheus 20Gi • Grafana 5Gi • Loki 50Gi/7d • MariaDB 15Gi • WordPress HPA 2-3 • Remediation Pod • etcd-backup CronJob" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="490" width="790" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="dev_k8s_info" value="&lt;b&gt;K8s:&lt;/b&gt; Pod CIDR 10.244.0.0/16 • Svc CIDR 10.96.0.0/12 • Calico IPIP • Ingress-NGINX :30080/:30443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="pve_dev">
+          <mxGeometry x="15" y="540" width="790" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== PROXMOX PROD HOST ==================== -->
+        <mxCell id="pve_prod" value="&lt;b&gt;Proxmox Prod — pve-prod.lab.local&lt;/b&gt;&lt;br&gt;64GB RAM • Ryzen 7 • 10.0.5.100" style="swimlane;startSize=45;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=13;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="40" width="820" height="620" as="geometry"/>
+        </mxCell>
+
+        <!-- Prod VMs Label -->
+        <mxCell id="prod_vm_label" value="&lt;b&gt;Virtual Machines&lt;/b&gt;" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="50" width="150" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_ipa" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;10.0.50.10&lt;br&gt;Identity • DNS • Kerberos • CA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="75" width="250" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_m1" value="&lt;b&gt;k8s-master1&lt;/b&gt;&lt;br&gt;10.0.51.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_m2" value="&lt;b&gt;k8s-master2&lt;/b&gt;&lt;br&gt;10.0.51.11" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="280" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_m3" value="&lt;b&gt;k8s-master3&lt;/b&gt;&lt;br&gt;10.0.51.12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="545" y="150" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_w1" value="&lt;b&gt;k8s-worker1&lt;/b&gt;&lt;br&gt;10.0.54.10 + VLAN40: 10.0.40.101" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="210" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_w2" value="&lt;b&gt;k8s-worker2&lt;/b&gt;&lt;br&gt;10.0.54.11 + VLAN40: 10.0.40.102" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="280" y="210" width="250" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_w3" value="&lt;b&gt;k8s-worker3&lt;/b&gt;&lt;br&gt;10.0.54.12 + VLAN40: 10.0.40.103" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="545" y="210" width="250" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Prod LXCs Label -->
+        <mxCell id="prod_lxc_label" value="&lt;b&gt;LXC Containers&lt;/b&gt;" style="text;html=1;fontSize=12;fontColor=#666666;align=left;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="275" width="150" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prod_v1" value="&lt;b&gt;vault1&lt;/b&gt;&lt;br&gt;10.0.52.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_v2" value="&lt;b&gt;vault2&lt;/b&gt;&lt;br&gt;10.0.52.11" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="200" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_v3" value="&lt;b&gt;vault3&lt;/b&gt;&lt;br&gt;10.0.52.12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="385" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_api_vip" value="&lt;b&gt;K8s API VIP&lt;/b&gt;&lt;br&gt;10.0.51.100:16443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;dashed=1;" vertex="1" parent="pve_prod">
+          <mxGeometry x="570" y="300" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_ansible" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;10.0.53.10&lt;br&gt;Control Node" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="360" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_runner" value="&lt;b&gt;local-runner&lt;/b&gt;&lt;br&gt;10.0.53.20&lt;br&gt;GitHub Self-hosted Runner" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="280" y="360" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_vault_vip" value="&lt;b&gt;Vault VIP&lt;/b&gt;&lt;br&gt;10.0.52.100 (Keepalived)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;" vertex="1" parent="pve_prod">
+          <mxGeometry x="545" y="360" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_nginx" value="&lt;b&gt;ex-nginx&lt;/b&gt;&lt;br&gt;10.0.55.10&lt;br&gt;Reverse Proxy (DMZ)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="425" width="250" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- K8s Prod Workloads -->
+        <mxCell id="prod_workloads" value="&lt;b&gt;K8s Workloads (Flux-managed):&lt;/b&gt; Prometheus 50Gi • Grafana 10Gi • Loki 100Gi/14d • MariaDB 50Gi • WordPress HPA 2-4 • Remediation Pod • etcd-backup CronJob" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="490" width="790" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_k8s_info" value="&lt;b&gt;K8s:&lt;/b&gt; Pod CIDR 10.245.0.0/16 • Svc CIDR 10.96.0.0/12 • Calico IPIP • Ingress-NGINX :30080/:30443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="pve_prod">
+          <mxGeometry x="15" y="540" width="790" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== NETWORK ==================== -->
+        <mxCell id="net" value="&lt;b&gt;Network Layer&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="720" width="820" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="mikrotik" value="&lt;b&gt;MikroTik L009UiGS-RM&lt;/b&gt;&lt;br&gt;10.0.5.1 • 13 VLANs • FW • VPN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="net">
+          <mxGeometry x="15" y="40" width="280" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="switch" value="&lt;b&gt;FS308GP L2 Switch&lt;/b&gt;&lt;br&gt;Storage VLAN trunking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="net">
+          <mxGeometry x="310" y="40" width="240" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ap" value="&lt;b&gt;AC750 WiFi AP&lt;/b&gt;&lt;br&gt;VLAN 5 mgmt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="net">
+          <mxGeometry x="565" y="40" width="240" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== AWS ==================== -->
+        <mxCell id="aws" value="&lt;b&gt;AWS Cloud&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="720" width="820" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="aws_dev_box" value="&lt;b&gt;Dev Account — eu-west-1&lt;/b&gt;&lt;br&gt;VPC 172.16.0.0/16&lt;br&gt;WireGuard EC2 :51820&lt;br&gt;KMS • S3 • Secrets Mgr • OIDC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="aws">
+          <mxGeometry x="15" y="40" width="380" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="aws_prod_box" value="&lt;b&gt;Prod Account — eu-west-2&lt;/b&gt;&lt;br&gt;VPC 172.17.0.0/16&lt;br&gt;WireGuard EC2 :51830&lt;br&gt;KMS • S3 • Secrets Mgr" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="aws">
+          <mxGeometry x="420" y="40" width="380" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="aws_gh" value="&lt;b&gt;GitHub&lt;/b&gt; — 31 Workflows • OIDC • Flux Source" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="aws">
+          <mxGeometry x="15" y="130" width="785" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STORAGE ==================== -->
+        <mxCell id="storage" value="&lt;b&gt;Storage — VLAN 40 (L2 Isolated)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="870" width="820" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas" value="&lt;b&gt;Asustor NAS&lt;/b&gt; 10.0.40.120 • NFSv3 • k8s-dev + k8s-prod shares • Vzdump backups • ISOs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="storage">
+          <mxGeometry x="15" y="35" width="790" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#999999;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="940" y="930" width="820" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="VM / LXC" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#FFFFFF;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="28" width="70" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="K8s Node" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="legend">
+          <mxGeometry x="90" y="28" width="70" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="Vault" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="legend">
+          <mxGeometry x="170" y="28" width="70" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="FreeIPA" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="legend">
+          <mxGeometry x="250" y="28" width="70" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="VIP (virtual)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;dashed=1;" vertex="1" parent="legend">
+          <mxGeometry x="330" y="28" width="80" height="18" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

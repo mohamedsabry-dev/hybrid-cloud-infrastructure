@@ -3,8 +3,8 @@
 # WireGuard Setup Script for AWS EC2
 # Usage: ./setup-wireguard.sh <dev|prod>
 #
-# IMPORTANT: Tunnel IPs are within AWS VPC range to simplify ER605 routing.
-# This allows single AllowedIPs entry on ER605 (VPC CIDR covers tunnel + subnets).
+# IMPORTANT: Tunnel IPs are within AWS VPC range to simplify on-prem routing.
+# This allows single AllowedIPs entry on the router (VPC CIDR covers tunnel + subnets).
 #
 
 set -e
@@ -18,17 +18,17 @@ fi
 echo "=== WireGuard Setup for $ENV ==="
 
 # Environment config
-# NOTE: Tunnel IPs are inside VPC range to solve ER605 AllowedIPs routing issue
+# NOTE: Tunnel IPs are inside VPC range to simplify AllowedIPs routing
 if [[ "$ENV" == "dev" ]]; then
     HOSTNAME="wg-dev"
     TUNNEL_IP="172.16.200.2/16"
-    ER605_TUNNEL_IP="172.16.200.1"
+    ONPREM_TUNNEL_IP="172.16.200.1"
     ALLOWED_IPS="172.16.200.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.0/24, 10.0.64.0/24, 10.0.65.0/24, 10.0.5.0/24"
     KEEPALIVE_TARGET="172.16.200.1"
 else
     HOSTNAME="wg-prod"
     TUNNEL_IP="172.17.200.2/16"
-    ER605_TUNNEL_IP="172.17.200.1"
+    ONPREM_TUNNEL_IP="172.17.200.1"
     ALLOWED_IPS="172.17.200.1/32, 10.0.50.0/24, 10.0.51.0/24, 10.0.52.0/24, 10.0.53.0/24, 10.0.54.0/24, 10.0.55.0/24, 10.0.5.0/24"
     KEEPALIVE_TARGET="172.17.200.1"
 fi
@@ -60,20 +60,20 @@ sudo chmod 600 /etc/wireguard/private.key
 
 echo ""
 echo "=========================================="
-echo "AWS Public Key (add to ER605 peer config):"
+echo "AWS Public Key (add to on-prem router peer config):"
 echo "$PUBLIC_KEY"
 echo "=========================================="
 echo ""
-echo "ER605 Peer Settings:"
+echo "On-Prem Router Peer Settings:"
 echo "  - Endpoint: <THIS_EC2_ELASTIC_IP>"
 echo "  - Endpoint Port: 51820"
 echo "  - AllowedIPs: ${TUNNEL_IP%/*}/16"
 echo ""
 
-# Get ER605 key
-echo "[2/4] Enter ER605 ${ENV}_tunnel public key:"
-read -r ER605_KEY
-if [[ -z "$ER605_KEY" ]]; then
+# Get on-prem router key
+echo "[2/4] Enter on-prem ${ENV}_tunnel public key:"
+read -r ONPREM_KEY
+if [[ -z "$ONPREM_KEY" ]]; then
     echo "Error: Key cannot be empty"
     exit 1
 fi
@@ -89,7 +89,7 @@ PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACC
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o $MAIN_INTERFACE -j MASQUERADE
 
 [Peer]
-PublicKey = $ER605_KEY
+PublicKey = $ONPREM_KEY
 AllowedIPs = $ALLOWED_IPS
 EOF
 sudo chmod 600 /etc/wireguard/wg0.conf
@@ -121,7 +121,7 @@ sudo systemctl enable --now wg-keepalive
 echo ""
 echo "=== Setup Complete ==="
 echo "AWS Tunnel IP: $TUNNEL_IP"
-echo "ER605 Tunnel IP: $ER605_TUNNEL_IP"
+echo "On-Prem Tunnel IP: $ONPREM_TUNNEL_IP"
 echo "AWS Public Key: $PUBLIC_KEY"
 echo ""
 echo "Verify: sudo wg show"

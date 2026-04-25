@@ -1,0 +1,180 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 1h
+  url: https://prometheus-community.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "82.18.0"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-stack
+        namespace: monitoring
+  values:
+
+    # ---------------------------------------------------------------------------
+    # Grafana
+    # ---------------------------------------------------------------------------
+    grafana:
+      # Single replica - SQLite DB corrupts with multiple writers on NFS (RWX)
+      # For HA, would need external PostgreSQL/MySQL database
+      replicas: 1
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: grafana
+                topologyKey: kubernetes.io/hostname
+
+      serviceAccount:
+        create: false
+        name: grafana-sa
+
+      # Vault agent injection — mirrors MariaDB/WordPress pattern
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "grafana"
+        vault.hashicorp.com/agent-inject-secret-grafana-admin: "secret/data/grafana/config"
+        vault.hashicorp.com/agent-inject-template-grafana-admin: |
+          {{- with secret "secret/data/grafana/config" -}}
+          GF_SECURITY_ADMIN_USER={{ .Data.data.admin_user }}
+          GF_SECURITY_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+          {{- end }}
+        vault.hashicorp.com/tls-skip-verify: "false"
+        vault.hashicorp.com/tls-secret: "vault-ca"
+        vault.hashicorp.com/ca-cert: "/vault/tls/ca.crt"
+
+      # Source Vault-injected env file before starting Grafana (same pattern as MariaDB/WordPress)
+      command:
+        - /bin/bash
+        - -c
+        - |
+          if [ -f /vault/secrets/grafana-admin ]; then
+            export $(cat /vault/secrets/grafana-admin | xargs)
+          fi
+          exec /run.sh
+
+      # Placeholder — Vault value overrides this at runtime
+      adminPassword: "vault-overridden"
+
+      persistence:
+        enabled: true
+        storageClassName: nfs-retain
+        accessModes:
+          - ReadWriteMany  # RWX required for multiple replicas
+        size: 5Gi
+
+      ingress:
+        enabled: true
+        ingressClassName: nginx
+        hosts:
+          - grafana-dev.lab.local
+
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          url: http://loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          isDefault: false
+        - name: Alertmanager
+          type: alertmanager
+          url: http://alertmanager.monitoring.svc:9093
+          access: proxy
+          isDefault: false
+          jsonData:
+            implementation: prometheus
+
+    # ---------------------------------------------------------------------------
+    # Prometheus
+    # ---------------------------------------------------------------------------
+    prometheus:
+      prometheusSpec:
+        # Scrape ALL ServiceMonitors/PodMonitors in the cluster, not just this release
+        serviceMonitorSelectorNilUsesHelmValues: false
+        podMonitorSelectorNilUsesHelmValues: false
+
+        # Point to standalone Alertmanager (Vault-integrated)
+        alertingEndpoints:
+          - name: alertmanager
+            namespace: monitoring
+            port: web
+
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: nfs-retain
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 20Gi
+
+        # External hosts — K8s nodes are excluded (covered by node-exporter DaemonSet)
+        additionalScrapeConfigs:
+          - job_name: external-nodes
+            scrape_interval: 30s
+            static_configs:
+              - targets: ['10.0.60.10:9100']
+                labels:
+                  instance: freeipa.lab.local
+                  role: freeipa
+              - targets: ['10.0.62.10:9100']
+                labels:
+                  instance: vault1.lab.local
+                  role: vault
+              - targets: ['10.0.62.11:9100']
+                labels:
+                  instance: vault2.lab.local
+                  role: vault
+              - targets: ['10.0.62.12:9100']
+                labels:
+                  instance: vault3.lab.local
+                  role: vault
+              - targets: ['10.0.63.10:9100']
+                labels:
+                  instance: ansible.lab.local
+                  role: automation
+              - targets: ['10.0.63.20:9100']
+                labels:
+                  instance: local-runner.lab.local
+                  role: automation
+              - targets: ['10.0.65.10:9100']
+                labels:
+                  instance: ex-nginx.lab.local
+                  role: nginx
+
+    # ---------------------------------------------------------------------------
+    # Node Exporter — tolerate master/control-plane taints
+    # ---------------------------------------------------------------------------
+    prometheus-node-exporter:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+    # ---------------------------------------------------------------------------
+    # Alertmanager - DISABLED (using standalone deployment with Vault)
+    # ---------------------------------------------------------------------------
+    # Standalone deployment: kubernetes/dev/deployments/apps/alertmanager/
+    # Prometheus points to it via alertingEndpoints above
+    # ---------------------------------------------------------------------------
+    alertmanager:
+      enabled: false

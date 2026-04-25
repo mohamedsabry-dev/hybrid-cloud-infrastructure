@@ -98,7 +98,7 @@ spec:
         name: mariadb-data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: nfs-retain
+        storageClassName: nfs-database
         resources:
           requests:
             storage: 50Gi

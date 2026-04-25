@@ -1,0 +1,107 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Infrastructure Overview" id="poc-overview">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== HOME NETWORK ==================== -->
+        <mxCell id="home_net" value="&lt;b&gt;Home Network — 192.168.0.x/24&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="700" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="home_router" value="&lt;b&gt;Home Router&lt;/b&gt;&lt;br&gt;192.168.0.1&lt;br&gt;Internet Gateway" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="home_net">
+          <mxGeometry x="15" y="38" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="mac_pc" value="&lt;b&gt;Mac PC&lt;/b&gt;&lt;br&gt;192.168.0.##&lt;br&gt;Management" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="home_net">
+          <mxGeometry x="220" y="38" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="win_host" value="&lt;b&gt;Windows 11 Host&lt;/b&gt;&lt;br&gt;64GB RAM • 16vCPU&lt;br&gt;VMware Workstation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="home_net">
+          <mxGeometry x="425" y="38" width="250" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ESXI MASTER ==================== -->
+        <mxCell id="esxi_master" value="&lt;b&gt;ESXi Master VM — Layer 1 Hypervisor&lt;/b&gt;&lt;br&gt;Nested on VMware Workstation • 16vCPU • vSwitch0 (WAN) + vSwitch_Internal (LAN)" style="swimlane;startSize=45;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="170" width="1520" height="350" as="geometry"/>
+        </mxCell>
+
+        <!-- Infrastructure Layer -->
+        <mxCell id="infra_layer" value="&lt;b&gt;Infrastructure Layer (Always Running — 24GB / 13vCPU)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=11;shadow=1;" vertex="1" parent="esxi_master">
+          <mxGeometry x="15" y="55" width="730" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="pfsense" value="&lt;b&gt;pfSense&lt;/b&gt;&lt;br&gt;10.0.20.170&lt;br&gt;NAT • FW • DNS&lt;br&gt;2GB • 2vCPU" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="10" y="38" width="130" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="vcenter" value="&lt;b&gt;vCenter&lt;/b&gt;&lt;br&gt;10.0.20.89&lt;br&gt;Cluster Mgmt&lt;br&gt;7GB • 3vCPU" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="150" y="38" width="130" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="nas_vm" value="&lt;b&gt;NAS VM&lt;/b&gt;&lt;br&gt;10.0.20.90&lt;br&gt;NFS 900GB&lt;br&gt;8GB • 4vCPU" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="290" y="38" width="130" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_vm" value="&lt;b&gt;FreeIPA&lt;/b&gt;&lt;br&gt;10.0.20.184&lt;br&gt;DNS • LDAP • Kerberos&lt;br&gt;2GB • 2vCPU" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="430" y="38" width="140" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="veeam_inner" value="&lt;b&gt;Veeam (Inner)&lt;/b&gt;&lt;br&gt;10.0.20.195&lt;br&gt;Backs up 7 outer VMs&lt;br&gt;5GB • 3vCPU" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="infra_layer">
+          <mxGeometry x="580" y="38" width="140" height="75" as="geometry"/>
+        </mxCell>
+
+        <!-- Production ESXi -->
+        <mxCell id="esxi_prod" value="&lt;b&gt;ESXi Production — Layer 2 Nested (25.5GB / 10vCPU)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=11;shadow=1;" vertex="1" parent="esxi_master">
+          <mxGeometry x="15" y="200" width="1490" height="135" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault01" value="&lt;b&gt;vault-01&lt;/b&gt;&lt;br&gt;.191 • 2GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="10" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault02" value="&lt;b&gt;vault-02&lt;/b&gt;&lt;br&gt;.192 • 2GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="130" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault03" value="&lt;b&gt;vault-03&lt;/b&gt;&lt;br&gt;.193 • 2GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="250" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s_master" value="&lt;b&gt;k8s-master&lt;/b&gt;&lt;br&gt;.181 • 3GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="380" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s_w1" value="&lt;b&gt;k8s-worker1&lt;/b&gt;&lt;br&gt;.182 • 2.5GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="500" y="38" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s_w2" value="&lt;b&gt;k8s-worker2&lt;/b&gt;&lt;br&gt;.183 • 2.5GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="630" y="38" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s_w3" value="&lt;b&gt;k8s-worker3&lt;/b&gt;&lt;br&gt;.187 • 2.5GB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="760" y="38" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ansible_vm" value="&lt;b&gt;ansible&lt;/b&gt;&lt;br&gt;.185 • 2.5GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="900" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="jenkins_vm" value="&lt;b&gt;jenkins&lt;/b&gt;&lt;br&gt;.196 • 3GB" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="1020" y="38" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="monitor_vm" value="&lt;b&gt;monitor&lt;/b&gt;&lt;br&gt;.186 • 2GB&lt;br&gt;Prom+Grafana" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="1140" y="38" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="prod_ip_note" value="&lt;i&gt;All IPs on 10.0.20.x/24&lt;/i&gt;" style="text;html=1;fontSize=10;fontColor=#999999;" vertex="1" parent="esxi_prod">
+          <mxGeometry x="1280" y="50" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- DR ESXi -->
+        <mxCell id="esxi_dr" value="&lt;b&gt;ESXi DR — Cold Standby (Powered OFF)&lt;/b&gt;&lt;br&gt;Mirrors Production • Manual failover • Saves 25.5GB RAM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;dashed=1;" vertex="1" parent="esxi_master">
+          <mxGeometry x="760" y="65" width="730" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VEEAM OUTER ==================== -->
+        <mxCell id="veeam_outer" value="&lt;b&gt;Veeam (Outer) — Windows Host&lt;/b&gt;&lt;br&gt;Backs up 10 inner VMs via vCenter • D:\Veeam_Backups\" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="810" y="40" width="450" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STATUS BOX ==================== -->
+        <mxCell id="status" value="&lt;b&gt;STATUS: ARCHIVED&lt;/b&gt;&lt;br&gt;Active: Dec 2025 - Jan 2026 (~2 months)&lt;br&gt;17 VMs • 64GB RAM • 4.5TB Storage&lt;br&gt;Retired: 10 reasons (see DESIGN.md)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="30" width="270" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_wan" value="VMnet0 Bridge (WAN)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#666666;fontColor=#333;fontSize=10;" edge="1" source="home_net" target="esxi_master" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_veeam" value="vCenter API (backup)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="veeam_outer" target="esxi_master" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

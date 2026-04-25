@@ -1,74 +1,79 @@
 # TS-PVE-007 | 2026-03-22 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Proxmox / Cron
-- Environment: pve-dev (Proxmox host)
-- Related components: Crontab, backup scripts, UPS monitor
+[Info]
+Domain: Proxmox / Cron
+Sub-techs: Crontab, backup scripts, UPS monitor
+Environment: pve-dev (Proxmox host)
+Re-opened: No
 
-## 2. Issue
-- Symptom: After adding a new cron job, all existing cron jobs disappeared
-- Error: No error - silent data loss
+_____________________________________________________________________
 
-**Before (existing crontab):**
+[Issue Description]
+After adding a new cron job, all existing cron jobs disappeared. Silent data loss -- no error message.
+
+Before (existing crontab):
 ```
 */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
 ```
 
-**Command used (WRONG):**
+Command I used (WRONG):
 ```bash
 echo "0 4 * * 0 /root/scripts/backup-proxmox-config.sh" | crontab -
 ```
 
-**After (entire crontab replaced):**
+After (entire crontab replaced):
 ```
 0 4 * * 0 /root/scripts/backup-proxmox-config.sh
 ```
 
 The UPS monitor cron job was lost.
 
-## 3. Analysis
+_____________________________________________________________________
 
-**Check 1: What does `crontab -` do?**
+[Analysis]
+# Step 1: What does `crontab -` do?
 ```bash
 man crontab
 # -    read crontab from standard input
 ```
-Finding: `crontab -` reads from stdin and **REPLACES** the entire crontab.
+`crontab -` reads from stdin and REPLACES the entire crontab.
 
-**Check 2: Compare commands**
+# Step 2: Compare commands
 
 | Command | Behavior |
 |---------|----------|
-| `echo "job" \| crontab -` | **REPLACES** all cron jobs with just "job" |
-| `(crontab -l; echo "job") \| crontab -` | **APPENDS** "job" to existing cron jobs |
+| `echo "job" \| crontab -` | REPLACES all cron jobs with just "job" |
+| `(crontab -l; echo "job") \| crontab -` | APPENDS "job" to existing cron jobs |
 
-Finding: The `-` means "read entire crontab from stdin" - it's a replacement, not append.
+The `-` means "read entire crontab from stdin" -- it's a replacement, not append.
 
-**Check 3: Is there a backup?**
+# Step 3: Check for backup
 ```bash
 ls -lt /mnt/pve/nas-backups/dump/proxmox-config-*.tar.gz | head -5
 ```
-Finding: Yes - the `backup-proxmox-config.sh` script backs up crontab to NAS.
+Found one -- the `backup-proxmox-config.sh` script backs up crontab to NAS.
 
-## 4. Root Cause
-> Using `echo ... | crontab -` **REPLACES** the entire crontab instead of appending. The `-` in `crontab -` means "read from stdin", which completely overwrites the existing crontab file.
+_____________________________________________________________________
 
-## 5. Solution
-> Recover from backup and use correct append syntax going forward.
+[Final Root Cause]
+Using `echo ... | crontab -` REPLACES the entire crontab instead of appending. The `-` in `crontab -` means "read from stdin", which completely overwrites the existing crontab file.
 
-**Step 1: Extract and find old crontab from backup**
+_____________________________________________________________________
+
+[Final Solution]
+Recovered from backup and restored all cron jobs.
+
+Step 1: Extract old crontab from backup
 ```bash
-# Extract latest backup
 tar -xzf /mnt/pve/nas-backups/dump/proxmox-config-pve-dev-20260321-114253.tar.gz -C /tmp
-
-# View the backed up crontab
 cat /tmp/proxmox-config-pve-dev-20260321-114253/cron/root-crontab.txt
 ```
 ```
 */5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
 ```
 
-**Step 2: Restore all cron jobs**
+Step 2: Restore all cron jobs
 ```bash
 crontab -e
 # Add these lines:
@@ -76,7 +81,7 @@ crontab -e
 0 21 * * 4,6 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log 2>&1
 ```
 
-**Step 3: Verify**
+Step 3: Verify
 ```bash
 crontab -l
 ```
@@ -85,19 +90,7 @@ crontab -l
 0 21 * * 4,6 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log 2>&1
 ```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: None - just restoring and using correct syntax
-
-## 7. Impact After Fix
-- Observed: Both cron jobs running correctly
-- UPS monitor: Every 5 minutes (continuous power monitoring)
-- Config backup: Thursday & Saturday 9 PM (before/after weekend work)
-
-## 8. Notes
-
-**Correct way to add cron jobs:**
-
+Correct way to append cron jobs going forward:
 ```bash
 # CORRECT - Appends to existing cron
 (crontab -l 2>/dev/null; echo "0 4 * * 0 /root/scripts/backup.sh") | crontab -
@@ -106,45 +99,14 @@ crontab -l
 echo "0 4 * * 0 /root/scripts/backup.sh" | crontab -
 ```
 
-The `2>/dev/null` suppresses "no crontab for user" error on first use.
+Verified: Yes -- both cron jobs running correctly.
 
-**Alternative - edit directly (safer for manual additions):**
-```bash
-crontab -e
-```
+_____________________________________________________________________
 
-**Quick reference:**
-```bash
-# List current cron jobs
-crontab -l
+[Risk Level] LOW
 
-# Edit interactively (RECOMMENDED - safe)
-crontab -e
+_____________________________________________________________________
 
-# Backup crontab
-crontab -l > ~/crontab-backup.txt
-
-# Restore from backup
-crontab ~/crontab-backup.txt
-```
-
-**Expected cron jobs on Proxmox hosts:**
-```bash
-# UPS monitor - every 5 min (continuous power monitoring)
-*/5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
-
-# Config backup - Thu & Sat 9 PM (before/after weekend work, when env is up)
-0 21 * * 4,6 /root/scripts/backup-proxmox-config.sh >> /var/log/backup-proxmox-config.log 2>&1
-```
-
-**Lessons learned:**
-1. `crontab -` replaces, not appends - always use `(crontab -l; echo ...) | crontab -`
-2. Backup scripts save the day - the backup captured crontab enabling recovery
-3. Document cron jobs - keep expected cron jobs in documentation
-
-## 9. Workaround (if any)
-> If no backup exists, manually recreate cron jobs from memory/documentation.
-
-## Related Files
-- `proxmox/backup-proxmox-config.sh` - Added warning about crontab replacement
-- `proxmox/disaster_recovery/dr_ups_setup.txt` - Added warning about crontab replacement
+[References]
+- `proxmox/backup-proxmox-config.sh` -- added warning about crontab replacement
+- `proxmox/disaster_recovery/dr_ups_setup.txt` -- added warning about crontab replacement

@@ -236,7 +236,7 @@ Python Verification:
 import requests
 response = requests.get('https://vsphere.local/api/')
 assert response.status_code == 200
-print("✓ Python SSL verification working")
+print("Yes Python SSL verification working")
 
 Ansible Verification:
 ---------------------

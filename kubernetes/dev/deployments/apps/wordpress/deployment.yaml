@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: flux
     environment: dev
 spec:
-  replicas: 3
+  # replicas managed by HPA (see hpa.yaml)
   selector:
     matchLabels:
       app: wordpress
@@ -93,7 +93,7 @@ spec:
               value: "0"
           resources:
             requests:
-              memory: "128Mi"
+              memory: "200Mi"  # Increased from 128Mi - see disaster-recovery/issues/hpa-memory-scaling-behavior.md
               cpu: "100m"
             limits:
               memory: "512Mi"
@@ -106,19 +106,27 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+          # Readiness checks NFS-mounted path to detect storage failures
+          # (DR Test finding: local path check masks NFS outages)
           readinessProbe:
             httpGet:
-              path: /wp-includes/images/blank.gif
+              path: /wp-content/index.php
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
-            timeoutSeconds: 3
+            timeoutSeconds: 5    # Longer timeout for NFS latency
             failureThreshold: 3
           volumeMounts:
             - name: wordpress-data
               mountPath: /var/www/html/wp-content
+            - name: php-config
+              mountPath: /usr/local/etc/php/conf.d/uploads.ini
+              subPath: uploads.ini
 
       volumes:
         - name: wordpress-data
           persistentVolumeClaim:
             claimName: wordpress-data
+        - name: php-config
+          configMap:
+            name: wordpress-php-config

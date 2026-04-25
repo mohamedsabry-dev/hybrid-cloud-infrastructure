@@ -1,23 +1,17 @@
-# Network Troubleshooting
+# Network — 4 cases
 
-pfSense, VLANs, and networking issues.
+pfSense, VLANs, and networking issues from the PoC v1 era.
 
-## Cases (5)
+[reference/](reference/) has 1 guide
 
-| Case | Issue | Root Cause |
-|------|-------|------------|
-| 04 | Promiscuous Mode for Nested Virtualization | vSwitch security settings |
-| 05 | Duplicate Packets from Network Loops | Uplink redundancy config |
-| 06 | pfSense Power Off Issues | VM shutdown sequence |
-| 07 | Windows IP Forwarding Loops | ARP corruption |
-| 08 | Static Route Loop SSH Disconnect | Duplicate static routes |
+| # | File | What Happened |
+|---|------|---------------|
+| 04 | [promiscuous-mode](04-promiscuous-mode-nested.md) | Nested VMs isolated — promiscuous mode not enabled on vSwitch |
+| 05 | [duplicate-packets](05-duplicate-packets-loop.md) | 3x duplicated pings — promiscuous mode + redundant uplinks |
+| 07 | [windows-host-loops](07-windows-host-network-loops.md) | Packet duplication and ARP corruption from Windows IP forwarding |
+| 08 | [static-route-loop](08-static-route-loop-ssh-disconnect.md) | SSH hangs — duplicate static routes creating routing loop |
 
-## Key Lessons
-
-- Enable promiscuous mode for nested ESXi
-- Avoid duplicate uplinks without proper LAG config
-- Disable Windows IP forwarding unless needed
-- Verify static routes don't create loops
+---
 
 ## Related
 

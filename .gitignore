@@ -14,6 +14,12 @@ override.tf.json
 # Sensitive files
 *.tfvars
 !example.tfvars
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
 
 # IDE
 .idea/
@@ -50,3 +56,9 @@ network/**/docs/*.pdf
 
 # Local guides (not tracked)
 git-workflow-guide.txt
+
+# Personal docs (not for public repo)
+personal-docs/
+
+# Ticket drafts (work-in-progress, not for public repo)
+drafts/

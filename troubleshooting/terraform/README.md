@@ -15,7 +15,7 @@ Documentation of issues encountered with Terraform, primarily using the bpg/prox
 | 5 | [TS-TF-005](5-terraform-proxmox-lxc-mount-point-bug.md) | 2026-03 | LXC mount point configuration issue | Provider mount point handling bug |
 | 6 | [TS-TF-006](6-route-table-inline-vs-resource.md) | 2026-03-14 | Route table removes routes from other modules | Inline routes own all routes in table |
 | 7 | [TS-TF-007](7-terraform-security-group-rename-stuck.md) | 2026-03-21 | Security group rename causes stuck resources | AWS name changes cause replacement |
-| 8 | [TS-TF-008](8-terraform-vm-disk-update-behavior.md) | 2026-03-27 | VM disk update behavior and hotplug | Disk operations support hotplug, verify cleanup |
+| 8 | [TS-TF-008](reference/8-terraform-vm-disk-update-behavior.md) | 2026-03-27 | VM disk update behavior and hotplug | Disk operations support hotplug, verify cleanup |
 | 9 | [TS-TF-009](9-terraform-cloud-init-update-behavior.md) | 2026-03-27 | Cloud-init changes require VM stop | Cloud-init (ide2) cannot hotplug |
 | 10 | [TS-TF-010](10-cloud-init-ssh-host-key-regeneration.md) | 2026-03-27 | SSH host keys regenerated after cloud-init change | Cloud-init re-runs regenerate SSH keys by default |
 | 11 | [TS-TF-011](11-terraform-orphaned-disks-after-removal.md) | 2026-03-27 | Orphaned disks after removal from config | Provider updates state but doesn't delete disk files |
@@ -75,13 +75,3 @@ AWS pattern: Avoid inline blocks when resources are managed across modules:
 
 ---
 
-## Best Practices (from lessons learned)
-
-1. **Always run `terraform plan` first** - Check for "must be replaced" warnings
-2. **Manual test in GUI before Terraform** - Understand API behavior
-3. **Stop VMs before cloud-init changes** - Cannot hotplug ide2
-4. **Verify disk cleanup after removal** - Provider may leave orphaned files
-5. **Use separate resources, not inline blocks** - Prevents cross-module conflicts
-6. **Commit lock files** - Prevents version drift
-7. **Implement approval gates** - Prevent accidental destruction
-8. **Enable S3 versioning** - Allows state rollback

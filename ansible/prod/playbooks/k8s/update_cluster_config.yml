@@ -1,0 +1,13 @@
+---
+- name: Update Unhealthy Zone Threshold
+  hosts: k8s_masters
+  become: yes
+  tasks:
+    - name: update kube controller config
+      ansible.builtin.lineinfile:
+        path: /etc/kubernetes/manifests/kube-controller-manager.yaml
+        regexp: '^\s+- --unhealthy-zone-threshold='
+        insertafter: '^\s+- --'
+        line: '    - --unhealthy-zone-threshold=0.8'
+        state: present
+# Consider match the indentation 4 spaces

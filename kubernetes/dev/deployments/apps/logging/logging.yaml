@@ -1,0 +1,130 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  interval: 1h
+  url: https://grafana.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: loki
+      version: "6.29.0"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: monitoring
+  values:
+
+    # ---------------------------------------------------------------------------
+    # Loki 3.x — Single Binary mode (simple deployment)
+    # ---------------------------------------------------------------------------
+    deploymentMode: SingleBinary
+
+    loki:
+      auth_enabled: false
+
+      commonConfig:
+        replication_factor: 1
+
+      storage:
+        type: filesystem
+
+      limits_config:
+        retention_period: 168h        # 7 days
+        ingestion_rate_mb: 16
+        ingestion_burst_size_mb: 32
+
+      compactor:
+        retention_enabled: true
+        delete_request_store: filesystem
+
+      schemaConfig:
+        configs:
+          - from: "2024-01-01"
+            store: tsdb
+            object_store: filesystem
+            schema: v13
+            index:
+              prefix: index_
+              period: 24h
+
+    # Single binary deployment
+    singleBinary:
+      replicas: 1
+      persistence:
+        enabled: true
+        storageClass: nfs-retain
+        size: 50Gi
+
+    # Disable distributed components
+    backend:
+      replicas: 0
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+
+    # Disable gateway (not needed for single binary)
+    gateway:
+      enabled: false
+
+    # Disable test pod
+    test:
+      enabled: false
+
+    # Disable caching (reduces memory requirements)
+    chunksCache:
+      enabled: false
+    resultsCache:
+      enabled: false
+
+    # Disable monitoring for now (can enable later)
+    monitoring:
+      selfMonitoring:
+        enabled: false
+        grafanaAgent:
+          installOperator: false
+      lokiCanary:
+        enabled: false
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: promtail
+  namespace: monitoring
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: promtail
+      version: "6.16.6"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: monitoring
+  values:
+
+    # ---------------------------------------------------------------------------
+    # Promtail — log collector DaemonSet on every node
+    # ---------------------------------------------------------------------------
+    config:
+      clients:
+        - url: http://loki:3100/loki/api/v1/push
+
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule

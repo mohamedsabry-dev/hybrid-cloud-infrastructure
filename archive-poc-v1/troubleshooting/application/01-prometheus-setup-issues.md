@@ -171,10 +171,10 @@ yamllint /etc/prometheus/prometheus.yml
 ```yaml
 scrape_configs:
   - job_name: 'linux_nodes'
-      static_configs:    # ❌ Wrong indentation (4 spaces instead of 2)
-      - targets:         # ❌ Dash not aligned
+      static_configs:    #  Wrong indentation (4 spaces instead of 2)
+      - targets:         #  Dash not aligned
         - '10.0.20.100:9100'
-          - '10.0.20.101:9100'  # ❌ Mixed indentation
+          - '10.0.20.101:9100'  #  Mixed indentation
 ```
 
 ### Resolution
@@ -243,15 +243,15 @@ sudo systemctl status prometheus
 
 | Time | Action | Result |
 |------|--------|--------|
-| T+0 min | Initial Prometheus deployment via Ansible | ❌ Failed to start |
+| T+0 min | Initial Prometheus deployment via Ansible |  Failed to start |
 | T+5 min | Investigated logs, found "bind: address already in use" | Port 9090 conflict identified |
 | T+10 min | Stopped/disabled/masked cockpit.socket | Port 9090 freed |
-| T+12 min | Restarted Prometheus | ❌ Still failed (new error) |
+| T+12 min | Restarted Prometheus |  Still failed (new error) |
 | T+15 min | Investigated logs, found YAML parsing error | Indentation issue identified |
 | T+20 min | Fixed prometheus.yml indentation, validated with yamllint | Syntax corrected |
-| T+22 min | Restarted Prometheus | ✅ Service started successfully |
-| T+25 min | Verified all targets showing State: UP | ✅ Metrics collection working |
-| T+30 min | Configured Grafana data source | ✅ Monitoring stack operational |
+| T+22 min | Restarted Prometheus |  Service started successfully |
+| T+25 min | Verified all targets showing State: UP |  Metrics collection working |
+| T+30 min | Configured Grafana data source |  Monitoring stack operational |
 
 ---
 
@@ -283,7 +283,7 @@ Default Login: admin / admin
 Configuration > Data Sources > Add data source > Prometheus
 URL: http://localhost:9090
 Click: Save & Test
-Result: ✅ Data source is working
+Result:  Data source is working
 ```
 
 **Step 3: Import Node Exporter Dashboard**
@@ -343,9 +343,9 @@ Click: Import
 ### 4. Documentation Updates
 
 **Added to Deployment Runbook**:
-- ⚠️ Rocky/RHEL systems: Check for Cockpit on port 9090
-- ⚠️ Always validate YAML with `yamllint` before applying
-- ⚠️ Use `promtool check config` before restarting service
+-  Rocky/RHEL systems: Check for Cockpit on port 9090
+-  Always validate YAML with `yamllint` before applying
+-  Use `promtool check config` before restarting service
 
 ---
 

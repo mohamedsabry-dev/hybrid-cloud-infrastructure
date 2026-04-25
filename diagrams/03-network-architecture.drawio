@@ -1,0 +1,157 @@
+<mxfile host="65bd71144e">
+    <diagram name="Network Architecture" id="network">
+        <mxGraphModel dx="726" dy="965" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="isp" value="&lt;b&gt;ISP — Fiber ONT&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="30" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="router" value="&lt;b&gt;MikroTik L009UiGS-RM — 10.0.5.1&lt;/b&gt;&lt;br&gt;Router • Firewall • WireGuard VPN • 13 VLANs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="110" width="520" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_isp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" parent="1" source="isp" target="router" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="vlan5" value="&lt;b&gt;VLAN 5 — Management Plane (WiFi: unified_mgmt)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="220" width="700" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="v5_ap" value="&lt;b&gt;AC750 AP&lt;/b&gt;&lt;br&gt;10.0.5.10" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" parent="vlan5" vertex="1">
+                    <mxGeometry x="10" y="38" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="v5_prod" value="&lt;b&gt;pve-prod&lt;/b&gt;&lt;br&gt;10.0.5.100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" parent="vlan5" vertex="1">
+                    <mxGeometry x="145" y="38" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="v5_dev" value="&lt;b&gt;pve-dev&lt;/b&gt;&lt;br&gt;10.0.5.110" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" parent="vlan5" vertex="1">
+                    <mxGeometry x="280" y="38" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="v5_nas" value="&lt;b&gt;NAS&lt;/b&gt;&lt;br&gt;10.0.5.120" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" parent="vlan5" vertex="1">
+                    <mxGeometry x="415" y="38" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="v5_router" value="&lt;b&gt;Router&lt;/b&gt;&lt;br&gt;10.0.5.1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="vlan5" vertex="1">
+                    <mxGeometry x="550" y="38" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_vlans" value="&lt;b&gt;PROD SERVICE VLANs 50-55&lt;/b&gt;&lt;br&gt;Trunk: MikroTik ether5 → pve-prod svc0" style="swimlane;startSize=40;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="360" width="700" height="350" as="geometry"/>
+                </mxCell>
+                <mxCell id="v50" value="&lt;b&gt;VLAN 50 — Identity&lt;/b&gt;&lt;br&gt;10.0.50.0/24&lt;br&gt;FreeIPA: 10.0.50.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="10" y="50" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v51" value="&lt;b&gt;VLAN 51 — K8s Control&lt;/b&gt;&lt;br&gt;10.0.51.0/24&lt;br&gt;Masters: .10-.12 • VIP: .100:16443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="245" y="50" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v52" value="&lt;b&gt;VLAN 52 — Vault&lt;/b&gt;&lt;br&gt;10.0.52.0/24&lt;br&gt;Nodes: .10-.12 • VIP: .100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="480" y="50" width="210" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v53" value="&lt;b&gt;VLAN 53 — Management&lt;/b&gt;&lt;br&gt;10.0.53.0/24&lt;br&gt;Ansible: .10 • Runner: .20" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="10" y="120" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v54" value="&lt;b&gt;VLAN 54 — K8s Workers&lt;/b&gt;&lt;br&gt;10.0.54.0/24&lt;br&gt;Workers: .10-.12 (+ VLAN40 dual-NIC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="245" y="120" width="250" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v55" value="&lt;b&gt;VLAN 55 — DMZ&lt;/b&gt;&lt;br&gt;10.0.55.0/24&lt;br&gt;Nginx: .10" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="510" y="120" width="180" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="prod_k8s_net" value="&lt;b&gt;K8s Overlay:&lt;/b&gt; Pod CIDR 10.245.0.0/16 • Service CIDR 10.96.0.0/12 • Calico IPIP • Ingress-NGINX NodePort :30080/:30443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="10" y="195" width="680" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="fw_rules" value="&lt;b&gt;Firewall Rules:&lt;/b&gt;&lt;br&gt;• dev ↔ prod: &lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;BLOCKED&lt;/b&gt;&lt;/font&gt;&lt;br&gt;• svc ↔ storage: &lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;BLOCKED&lt;/b&gt;&lt;/font&gt; (workers exempt via dual-NIC)&lt;br&gt;• svc ↔ mgmt: &lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;BLOCKED&lt;/b&gt;&lt;/font&gt; (except K8s → Proxmox API for remediation)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" parent="prod_vlans" vertex="1">
+                    <mxGeometry x="10" y="245" width="680" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_vlans" value="&lt;b&gt;DEV SERVICE VLANs 60-65&lt;/b&gt;&lt;br&gt;Trunk: MikroTik ether6 → pve-dev svc0" style="swimlane;startSize=40;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="760" width="700" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="v60" value="&lt;b&gt;VLAN 60 — Identity&lt;/b&gt;&lt;br&gt;10.0.60.0/24&lt;br&gt;FreeIPA: 10.0.60.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="10" y="50" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v61" value="&lt;b&gt;VLAN 61 — K8s Control&lt;/b&gt;&lt;br&gt;10.0.61.0/24&lt;br&gt;Masters: .10-.12 • VIP: .100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="245" y="50" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v62" value="&lt;b&gt;VLAN 62 — Vault&lt;/b&gt;&lt;br&gt;10.0.62.0/24&lt;br&gt;Nodes: .10-.12 • VIP: .100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="480" y="50" width="210" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v63" value="&lt;b&gt;VLAN 63 — Mgmt&lt;/b&gt;&lt;br&gt;10.0.63.0/24&lt;br&gt;Ansible: .10 • Runner: .20" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="10" y="120" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v64" value="&lt;b&gt;VLAN 64 — K8s Workers&lt;/b&gt;&lt;br&gt;10.0.64.0/24&lt;br&gt;Workers: .10-.11 (+ VLAN40)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="245" y="120" width="250" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v65" value="&lt;b&gt;VLAN 65 — DMZ&lt;/b&gt;&lt;br&gt;10.0.65.0/24&lt;br&gt;Nginx: .10" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="510" y="120" width="180" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="dev_k8s_net" value="&lt;b&gt;K8s Overlay:&lt;/b&gt; Pod CIDR 10.244.0.0/16 • Service CIDR 10.96.0.0/12 • Calico IPIP • Ingress-NGINX NodePort :30080/:30443" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" parent="dev_vlans" vertex="1">
+                    <mxGeometry x="10" y="190" width="680" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="vlan40" value="&lt;b&gt;VLAN 40 — Storage Plane (L2 Isolated on FS308GP Switch)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="1050" width="700" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="v40_nas" value="&lt;b&gt;NAS&lt;/b&gt;&lt;br&gt;10.0.40.120&lt;br&gt;NFSv3" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" parent="vlan40" vertex="1">
+                    <mxGeometry x="10" y="38" width="100" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v40_ppve" value="&lt;b&gt;pve-prod stor0&lt;/b&gt;&lt;br&gt;10.0.40.100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" parent="vlan40" vertex="1">
+                    <mxGeometry x="125" y="38" width="120" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v40_dpve" value="&lt;b&gt;pve-dev stor0&lt;/b&gt;&lt;br&gt;10.0.40.110" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=10;" parent="vlan40" vertex="1">
+                    <mxGeometry x="260" y="38" width="120" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v40_pw" value="&lt;b&gt;Prod Workers&lt;/b&gt;&lt;br&gt;.101-.103" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" parent="vlan40" vertex="1">
+                    <mxGeometry x="395" y="38" width="120" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="v40_dw" value="&lt;b&gt;Dev Workers&lt;/b&gt;&lt;br&gt;.201-.202" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" parent="vlan40" vertex="1">
+                    <mxGeometry x="530" y="38" width="120" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_vpn" value="&lt;b&gt;AWS VPN Endpoints&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="220" width="700" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_dev_vpn" value="&lt;b&gt;Dev VPC — eu-west-1&lt;/b&gt;&lt;br&gt;172.16.0.0/16&lt;br&gt;WireGuard EC2: 172.16.200.2&lt;br&gt;Tunnel: On-prem 172.16.200.1 ↔ AWS 172.16.200.2&lt;br&gt;UDP :51820 • AllowedIPs: 10.0.60-65.0/24, 10.0.5.0/24" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;" parent="aws_vpn" vertex="1">
+                    <mxGeometry x="10" y="38" width="330" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws_prod_vpn" value="&lt;b&gt;Prod VPC — eu-west-2&lt;/b&gt;&lt;br&gt;172.17.0.0/16&lt;br&gt;WireGuard EC2: 172.17.200.2&lt;br&gt;Tunnel: On-prem 172.17.200.1 ↔ AWS 172.17.200.2&lt;br&gt;UDP :51830 • AllowedIPs: 10.0.50-55.0/24, 10.0.5.0/24" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;" parent="aws_vpn" vertex="1">
+                    <mxGeometry x="355" y="38" width="335" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="dns" value="&lt;b&gt;DNS Architecture&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="450" width="700" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="dns_ipa" value="&lt;b&gt;FreeIPA DNS&lt;/b&gt;&lt;br&gt;lab.local zone&lt;br&gt;Internal resolution&lt;br&gt;Forward: 8.8.8.8, 1.1.1.1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="dns" vertex="1">
+                    <mxGeometry x="10" y="38" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="dns_r53" value="&lt;b&gt;Route53 Private Hosted Zones&lt;/b&gt;&lt;br&gt;lab.local (dev + prod)&lt;br&gt;Service endpoints → Nginx VIPs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="dns" vertex="1">
+                    <mxGeometry x="245" y="38" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="dns_coredns" value="&lt;b&gt;CoreDNS (K8s)&lt;/b&gt;&lt;br&gt;10.96.0.10&lt;br&gt;Cluster DNS&lt;br&gt;Master-only scheduling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" parent="dns" vertex="1">
+                    <mxGeometry x="480" y="38" width="210" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="physical" value="&lt;b&gt;Physical Cabling&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="610" width="700" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="phy_e5" value="&lt;b&gt;ether5&lt;/b&gt; → pve-prod svc0&lt;br&gt;802.1Q trunk (VLANs 50-55)&lt;br&gt;100M forced" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="physical" vertex="1">
+                    <mxGeometry x="10" y="38" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="phy_e6" value="&lt;b&gt;ether6&lt;/b&gt; → pve-dev svc0&lt;br&gt;802.1Q trunk (VLANs 60-65)&lt;br&gt;100M forced" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="physical" vertex="1">
+                    <mxGeometry x="245" y="38" width="220" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="phy_sw" value="&lt;b&gt;FS308GP Switch&lt;/b&gt;&lt;br&gt;VLAN 40 storage trunking&lt;br&gt;L2 isolated — no router" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" parent="physical" vertex="1">
+                    <mxGeometry x="480" y="38" width="210" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="en1" value="ether5 trunk" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;" parent="1" source="router" target="prod_vlans" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="en2" value="ether6 trunk" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;" parent="1" source="router" target="dev_vlans" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="760" y="465"/>
+                            <mxPoint x="770" y="465"/>
+                            <mxPoint x="770" y="880"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="en3" value="WireGuard VPN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" parent="1" source="router" target="aws_vpn" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="en4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;" parent="1" source="router" target="vlan5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

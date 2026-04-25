@@ -1,0 +1,96 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="PoC v1 Backup Architecture" id="poc-backup">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== OUTER VEEAM ==================== -->
+        <mxCell id="outer_veeam" value="&lt;b&gt;OUTER VEEAM — Windows Host (192.168.0.x)&lt;/b&gt;&lt;br&gt;Backs up 10 inner Production VMs via vCenter API • Repository: D:\Veeam_Backups\" style="swimlane;startSize=40;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1420" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_vault" value="&lt;b&gt;8:20 PM&lt;/b&gt;&lt;br&gt;Vault Cluster (3 VMs)&lt;br&gt;~25 min" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="15" y="50" width="180" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_workers" value="&lt;b&gt;8:45 PM&lt;/b&gt;&lt;br&gt;K8s Workers (3 VMs)&lt;br&gt;~30 min" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="215" y="50" width="180" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_ops" value="&lt;b&gt;9:10 PM&lt;/b&gt;&lt;br&gt;Ansible + Jenkins (2 VMs)&lt;br&gt;~20 min" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="415" y="50" width="180" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_monitor" value="&lt;b&gt;9:50 PM&lt;/b&gt;&lt;br&gt;Monitor (1 VM)&lt;br&gt;~15 min" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="615" y="50" width="160" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_k8s_master" value="&lt;b&gt;K8s Master&lt;/b&gt;&lt;br&gt;(included in sequence)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="795" y="50" width="160" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_repo" value="&lt;b&gt;Repository&lt;/b&gt;&lt;br&gt;D:\Veeam_Backups\&lt;br&gt;Windows Host local disk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="975" y="50" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ov_method" value="&lt;b&gt;Access: Direct Storage&lt;/b&gt;&lt;br&gt;Via vCenter (10.0.20.89)&lt;br&gt;Concurrent tasks: 1&lt;br&gt;Throttle: 200 MB/s" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="outer_veeam">
+          <mxGeometry x="1195" y="50" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="eov1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ov_vault" target="ov_workers" parent="outer_veeam"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eov2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ov_workers" target="ov_ops" parent="outer_veeam"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eov3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ov_ops" target="ov_monitor" parent="outer_veeam"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== INNER VEEAM ==================== -->
+        <mxCell id="inner_veeam" value="&lt;b&gt;INNER VEEAM — VM 10.0.20.195 (Win Server 2022)&lt;/b&gt;&lt;br&gt;Backs up 7 outer infrastructure VMs via direct ESXi Master (not vCenter) • Repository: NAS /mnt/backups/veeam/" style="swimlane;startSize=40;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="1420" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_pf" value="&lt;b&gt;7:50 PM&lt;/b&gt;&lt;br&gt;pfSense&lt;br&gt;Auto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="15" y="50" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_ipa" value="&lt;b&gt;10:30 PM&lt;/b&gt;&lt;br&gt;IPA&lt;br&gt;Auto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="160" y="50" width="130" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_self" value="&lt;b&gt;11:15 PM&lt;/b&gt;&lt;br&gt;Inner Veeam itself&lt;br&gt;Auto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="305" y="50" width="150" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_manual" value="&lt;b&gt;Manual Only&lt;/b&gt;&lt;br&gt;NAS • Prod ESXi • DR ESXi&lt;br&gt;vCenter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="470" y="50" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_repo" value="&lt;b&gt;Repository&lt;/b&gt;&lt;br&gt;NAS /mnt/backups/veeam/&lt;br&gt;NFS mount" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="690" y="50" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="iv_method" value="&lt;b&gt;Access: Direct ESXi&lt;/b&gt;&lt;br&gt;10.0.20.100 (not vCenter)&lt;br&gt;Avoids circular dependency" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="inner_veeam">
+          <mxGeometry x="910" y="50" width="210" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VCENTER BACKUP ==================== -->
+        <mxCell id="vc_backup" value="&lt;b&gt;vCenter Built-in Backup&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="450" width="690" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="vcb_target" value="&lt;b&gt;Target&lt;/b&gt;&lt;br&gt;NAS /mnt/datastor2/&lt;br&gt;~10GB per backup" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vc_backup">
+          <mxGeometry x="15" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="vcb_ret" value="&lt;b&gt;Retention&lt;/b&gt;&lt;br&gt;Max 4 backups&lt;br&gt;Encrypted" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vc_backup">
+          <mxGeometry x="235" y="38" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="vcb_content" value="&lt;b&gt;Includes&lt;/b&gt;&lt;br&gt;Configuration + etcd state&lt;br&gt;SSO + certificates" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vc_backup">
+          <mxGeometry x="435" y="38" width="230" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== WHY DUAL VEEAM ==================== -->
+        <mxCell id="why_dual" value="&lt;b&gt;Why Dual Veeam?&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="770" y="450" width="690" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="wd_limit" value="&lt;b&gt;Community Edition Limit&lt;/b&gt;&lt;br&gt;10 VMs per instance&lt;br&gt;Total VMs: 17" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="why_dual">
+          <mxGeometry x="15" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="wd_cross" value="&lt;b&gt;Cross-Layer Protection&lt;/b&gt;&lt;br&gt;Outer backs up Inner Veeam VM&lt;br&gt;Config preserved, not backup files" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="why_dual">
+          <mxGeometry x="235" y="38" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="wd_rules" value="&lt;b&gt;Tuning Rules&lt;/b&gt;&lt;br&gt;Concurrent: 1 (NAS contention)&lt;br&gt;10-min buffer between jobs&lt;br&gt;Network fallback: DISABLED" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="why_dual">
+          <mxGeometry x="475" y="38" width="200" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EDGES ==================== -->
+        <mxCell id="edge_outer_inner" value="outer backs up inner VM config" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="outer_veeam" target="inner_veeam" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_inner_vc" value="independent paths" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="inner_veeam" target="vc_backup" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_vc_why" value="design constraint" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="vc_backup" target="why_dual" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

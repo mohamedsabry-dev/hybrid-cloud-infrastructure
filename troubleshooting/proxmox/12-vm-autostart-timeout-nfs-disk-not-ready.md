@@ -1,25 +1,31 @@
 # TS-PVE-012 | 2026-04-06 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Proxmox VE autostart with NFS storage
-- Environment: pve-dev
-- Related components: VM 1001 (freeipa), NFS storage (nas-dev-data), QEMU autostart
+[Info]
+Domain: Proxmox VE autostart / NFS storage
+Sub-techs: VM 1001 (freeipa), NFS storage (nas-dev-data), QEMU autostart, Terraform startup config
+Environment: pve-dev
+Re-opened: Yes -- April 12 follow-up discovered original fix was ineffective
 
-## 2. Issue
-- Symptom: FreeIPA VM (1001) failed to start during Proxmox autostart sequence after system reboot. Manual start ~15 minutes later succeeded immediately.
-- Error:
+_____________________________________________________________________
+
+[Issue Description]
+REAL INCIDENT -- occurred during unplanned power outage recovery, not planned DR testing.
+
+FreeIPA VM (1001) failed to start during Proxmox autostart sequence after system reboot. Manual start ~15 minutes later succeeded immediately.
+
 ```
 Status:        stopped: start failed: command '/usr/bin/kvm ...' failed: got timeout
 Task type:     qmstart
 Duration:      38s
 ```
 
-**Note:** No explicit NFS mount errors found in logs. Root cause is suspected based on behavioral pattern, not confirmed with direct evidence.
+No explicit NFS mount errors found in logs. Root cause is suspected based on behavioral pattern.
 
-## 3. Analysis
+_____________________________________________________________________
 
-### Timeline
-
+[Analysis]
+# Step 1: Timeline
 ```
 23:01:40  Autostart task begins (root@pam)
 23:01:41  qemu.slice created, 1001.scope started
@@ -34,13 +40,12 @@ Duration:      38s
 23:17:01  VM started successfully with PID 11818
 ```
 
-### VM Disk Configuration
-
+# Step 2: Check VM disk configuration
 VM 1001 has disk on NFS:
 - `scsi0`: local-lvm (OS disk)
 - `scsi1`: nas-dev-data (data disk at `/mnt/pve/nas-dev-data/images/1001/vm-1001-disk-0.raw`)
 
-### Behavioral Pattern Analysis
+# Step 3: Behavioral pattern analysis
 
 | Observation | Implication |
 |-------------|-------------|
@@ -50,101 +55,93 @@ VM 1001 has disk on NFS:
 | NFS mount timestamp 23:01:41 | Mount was initializing |
 | No explicit NFS errors in logs | QEMU just timed out silently |
 
-### Why No NFS Errors in Logs
+# Step 4: Why no NFS errors
+QEMU/KVM does not log "file not found" or "mount not ready" errors explicitly. When a blockdev cannot be opened, the open() call hangs, and after timeout QEMU returns a generic "got timeout" error.
 
-QEMU/KVM does not log "file not found" or "mount not ready" errors explicitly. When a blockdev cannot be opened:
-1. QEMU attempts to open the file
-2. If NFS is not ready, the open() call hangs
-3. After timeout, QEMU returns generic "got timeout" error
-4. No specific I/O or mount error is logged
+_____________________________________________________________________
 
-## 4. Root Cause
-> Proxmox autostart ran before NFS storage was fully operational. QEMU attempted to open the NFS-backed disk file, hung waiting for I/O, and timed out after ~36 seconds.
+[Final Root Cause]
+Proxmox autostart ran before NFS storage was fully operational. QEMU attempted to open the NFS-backed disk file, hung waiting for I/O, and timed out after ~36 seconds.
 
-## 5. Solution
-> Increase VM startup delay to allow NFS mount to fully initialize before VM starts.
+_____________________________________________________________________
 
-### Terraform Configuration Changes
+[Final Solution]
+Initial fix (April 6): Increased `startup_delay` from 60 to 180 seconds in Terraform for VM 1001.
 
-**File: `terraform/dev/proxmox/vms/freeipa/variables.tf`**
 ```hcl
-# Before
-startup_delay   = 60
-
-# After
+# terraform/dev/proxmox/vms/freeipa/variables.tf
+# terraform/prod/proxmox/vms/freeipa/variables.tf
 startup_delay   = 180
 ```
 
-**File: `terraform/prod/proxmox/vms/freeipa/variables.tf`**
-```hcl
-# Before
-startup_delay   = 60
+CRITICAL DISCOVERY (April 12): The April 6 fix was wrong. The `startup_delay` (Proxmox `up_delay`) delays the NEXT VM, not the current one.
 
-# After
-startup_delay   = 180
+From Terraform Proxmox Provider docs:
+```
+up_delay - A non-negative number defining the delay in seconds
+           before the NEXT VM is started.
 ```
 
-### Applied to Proxmox
-
-After `terraform apply`, VM startup configuration will be:
-```bash
-qm config 1001 | grep startup
-# startup: order=1,up=180,down=60
+Old config (broken):
+```terraform
+# VM 1001 (FreeIPA) - order=1, startup_delay=180
+# CT 2001 (Ansible) - order=2, startup_delay=60
 ```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: VM start delayed by 3 minutes after host boot. Acceptable trade-off for reliability.
-
-## 7. Impact After Fix
-- Observed: Startup delay increased to 180 seconds
-- VM will wait for NFS to be fully ready before starting
-- No more timeout failures on autostart
-
-## 8. Notes
-
-### Alternative Solutions Considered
-
-| Solution | Pros | Cons |
-|----------|------|------|
-| Increase startup delay (chosen) | Simple, reliable | Delays VM start by 3 min |
-| systemd mount dependency | Proper dependency chain | Complex to configure |
-| Move disk to local storage | No NFS dependency | Loses NFS benefits |
-| Retry script | Auto-recovers | Adds complexity |
-
-### Prevention for NFS-backed VMs
-
-For any VM with disks on NFS storage:
-1. Set `startup_delay` to at least 120-180 seconds
-2. Set `startup_order` to higher number (start later)
-3. Consider local disk for OS, NFS only for data
-
-**Terraform pattern for NFS-backed VMs:**
-```hcl
-startup_delay   = 180  # Wait for NFS
-startup_order   = 99   # Start last
+What actually happened:
+```
+T+0:00   FreeIPA starts IMMEDIATELY (no delay - it's first!)
+         | 180s wait (FreeIPA's up_delay delays Ansible)
+T+3:00   Ansible starts (delayed by FreeIPA's setting)
 ```
 
-### Investigation Commands
+FreeIPA was still starting before NFS was ready.
 
-```bash
-# Check Proxmox task logs
-grep -r "1001" /var/log/pve/tasks/
+Correct fix (April 13): Swapped the order -- Ansible boots first and its delay holds FreeIPA:
 
-# Check journal logs for VM
-journalctl -u pvedaemon --since "1 hour ago" | grep 1001
+```terraform
+# CT 2001 (Ansible) - boots FIRST, delays FreeIPA
+startup_order = 1
+startup_delay = 300     # 5 min delay for NAS to be ready
 
-# Check NFS mount status
-systemctl status mnt-pve-nas\\x2ddev\\x2ddata.mount
-
-# Check storage configuration
-cat /etc/pve/storage.cfg | grep -A10 nas-dev-data
-
-# Check VM startup configuration
-qm config 1001 | grep startup
+# VM 1001 (FreeIPA) - boots SECOND, after delay
+startup_order = 2
+startup_delay = 60      # Delay next containers
 ```
 
-**Related:** TS-PVE-009 (NFS shutdown hang), TS-PVE-010 (VM restore hang) - all related to NFS storage timing
+New boot sequence:
+```
+T+0:00   Ansible starts (order 1, local-lvm only - no NFS needed)
+         | 300s wait (5 min for NAS to fully initialize)
+T+5:00   FreeIPA starts (order 2, NAS now ready for data disk)
+         | 60s wait
+T+6:00   Next containers...
+```
 
-## 9. Workaround (if any)
-> If VM fails to autostart: Manually start after 2-3 minutes with `qm start <VMID>`. NFS will be ready by then.
+Files changed:
+| File | Change |
+|------|--------|
+| `terraform/dev/proxmox/lxc/ansible/variables.tf` | order: 2->1, delay: 60->300 |
+| `terraform/dev/proxmox/vms/freeipa/variables.tf` | order: 1->2, delay: 180->60 |
+| `terraform/prod/proxmox/lxc/ansible/variables.tf` | order: 2->1, delay: 60->300 |
+| `terraform/prod/proxmox/vms/freeipa/variables.tf` | order: 1->2, delay: 180->60 |
+
+Boot sequence log (April 12, before fix):
+```
+Apr 12 23:59:29  VM 1001 (FreeIPA) - Start  <- IMMEDIATE, no delay!
+         | 180s wait
+Apr 13 00:02:30  CT 2001 (Ansible) - Start  <- 3 min later
+```
+
+Verified: Yes -- correct fix applied April 13. Ansible boots first with 300s delay, FreeIPA boots second after NAS is ready.
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+
+_____________________________________________________________________
+
+[References]
+- Terraform Proxmox Provider: https://registry.terraform.io/providers/bpg/proxmox/latest/docs/resources/virtual_environment_vm
+- Related: TS-PVE-009 (NFS shutdown hang), TS-PVE-010 (VM restore hang) -- NFS storage timing
+- Related: TS-PVE-014 -- where `up_delay` behavior was discovered

@@ -1,0 +1,163 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="GitOps CI/CD Pipeline" id="cicd">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== STAGE 1: GIT TRIGGER ==================== -->
+        <mxCell id="stage1" value="&lt;b&gt;STAGE 1 — Git Trigger&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="1320" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="git_push" value="&lt;b&gt;Git Push&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="stage1">
+          <mxGeometry x="15" y="40" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="branch_dev" value="&lt;b&gt;dev&lt;/b&gt; branch&lt;br&gt;Infrastructure workflows" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage1">
+          <mxGeometry x="200" y="40" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="branch_sec" value="&lt;b&gt;dev-security&lt;/b&gt; branch&lt;br&gt;IAM / KMS / Trust" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="stage1">
+          <mxGeometry x="450" y="40" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="branch_prod" value="&lt;b&gt;prod&lt;/b&gt; branch&lt;br&gt;Production mirror" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage1">
+          <mxGeometry x="700" y="40" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="branch_docker" value="&lt;b&gt;images/**&lt;/b&gt; path&lt;br&gt;Docker builds" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage1">
+          <mxGeometry x="950" y="40" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_p1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="git_push" target="branch_dev" parent="stage1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="git_push" target="branch_sec" parent="stage1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="git_push" target="branch_prod" parent="stage1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_p4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="git_push" target="branch_docker" parent="stage1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== STAGE 2: GITHUB ACTIONS ==================== -->
+        <mxCell id="stage2" value="&lt;b&gt;STAGE 2 — GitHub Actions (OIDC Auth)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="oidc_token" value="&lt;b&gt;OIDC Token&lt;/b&gt;&lt;br&gt;GitHub → AWS STS&lt;br&gt;AssumeRole" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="stage2">
+          <mxGeometry x="15" y="40" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_role" value="&lt;b&gt;Infrastructure-{env}&lt;/b&gt;&lt;br&gt;PowerUserAccess&lt;br&gt;Fetch secrets from AWS SM" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage2">
+          <mxGeometry x="260" y="40" width="240" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="admin_role" value="&lt;b&gt;TerraformAdmin-{env}&lt;/b&gt;&lt;br&gt;Full admin + PermissionsBoundary&lt;br&gt;Security-sensitive only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="stage2">
+          <mxGeometry x="545" y="40" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="runner_type" value="&lt;b&gt;Runners&lt;/b&gt;&lt;br&gt;Mac Mini (self-hosted) for Proxmox&lt;br&gt;ubuntu-latest for Docker builds" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage2">
+          <mxGeometry x="840" y="40" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="docker_build" value="&lt;b&gt;Docker Build&lt;/b&gt;&lt;br&gt;remediation + etcd-backup&lt;br&gt;→ GHCR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="stage2">
+          <mxGeometry x="1135" y="40" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_o1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="oidc_token" target="infra_role" parent="stage2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_o2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="oidc_token" target="admin_role" parent="stage2"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== STAGE 3: TERRAFORM ==================== -->
+        <mxCell id="stage3" value="&lt;b&gt;STAGE 3 — Terraform (Proxmox + AWS)&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#ffe6cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="350" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="tf_secrets" value="&lt;b&gt;Fetch Secrets&lt;/b&gt;&lt;br&gt;Proxmox token&lt;br&gt;Root passwords&lt;br&gt;SSH keys • KMS creds" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage3">
+          <mxGeometry x="15" y="40" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="tf_init" value="&lt;b&gt;terraform init&lt;/b&gt;&lt;br&gt;S3 state backend&lt;br&gt;DynamoDB lock" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage3">
+          <mxGeometry x="260" y="40" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="tf_plan" value="&lt;b&gt;terraform plan&lt;/b&gt;&lt;br&gt;Review output" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage3">
+          <mxGeometry x="505" y="40" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="tf_approve" value="&lt;b&gt;Manual Approval&lt;/b&gt;&lt;br&gt;3-min window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="stage3">
+          <mxGeometry x="720" y="40" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="tf_apply" value="&lt;b&gt;terraform apply&lt;/b&gt;&lt;br&gt;-auto-approve&lt;br&gt;VMs + LXCs created" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="stage3">
+          <mxGeometry x="935" y="40" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_t1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="tf_secrets" target="tf_init" parent="stage3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_t2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="tf_init" target="tf_plan" parent="stage3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_t3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="tf_plan" target="tf_approve" parent="stage3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_t4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="tf_approve" target="tf_apply" parent="stage3"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== STAGE 4: ANSIBLE ==================== -->
+        <mxCell id="stage4" value="&lt;b&gt;STAGE 4 — Ansible Configuration&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_clone" value="&lt;b&gt;Clone Repo&lt;/b&gt;&lt;br&gt;Deploy key SSH auth&lt;br&gt;dev or prod branch" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="15" y="40" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_pre" value="&lt;b&gt;pre_setup&lt;/b&gt;&lt;br&gt;Base config&lt;br&gt;Packages" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="230" y="40" width="150" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_ipa" value="&lt;b&gt;freeipa_setup&lt;/b&gt;&lt;br&gt;Identity • DNS&lt;br&gt;CA • Keytabs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="415" y="40" width="150" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_vault" value="&lt;b&gt;vault_setup&lt;/b&gt;&lt;br&gt;HA cluster&lt;br&gt;KMS unseal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="600" y="40" width="150" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_k8s" value="&lt;b&gt;k8s_setup&lt;/b&gt;&lt;br&gt;kubeadm init&lt;br&gt;HA masters + workers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="785" y="40" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ans_flux" value="&lt;b&gt;flux_setup&lt;/b&gt;&lt;br&gt;Bootstrap Flux CD&lt;br&gt;Watch git branch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="stage4">
+          <mxGeometry x="990" y="40" width="170" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ans_clone" target="ans_pre" parent="stage4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ans_pre" target="ans_ipa" parent="stage4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ans_ipa" target="ans_vault" parent="stage4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ans_vault" target="ans_k8s" parent="stage4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="ans_k8s" target="ans_flux" parent="stage4"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== STAGE 5: FLUX GITOPS ==================== -->
+        <mxCell id="stage5" value="&lt;b&gt;STAGE 5 — Flux CD GitOps Reconciliation&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="690" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="flux_watch" value="&lt;b&gt;GitRepository&lt;/b&gt;&lt;br&gt;Watch every 1m&lt;br&gt;SSH deploy key" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage5">
+          <mxGeometry x="15" y="40" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="flux_infra" value="&lt;b&gt;Infrastructure Layer&lt;/b&gt;&lt;br&gt;Namespaces • StorageClasses&lt;br&gt;Vault Agent • CoreDNS&lt;br&gt;Ingress-NGINX • metrics-server" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage5">
+          <mxGeometry x="240" y="40" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="flux_health" value="&lt;b&gt;Health Gate&lt;/b&gt;&lt;br&gt;vault-agent-injector&lt;br&gt;Ready == true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="stage5">
+          <mxGeometry x="565" y="40" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="flux_apps" value="&lt;b&gt;Apps Layer&lt;/b&gt;&lt;br&gt;Prometheus • Grafana • Loki&lt;br&gt;MariaDB • WordPress&lt;br&gt;Remediation • etcd-backup" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage5">
+          <mxGeometry x="790" y="40" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="flux_vault_inject" value="&lt;b&gt;Vault Agent&lt;/b&gt;&lt;br&gt;Sidecar Injection&lt;br&gt;K8s Auth → Vault" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="stage5">
+          <mxGeometry x="1115" y="40" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_f1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flux_watch" target="flux_infra" parent="stage5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_f2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flux_infra" target="flux_health" parent="stage5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_f3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flux_health" target="flux_apps" parent="stage5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_f4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="flux_apps" target="flux_vault_inject" parent="stage5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== STAGE 6: SELF-HEALING ==================== -->
+        <mxCell id="stage6" value="&lt;b&gt;STAGE 6 — Self-Healing + Backup&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="860" width="1320" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="rem_scan" value="&lt;b&gt;Remediation Pod&lt;/b&gt;&lt;br&gt;Phase 1: 5min node scan&lt;br&gt;Phase 1.5: 3min confirm" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage6">
+          <mxGeometry x="15" y="40" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="rem_action" value="&lt;b&gt;Phase 2: Escalate&lt;/b&gt;&lt;br&gt;Proxmox API call&lt;br&gt;Worker reset/reboot" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="stage6">
+          <mxGeometry x="310" y="40" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="rem_recover" value="&lt;b&gt;Auto-Recovery&lt;/b&gt;&lt;br&gt;Node rejoins cluster&lt;br&gt;Pods rescheduled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="stage6">
+          <mxGeometry x="575" y="40" width="200" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="etcd_cron" value="&lt;b&gt;etcd-backup CronJob&lt;/b&gt;&lt;br&gt;Nightly snapshot&lt;br&gt;Vault STS creds" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="stage6">
+          <mxGeometry x="850" y="40" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="etcd_s3" value="&lt;b&gt;S3 Upload&lt;/b&gt;&lt;br&gt;Off-site backup&lt;br&gt;KMS encrypted" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="stage6">
+          <mxGeometry x="1105" y="40" width="190" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge_r1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="rem_scan" target="rem_action" parent="stage6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_r2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="rem_action" target="rem_recover" parent="stage6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge_r3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="etcd_cron" target="etcd_s3" parent="stage6"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== INTER-STAGE FLOW EDGES ==================== -->
+        <mxCell id="flow_12" value="triggers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666666;fontSize=10;" edge="1" source="stage1" target="stage2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="flow_23" value="provisions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666666;fontSize=10;" edge="1" source="stage2" target="stage3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="flow_34" value="configures" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666666;fontSize=10;" edge="1" source="stage3" target="stage4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="flow_45" value="bootstraps" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666666;fontSize=10;" edge="1" source="stage4" target="stage5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="flow_56" value="deploys" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#999999;fontColor=#666666;fontSize=10;" edge="1" source="stage5" target="stage6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,108 +1,23 @@
-# Power Outage DR
+# Power DR — UPS / Battery Monitor
 
-UPS/battery monitoring for Proxmox on laptop hardware.
+UPS monitoring for Proxmox running on laptop hardware. The laptop's
+internal battery IS the UPS — the `dr_ups_monitor.sh` script watches
+battery state and triggers a graceful shutdown when a site-wide outage
+is confirmed (via a network probe at the warning threshold).
 
-## Overview
-
-Proxmox installed bare-metal on laptop uses the laptop battery as a UPS.
-The `dr_ups_monitor.sh` script detects power outages and triggers safe shutdown before battery dies.
-
-## Quick Setup
-
-```bash
-# 1. Create scripts directory
-mkdir -p /root/scripts
-
-# 2. Copy script to Proxmox hosts
-scp dr_ups_monitor.sh root@pve-dev:/root/scripts/
-scp dr_ups_monitor.sh root@pve-prod:/root/scripts/
-
-# 3. Make executable
-chmod +x /root/scripts/dr_ups_monitor.sh
-
-# 4. Add cron job (runs every 5 min)
-crontab -e
-# Add this line:
-*/5 * * * * /root/scripts/dr_ups_monitor.sh >> /var/log/dr_ups.log 2>&1
-
-# 5. Verify cron was added
-crontab -l
-
-# 6. Test
-/root/scripts/dr_ups_monitor.sh
-```
-
-## How It Works
-
-### Battery Detection
-
-Linux exposes battery info at:
-```
-/sys/class/power_supply/BAT*/status    → Charging, Discharging, Full
-/sys/class/power_supply/BAT*/capacity  → 0-100 (percentage)
-```
-
-### Key Decision: Discharging Check
-
-Only trigger shutdown if battery is **DISCHARGING** (going down).
-If battery is "Charging" at 40%, power is BACK - don't shutdown!
-
-### Battery Thresholds
-
-| Level | Threshold | Action | Reason |
-|-------|-----------|--------|--------|
-| CRITICAL | < 35% | Force halt NOW | No time left, save disks |
-| LOW | < 55% | Graceful shutdown | Power definitely lost |
-| WARNING | < 78% | Check network first | Maybe just unplugged briefly |
-| NORMAL | > 78% | Monitor only | Plenty of time |
-
-### Network Check Logic (at 78%)
-
-When battery < 78% AND discharging:
-- Ping 3 hosts: `10.0.5.1` (gateway), `10.0.40.120` (NAS), `8.8.8.8` (internet)
-- Check every 10 seconds for 2 minutes (12 rounds)
-- If ANY host responds → Network up, maybe just unplugged charger
-- If ALL fail for 2 min → Full site power outage, trigger shutdown
-
-### Why 3 Different Hosts?
-
-| Host | Purpose |
-|------|---------|
-| `10.0.5.1` | Local gateway |
-| `10.0.40.120` | NAS (another local device) |
-| `8.8.8.8` | Internet (confirms external is also down) |
-
-## Technical Details
-
-### Lock File
-`/tmp/dr_ups_monitor.lock` prevents multiple script instances.
-
-### Cron Schedule
-`*/5 * * * *` → Every 5 minutes. Cron auto-starts on boot.
-
-### Log File
-`/var/log/dr_ups.log` - all output with timestamps.
-
-## Troubleshooting
-
-```bash
-# Check battery status manually
-cat /sys/class/power_supply/BAT*/status
-cat /sys/class/power_supply/BAT*/capacity
-
-# Check recent logs
-tail -50 /var/log/dr_ups.log
-
-# Test script manually
-/root/scripts/dr_ups_monitor.sh
-
-# Verify cron is running
-crontab -l
-systemctl status cron
-```
+For why the script decides what it decides (thresholds, discharging-only
+rule, 3-host network probe), see [`DESIGN.md`](DESIGN.md). For install
+and run commands see [`ups-monitor-setup-guide.txt`](ups-monitor-setup-guide.txt).
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `dr_ups_monitor.sh` | Main monitoring script |
+| `dr_ups_monitor.sh` | The monitor script (read battery, decide, shut down if needed) |
+| `DESIGN.md` | Threshold model + network-probe rationale + scope boundary |
+| `ups-monitor-setup-guide.txt` | Install / cron / test / troubleshoot commands |
+
+## Related
+
+- [`../README.md`](../README.md) — parent DR scope (power + thermal + hardware + recovery)
+- [`../thermal/`](../thermal/) — sibling concern (CPU temperature monitoring)

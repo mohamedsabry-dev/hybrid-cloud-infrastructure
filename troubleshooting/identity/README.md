@@ -16,6 +16,8 @@ Documentation of FreeIPA, Kerberos, and SSSD issues encountered in the hybrid cl
 | 6 | [freeipa-lxc-uid-range-investigation](6-freeipa-lxc-uid-range-investigation.md) | initgroups fails, UID range errors | FreeIPA UIDs must be 60001-65500 for LXC |
 | 7 | [freeipa-client-ntp-lxc-skip](7-freeipa-client-ntp-lxc-skip.md) | NTP config fails on LXC during enrollment | LXC inherits time from host, skip NTP config |
 | 8 | [keytab-preauthentication-failed](8-keytab-preauthentication-failed.md) | Keytab authentication fails | Preauthentication error - keytab issues |
+| 9 | [ansible-sssd-knownhosts-timeout](9-ansible-sssd-knownhosts-timeout.md) | 28-34s Ansible delays when IPA down | SSSD KnownHostsProxyCommand timeout |
+| 10 | [sssd-crash-boot-keytab-read-failure](10-sssd-crash-boot-keytab-read-failure.md) | SSSD failed to start after backup incident reboot | Keytab read failure at boot — restart fixed, root cause not identified |
 
 ---
 

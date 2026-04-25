@@ -46,10 +46,10 @@ No interference between operations
 ```
 
 **Benefits:**
-- ✅ vMotion isolated from backup traffic
-- ✅ No I/O contention during simultaneous operations
-- ✅ Faster and more reliable live migrations
-- ✅ Production best practice
+- vMotion isolated from backup traffic
+- No I/O contention during simultaneous operations
+- Faster and more reliable live migrations
+- Production best practice
 
 ---
 
@@ -95,13 +95,13 @@ No interference between operations
 **On each ESXi host:**
 1. Navigate to: Networking > VMkernel adapters
 2. Edit VMkernel adapter on vMotion network (vmk2 on Master, vmk on nested)
-3. Enable: ✓ vMotion traffic
+3. Enable: Yes vMotion traffic
 4. Disable vMotion on other VMkernel adapters (Management network)
 
 **vCenter GUI:**
 ```
 Host > Configure > Networking > VMkernel adapters > Edit > Services
-✓ vMotion
+Yes vMotion
 ```
 
 ### Verification

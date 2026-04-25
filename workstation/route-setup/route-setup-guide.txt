@@ -1,0 +1,62 @@
+# Mac Mini — Persistent Route to 10.0.0.0/8
+
+Commands for installing / managing the persistent route that lets the Mac Mini
+reach on-prem 10.x subnets via the local gateway.
+
+> Current state: the 10.0.0.0/8 route is held one hop up at the MikroTik
+> router level (previously the ER605). This local Mac-Mini script is kept as
+> a fallback for cases where the router can't hold the route (emergency
+> local-only runs, ISP hardware swap, MikroTik rebuild).
+
+See workstation/route-setup/README.md for scope + file listing.
+
+---
+
+## Configure
+
+Before first install, edit the gateway IP in add-route.sh:
+
+  GATEWAY="192.168.100.195"   # ISP router / gateway IP
+  NETWORK="10.0.0.0/8"        # internal network range (don't change)
+
+---
+
+## Install (persistent, survives reboot)
+
+  cd workstation/route-setup
+  sudo ./install-route.sh
+
+This copies add-route.sh to /usr/local/bin/, creates the launchd service
+com.local.route10, and adds the route on boot.
+
+---
+
+## Manual add (temporary, does not survive reboot)
+
+  cd workstation/route-setup
+  sudo ./add-route.sh
+
+---
+
+## Verify
+
+  netstat -rn | grep "^10"       # should show 10.0.0.0/8 via GATEWAY
+  launchctl list | grep route10  # should show com.local.route10 active
+  ping 10.0.5.110                # Proxmox host reachable
+
+---
+
+## Uninstall
+
+  sudo launchctl unload /Library/LaunchDaemons/com.local.route10.plist
+  sudo rm /Library/LaunchDaemons/com.local.route10.plist
+  sudo rm /usr/local/bin/add-route.sh
+
+---
+
+## Related
+
+- workstation/README.md                       — parent scope
+- workstation/route-setup/README.md           — this folder's file listing
+- deployment-docs/00-network-setup-guide.md     — network + routing at the router level
+- network/DESIGN.md                           — MikroTik vs ER605 migration reasoning

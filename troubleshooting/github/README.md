@@ -10,10 +10,10 @@ Documentation of issues encountered with GitHub Actions, self-hosted runners, wo
 |---|------|-------|------------|
 | 1 | [github-runner-stuck-job](1-github-runner-stuck-job.md) | Runner doesn't start after reboot, jobs stuck | Runner service not installed as persistent LaunchDaemon |
 | 2 | [workflow-lock-flag-pattern](2-workflow-lock-flag-pattern.md) | Terraform workflows triggered on push destroy resources | No mechanism to lock workflows after setup |
-| 3 | [delete-workflow-logs-secrets](3-delete-workflow-logs-secrets.md) | Old workflow logs may contain unmasked secrets | Masking implemented after initial runs |
-| 4 | [git-history-secrets-cleanup](4-git-history-secrets-cleanup.md) | Sensitive values in git commit history | Secrets hardcoded before moving to GitHub Secrets |
+| 3 | [delete-workflow-logs-secrets](reference/3-delete-workflow-logs-secrets.md) | Old workflow logs may contain unmasked secrets | Masking implemented after initial runs |
+| 4 | [git-history-secrets-cleanup](reference/4-git-history-secrets-cleanup.md) | Sensitive values in git commit history | Secrets hardcoded before moving to GitHub Secrets |
 | 5 | [runner-clock-skew-auth-failure](5-runner-clock-skew-auth-failure.md) | Runner offline with "registration deleted" error | Clock skew from broken DNS/NTP |
-| 6 | [mac-address-deep-inspection-cleanup](6-mac-address-deep-inspection-cleanup.md) | Hardware MAC addresses in git history | Raw command outputs committed before .gitignore |
+| 6 | [mac-address-deep-inspection-cleanup](reference/6-mac-address-deep-inspection-cleanup.md) | Hardware MAC addresses in git history | Raw command outputs committed before .gitignore |
 | 7 | [concurrent-terraform-workflow-lxc-reboot](7-concurrent-terraform-workflow-lxc-reboot.md) | Vault workflow fails with exit code 255 | Concurrent Terraform workflows rebooted LXCs |
 | 8 | [git-branch-merge-conflicts-flux-gitops](8-git-branch-merge-conflicts-flux-gitops.md) | Cascading merge conflicts between dev/prod branches | Two-way merging between environment branches |
 | 9 | [commit-attributed-to-wrong-user](9-commit-attributed-to-wrong-user.md) | Commits showing wrong GitHub user as author | Unconfigured git + email registered by another account |

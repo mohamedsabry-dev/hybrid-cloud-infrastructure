@@ -158,10 +158,10 @@ PHASE 6: TESTING
 6. Click "Test Now" or "Apply"
 
 Expected Results:
-✅ Green check: "SSH connection established"
-✅ Green check: "Root access verification"
+- Green check: "SSH connection established"
+- Green check: "Root access verification"
 
-❌ If failed:
+- If failed:
 - Verify Veeam Server IP is in 10.0.20.0/24 range
 - Check if VMkernel has required services:
   * vSphere Replication
@@ -180,7 +180,7 @@ After successful test, confirm the credential is working before cleanup.
 PHASE 7: SECURE CLEANUP (Windows Veeam Server)
 ================================================================================
 
-⚠️  ONLY perform cleanup AFTER Phase 6 is successful!
+  ONLY perform cleanup AFTER Phase 6 is successful!
 
 1. Backup Public Key
    - Save id_ed25519.pub to secure USB/vault (alongside private key backup)
@@ -199,12 +199,12 @@ PHASE 7: SECURE CLEANUP (Windows Veeam Server)
 SECURITY NOTES
 ================================================================================
 
-✓ SSH keys are stored in Vault, not hardcoded in playbooks
-✓ Private keys never exposed in command history
-✓ Keys deleted from Windows after import to Veeam
-✓ IP restriction enforced (10.0.20.0/24)
-✓ Sudo privileges with NOPASSWD for veeam_user
-✓ Emergency backup stored in secure location
+Yes SSH keys are stored in Vault, not hardcoded in playbooks
+Yes Private keys never exposed in command history
+Yes Keys deleted from Windows after import to Veeam
+Yes IP restriction enforced (10.0.20.0/24)
+Yes Sudo privileges with NOPASSWD for veeam_user
+Yes Emergency backup stored in secure location
 
 ================================================================================
 END OF PROCEDURE

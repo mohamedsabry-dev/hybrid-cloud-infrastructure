@@ -1,208 +1,183 @@
 # TS-TF-006 | 2026-03-14 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Terraform with AWS provider
-- Environment: AWS VPC with cross-state modules (network + compute)
-- Related components: Route tables, aws_route resource, cross-module dependencies
+[Info]
+Domain: Terraform / AWS
+Sub-techs: Terraform AWS provider, aws_route_table, aws_route, cross-state modules,
+           route table ownership, remote state
+Environment: AWS VPC | cross-state modules (network + compute)
+Re-opened: No
 
-## 2. Issue
-- Symptom: Network module tries to remove routes added by compute module. Terraform plan shows route table update removing `10.0.0.0/16` route.
-- Error: Happens when running network module after compute module has added routes.
+_____________________________________________________________________
 
-## 3. Analysis
+[Issue Description]
+Network module tries to remove routes added by compute module. Every time the
+network module runs after compute has added routes, Terraform plans to delete
+the compute-added routes.
 
-**Check 1: What does the plan show?**
+  aws_route_table.rt_public will be updated in-place:
+  ~ route = [
+      - { cidr_block = "0.0.0.0/0", gateway_id = "igw-xxx" }
+      - { cidr_block = "10.0.0.0/16", network_interface_id = "eni-xxx" }  ← REMOVES!
+      + { cidr_block = "0.0.0.0/0", gateway_id = "igw-xxx" }
+    ]
 
-```
-# aws_route_table.rt_public will be updated in-place
-~ resource "aws_route_table" "rt_public" {
-    ~ route = [
-        - { cidr_block = "0.0.0.0/0", gateway_id = "igw-xxx" },
-        - { cidr_block = "10.0.0.0/16", network_interface_id = "eni-xxx" },  ← REMOVES!
-        + { cidr_block = "0.0.0.0/0", gateway_id = "igw-xxx" },
-      ]
+_____________________________________________________________________
+
+[Analysis]
+
+# Initial Check Notes:
+Checked what in the network module config was causing it to own all routes.
+
+Network module was using inline route {} blocks:
+  resource "aws_route_table" "rt_public" {
+    vpc_id = aws_vpc.vpc_main.id
+    route {
+      cidr_block = "0.0.0.0/0"
+      gateway_id = aws_internet_gateway.igw_main.id
+    }
+    tags = { Name = "dev-public-rt" }
   }
 
-Plan: 0 to add, 1 to change, 0 to destroy.
-```
+Inline route {} blocks cause aws_route_table to own ALL routes in the table.
+Any route not explicitly listed in the config is seen as drift and removed on
+next apply. The 10.0.0.0/16 route added by the compute module was not in the
+network module config — so Terraform removed it.
 
-Finding: Network module sees the compute-added route as "drift" and removes it.
 
-**Check 2: Why is this happening?**
+# Suspected Root Cause
+aws_route_table with inline route {} blocks tries to own all routes in the
+table. Routes added by other modules are treated as drift and removed.
+This is fundamental Terraform behaviour for inline blocks — not a bug.
 
-The network module uses **inline routes**:
-```hcl
-resource "aws_route_table" "rt_public" {
-  vpc_id = aws_vpc.vpc_main.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw_main.id
-  }
+# More Checks Notes:
+Why compute module adds routes instead of network module:
+  The 10.0.0.0/16 route needs network_interface_id from the WireGuard EC2 instance.
+  EC2 instance does not exist until compute module runs.
+  Network module runs separately (different state) and cannot reference compute
+  resources. Compute module must own the routes that depend on compute resources.
 
-  tags = { Name = "dev-public-rt" }
-}
-```
+  Cross-state architecture:
+    Network module (State A):
+      aws_route_table.rt_public (no inline routes)
+      aws_route.internet (0.0.0.0/0 → IGW)
+      output: rt_public_id
 
-Finding: Inline `route {}` blocks make Terraform **own ALL routes** in the table. Any route not in the config is seen as drift and removed.
+    Compute module (State B):
+      aws_instance.wireguard
+      aws_route.home_subnets (10.0.0.0/16 → ENI)
+      reads rt_public_id via data.terraform_remote_state
 
-## 4. Root Cause
-> `aws_route_table` with inline `route {}` blocks tries to own all routes in the table. It sees routes added by other modules as "drift" and removes them on next apply. This is fundamental Terraform behavior for inline blocks.
 
-## 5. Solution
-> Use separate `aws_route` resources instead of inline routes. Each resource owns only its route.
+# Suspected Solution
+Replace inline route {} blocks with separate aws_route resources.
+Each aws_route resource owns only its specific route — no ownership conflict.
 
-### Approach 1: Inline Routes (PROBLEMATIC)
 
-```hcl
-resource "aws_route_table" "rt_public" {
-  vpc_id = aws_vpc.vpc_main.id
+# Test
+Replaced inline route with aws_route.internet, re-ran network module after
+compute module had added the 10.0.0.0/16 route.
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw_main.id
-  }
+Result: PASS
+  Terraform plan output: No changes. Your infrastructure matches the configuration.
+  Network module no longer sees compute-added route as drift.
 
-  tags = { Name = "dev-public-rt" }
-}
-```
+_____________________________________________________________________
 
-| Pros | Cons |
-|------|------|
-| Simple, all-in-one resource | Owns ALL routes in table |
-| Easy to read | Conflicts with other modules adding routes |
-| | Deletes routes it doesn't know about |
-| | Cross-module dependency issues |
+[Final Root Cause]
+aws_route_table with inline route {} blocks claims ownership of all routes in
+the table — any route not in the config is removed on next apply. The compute
+module added a 10.0.0.0/16 route to the same table. Network module did not
+know about it and removed it on every subsequent run.
 
-### Approach 2: Separate aws_route Resources (RECOMMENDED)
+_____________________________________________________________________
 
-```hcl
-resource "aws_route_table" "rt_public" {
-  vpc_id = aws_vpc.vpc_main.id
-  tags   = { Name = "dev-public-rt" }
-  # No inline routes!
-}
+[Final Solution]
+Removed inline route {} blocks from aws_route_table. Created separate
+aws_route resource for each route. Each resource owns only its own route —
+multiple modules can safely add routes to the same table.
 
-resource "aws_route" "internet" {
-  route_table_id         = aws_route_table.rt_public.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw_main.id
-}
-```
+  Before (PROBLEMATIC — inline routes, owns everything):
+    resource "aws_route_table" "rt_public" {
+      vpc_id = aws_vpc.vpc_main.id
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.igw_main.id
+      }
+    }
 
-**Terraform Plan Output (after compute added 10.0.0.0/16 route):**
-```
-No changes. Your infrastructure matches the configuration.
-```
+  After (CORRECT — separate resource, owns only this route):
+    resource "aws_route_table" "rt_public" {
+      vpc_id = aws_vpc.vpc_main.id
+      tags   = { Name = "dev-public-rt" }
+      # no inline routes
+    }
 
-| Pros | Cons |
-|------|------|
-| Each module owns only its routes | Slightly more verbose |
-| No cross-module conflicts | Route table and route are separate resources |
-| Compute can add routes independently | One-time import needed when migrating |
-| Clear ownership per route | |
-| AWS recommended pattern | |
+    resource "aws_route" "internet" {
+      route_table_id         = aws_route_table.rt_public.id
+      destination_cidr_block = "0.0.0.0/0"
+      gateway_id             = aws_internet_gateway.igw_main.id
+    }
 
-### Architecture: Cross-State Route Management
+  Compute module (unchanged — already correct pattern):
+    resource "aws_route" "home_subnets" {
+      route_table_id         = data.terraform_remote_state.network.outputs.rt_public_id
+      destination_cidr_block = "10.0.0.0/16"
+      network_interface_id   = aws_instance.wireguard.primary_network_interface_id
+    }
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              Network Module (State A)                           │
-│  - aws_route_table.rt_public (no inline routes)                 │
-│  - aws_route.internet (0.0.0.0/0 → IGW)                         │
-│  - outputs: rt_public_id                                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ data.terraform_remote_state
-┌─────────────────────────────────────────────────────────────────┐
-│              Compute Module (State B)                           │
-│  - aws_instance.wireguard                                       │
-│  - aws_route.home_subnets (10.0.0.0/16 → ENI)                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+One-time migration — import existing route after switching from inline to aws_route:
+  terraform import aws_route.internet rtb-xxx_0.0.0.0/0
 
-### Why Compute Creates Routes (Not Network)
+  If RouteAlreadyExists error on first apply after import:
+    Error: creating Route in Route Table (rtb-xxx): RouteAlreadyExists: 0.0.0.0/0
+    Fix: run the import command above, then re-run.
 
-```hcl
-# In compute/main.tf
-resource "aws_route" "home_subnets" {
-  route_table_id         = data.terraform_remote_state.network.outputs.rt_public_id
-  destination_cidr_block = "10.0.0.0/16"
-  network_interface_id   = aws_instance.wireguard.primary_network_interface_id
-}
-```
+  Added to workflow with comment to remove after first successful run:
+    terraform import aws_route.internet $(terraform output -raw rt_public_id)_0.0.0.0/0 || true
 
-**Chicken and egg problem:**
-- Route needs `network_interface_id` from EC2 instance
-- EC2 instance doesn't exist until compute module runs
-- Network module can't reference compute resources (separate state)
-- Solution: Compute module creates routes that depend on compute resources
+Files changed:
+  terraform/dev/aws/network/main.tf
+  terraform/prod/aws/network/main.tf
+  .github/workflows/dev-aws-network.yml  (migration import step)
+  .github/workflows/prod-aws-network.yml (migration import step)
 
-**This is correct because:**
-- Each module owns resources it can fully manage
-- Network exports `rt_public_id` for other modules to use
-- Compute creates `aws_route` resources in the same route table
-- No state conflicts - each `aws_route` is independent
+Verified: Yes
 
-### Migration Steps
+_____________________________________________________________________
 
-**One-Time Migration (existing infrastructure):**
+[Risk Level] LOW
+Note: One-time import required when migrating existing infrastructure.
+No functional impact after migration.
 
-Added to workflow with comment to remove after first run:
+_____________________________________________________________________
 
-```yaml
-# One-time migration: import route after switching from inline to aws_route resource
-# Comment out after first successful run
-- name: Import Route (migration)
-  run: terraform import aws_route.internet $(terraform output -raw rt_public_id)_0.0.0.0/0 || true
-```
+[References]
+-
+-
 
-**Manual Import (if needed):**
-```bash
-# Get route table ID
-cd terraform/dev/aws/network
-terraform output rt_public_id
+_____________________________________________________________________
 
-# Import the route
-terraform import aws_route.internet rtb-xxx_0.0.0.0/0
-```
+[Draft Notes]
 
-**If "RouteAlreadyExists" Error:**
-```
-Error: creating Route in Route Table (rtb-xxx) with destination (0.0.0.0/0):
-RouteAlreadyExists: The route identified by 0.0.0.0/0 already exists
-```
+aws_route_table inline route {} vs aws_route resource:
 
-Fix: Run import command above, then re-run workflow.
+  Inline route {}:
+    Pros: simple, all-in-one, easy to read
+    Cons: owns ALL routes in table, conflicts with other modules,
+          deletes routes it does not know about
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: One-time import required when migrating existing infrastructure
+  Separate aws_route resources:
+    Pros: each module owns only its routes, no cross-module conflicts,
+          compute can add routes independently, AWS recommended pattern
+    Cons: slightly more verbose, one-time import when migrating
 
-## 7. Impact After Fix
-- Observed: Network module no longer removes compute-added routes
-- Cross-module route management works correctly
-- No state conflicts between modules
+The core principle: in Terraform, inline blocks mean "I own everything in this
+collection." Separate resources mean "I own only this one item." When multiple
+modules share the same AWS resource (like a route table), always use separate
+resource types rather than inline blocks.
 
-## 8. Notes
-
-**Root Cause Summary:**
-
-`aws_route_table` with inline `route {}` blocks:
-- Tries to **own all routes** in the table
-- Sees routes from other modules as "drift"
-- Removes them on next apply
-
-`aws_route` resources:
-- Each resource owns **only its route**
-- Multiple modules can add routes independently
-- No conflicts between states
-
-**Files Changed:**
-- `terraform/dev/aws/network/main.tf` - Removed inline route, added `aws_route.internet`
-- `terraform/prod/aws/network/main.tf` - Same
-- `.github/workflows/dev-aws-network.yml` - Added migration import step
-- `.github/workflows/prod-aws-network.yml` - Same
-
-## 9. Workaround (if any)
-> If migration not possible: Add `lifecycle { ignore_changes = [route] }` to route table, but this prevents Terraform from managing any routes in that table.
+Workaround if migration not possible:
+  lifecycle { ignore_changes = [route] }
+  Warning: this prevents Terraform from managing ANY routes in that table.

@@ -1,6 +1,9 @@
 # Bash Scripts
 
-Linux system administration utilities.
+> **Archived PoC v1 material** — retired infrastructure, not the current project.
+> See [`../../../README.md`](../../../README.md) for the retirement story.
+
+Linux system administration utilities (PoC v1 era).
 
 ## Scripts
 

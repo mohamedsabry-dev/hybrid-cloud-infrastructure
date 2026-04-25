@@ -39,7 +39,7 @@
         msg: >-
           Target: {{ inventory_hostname }} | 
           Local Service:  UP | 
-          Prometheus Connection: {{ ' SUCCESS' if connectivity_test is success else '❌ BLOCKED (Check Firewall)' }}
+          Prometheus Connection: {{ ' SUCCESS' if connectivity_test is success else ' BLOCKED (Check Firewall)' }}
       failed_when: connectivity_test is failed
 
 ## ansible monitor.home.lab -m shell -a "cat /etc/prometheus/prometheus.yml" --become

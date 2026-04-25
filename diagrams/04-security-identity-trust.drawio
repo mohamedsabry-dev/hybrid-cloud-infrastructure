@@ -1,0 +1,149 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Security and Identity Trust" id="security">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== GITHUB OIDC ==================== -->
+        <mxCell id="oidc_layer" value="&lt;b&gt;GitHub Actions OIDC Authentication&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="700" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="gh_wf" value="&lt;b&gt;GitHub Actions&lt;/b&gt;&lt;br&gt;31 workflows&lt;br&gt;JWT token issued per job" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="oidc_layer">
+          <mxGeometry x="10" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="oidc_prov" value="&lt;b&gt;OIDC Provider&lt;/b&gt;&lt;br&gt;token.actions.githubusercontent.com&lt;br&gt;Registered in both AWS accounts" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="oidc_layer">
+          <mxGeometry x="260" y="40" width="280" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="eo_gh" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;" edge="1" source="gh_wf" target="oidc_prov" parent="oidc_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== AWS IAM 2-TIER ==================== -->
+        <mxCell id="iam_layer" value="&lt;b&gt;AWS IAM — 2-Tier Role Architecture&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="190" width="700" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="cfn" value="&lt;b&gt;CloudFormation Bootstrap&lt;/b&gt;&lt;br&gt;One-time manual deploy&lt;br&gt;Creates OIDC + roles" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="iam_layer">
+          <mxGeometry x="10" y="40" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="admin_role" value="&lt;b&gt;TerraformAdmin-{env}&lt;/b&gt;&lt;br&gt;Trigger: dev-security branch&lt;br&gt;Full admin + PermissionsBoundary&lt;br&gt;Creates: IAM roles, KMS keys, users" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="iam_layer">
+          <mxGeometry x="10" y="115" width="330" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="infra_role" value="&lt;b&gt;Infrastructure-{env}&lt;/b&gt;&lt;br&gt;Trigger: dev/prod branch&lt;br&gt;PowerUserAccess + SecurityBoundary&lt;br&gt;DENY: iam:*, cloudtrail:*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="iam_layer">
+          <mxGeometry x="360" y="115" width="330" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="perm_boundary" value="&lt;b&gt;PermissionsBoundary&lt;/b&gt;&lt;br&gt;Protects bootstrap resources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;dashed=1;" vertex="1" parent="iam_layer">
+          <mxGeometry x="250" y="40" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="sec_boundary" value="&lt;b&gt;SecurityBoundary&lt;/b&gt;&lt;br&gt;DENY iam:* cloudtrail:*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;dashed=1;" vertex="1" parent="iam_layer">
+          <mxGeometry x="500" y="40" width="190" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ei1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;dashed=1;" edge="1" source="cfn" target="admin_role" parent="iam_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ei2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1;dashed=1;" edge="1" source="cfn" target="infra_role" parent="iam_layer"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ==================== AWS VAULT RESOURCES ==================== -->
+        <mxCell id="aws_vault" value="&lt;b&gt;AWS Resources for Vault&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="450" width="700" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="kms_key" value="&lt;b&gt;KMS Key: vault-unseal&lt;/b&gt;&lt;br&gt;Annual rotation&lt;br&gt;3-tier key policy: Root/Admin/User" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="aws_vault">
+          <mxGeometry x="10" y="38" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="unseal_user" value="&lt;b&gt;vault-unseal IAM User&lt;/b&gt;&lt;br&gt;kms:Encrypt/Decrypt only&lt;br&gt;on vault-unseal key" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="aws_vault">
+          <mxGeometry x="240" y="38" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_trust" value="&lt;b&gt;vault_trust IAM User&lt;/b&gt;&lt;br&gt;sts:AssumeRole → etcd-backup&lt;br&gt;S3 Put/Get/List/Delete" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="aws_vault">
+          <mxGeometry x="470" y="38" width="220" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== FREEIPA ==================== -->
+        <mxCell id="ipa_layer" value="&lt;b&gt;FreeIPA Domain — lab.local&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="30" width="700" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_ldap" value="&lt;b&gt;LDAP Directory&lt;/b&gt;&lt;br&gt;Users • Groups&lt;br&gt;vault-admins → super_admin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="10" y="40" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_kerb" value="&lt;b&gt;Kerberos&lt;/b&gt;&lt;br&gt;Service principals&lt;br&gt;vault/vault1.lab.local&lt;br&gt;Keytab distribution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="240" y="40" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_ca" value="&lt;b&gt;Certificate Authority&lt;/b&gt;&lt;br&gt;Root CA → Intermediate&lt;br&gt;Issues TLS certs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="470" y="40" width="220" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_dns" value="&lt;b&gt;DNS Server&lt;/b&gt;&lt;br&gt;lab.local zone&lt;br&gt;Forward: 8.8.8.8, 1.1.1.1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="10" y="115" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_certmonger" value="&lt;b&gt;Certmonger&lt;/b&gt;&lt;br&gt;Auto cert renewal&lt;br&gt;ipa-getcert requests&lt;br&gt;systemctl reload on renew" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="240" y="115" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="ipa_hosts" value="&lt;b&gt;Host Enrollment&lt;/b&gt;&lt;br&gt;K8s nodes • Vault nodes&lt;br&gt;All service hosts" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="ipa_layer">
+          <mxGeometry x="470" y="115" width="220" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== VAULT ==================== -->
+        <mxCell id="vault_layer" value="&lt;b&gt;HashiCorp Vault HA Cluster&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="270" width="700" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_ha" value="&lt;b&gt;3-Node HA Cluster&lt;/b&gt;&lt;br&gt;Raft storage backend&lt;br&gt;Keepalived VIP&lt;br&gt;vault.lab.local" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="vault_layer">
+          <mxGeometry x="10" y="40" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_auth" value="&lt;b&gt;Auth Methods&lt;/b&gt;&lt;br&gt;• LDAP (FreeIPA bind)&lt;br&gt;• Kubernetes (SA token review)&lt;br&gt;• UserPass (emergency)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="240" y="40" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_secrets" value="&lt;b&gt;Secrets Engines&lt;/b&gt;&lt;br&gt;• KV v2: secret/&lt;br&gt;• AWS: etcd-backup role&lt;br&gt;  (STS temporary creds)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="470" y="40" width="220" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_policies" value="&lt;b&gt;Policies:&lt;/b&gt; super_admin (vault-admins LDAP group) • readonly • wordpress • mariadb • etcd-backup • remediation • alertmanager • grafana" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="10" y="125" width="450" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_tls" value="&lt;b&gt;TLS:&lt;/b&gt; FreeIPA-issued certs&lt;br&gt;Port 8200 + 8201 (cluster)&lt;br&gt;CA: /etc/ipa/ca.crt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="vault_layer">
+          <mxGeometry x="470" y="125" width="220" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== K8S RBAC ==================== -->
+        <mxCell id="k8s_layer" value="&lt;b&gt;Kubernetes RBAC + Vault Integration&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="510" width="700" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_auth_sa" value="&lt;b&gt;vault-auth ServiceAccount&lt;/b&gt;&lt;br&gt;kube-system namespace&lt;br&gt;Long-lived token secret&lt;br&gt;ClusterRoleBinding: system:auth-delegator" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="k8s_layer">
+          <mxGeometry x="10" y="40" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault_injector" value="&lt;b&gt;Vault Agent Injector&lt;/b&gt;&lt;br&gt;Mutating admission webhook&lt;br&gt;2 replicas on masters&lt;br&gt;Watches pod annotations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="k8s_layer">
+          <mxGeometry x="310" y="40" width="230" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_sas" value="&lt;b&gt;App ServiceAccounts&lt;/b&gt;&lt;br&gt;wordpress-sa • mariadb-sa&lt;br&gt;etcd-backup-sa&lt;br&gt;remediation-sa" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="k8s_layer">
+          <mxGeometry x="560" y="40" width="130" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s_inject_flow" value="&lt;b&gt;Secret Injection Flow:&lt;/b&gt; Pod created → webhook intercepts → adds Vault Agent init+sidecar → agent authenticates via K8s auth → requests secrets from Vault → renders templates to /vault/secrets/ → app container sources secrets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="k8s_layer">
+          <mxGeometry x="10" y="130" width="680" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== NETWORK SECURITY ==================== -->
+        <mxCell id="net_sec" value="&lt;b&gt;Network Security Boundaries&lt;/b&gt;" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;rounded=1;whiteSpace=wrap;html=1;collapsible=0;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="600" width="700" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="vlan_iso" value="&lt;b&gt;VLAN Isolation&lt;/b&gt;&lt;br&gt;13 VLANs total&lt;br&gt;VLAN 40: Storage (L2 isolated)&lt;br&gt;50-55: Prod • 60-65: Dev" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="net_sec">
+          <mxGeometry x="10" y="38" width="210" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="fw_policy" value="&lt;b&gt;MikroTik Firewall&lt;/b&gt;&lt;br&gt;Hard block: dev ↔ prod&lt;br&gt;Hard block: svc ↔ storage&lt;br&gt;Exception: K8s → Proxmox API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="net_sec">
+          <mxGeometry x="240" y="38" width="210" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="vpn_sec" value="&lt;b&gt;WireGuard VPN&lt;/b&gt;&lt;br&gt;On-prem ↔ AWS&lt;br&gt;Per-env tunnel isolation&lt;br&gt;AllowedIPs scoped" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="net_sec">
+          <mxGeometry x="470" y="38" width="220" height="75" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== TRUST FLOW EDGES ==================== -->
+        <!-- OIDC -> IAM -->
+        <mxCell id="et1" value="OIDC validate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#333;fontSize=10;" edge="1" source="oidc_layer" target="iam_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- IAM -> Vault resources -->
+        <mxCell id="et2" value="Terraform creates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#6c8ebf;fontColor=#333;fontSize=10;" edge="1" source="iam_layer" target="aws_vault" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- FreeIPA -> Vault -->
+        <mxCell id="et3" value="LDAP auth + TLS certs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#82b366;fontColor=#333;fontSize=10;" edge="1" source="ipa_layer" target="vault_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- KMS -> Vault -->
+        <mxCell id="et4" value="KMS auto-unseal" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#b85450;fontColor=#333;fontSize=10;dashed=1;" edge="1" source="aws_vault" target="vault_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Vault -> K8s -->
+        <mxCell id="et5" value="K8s auth + secret injection" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=2;strokeColor=#9673a6;fontColor=#333;fontSize=10;" edge="1" source="vault_layer" target="k8s_layer" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

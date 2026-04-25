@@ -1,6 +1,8 @@
 # Golden Templates
 
-Scripts to prepare base VM/LXC images for cloning. Run once to create golden templates.
+Scripts to prepare base VM/LXC images for cloning. Run once (per OS rebuild) to create the golden templates that Terraform then clones from.
+
+> **Design notes & reasoning** — for why each package is in the list, why `firewalld` is installed-but-disabled by default, why debugging tools are shipped on every node, and how these scripts grew iteratively, see [`DESIGN.md`](DESIGN.md).
 
 ## Scripts
 
@@ -57,21 +59,7 @@ Scripts to prepare base VM/LXC images for cloning. Run once to create golden tem
    - Clear network config, SSH host keys
    - Clear machine-id, logs, cache, history
 
-**Final steps (manual):**
-```bash
-# Stop container
-pct stop 9001
-
-# Create vzdump backup
-vzdump 9001 --compress gzip --storage local --mode stop
-
-# Move to template cache
-mv /var/lib/vz/dump/vzdump-lxc-9001-*.tar.gz \
-   /mnt/pve/nas-iso/template/cache/rocky-9-lxc-golden.tar.gz
-
-# Verify
-pveam list nas-iso
-```
+**Final steps (manual)** — Proxmox-host-side vzdump + move to template cache. See [`lxc-template-finalize-guide.txt`](lxc-template-finalize-guide.txt) for the commands.
 
 ## Key Differences
 

@@ -11,7 +11,7 @@ This guide covers the initial setup of a HashiCorp Vault cluster including:
 - Security best practices for key management
 
 
-⚠️  CRITICAL SECURITY WARNINGS
+  CRITICAL SECURITY WARNINGS
 ---------------------------------
 1. Unseal keys and root token are EXTREMELY sensitive
 2. If lost, your vault data becomes permanently inaccessible
@@ -37,20 +37,20 @@ PHASE 2: VAULT INITIALIZATION (First Node Only)
 
 2.1 - Security Recommendation
 -------------------------------
-⚠️  DO NOT run initialization via Ansible!
+  DO NOT run initialization via Ansible!
 
 Why?
 - Unseal keys and root token will appear in Ansible console logs
 - Keys stored temporarily in vault server's memory
 - Increased exposure risk
 
-❌ AVOID THIS:
+- AVOID THIS:
 ansible -i ../inventory vault-01.home.lab -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault operator init"
 
 
 2.2 - Recommended Method (Direct SSH)
 --------------------------------------
-✅ Use direct SSH connection for maximum security:
+- Use direct SSH connection for maximum security:
 
 ssh vault-01.home.lab
 export VAULT_ADDR='http://127.0.0.1:8200'
@@ -67,16 +67,16 @@ IMMEDIATELY after initialization:
 
 1. Copy all 5 unseal keys and root token
 2. Store in one or more of these locations:
-   ✓ Password manager (1Password, Bitwarden, LastPass, etc.)
-   ✓ Hardware security module (HSM)
-   ✓ Physical vault/safe
-   ✓ Encrypted USB drive (offline storage)
+   Yes Password manager (1Password, Bitwarden, LastPass, etc.)
+   Yes Hardware security module (HSM)
+   Yes Physical vault/safe
+   Yes Encrypted USB drive (offline storage)
 
 3. For lab environments ONLY (NOT production):
    - You may temporarily store in a file added to .gitignore
    - Move to secure storage as soon as possible
 
-⚠️  NEVER commit keys to version control!
+  NEVER commit keys to version control!
 
 
 ================================================================================
@@ -105,13 +105,13 @@ history | tail -5
 Verify Your Shell Configuration:
 echo $HISTCONTROL
 
-If output is "ignorespace" or "ignoreboth" → The trick works ✅
-If output is empty or other value → The trick won't work ❌
+If output is "ignorespace" or "ignoreboth" → The trick works 
+If output is empty or other value → The trick won't work 
 
 
 3.2 - Unseal First Node (vault-01)
 ------------------------------------
-⚠️  Note the SPACE before each ansible command below!
+  Note the SPACE before each ansible command below!
 
 Unseal with 3 different keys (threshold = 3):
 
@@ -148,7 +148,7 @@ Check status of all vault nodes:
 
 ansible -i ../inventory vault -m shell -a "export VAULT_ADDR='http://127.0.0.1:8200'; vault status"
 
-✅ Confirm all nodes show "Sealed: false"
+- Confirm all nodes show "Sealed: false"
 
 
 ================================================================================
@@ -222,16 +222,16 @@ vault login -method=userpass username=admin2
 SECURITY BEST PRACTICES
 ================================================================================
 
-✓ Initialize vault via direct SSH, not through Ansible
-✓ Store unseal keys and root token in secure offline storage
-✓ Use 3+ unseal keys from different team members (production)
-✓ Never commit secrets to version control
-✓ Use space trick or $HISTCONTROL to prevent history logging
-✓ Use operational admin accounts for daily tasks
-✓ Reserve root token for emergencies only
-✓ Rotate passwords regularly
-✓ Enable audit logging (recommended for production)
-✓ Remember: vault seals on restart - keep unseal keys accessible
+Yes Initialize vault via direct SSH, not through Ansible
+Yes Store unseal keys and root token in secure offline storage
+Yes Use 3+ unseal keys from different team members (production)
+Yes Never commit secrets to version control
+Yes Use space trick or $HISTCONTROL to prevent history logging
+Yes Use operational admin accounts for daily tasks
+Yes Reserve root token for emergencies only
+Yes Rotate passwords regularly
+Yes Enable audit logging (recommended for production)
+Yes Remember: vault seals on restart - keep unseal keys accessible
 
 
 ================================================================================

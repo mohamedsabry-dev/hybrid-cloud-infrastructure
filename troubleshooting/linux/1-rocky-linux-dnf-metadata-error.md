@@ -1,117 +1,131 @@
 # TS-LNX-001 | 2026-02-24 | RESOLVED
+_____________________________________________________________________
 
-## 1. Context
-- System: Rocky Linux 10.1 / DNF package manager
-- Environment: DEV (lab.local)
-- Related components: LXC containers, yum repos
+[Info]
+Domain: Linux
+Sub-techs: Rocky Linux, DNF, yum repos, mirrorlist, HTTPS
+Environment: DEV lab.local | Rocky Linux 10.1 | LXC containers
+Re-opened: No
 
-## 2. Issue
-- Symptom: DNF fails to download repository metadata
-- Error:
-```
-Error: Failed to download metadata for repo 'baseos': repomd.xml parser error: Parse error at line: 36 (Opening and ending tag mismatch: link line 0 and head)
-```
+_____________________________________________________________________
 
-This error occurs when running any DNF command (`dnf install`, `dnf update`, `dnf makecache`).
+[Issue Description]
+DNF fails to download repository metadata on any command (install, update, makecache).
 
-## 3. Analysis
+  Error: Failed to download metadata for repo 'baseos':
+  repomd.xml parser error: Parse error at line: 36
+  (Opening and ending tag mismatch: link line 0 and head)
 
-**Check 1: What is the error saying?**
-```
-repomd.xml parser error: Opening and ending tag mismatch: link line 0 and head
-```
-Finding: DNF is receiving HTML instead of XML. The "link" and "head" tags are HTML elements, not XML metadata.
+_____________________________________________________________________
 
-**Check 2: Why is it returning HTML?**
-```bash
-# Check current repo config
-cat /etc/yum.repos.d/rocky.repo | grep -E "mirrorlist|baseurl"
-mirrorlist=http://mirrors.rockylinux.org/mirrorlist?...
-#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
-```
-Finding: Using mirrorlist which returns mirrors - some mirrors are misconfigured and return HTML error pages.
+[Analysis]
 
-**Check 3: Test direct baseurl**
-```bash
-curl -I https://dl.rockylinux.org/pub/rocky/10/BaseOS/x86_64/os/repodata/repomd.xml
-# HTTP/2 200
-```
-Finding: Direct URL works. Problem is with mirrorlist returning bad mirrors.
+# Initial Check Notes:
+The error message itself was the first clue — "link" and "head" are HTML tags,
+not XML. DNF was receiving an HTML page instead of repo metadata.
 
-## 4. Root Cause
-> 1. Rocky Linux mirrorlist returns mirrors that may serve HTML error pages instead of XML metadata
-> 2. Default repo config uses `http://` which may redirect to error pages
-> 3. Some mirrors in the mirrorlist are misconfigured or down
+Checked repo config to understand where DNF was fetching from:
 
-## 5. Solution
-> Disable mirrorlist, enable direct baseurl with HTTPS.
+Command:
+  cat /etc/yum.repos.d/rocky.repo | grep -E "mirrorlist|baseurl"
 
-**Why this works:** Using direct URL to dl.rockylinux.org bypasses unreliable mirrors. HTTPS prevents redirects to error pages.
+Output:
+  mirrorlist=http://mirrors.rockylinux.org/mirrorlist?...
+  #baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
 
-**Location:** On affected Rocky Linux system (LXC container or VM)
+Using mirrorlist — DNF picks a mirror from the list. Some mirrors in the list
+are misconfigured or down and return HTML error pages instead of XML metadata.
 
-**File:** `/etc/yum.repos.d/rocky.repo`
+Tested direct baseurl to confirm it works:
 
-**Step 1: Disable mirrorlist, enable baseurl**
-```bash
-sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo
-sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo
-```
+Command:
+  curl -I https://dl.rockylinux.org/pub/rocky/10/BaseOS/x86_64/os/repodata/repomd.xml
 
-**Step 2: Switch from HTTP to HTTPS**
-```bash
-sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo
-```
+Output:
+  HTTP/2 200 — direct URL works fine.
 
-**Step 3: Fix extras repo (if exists)**
-```bash
-# Option A: Disable extras (not usually needed)
-dnf config-manager --set-disabled extras
+Problem is the mirrorlist handing out bad mirrors, not the metadata itself.
 
-# Option B: Fix extras repo URL
-sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky-extras.repo
-```
 
-**Step 4: Clean and rebuild cache**
-```bash
-dnf clean all
-dnf makecache
-```
+# Suspected Root Cause
+Rocky Linux mirrorlist returns mirrors that may serve HTML error pages instead
+of XML metadata. Default repo config uses http:// which can redirect to error
+pages. Some mirrors in the list are misconfigured or down.
 
-**Complete one-liner:**
-```bash
-sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo && \
-sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo && \
-sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo && \
-dnf config-manager --set-disabled extras && \
-dnf clean all && \
-dnf makecache
-```
 
-**Verification:**
-```bash
-# Should complete without errors
-dnf makecache
+# More Checks Notes:
+N/A — direct URL test confirmed the fix direction.
 
-# Test install
-dnf install -y vim
-```
 
-## 6. Solution Risk
-- Risk level: LOW
-- Potential impact: Using single mirror (dl.rockylinux.org) instead of mirrorlist - if that mirror is down, DNF fails. But it's the official mirror, very reliable.
+# Suspected Solution
+Disable mirrorlist, switch to direct baseurl pointing at dl.rockylinux.org over HTTPS.
+Bypasses unreliable mirrors entirely.
 
-## 7. Impact After Fix
-- Observed: DNF commands work correctly
-- No new issues caused
 
-## 8. Notes
-- Apply this fix as part of golden image setup or initial provisioning
-- Affected systems: ansible LXC (10.0.63.10), any Rocky Linux 10.x using default mirrorlist
+# Test
+Applied sed commands to switch to baseurl + HTTPS, ran dnf makecache.
 
-**Related files:**
-- `/etc/yum.repos.d/rocky.repo`
-- `/etc/yum.repos.d/rocky-extras.repo`
+Command:
+  dnf makecache
+  dnf install -y vim
 
-## 9. Workaround (if any)
-> Same as solution - no alternative workaround.
+Result: PASS — metadata downloaded cleanly, package install worked.
+
+_____________________________________________________________________
+
+[Final Root Cause]
+Rocky Linux mirrorlist was handing out misconfigured or down mirrors that return
+HTML error pages instead of XML repo metadata. DNF tried to parse the HTML as XML
+and failed. The official direct URL (dl.rockylinux.org) works fine — the mirrorlist
+was the only problem.
+
+_____________________________________________________________________
+
+[Final Solution]
+Disabled mirrorlist, enabled direct baseurl with HTTPS on all affected Rocky Linux systems.
+
+  # Disable mirrorlist, enable baseurl
+  sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo
+  sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo
+
+  # Switch to HTTPS
+  sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo
+
+  # Disable extras repo (not usually needed)
+  dnf config-manager --set-disabled extras
+
+  # Rebuild cache
+  dnf clean all && dnf makecache
+
+One-liner:
+  sed -i 's/^mirrorlist=/#mirrorlist=/g' /etc/yum.repos.d/rocky.repo && \
+  sed -i 's/^#baseurl=/baseurl=/g' /etc/yum.repos.d/rocky.repo && \
+  sed -i 's|http://dl.rockylinux.org|https://dl.rockylinux.org|g' /etc/yum.repos.d/rocky.repo && \
+  dnf config-manager --set-disabled extras && \
+  dnf clean all && dnf makecache
+
+Apply as part of golden image setup or initial provisioning on any Rocky Linux 10.x.
+Affected: ansible LXC (10.0.63.10), any Rocky Linux 10.x using default mirrorlist.
+
+Verified: Yes
+
+_____________________________________________________________________
+
+[Risk Level] LOW
+Note: Now using single mirror (dl.rockylinux.org) instead of mirrorlist.
+If that mirror goes down DNF will fail — but it is the official Rocky mirror,
+very reliable in practice.
+
+_____________________________________________________________________
+
+[References]
+-
+-
+
+_____________________________________________________________________
+
+[Draft Notes]
+
+Related files:
+  /etc/yum.repos.d/rocky.repo
+  /etc/yum.repos.d/rocky-extras.repo
