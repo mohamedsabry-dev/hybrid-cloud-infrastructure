@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - coredns-custom.yaml
   - coredns-patch.yaml
-

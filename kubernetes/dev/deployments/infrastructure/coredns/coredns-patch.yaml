@@ -4,12 +4,12 @@ metadata:
   name: coredns
   namespace: kube-system
 spec:
-  selector:                    # add this
+  selector:
     matchLabels:
       k8s-app: kube-dns
   template:
     metadata:
-      labels:                  # add this
+      labels:
         k8s-app: kube-dns
     spec:
       nodeSelector:
