@@ -13,7 +13,7 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 | Phase | Period | Focus |
 |-------|--------|-------|
 | PoC v1 (VMware) | Nov 2025 → Jan 2026 | Nested ESXi lab — killed before K8s phase ([why](archive-poc-v1/DESIGN.md)) |
-| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 99 troubleshooting cases |
+| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 100 troubleshooting cases |
 | Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
 
 ---
