@@ -1,13 +1,19 @@
-# coredns-patch.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: coredns
   namespace: kube-system
 spec:
+  selector:                    # add this
+    matchLabels:
+      k8s-app: kube-dns
   template:
+    metadata:
+      labels:                  # add this
+        k8s-app: kube-dns
     spec:
       nodeSelector:
+        kubernetes.io/os: linux
         node-role.kubernetes.io/control-plane: ""
       tolerations:
         - key: node-role.kubernetes.io/control-plane
