@@ -2,14 +2,14 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**100 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
+**102 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 43 cases, 8 reference guides
+├── kubernetes/                  # 45 cases, 8 reference guides
 ├── proxmox/                     # 16 cases, 1 reference guide
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)
@@ -50,7 +50,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Kubernetes — 43 cases
+## Kubernetes — 45 cases
 
 [reference/](kubernetes/reference/) has 8 guides
 
@@ -98,7 +98,8 @@ Cascading failures, data loss risk, or full-service outages.
 | 47 | [csi-nfs-podlabels](kubernetes/47-csi-nfs-podlabels-silent-accept.md) | Helm silently accepted unsupported chart values |
 | 48 | [prometheus-pvc-nfs](kubernetes/48-prometheus-pvc-nfsv4-version-mismatch.md) | NFS version drift after StorageClass update |
 | 49 | [git-history-rewrite-flux-prune](kubernetes/49-git-history-rewrite-flux-prune-cascade.md) | Force-push from stale local orphaned 70 commits → Flux pruned CoreDNS ConfigMap → cluster DNS dead, apps cascade down |
-| 52 | [coredns-flux-patch-silent-skip](kubernetes/52-coredns-flux-patch-silent-skip-dns-boot-delay.md) | Flux patches: block silently skipped CoreDNS Deployment patch → DNS on workers → 3.5 min boot delay |
+| 52 | [remediation-pod-startup-delay](kubernetes/52-remediation-pod-startup-delay-disk-io-throttle.md) | vault-agent-init blocked 5 min on cold boot → Proxmox disk IO throttle (30 MB/s) page-faulting 250MB Go binary |
+| 53 | [coredns-flux-patch-silent-skip](kubernetes/53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | Flux patches: block silently skipped CoreDNS Deployment patch → DNS on workers → 3.5 min boot delay |
 
 ---
 

@@ -550,3 +550,4 @@ _____________________________________________________________________
 - proxmox/disaster_recovery/io-storm/ — IO storm watchdog script and docs
 - kubernetes/dev/deployments/apps/remediation/DESIGN.md — remediation confirmation delay reasoning
 - terraform/dev/proxmox/vms/k8s_workers/main.tf — IO throttle values in Terraform
+- TS-K8S-052 — Remediation pod startup delay: the 30 MB/s read limit from this case caused vault-agent-init to page-fault for 5+ minutes on cold boot. Values later updated to 125/150 MB/s r/w based on that investigation.
