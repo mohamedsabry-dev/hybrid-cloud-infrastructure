@@ -10,7 +10,7 @@ Severity: CRITICAL
 Discovered during: DR Test 2 — Total Worker Loss
 Related: TS-K8S-043 (NoExecute taint not applied — related eviction issue),
          disaster-recovery/worker-2of3-down.md
-Re-opened: No
+Re-opened: Yes — TS-K8S-052 (Flux patch was silently skipped on prod, manual apply masked it)
 
 _____________________________________________________________________
 
@@ -165,3 +165,4 @@ _____________________________________________________________________
 - disaster-recovery/worker-2of3-down.md — DR test where issue was discovered
 - ansible/dev/playbooks/k8s/coredns_ha.yml — Ansible playbook for CoreDNS HA
 - kubernetes/docs/manual-operation.txt — manual command reference
+- TS-K8S-052 — Re-opened: Flux patches: block silently skipped Deployment patch on prod (manual apply masked it on dev)

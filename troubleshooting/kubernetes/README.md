@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-41 cases + 11 reference guides in [reference/](reference/)
+44 cases + 11 reference guides in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -48,3 +48,5 @@
 | [049](49-git-history-rewrite-flux-prune-cascade.md) | 2026-04-23 | RESOLVED | Git History Rewrite → Flux Prune Cascade (CoreDNS Lost) |
 | [050](reference/50-remediation-pod-backup-window-race-condition.md) | 2026-04-24 | PENDING | Remediation Pod vs Backup Window Race Condition |
 | [051](reference/51-worker1-rollout-restart-micro-cascade.md) | 2026-04-25 | RESOLVED | Worker1 Rollout Restart Micro-Cascade → 2-Worker Drift |
+| [052](52-remediation-pod-startup-delay-disk-io-throttle.md) | 2026-04-27 | RESOLVED | Remediation Pod Startup Delay → Proxmox Disk IO Throttle |
+| [053](53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | 2026-04-26 | RESOLVED | CoreDNS Flux Patch Silent Skip → DNS Boot Delay |

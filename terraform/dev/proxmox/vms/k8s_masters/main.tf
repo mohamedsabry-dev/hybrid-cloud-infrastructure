@@ -43,10 +43,10 @@ resource "proxmox_virtual_environment_vm" "k8s_master1" {
       iops_read_burstable = 1500
       iops_write          = 300
       iops_write_burstable = 800
-      read                = 30
-      read_burstable      = 80
-      write               = 20
-      write_burstable     = 40
+      read                = 125
+      read_burstable      = 150
+      write               = 125
+      write_burstable     = 150
     }
   }
 
@@ -145,10 +145,10 @@ resource "proxmox_virtual_environment_vm" "k8s_master2" {
       iops_read_burstable = 1500
       iops_write          = 300
       iops_write_burstable = 800
-      read                = 30
-      read_burstable      = 80
-      write               = 20
-      write_burstable     = 40
+      read                = 125
+      read_burstable      = 150
+      write               = 125
+      write_burstable     = 150
     }
   }
 
@@ -246,10 +246,10 @@ resource "proxmox_virtual_environment_vm" "k8s_master3" {
       iops_read_burstable = 1500
       iops_write          = 300
       iops_write_burstable = 800
-      read                = 30
-      read_burstable      = 80
-      write               = 20
-      write_burstable     = 40
+      read                = 125
+      read_burstable      = 150
+      write               = 125
+      write_burstable     = 150
     }
   }
 
