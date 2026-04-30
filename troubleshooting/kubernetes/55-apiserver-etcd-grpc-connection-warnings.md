@@ -395,8 +395,54 @@ No local fix available:
 - No apiserver flag to control gRPC log verbosity for this
 - hashicorp/consul#17842 hit the same gRPC behavior, also no fix
 
-Workaround: filter in Loki queries with `|!= "addrConn.createTransport"`
-to exclude the noise during real-time monitoring.
+Workaround applied: Promtail drop filter to suppress the noise at
+ingestion level (see below).
+
+# The second variant — authentication handshake
+
+After the Promtail filter removed the "operation was canceled" storm,
+a second error variant became visible that was buried under the noise:
+
+```
+grpc: addrConn.createTransport failed to connect to
+{Addr: "127.0.0.1:2379"} Err: connection error: desc =
+"transport: authentication handshake failed: context canceled"
+```
+
+Less frequent (~every 7 minutes vs every 30 seconds), but same
+`addrConn.createTransport`, same `canceled`. I suspected this might
+actually be the cause of the main error — a TLS handshake getting
+canceled could trigger the resolver to cycle subchannels. But I
+don't have evidence to confirm that connection.
+
+Searched online — found kubernetes/kubernetes#125770 with comments
+showing the exact same "authentication handshake failed: context
+canceled" pattern across k8s 1.28+. Looks related to the same
+resolver bug but can't confirm if it's cause or effect.
+
+Decided to filter both variants — broadened the Promtail drop to
+catch any `addrConn.createTransport.*canceled` pattern. It's the
+practical solution until upstream fixes it.
+
+# Promtail filter applied
+
+Added drop pipeline stage to Promtail config (both dev and prod):
+```yaml
+config:
+  snippets:
+    pipelineStages:
+      - cri: {}
+      - drop:
+          expression: ".*addrConn\\.createTransport.*canceled.*"
+```
+
+Files changed:
+- kubernetes/dev/deployments/apps/logging/logging.yaml
+- kubernetes/prod/deployments/apps/logging/logging.yaml
+
+Flux deploys the change → Promtail restarts → noise stops appearing
+in Loki. The apiserver still generates the warnings (can't stop that
+until upstream fix), but they never reach Loki storage.
 
 _____________________________________________________________________
 
@@ -420,5 +466,6 @@ _____________________________________________________________________
 - etcd-io/etcd#21662 — fix PR (not merged yet)
 - grpc/grpc-go#8654 — attempt to suppress warning, rejected by maintainers
 - hashicorp/consul#17842 — same gRPC behavior in Consul, confirmed no impact
+- kubernetes/kubernetes#125770 — same error reported across k8s versions (1.28+), comments confirm both "operation was canceled" and "authentication handshake failed: context canceled" variants
 - TS-K8S-056 — cgroup fix session where log noise made Loki monitoring a nightmare
 - Versions: k8s v1.35.3, etcd 3.6.6, kubeadm cluster
