@@ -125,8 +125,7 @@ spec:
         pipelineStages:
           - cri: {}
           - drop:
-              source: ""
-              expression: "addrConn\\.createTransport.*operation was canceled"
+              expression: ".*addrConn\\.createTransport.*operation was canceled.*"
 
     tolerations:
       - key: node-role.kubernetes.io/control-plane
