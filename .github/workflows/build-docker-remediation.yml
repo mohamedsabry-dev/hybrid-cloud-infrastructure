@@ -1,0 +1,39 @@
+# Builds & pushes the remediation Docker image to GHCR
+# Image is generic and contains no sensitive data — set to public on GHCR after push.
+# related: kubernetes/docker-images/remediation/
+name: Build Docker Remediation
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'kubernetes/docker-images/remediation/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-remediation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Remediation
+        uses: docker/build-push-action@v5
+        with:
+          context: kubernetes/docker-images/remediation/
+          push: true
+          tags: ghcr.io/mohamedsabry-dev/remediation:latest

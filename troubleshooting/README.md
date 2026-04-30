@@ -2,14 +2,14 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**102 cases + 14 reference guides across 10 categories** — [9 open](OPEN-TICKETS.md)
+**107 cases + 17 reference guides across 10 categories** — [10 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 45 cases, 8 reference guides
+├── kubernetes/                  # 46 cases, 11 reference guides
 ├── proxmox/                     # 16 cases, 1 reference guide
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)

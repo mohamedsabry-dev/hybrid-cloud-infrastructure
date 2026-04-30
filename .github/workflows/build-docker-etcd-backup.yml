@@ -1,0 +1,39 @@
+# Builds & pushes the etcd-backup Docker image to GHCR
+# Image is generic and contains no sensitive data — set to public on GHCR after push.
+# related: kubernetes/docker-images/etcd-backup/
+name: Build Docker etcd-backup
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'kubernetes/docker-images/etcd-backup/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-etcd-backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push etcd-backup
+        uses: docker/build-push-action@v5
+        with:
+          context: kubernetes/docker-images/etcd-backup/
+          push: true
+          tags: ghcr.io/mohamedsabry-dev/etcd-backup:latest
