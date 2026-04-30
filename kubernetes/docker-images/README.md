@@ -29,6 +29,7 @@ docker push ghcr.io/mohamedsabry-dev/remediation:latest
 ```
 
 **Used by:** `kubernetes/{dev,prod}/deployments/apps/remediation/deployment.yaml`
+**CI workflow:** `.github/workflows/build-docker-remediation.yml`
 
 ---
 
@@ -53,3 +54,4 @@ docker push ghcr.io/mohamedsabry-dev/etcd-backup:latest
 ```
 
 **Used by:** `kubernetes/{dev,prod}/deployments/apps/etcd-backup/cronjob.yaml`
+**CI workflow:** `.github/workflows/build-docker-etcd-backup.yml`

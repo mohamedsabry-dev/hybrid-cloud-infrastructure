@@ -44,9 +44,10 @@ For architecture, branch strategy, runners, and secrets — see [`../../github/`
 
 | Workflow | Branch | Purpose |
 |----------|--------|---------|
-| `build-docker-images` | dev | Build & push custom container images to GHCR (remediation, etcd-backup) |
+| `build-docker-remediation` | dev | Build & push remediation image to GHCR |
+| `build-docker-etcd-backup` | dev | Build & push etcd-backup image to GHCR |
 
-Triggered by changes under `kubernetes/docker-images/**`. Uses `dorny/paths-filter` to rebuild only the image whose source changed.
+Each triggers only on changes under its own `kubernetes/docker-images/{name}/**` path.
 
 ---
 
