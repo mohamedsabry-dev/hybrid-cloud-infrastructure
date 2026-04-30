@@ -1,0 +1,12 @@
+---
+- name: update config of containerd
+  hosts: k8s
+  become: yes
+  tasks:
+    - name: Enable systemd cgroup driver
+      ansible.builtin.blockinfile:
+        path: /etc/containerd/config.toml
+        block: |
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+            SystemdCgroup = true
+        marker: "# {mark} ANSIBLE MANAGED - SystemdCgroup"

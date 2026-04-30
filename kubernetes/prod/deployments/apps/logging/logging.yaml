@@ -121,6 +121,13 @@ spec:
       clients:
         - url: http://loki:3100/loki/api/v1/push
 
+      snippets:
+        pipelineStages:
+          - cri: {}
+          - drop:
+              source: ""
+              expression: "addrConn\\.createTransport.*operation was canceled"
+
     tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists
