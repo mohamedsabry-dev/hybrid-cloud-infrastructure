@@ -87,10 +87,12 @@
         creates: /etc/containerd/config.toml
 
     - name: Enable systemd cgroup driver
-      ansible.builtin.replace:
+      ansible.builtin.blockinfile:
         path: /etc/containerd/config.toml
-        regexp: 'SystemdCgroup = false'
-        replace: 'SystemdCgroup = true'
+        block: |
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+            SystemdCgroup = true
+        marker: "# {mark} ANSIBLE MANAGED - SystemdCgroup"
       notify: Restart containerd
 
     - name: Enable CRI plugin (containerd v2)

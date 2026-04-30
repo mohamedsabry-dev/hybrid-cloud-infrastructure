@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-44 cases + 11 reference guides in [reference/](reference/)
+46 cases + 11 reference guides in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -50,3 +50,6 @@
 | [051](reference/51-worker1-rollout-restart-micro-cascade.md) | 2026-04-25 | RESOLVED | Worker1 Rollout Restart Micro-Cascade → 2-Worker Drift |
 | [052](52-remediation-pod-startup-delay-disk-io-throttle.md) | 2026-04-27 | RESOLVED | Remediation Pod Startup Delay → Proxmox Disk IO Throttle |
 | [053](53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | 2026-04-26 | RESOLVED | CoreDNS Flux Patch Silent Skip → DNS Boot Delay |
+| [054](54-scheduler-controller-manager-bind-address-fix.md) | 2026-04-30 | RESOLVED | Scheduler + Controller-Manager Bind Address Fix |
+| [055](55-apiserver-etcd-grpc-connection-warnings.md) | 2026-04-30 | WORKAROUND APPLIED | API Server etcd gRPC Connection Warnings |
+| [056](56-containerd-kubelet-cgroup-driver-mismatch.md) | 2026-04-30 | RESOLVED | containerd/Kubelet Cgroup Driver Mismatch |
