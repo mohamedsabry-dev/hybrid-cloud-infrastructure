@@ -148,7 +148,7 @@ variable "disks" {
     os_disk = {
       datastore_id = "local-lvm"
       interface    = "scsi0"
-      size         = 15
+      size         = 20
       ssd          = true
       discard      = "on"
       file_format  = "raw"
