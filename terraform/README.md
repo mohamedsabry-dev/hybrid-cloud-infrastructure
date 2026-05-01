@@ -36,7 +36,8 @@ terraform/
 │           └── k8s_workers/    # 3 K8s worker VMs (with second NIC on VLAN 40 for CSI-NFS)
 └── prod/                       # Mirror of dev with env-specific tokens swapped
     ├── aws/          (same structure as dev)
-    └── proxmox/      (same structure as dev)
+    └── proxmox/      (same structure as dev, plus:)
+        └── vms/testing/       # 2 throwaway VMs for DR break/fix testing (prod only, VLAN 55)
 ```
 
 Each module has its own `provider.tf` pinning the S3 state backend + DynamoDB lock table. No shared state between modules — each module owns its slice.
