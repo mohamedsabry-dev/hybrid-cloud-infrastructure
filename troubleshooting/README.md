@@ -2,18 +2,18 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**107 cases + 17 reference guides across 10 categories** — [10 open](OPEN-TICKETS.md)
+**109 cases + 18 reference guides across 10 categories** — [10 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 46 cases, 11 reference guides
-├── proxmox/                     # 16 cases, 1 reference guide
+├── kubernetes/                  # 48 cases, 11 reference guides
+├── proxmox/                     # 18 cases, 2 reference guides
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)
-├── identity/                    # 9 cases (FreeIPA, Kerberos, SSSD)
+├── identity/                    # 10 cases (FreeIPA, Kerberos, SSSD)
 ├── vault/                       # 5 cases
 ├── network/                     # 5 cases
 ├── linux/                       # 4 cases
@@ -50,7 +50,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Kubernetes — 45 cases
+## Kubernetes — 48 cases
 
 [reference/](kubernetes/reference/) has 8 guides
 
@@ -100,12 +100,17 @@ Cascading failures, data loss risk, or full-service outages.
 | 49 | [git-history-rewrite-flux-prune](kubernetes/49-git-history-rewrite-flux-prune-cascade.md) | Force-push from stale local orphaned 70 commits → Flux pruned CoreDNS ConfigMap → cluster DNS dead, apps cascade down |
 | 52 | [remediation-pod-startup-delay](kubernetes/52-remediation-pod-startup-delay-disk-io-throttle.md) | vault-agent-init blocked 5 min on cold boot → Proxmox disk IO throttle (30 MB/s) page-faulting 250MB Go binary |
 | 53 | [coredns-flux-patch-silent-skip](kubernetes/53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | Flux patches: block silently skipped CoreDNS Deployment patch → DNS on workers → 3.5 min boot delay |
+| 54 | [scheduler-controller-manager-bind-address](kubernetes/54-scheduler-controller-manager-bind-address-fix.md) | Scheduler and controller-manager metrics invisible in Grafana — bound to localhost only |
+| 55 | [apiserver-etcd-grpc-warnings](kubernetes/55-apiserver-etcd-grpc-connection-warnings.md) | apiserver etcd gRPC connection warnings across all masters |
+| 56 | [containerd-cgroup-mismatch](kubernetes/56-containerd-kubelet-cgroup-driver-mismatch.md) | containerd using cgroupfs while kubelet uses systemd cgroup driver |
+| 57 | [etcd-backup-boot-race](kubernetes/57-etcd-backup-cronjob-boot-race-vault-init.md) | KubeJobFailed alerts — etcd-backup CronJob fails on boot due to Vault init container race |
+| 58 | [kube-proxy-metrics-bind](kubernetes/58-kube-proxy-metrics-bind-address-fix.md) | TargetDown for kube-proxy — metrics bound to localhost, Prometheus can't scrape |
 
 ---
 
-## Proxmox — 16 cases
+## Proxmox — 18 cases
 
-[reference/](proxmox/reference/) has 1 guide
+[reference/](proxmox/reference/) has 2 guides
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -125,6 +130,8 @@ Cascading failures, data loss risk, or full-service outages.
 | 14 | [worker-vm-crash](proxmox/14-worker-vm-crash-unknown-root-cause.md) | Worker VM crashed on autostart — remediation pod triggered reboot during boot |
 | 15 | [vzdump-thermal](proxmox/15-vzdump-thermal-shutdown-during-backup.md) | vzdump thermal crash/shutdown during backup (dev+prod merged, was also TS-PVE-018) |
 | 17 | [host-cpu-io-spike](proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md) | CPU/IO spike during DR testing — all VMs hung |
+| 19 | [worker3-config-drift](proxmox/19-worker3-vm-config-drift.md) | Worker3 config drift — qmrestore on LVM-thin renamed cloud-init volume |
+| 20 | [vzdump-destabilizes-k8s](proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md) | vzdump backup destabilizes k8s cluster — dense VM data saturates NVMe IO |
 
 ---
 
@@ -163,7 +170,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Identity — 9 cases
+## Identity — 10 cases
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -176,6 +183,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 7 | [ntp-lxc-skip](identity/7-freeipa-client-ntp-lxc-skip.md) | chronyd can't run in unprivileged LXC |
 | 8 | [keytab-preauth](identity/8-keytab-preauthentication-failed.md) | ipa-getkeytab without -r broke password auth |
 | 9 | [sssd-knownhosts-timeout](identity/9-ansible-sssd-knownhosts-timeout.md) | 28-34s Ansible delays when IPA down |
+| 10 | [sssd-crash-boot-keytab](identity/10-sssd-crash-boot-keytab-read-failure.md) | SSSD failed after reboot — keytab read failure broke domain logins for 12+ hours |
 
 ---
 

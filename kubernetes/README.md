@@ -74,10 +74,10 @@ a ServiceAccount + `vault-ca-secret` + pod annotations. The Vault agent injector
 (deployed in infrastructure layer) handles the rest. No hardcoded credentials anywhere.
 
 **NFS storage classes** — three classes on the Asustor NAS, each for a different use case:
-- `nfs-retain` — soft mount, 30s timeout. For stateful apps that can tolerate brief NFS
+- `nfs-retain` — soft mount, 3s timeout (timeo=30 deciseconds). For stateful apps that can tolerate brief NFS
   hiccups (Grafana, Prometheus, Loki).
 - `nfs-delete` — soft mount. For ephemeral/testing workloads.
-- `nfs-database` — hard mount, 600s timeout, interruptible. For databases (MariaDB) where
+- `nfs-database` — hard mount, 60s timeout (timeo=600 deciseconds), interruptible. For databases (MariaDB) where
   data integrity matters more than availability during NFS blips.
 
 **On-prem self-healing** — the remediation system handles what Kubernetes can't: VM-level
