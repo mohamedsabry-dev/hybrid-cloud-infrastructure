@@ -16,9 +16,16 @@ For the setup + refresh commands, see [`golden-image-operation-guide.txt`](golde
 | `freeipa` | FreeIPA identity + DNS server | `vm, freeipa, identity, prod` |
 | `k8s_masters` | Kubernetes control plane (3 nodes) | `vm, k8s-master, kubernetes, prod` |
 | `k8s_workers` | Kubernetes workers (3 nodes, with second NIC on VLAN 40 for CSI-NFS) | `vm, k8s-worker, kubernetes, prod` |
+| `testing` | 2 throwaway VMs for DR break/fix testing (VLAN 55, not in boot order) | `vm, test, linux, prod` |
 
 Template flow: `golden-image` → cloned manually to VMID 9001 (not Terraform-managed)
-→ `freeipa` / `k8s_masters` / `k8s_workers` clone from 9001.
+→ `freeipa` / `k8s_masters` / `k8s_workers` / `testing` clone from 9001.
+
+### Testing VMs — why they exist
+
+Two disposable VMs (test1, test2) for running risky Linux operations — filesystem corruption, kernel-level recovery, boot failure DR scenarios — without touching any production workload. Placed on VLAN 55 (the external-facing VLAN, same as Nginx) rather than internal-sensitive VLANs. Ansible SSH key injected so I can jump to them from VPN without extra setup, which matters for operating from outside the home network. Second NIC on VLAN 40 (storage) attached just in case I need NFS access later.
+
+Both VMs are `started = false` and `on_boot = false` — excluded from the Proxmox boot order entirely. They only come up when I manually start them for a test session.
 
 ## Tags convention
 
@@ -37,6 +44,7 @@ Every VM is tagged `[type, service, category, environment]`:
 | `freeipa` | `vm_id`, `name`, `ip` |
 | `k8s_masters` | per-master `vm_id`, `name`, `ip` |
 | `k8s_workers` | per-worker `vm_id`, `name`, `ip` |
+| `testing` | per-vm `vm_id`, `name`, `ip`, `storage_ip` |
 
 ## Environment differences (dev vs prod)
 

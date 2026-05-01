@@ -13,7 +13,7 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 | Phase | Period | Focus |
 |-------|--------|-------|
 | PoC v1 (VMware) | Nov 2025 → Jan 2026 | Nested ESXi lab — killed before K8s phase ([why](archive-poc-v1/DESIGN.md)) |
-| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 30 workflows, 16 DR tests, 107 troubleshooting cases |
+| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 107 troubleshooting cases |
 | Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
 
 ---
@@ -90,7 +90,7 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | GitOps | Flux CD | 2-layer reconciliation (infra → apps) |
 | IaC | Terraform | AWS resources + Proxmox VM/LXC provisioning |
 | Config mgmt | Ansible | 72+ playbooks across dev and prod |
-| CI/CD | GitHub Actions (30 workflows) | OIDC auth, self-hosted runners, no long-lived keys |
+| CI/CD | GitHub Actions (31 workflows) | OIDC auth, self-hosted runners, no long-lived keys |
 | Monitoring | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
 | Alerting | Alertmanager | Vault-injected SMTP → email |
 | Networking | MikroTik + WireGuard | 13 VLANs, site-to-site VPN to AWS |
@@ -124,7 +124,7 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | Physical servers | 2 (dev 24GB Ryzen 7, prod 64GB Ryzen 7) |
 | VMs + LXCs per env | 7 VMs + 6 LXCs |
 | VLANs | 13 (management, storage, 6 per environment) |
-| GitHub workflows | 30 (OIDC auth, self-hosted runners) |
+| GitHub workflows | 31 (OIDC auth, self-hosted runners) |
 | Deployment guides | 15 (sequential, full stack) |
 | DR scenarios tested | 16 (storage, compute, identity, secrets, network) |
 | Troubleshooting cases | 107 (10 open, rest resolved) |
