@@ -16,7 +16,7 @@ data:
       contentType: ""
       kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
       qps: 0
-    clusterCIDR: 10.245.0.0/16
+    clusterCIDR: 10.244.0.0/16
     configSyncPeriod: 0s
     conntrack:
       maxPerCore: null
@@ -80,7 +80,7 @@ data:
     clusters:
     - cluster:
         certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: https://10.0.51.100:16443
+        server: https://10.0.61.100:16443
       name: default
     contexts:
     - context:
