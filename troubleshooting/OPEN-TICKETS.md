@@ -18,8 +18,6 @@ Non-resolved cases across all categories. Last updated: 2026-04-30.
 
 | Ticket | Status | What Happened |
 |--------|--------|---------------|
-| [TS-K8S-025](kubernetes/25-promtail-vault-namespace-logs.md) | SUSPENDED | Promtail not collecting logs from Vault namespace. Also confirmed not collecting |
-| [TS-K8S-039](kubernetes/39-kube-system-targetdown-false-positives.md) | SUSPENDED | Prometheus firing TargetDown and etcd alerts for kube-system components despite |
 | [TS-LNX-004](linux/4-cloud-init-etc-hosts-ownership.md) | SUSPENDED | Ansible playbook k8s_hosts_fallback.yml adds entries to /etc/hosts, but cloud-init resets ownership |
 
-**Total: 10 open (7 workaround/temp closed, 3 suspended)**
+**Total: 8 open (7 workaround/temp closed, 1 suspended)**

@@ -13,7 +13,7 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 | Phase | Period | Focus |
 |-------|--------|-------|
 | PoC v1 (VMware) | Nov 2025 → Jan 2026 | Nested ESXi lab — killed before K8s phase ([why](archive-poc-v1/DESIGN.md)) |
-| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 109 troubleshooting cases |
+| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows, 16 DR tests, 110 troubleshooting cases |
 | Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
 
 ---
@@ -112,7 +112,7 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | [`disaster-recovery/`](disaster-recovery/README.md) | 16 tested DR scenarios with outcomes and recovery procedures |
 | [`diagrams/`](diagrams/) | Architecture diagrams (draw.io) — topology, GitOps, network, security, monitoring, DR, storage |
 | [`deployment-docs/`](deployment-docs/README.md) | 15 sequential setup guides — full stack from bare metal to apps |
-| [`troubleshooting/`](troubleshooting/README.md) | 109 documented cases across 10 domains with root-cause analysis |
+| [`troubleshooting/`](troubleshooting/README.md) | 110 documented cases across 10 domains with root-cause analysis |
 | [`archive-poc-v1/`](archive-poc-v1/) | Retired VMware PoC v1 — 25 cases, 9 architecture diagrams, preserved as learning record |
 
 ---
@@ -143,7 +143,7 @@ Follow the 15-guide sequence in [`deployment-docs/`](deployment-docs/README.md).
 
 ## Troubleshooting
 
-109 cases across kubernetes, proxmox, terraform, identity, vault, network, github, linux, and AWS. Organized by domain in [`troubleshooting/`](troubleshooting/README.md). Open issues tracked in [`OPEN-TICKETS.md`](troubleshooting/OPEN-TICKETS.md).
+110 cases across kubernetes, proxmox, terraform, identity, vault, network, github, linux, and AWS. Organized by domain in [`troubleshooting/`](troubleshooting/README.md). Open issues tracked in [`OPEN-TICKETS.md`](troubleshooting/OPEN-TICKETS.md).
 
 ## Design Decisions
 
