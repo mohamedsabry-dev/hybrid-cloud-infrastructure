@@ -2,21 +2,21 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**110 cases + 22 reference guides across 10 categories** — [10 open](OPEN-TICKETS.md)
+**114 cases + 22 reference guides across 10 categories** — [11 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 49 cases, 15 reference guides
-├── proxmox/                     # 18 cases, 2 reference guides
+├── kubernetes/                  # 49 cases, 16 reference guides
+├── proxmox/                     # 18 cases, 3 reference guides
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)
 ├── identity/                    # 10 cases (FreeIPA, Kerberos, SSSD)
 ├── vault/                       # 5 cases
 ├── network/                     # 5 cases
-├── linux/                       # 4 cases
+├── linux/                       # 6 cases
 ├── macos/                       # 1 case, 1 reference guide
 └── aws/                         # 1 case
 ```
@@ -52,7 +52,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ## Kubernetes — 49 cases
 
-[reference/](kubernetes/reference/) has 15 reference files
+[reference/](kubernetes/reference/) has 16 reference files
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -106,12 +106,13 @@ Cascading failures, data loss risk, or full-service outages.
 | 57 | [etcd-backup-boot-race](kubernetes/57-etcd-backup-cronjob-boot-race-vault-init.md) | KubeJobFailed alerts — etcd-backup CronJob fails on boot due to Vault init container race |
 | 58 | [kube-proxy-metrics-bind](kubernetes/reference/58-kube-proxy-metrics-bind-address-fix.md) | TargetDown for kube-proxy — metrics bound to localhost, Prometheus can't scrape |
 | 59 | [etcd-metrics-listen-address](kubernetes/reference/59-etcd-metrics-listen-address-fix.md) | etcd metrics bound to localhost — Prometheus can't scrape, 3 false alarms |
+| 60 | [disk-full-monitoring-gaps](kubernetes/reference/60-disk-full-monitoring-gaps.md) | Node-exporter evicted before disk alert fires + event-exporter single replica |
 
 ---
 
 ## Proxmox — 18 cases
 
-[reference/](proxmox/reference/) has 2 guides
+[reference/](proxmox/reference/) has 3 guides
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -133,6 +134,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 17 | [host-cpu-io-spike](proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md) | CPU/IO spike during DR testing — all VMs hung |
 | 19 | [worker3-config-drift](proxmox/19-worker3-vm-config-drift.md) | Worker3 config drift — qmrestore on LVM-thin renamed cloud-init volume |
 | 20 | [vzdump-destabilizes-k8s](proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md) | vzdump backup destabilizes k8s cluster — dense VM data saturates NVMe IO |
+| 22 | [proxmox-memory-monitoring](proxmox/reference/22-proxmox-memory-monitoring.md) | No hypervisor-layer memory monitoring — disk pressure cascaded to 98% memory |
 
 ---
 
@@ -212,7 +214,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Linux — 4 cases
+## Linux — 6 cases
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -220,6 +222,8 @@ Cascading failures, data loss risk, or full-service outages.
 | 2 | [chronyd-lxc](linux/2-lxc-chronyd-adjtimex-failure.md) | chronyd permission denied in LXC |
 | 3 | [dns-fallback](linux/3-linux-nodes-dns-fallback.md) | SSSD overwrites fallback DNS → Vault can't reach KMS on IPA outage |
 | 4 | [cloud-init-hosts](linux/4-cloud-init-etc-hosts-ownership.md) | cloud-init wipes /etc/hosts on reboot |
+| 5 | [ssh-forced-password-change](linux/5-ssh-forced-password-change-pam-failure.md) | chage -d 0 forced change fails over SSH/su - — only passwd works |
+| 6 | [var-not-separate-partition](linux/6-var-not-separate-partition.md) | /var not isolated in golden image — container growth fills / and kills OS |
 
 ---
 

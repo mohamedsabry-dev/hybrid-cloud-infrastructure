@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-49 cases + 15 reference files in [reference/](reference/)
+49 cases + 16 reference files in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -56,3 +56,4 @@
 | [057](57-etcd-backup-cronjob-boot-race-vault-init.md) | 2026-04-30 | RESOLVED | etcd-backup CronJob Boot Race → Vault Init |
 | [058](reference/58-kube-proxy-metrics-bind-address-fix.md) | 2026-05-01 | RESOLVED | kube-proxy Metrics Bind Address Fix |
 | [059](reference/59-etcd-metrics-listen-address-fix.md) | 2026-05-02 | RESOLVED | etcd Metrics Listen Address Fix |
+| [060](reference/60-disk-full-monitoring-gaps.md) | 2026-05-03 | OPEN | Disk Full Monitoring Gaps (Absent Metric Alert + Event Exporter HA) |
