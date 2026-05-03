@@ -13,8 +13,10 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 | Phase | Period | Focus |
 |-------|--------|-------|
 | PoC v1 (VMware) | Nov 2025 → Jan 2026 | Nested ESXi lab — killed before K8s phase ([why](archive-poc-v1/DESIGN.md)) |
-| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 30 workflows, 16 DR tests, 107 troubleshooting cases |
+| Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows |
 | Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
+
+**Cumulative:** 17 DR tests, 114 troubleshooting cases across both phases.
 
 ---
 
@@ -29,7 +31,7 @@ All 8 architecture diagrams with full detail: [`diagrams/`](diagrams/README.md)
 
 ```
     ┌──────────── AWS ─────────────┐          ┌────── GitHub ──────┐
-    │ IAM/OIDC    S3 (etcd backup) │          │ 30 CI/CD workflows │
+    │ IAM/OIDC    S3 (etcd backup) │          │ 31 CI/CD workflows │
     │ KMS         Route53          │          │ OIDC auth (no keys)│
     │ WireGuard EC2 (VPN peer)     │          │ Flux source repo   │
     └──────────────┬───────────────┘          └────────────────────┘
@@ -89,8 +91,8 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | Orchestration | Kubernetes (3 masters + 3 workers) | HA cluster, HAProxy + Keepalived VIP |
 | GitOps | Flux CD | 2-layer reconciliation (infra → apps) |
 | IaC | Terraform | AWS resources + Proxmox VM/LXC provisioning |
-| Config mgmt | Ansible | 72+ playbooks across dev and prod |
-| CI/CD | GitHub Actions (30 workflows) | OIDC auth, self-hosted runners, no long-lived keys |
+| Config mgmt | Ansible | 76 playbooks across dev and prod |
+| CI/CD | GitHub Actions (31 workflows) | OIDC auth, self-hosted runners, no long-lived keys |
 | Monitoring | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
 | Alerting | Alertmanager | Vault-injected SMTP → email |
 | Networking | MikroTik + WireGuard | 13 VLANs, site-to-site VPN to AWS |
@@ -108,11 +110,11 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | [`kubernetes/`](kubernetes/) | Flux-managed manifests: monitoring, remediation, etcd-backup, WordPress, MariaDB |
 | [`network/`](network/README.md) | MikroTik configs, VLAN map, IP plan, WireGuard VPN setup |
 | [`proxmox/`](proxmox/README.md) | Bootstrap scripts, golden templates, backup config, DR prevention scripts |
-| [`.github/workflows/`](.github/workflows/README.md) | 30 CI/CD workflows — Terraform + Ansible + Docker builds |
-| [`disaster-recovery/`](disaster-recovery/README.md) | 16 tested DR scenarios with outcomes and recovery procedures |
+| [`.github/workflows/`](.github/workflows/README.md) | 31 CI/CD workflows — Terraform + Ansible + Docker builds |
+| [`disaster-recovery/`](disaster-recovery/README.md) | 17 tested DR scenarios with outcomes and recovery procedures |
 | [`diagrams/`](diagrams/) | Architecture diagrams (draw.io) — topology, GitOps, network, security, monitoring, DR, storage |
 | [`deployment-docs/`](deployment-docs/README.md) | 15 sequential setup guides — full stack from bare metal to apps |
-| [`troubleshooting/`](troubleshooting/README.md) | 107 documented cases across 10 domains with root-cause analysis |
+| [`troubleshooting/`](troubleshooting/README.md) | 114 documented cases across 10 domains with root-cause analysis |
 | [`archive-poc-v1/`](archive-poc-v1/) | Retired VMware PoC v1 — 25 cases, 9 architecture diagrams, preserved as learning record |
 
 ---
@@ -124,11 +126,11 @@ Every app with secrets uses the same Vault Agent injection pattern — no secret
 | Physical servers | 2 (dev 24GB Ryzen 7, prod 64GB Ryzen 7) |
 | VMs + LXCs per env | 7 VMs + 6 LXCs |
 | VLANs | 13 (management, storage, 6 per environment) |
-| GitHub workflows | 30 (OIDC auth, self-hosted runners) |
+| GitHub workflows | 31 (OIDC auth, self-hosted runners) |
 | Deployment guides | 15 (sequential, full stack) |
-| DR scenarios tested | 16 (storage, compute, identity, secrets, network) |
-| Troubleshooting cases | 107 (10 open, rest resolved) |
-| Ansible playbooks | 72+ |
+| DR scenarios tested | 17 (storage, compute, identity, secrets, network) |
+| Troubleshooting cases | 114 (11 open, rest resolved) |
+| Ansible playbooks | 76 |
 | Terraform modules | 12 per environment |
 
 ---
@@ -139,11 +141,11 @@ Follow the 15-guide sequence in [`deployment-docs/`](deployment-docs/README.md).
 
 ## Disaster Recovery
 
-16 scenarios tested and documented in [`disaster-recovery/`](disaster-recovery/README.md). Covers etcd quorum loss, full NAS shutdown, FreeIPA outage, Vault credential loss, worker node failure with auto-remediation, and more. Each test documents what broke, what survived, and what was fixed.
+17 scenarios tested and documented in [`disaster-recovery/`](disaster-recovery/README.md). Covers etcd quorum loss, full NAS shutdown, FreeIPA outage, Vault credential loss, worker node failure with auto-remediation, and more. Each test documents what broke, what survived, and what was fixed.
 
 ## Troubleshooting
 
-107 cases across kubernetes, proxmox, terraform, identity, vault, network, github, linux, and AWS. Organized by domain in [`troubleshooting/`](troubleshooting/README.md). Open issues tracked in [`OPEN-TICKETS.md`](troubleshooting/OPEN-TICKETS.md).
+114 cases across kubernetes, proxmox, terraform, identity, vault, network, github, linux, and AWS. Organized by domain in [`troubleshooting/`](troubleshooting/README.md). Open issues tracked in [`OPEN-TICKETS.md`](troubleshooting/OPEN-TICKETS.md).
 
 ## Design Decisions
 

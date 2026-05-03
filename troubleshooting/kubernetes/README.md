@@ -1,6 +1,6 @@
 # Kubernetes Troubleshooting Cases
 
-46 cases + 11 reference guides in [reference/](reference/)
+49 cases + 16 reference files in [reference/](reference/)
 
 | # | Date | Status | Title |
 |---|------|--------|-------|
@@ -35,7 +35,7 @@
 | [036](36-grafana-antiaffinity-rollout-stuck.md) | 2026-04-18 | RESOLVED | Grafana Anti-Affinity Rollout Stuck |
 | [037](37-grafana-dashboards-missing-sqlite-corruption.md) | 2026-04-18 | RESOLVED | Grafana Dashboards Missing (SQLite Corruption) |
 | [038](38-qemu-guest-agent-cpu-loop.md) | 2026-04-17 | TRIGGER NOT IDENTIFIED | QEMU Guest Agent CPU Busy Loop |
-| [039](39-kube-system-targetdown-false-positives.md) | 2026-04-18 | SUSPENDED | kube-system TargetDown False Positives |
+| [039](reference/39-kube-system-targetdown-false-positives.md) | 2026-04-18 | RESOLVED | kube-system TargetDown False Positives |
 | [040](40-hpa-memory-scaling-behavior.md) | 2026-04-18 | RESOLVED | HPA Memory-Based Scaling Behavior |
 | [041](41-prometheusrule-not-picked-up.md) | 2026-04-18 | RESOLVED | PrometheusRule Not Picked Up |
 | [042](42-flux-retry-storm-cluster-outage.md) | 2026-04-18 | RESOLVED | Flux Retry Storm Cluster-Wide Outage |
@@ -50,6 +50,10 @@
 | [051](reference/51-worker1-rollout-restart-micro-cascade.md) | 2026-04-25 | RESOLVED | Worker1 Rollout Restart Micro-Cascade → 2-Worker Drift |
 | [052](52-remediation-pod-startup-delay-disk-io-throttle.md) | 2026-04-27 | RESOLVED | Remediation Pod Startup Delay → Proxmox Disk IO Throttle |
 | [053](53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | 2026-04-26 | RESOLVED | CoreDNS Flux Patch Silent Skip → DNS Boot Delay |
-| [054](54-scheduler-controller-manager-bind-address-fix.md) | 2026-04-30 | RESOLVED | Scheduler + Controller-Manager Bind Address Fix |
+| [054](reference/54-scheduler-controller-manager-bind-address-fix.md) | 2026-04-30 | RESOLVED | Scheduler + Controller-Manager Bind Address Fix |
 | [055](55-apiserver-etcd-grpc-connection-warnings.md) | 2026-04-30 | WORKAROUND APPLIED | API Server etcd gRPC Connection Warnings |
 | [056](56-containerd-kubelet-cgroup-driver-mismatch.md) | 2026-04-30 | RESOLVED | containerd/Kubelet Cgroup Driver Mismatch |
+| [057](57-etcd-backup-cronjob-boot-race-vault-init.md) | 2026-04-30 | RESOLVED | etcd-backup CronJob Boot Race → Vault Init |
+| [058](reference/58-kube-proxy-metrics-bind-address-fix.md) | 2026-05-01 | RESOLVED | kube-proxy Metrics Bind Address Fix |
+| [059](reference/59-etcd-metrics-listen-address-fix.md) | 2026-05-02 | RESOLVED | etcd Metrics Listen Address Fix |
+| [060](reference/60-disk-full-monitoring-gaps.md) | 2026-05-03 | OPEN | Disk Full Monitoring Gaps (Absent Metric Alert + Event Exporter HA) |

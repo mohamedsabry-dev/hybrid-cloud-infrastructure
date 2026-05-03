@@ -12,6 +12,8 @@ Documentation of OS-level issues encountered on Rocky Linux and LXC containers.
 | 2 | [lxc-chronyd-adjtimex-failure](2-lxc-chronyd-adjtimex-failure.md) | Chronyd fails with "adjtimex: Operation not permitted" | LXC lacks CAP_SYS_TIME, skip chronyd on LXC |
 | 3 | [linux-nodes-dns-fallback](3-linux-nodes-dns-fallback.md) | SSSD overwrites fallback DNS on IPA outage | zzz-ipa.conf overwrites resolv.conf |
 | 4 | [cloud-init-etc-hosts-ownership](4-cloud-init-etc-hosts-ownership.md) | cloud-init wipes /etc/hosts on reboot | cloud-init manages_etc_hosts default behavior |
+| 5 | [ssh-forced-password-change-pam-failure](5-ssh-forced-password-change-pam-failure.md) | chage -d 0 forced change fails over SSH/su - | SSH/su - can't handle expired password change, only passwd works |
+| 6 | [var-not-separate-partition](6-var-not-separate-partition.md) | /var not isolated — disk full kills entire OS | Golden image uses default partitioning, no /var separation |
 
 ---
 

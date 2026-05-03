@@ -28,6 +28,7 @@ For architecture, branch strategy, runners, and secrets — see [`../../github/`
 | `{env}-nginx-full-setup` | 1 | Deploy Nginx reverse proxy |
 | `{env}-vault-full-setup` | 2 | Deploy Vault cluster + Setup |
 | `{env}-proxmox-storage` | 1 | Configure NAS storage mounts |
+| `prod-test-infra` | 1 | Deploy 2 throwaway Linux VMs for DR break/fix testing (prod only) |
 
 ### AWS Infrastructure
 

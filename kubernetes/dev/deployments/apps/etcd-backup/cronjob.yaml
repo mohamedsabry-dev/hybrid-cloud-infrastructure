@@ -8,10 +8,10 @@ spec:
   timeZone: "Africa/Cairo"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
-      backoffLimit: 2
+      backoffLimit: 6
       template:
         metadata:
           labels:

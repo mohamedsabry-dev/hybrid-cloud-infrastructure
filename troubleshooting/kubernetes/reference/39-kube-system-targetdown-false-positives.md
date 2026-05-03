@@ -1,4 +1,4 @@
-# TS-K8S-039 | 2026-04-18 | SUSPENDED
+# TS-K8S-039 | 2026-04-18 | RESOLVED
 _____________________________________________________________________
 
 [Info]
@@ -148,4 +148,5 @@ _____________________________________________________________________
 [References]
 - Discovered after 2026-04-18 cluster outage recovery (TS-K8S-042)
 - TS-K8S-054 — Scheduler + controller-manager bind-address fix (partial resolution, 2026-04-30)
-- Remaining: kube-proxy (ConfigMap fix) and etcd (cert config) — separate tickets
+- TS-K8S-058 — Kube-proxy metricsBindAddress fix via Flux-managed ConfigMap (2026-05-01)
+- Remaining: etcd metrics (requires cert config) — separate ticket

@@ -9,4 +9,5 @@ resources:
   # Moved from infrastructure/ - requires vault-agent injection
   - remediation
   - etcd-backup
+  - event-exporter
   - alertmanager  # TODO: Enable after fixing vault-ca conflict
