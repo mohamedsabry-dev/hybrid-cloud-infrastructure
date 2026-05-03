@@ -1,4 +1,4 @@
-# TS-K8S-025 | 2026-04-11 | SUSPENDED
+# TS-K8S-025 | 2026-04-11 | CANCELLED
 # Originally identified during DR Task 1 pod kill testing.
 # Partially investigated 2026-04-20 — symptoms confirmed, root cause not yet found.
 _____________________________________________________________________
@@ -125,11 +125,11 @@ _____________________________________________________________________
 
 _____________________________________________________________________
 
-[Draft Notes]
-Next steps when resuming:
-  [ ] Check NetworkPolicy in vault namespace: kubectl get networkpolicy -n vault
-  [ ] Deep inspect Promtail target discovery: full /targets output, not just grep
-  [ ] Compare working namespace (apps) vs broken (vault) in Promtail targets
-  [ ] Check if Promtail has node affinity filtering in its SD config
-  [ ] Test: manually restart single Promtail pod on master1, watch /targets for vault
-  [ ] Check Loki ingestion limits / rate limiting
+[Cancellation — 2026-05-02]
+
+Vault namespace logs are now visible in Loki. Queried
+{namespace="vault", pod=~"vault-agent-injector.*"} and confirmed logs
+flowing normally — handler requests, TLS cert rotations, leader election
+events all present. Issue likely resolved itself at some point (possibly
+after a Promtail or Loki restart) or was caused by querying too narrow
+a time window during the original investigation. Cannot reproduce.

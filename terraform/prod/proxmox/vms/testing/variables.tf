@@ -37,7 +37,7 @@ variable "test1" {
     vmid           = 1030
     name           = "test1"
     cores          = 2
-    memory         = 1536  # 1.5GB
+    memory         = 3584  # 3.5GB # edited to carry docker
     ip             = "10.0.55.151/24"
     gateway        = "10.0.55.1"
     bridge         = "vmbr0"

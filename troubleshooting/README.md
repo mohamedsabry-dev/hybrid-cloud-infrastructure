@@ -2,21 +2,21 @@
 
 Issues encountered and resolved during hybrid cloud infrastructure operations (Proxmox iteration).
 
-**107 cases + 17 reference guides across 10 categories** — [10 open](OPEN-TICKETS.md)
+**114 cases + 22 reference guides across 10 categories** — [11 open](OPEN-TICKETS.md)
 
 ```
 troubleshooting/
 ├── OPEN-TICKETS.md              # Non-resolved ticket tracker
 ├── TEMPLATE.txt                 # Case template
 ├── update-open-tickets.sh       # Regenerate OPEN-TICKETS.md + open HTML report
-├── kubernetes/                  # 46 cases, 11 reference guides
-├── proxmox/                     # 16 cases, 1 reference guide
+├── kubernetes/                  # 49 cases, 16 reference guides
+├── proxmox/                     # 18 cases, 3 reference guides
 ├── terraform/                   # 10 cases, 1 reference guide
 ├── github/                      # 7 cases, 3 reference guides (security audits)
-├── identity/                    # 9 cases (FreeIPA, Kerberos, SSSD)
+├── identity/                    # 10 cases (FreeIPA, Kerberos, SSSD)
 ├── vault/                       # 5 cases
 ├── network/                     # 5 cases
-├── linux/                       # 4 cases
+├── linux/                       # 6 cases
 ├── macos/                       # 1 case, 1 reference guide
 └── aws/                         # 1 case
 ```
@@ -50,9 +50,9 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Kubernetes — 45 cases
+## Kubernetes — 49 cases
 
-[reference/](kubernetes/reference/) has 8 guides
+[reference/](kubernetes/reference/) has 16 reference files
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -76,7 +76,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 21 | [remediation-pod-stopped-vm](kubernetes/21-remediation-pod-stopped-vm-api-error.md) | Remediation crashed on already-stopped VM |
 | 22 | [worker-node-cascade](kubernetes/22-worker-node-failure-cascading-pod-failures.md) | Worker2 failure → StatefulSet split-brain, Vault race, CSI failures |
 | 23 | [kustomization-leftover](kubernetes/23-kustomization-resource-not-removed.md) | Test resource left in prod kustomization |
-| 25 | [promtail-vault-logs](kubernetes/25-promtail-vault-namespace-logs.md) | Promtail not collecting Vault logs — inconclusive |
+| 25 | [promtail-vault-logs](kubernetes/25-promtail-vault-namespace-logs.md) | Promtail not collecting Vault logs — CANCELLED, logs flowing normally on recheck |
 | 26 | [released-pvs](kubernetes/26-released-pvs-cleanup.md) | Orphaned PVs wasting storage |
 | 27 | [wordpress-php-upload](kubernetes/27-wordpress-php-upload-limits.md) | 2MB upload limit — missing PHP config |
 | 28 | [nginx-proxy-body-size](kubernetes/28-nginx-proxy-body-size-413-error.md) | 413 errors — external nginx missing body size config |
@@ -87,7 +87,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 36 | [grafana-antiaffinity](kubernetes/36-grafana-antiaffinity-rollout-stuck.md) | Anti-affinity too strict → rolling update blocked |
 | 37 | [grafana-sqlite-corruption](kubernetes/37-grafana-dashboards-missing-sqlite-corruption.md) | 3 Grafana replicas writing SQLite over NFS → corruption |
 | 38 | [qemu-guest-agent](kubernetes/38-qemu-guest-agent-cpu-loop.md) | qemu-ga EAGAIN busy loop eating 98% CPU |
-| 39 | [kube-system-targetdown](kubernetes/39-kube-system-targetdown-false-positives.md) | Prometheus false alerts — kubeadm localhost-only metrics |
+| 39 | [kube-system-targetdown](kubernetes/reference/39-kube-system-targetdown-false-positives.md) | Prometheus false alerts — kubeadm localhost-only metrics |
 | 40 | [hpa-memory-scaling](kubernetes/40-hpa-memory-scaling-behavior.md) | HPA triggered wrong — uses REQUEST not LIMIT for % |
 | 41 | [prometheusrule-not-picked-up](kubernetes/41-prometheusrule-not-picked-up.md) | Custom alerts missing — wrong label selector |
 | 42 | [flux-retry-storm](kubernetes/42-flux-retry-storm-cluster-outage.md) | Flux retry loop → etcd leader election failure → API down |
@@ -100,12 +100,19 @@ Cascading failures, data loss risk, or full-service outages.
 | 49 | [git-history-rewrite-flux-prune](kubernetes/49-git-history-rewrite-flux-prune-cascade.md) | Force-push from stale local orphaned 70 commits → Flux pruned CoreDNS ConfigMap → cluster DNS dead, apps cascade down |
 | 52 | [remediation-pod-startup-delay](kubernetes/52-remediation-pod-startup-delay-disk-io-throttle.md) | vault-agent-init blocked 5 min on cold boot → Proxmox disk IO throttle (30 MB/s) page-faulting 250MB Go binary |
 | 53 | [coredns-flux-patch-silent-skip](kubernetes/53-coredns-flux-patch-silent-skip-dns-boot-delay.md) | Flux patches: block silently skipped CoreDNS Deployment patch → DNS on workers → 3.5 min boot delay |
+| 54 | [scheduler-controller-manager-bind-address](kubernetes/reference/54-scheduler-controller-manager-bind-address-fix.md) | Scheduler and controller-manager metrics invisible in Grafana — bound to localhost only |
+| 55 | [apiserver-etcd-grpc-warnings](kubernetes/55-apiserver-etcd-grpc-connection-warnings.md) | apiserver etcd gRPC connection warnings across all masters |
+| 56 | [containerd-cgroup-mismatch](kubernetes/56-containerd-kubelet-cgroup-driver-mismatch.md) | containerd using cgroupfs while kubelet uses systemd cgroup driver |
+| 57 | [etcd-backup-boot-race](kubernetes/57-etcd-backup-cronjob-boot-race-vault-init.md) | KubeJobFailed alerts — etcd-backup CronJob fails on boot due to Vault init container race |
+| 58 | [kube-proxy-metrics-bind](kubernetes/reference/58-kube-proxy-metrics-bind-address-fix.md) | TargetDown for kube-proxy — metrics bound to localhost, Prometheus can't scrape |
+| 59 | [etcd-metrics-listen-address](kubernetes/reference/59-etcd-metrics-listen-address-fix.md) | etcd metrics bound to localhost — Prometheus can't scrape, 3 false alarms |
+| 60 | [disk-full-monitoring-gaps](kubernetes/reference/60-disk-full-monitoring-gaps.md) | Node-exporter evicted before disk alert fires + event-exporter single replica |
 
 ---
 
-## Proxmox — 16 cases
+## Proxmox — 18 cases
 
-[reference/](proxmox/reference/) has 1 guide
+[reference/](proxmox/reference/) has 3 guides
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -125,6 +132,9 @@ Cascading failures, data loss risk, or full-service outages.
 | 14 | [worker-vm-crash](proxmox/14-worker-vm-crash-unknown-root-cause.md) | Worker VM crashed on autostart — remediation pod triggered reboot during boot |
 | 15 | [vzdump-thermal](proxmox/15-vzdump-thermal-shutdown-during-backup.md) | vzdump thermal crash/shutdown during backup (dev+prod merged, was also TS-PVE-018) |
 | 17 | [host-cpu-io-spike](proxmox/17-proxmox-host-cpu-io-spike-vms-stuck.md) | CPU/IO spike during DR testing — all VMs hung |
+| 19 | [worker3-config-drift](proxmox/19-worker3-vm-config-drift.md) | Worker3 config drift — qmrestore on LVM-thin renamed cloud-init volume |
+| 20 | [vzdump-destabilizes-k8s](proxmox/20-vzdump-backup-destabilizes-k8s-cluster.md) | vzdump backup destabilizes k8s cluster — dense VM data saturates NVMe IO |
+| 22 | [proxmox-memory-monitoring](proxmox/reference/22-proxmox-memory-monitoring.md) | No hypervisor-layer memory monitoring — disk pressure cascaded to 98% memory |
 
 ---
 
@@ -163,7 +173,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Identity — 9 cases
+## Identity — 10 cases
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -176,6 +186,7 @@ Cascading failures, data loss risk, or full-service outages.
 | 7 | [ntp-lxc-skip](identity/7-freeipa-client-ntp-lxc-skip.md) | chronyd can't run in unprivileged LXC |
 | 8 | [keytab-preauth](identity/8-keytab-preauthentication-failed.md) | ipa-getkeytab without -r broke password auth |
 | 9 | [sssd-knownhosts-timeout](identity/9-ansible-sssd-knownhosts-timeout.md) | 28-34s Ansible delays when IPA down |
+| 10 | [sssd-crash-boot-keytab](identity/10-sssd-crash-boot-keytab-read-failure.md) | SSSD failed after reboot — keytab read failure broke domain logins for 12+ hours |
 
 ---
 
@@ -203,7 +214,7 @@ Cascading failures, data loss risk, or full-service outages.
 
 ---
 
-## Linux — 4 cases
+## Linux — 6 cases
 
 | # | File | What Happened |
 |---|------|---------------|
@@ -211,6 +222,8 @@ Cascading failures, data loss risk, or full-service outages.
 | 2 | [chronyd-lxc](linux/2-lxc-chronyd-adjtimex-failure.md) | chronyd permission denied in LXC |
 | 3 | [dns-fallback](linux/3-linux-nodes-dns-fallback.md) | SSSD overwrites fallback DNS → Vault can't reach KMS on IPA outage |
 | 4 | [cloud-init-hosts](linux/4-cloud-init-etc-hosts-ownership.md) | cloud-init wipes /etc/hosts on reboot |
+| 5 | [ssh-forced-password-change](linux/5-ssh-forced-password-change-pam-failure.md) | chage -d 0 forced change fails over SSH/su - — only passwd works |
+| 6 | [var-not-separate-partition](linux/6-var-not-separate-partition.md) | /var not isolated in golden image — container growth fills / and kills OS |
 
 ---
 

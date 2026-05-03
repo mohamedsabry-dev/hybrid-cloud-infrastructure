@@ -49,6 +49,7 @@ Before the planned DR test phase even began, real production incidents occurred 
 | [vault-raft-quorum-loss](vault-raft-quorum-loss.md) | Vault | PASS | Raft redirect behavior, new pods blocked |
 | [vault-aws-kms-credential-loss](vault-aws-kms-credential-loss.md) | Vault | PASS | No credentials = hard failure, not sealed |
 | [scheduler-failure-full-kill](scheduler-failure-full-kill.md) | Control Plane | PASS | Quietest failure in k8s — silent Pending, no events, no logs |
+| [worker-disk-full-root-filesystem](worker-disk-full-root-filesystem.md) | Compute / Storage | PASS | Kubelet self-healing validated, monitoring blind spot found (node-exporter dies first) |
 
 ---
 
@@ -64,6 +65,9 @@ Before the planned DR test phase even began, real production incidents occurred 
 | Ansible KnownHostsCommand=none | network-ipa-dns | 34s → 3s during IPA outage |
 | Remediation VM status check | worker-2of3-down | Couldn't handle stopped VMs |
 | Event Exporter deployed | scheduler-failure-full-kill | kubectl events invisible from Grafana — 6th monitoring source |
+| Absent metric alert needed | worker-disk-full-root-filesystem | Node-exporter evicted before disk alert fires — silence = no signal |
+| Event Exporter 2 replicas | worker-disk-full-root-filesystem | Single replica evicted during disk pressure — brief monitoring gap |
+| /var separate partition | worker-disk-full-root-filesystem | Golden image default partitioning lets /var growth kill root filesystem |
 
 ---
 

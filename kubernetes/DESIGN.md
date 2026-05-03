@@ -71,7 +71,7 @@ Every DR test has produced at least one surprise that improved the setup. The re
 
 That's the pattern: break it on purpose, learn, harden, repeat.
 
-## 8. Dev drift — 2 workers instead of 3
+## 7. Dev drift — 2 workers instead of 3
 
 Dev runs 2 workers (4GB each) while prod keeps the full 3+3. This is a deliberate resource optimization, not a feature gap.
 
@@ -89,7 +89,7 @@ This decision came directly from TS-K8S-051 — a cluster-wide rollout restart e
 
 ---
 
-## 7. etcd backup — automated snapshots, manual restore (for now)
+## 8. etcd backup — automated snapshots, manual restore (for now)
 
 A CronJob takes daily etcd snapshots and pushes them to S3. The upload uses a Vault-assumed IAM role, so no static AWS credentials sit in the cluster. That side is fully automated and working.
 

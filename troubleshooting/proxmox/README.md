@@ -28,6 +28,8 @@ Documentation of issues encountered with Proxmox VE, including LXC containers, V
 | 18 | — | — | Merged into TS-PVE-015 | Same root cause (vzdump thermal spike) |
 | 19 | [TS-PVE-019](19-worker3-vm-config-drift.md) | 2026-04-24 | Worker3 (1022) config drift — ide2/scsi0 changed between Apr 16-18 | qmrestore on LVM-thin renames cloud-init volume to disk-0 (loses CloudInit Drive type) |
 | 20 | [TS-PVE-020](20-vzdump-backup-destabilizes-k8s-cluster.md) | 2026-04-24 | vzdump backup destabilizes k8s cluster — IO 50-70%, control plane crashes | K8s VM disks have dense data (not sparse like IPA's 91% zeros) causing sustained NVMe IO contention |
+| 21 | [TS-PVE-021](reference/21-tf-disk-size-below-golden-image.md) | 2026-05-01 | Terraform apply failed — disk resize below golden image base | OS disk 15GB < golden image 20GB. Proxmox can't shrink cloned disk. Left stale tfstate, re-apply fixed it. |
+| 22 | [TS-PVE-022](reference/22-proxmox-memory-monitoring.md) | 2026-05-03 | Proxmox memory monitoring script needed | Disk pressure cascaded to 98% memory — no hypervisor-layer memory alerting exists |
 
 ---
 
@@ -65,6 +67,9 @@ Related cases covering NFS timing issues:
 
 ### Monitoring & Metrics
 - **Case 16:** Memory shows 97% → Linux cache counted as used — use Prometheus `MemAvailable`, NOT Proxmox metrics for CloudWatch integration
+
+### Terraform & Provisioning
+- **Case 21:** Disk resize failure → OS disk size must be >= golden image base (20GB). Terraform plan won't catch it — fails at apply after clone.
 
 ---
 
