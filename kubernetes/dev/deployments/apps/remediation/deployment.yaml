@@ -38,7 +38,7 @@ spec:
       priorityClassName: self-healing-critical
       containers:
         - name: remediation
-          image: ghcr.io/mohamedsabry-dev/remediation:latest
+          image: ghcr.io/mohamedsabry-dev/remediation:dev
           imagePullPolicy: Always
           command: ["python", "-u", "/scripts/remediation.py"]
           volumeMounts:

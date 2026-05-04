@@ -7,12 +7,9 @@ on:
   push:
     branches:
       - dev
+      - prod
     paths:
       - 'kubernetes/docker-images/remediation/**'
-  workflow_dispatch:
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-remediation:
@@ -36,4 +33,15 @@ jobs:
         with:
           context: kubernetes/docker-images/remediation/
           push: true
-          tags: ghcr.io/mohamedsabry-dev/remediation:latest
+          tags: |
+            ghcr.io/mohamedsabry-dev/remediation:${{ github.ref_name == 'prod' && 'latest' || 'dev' }}
+            ghcr.io/mohamedsabry-dev/remediation:${{ github.sha }}
+
+
+      - name: Delete old remediation images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: remediation
+          package-type: container
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
