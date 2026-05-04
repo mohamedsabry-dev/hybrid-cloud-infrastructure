@@ -16,7 +16,7 @@ The infrastructure provisions, configures, monitors, alerts, and heals itself. T
 | Construction | Jan 2026 → Apr 2026 | Full rebuild on Proxmox — K8s HA, Vault, Flux, 31 workflows |
 | Operations | Apr 2026 → ongoing | Platform stable — observability depth, chaos testing, pattern analysis |
 
-**Cumulative:** 17 DR tests, 114 troubleshooting cases across both phases.
+**Cumulative:** 17 DR tests, 139 troubleshooting cases across both phases.
 
 ---
 
