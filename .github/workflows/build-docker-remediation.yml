@@ -10,6 +10,7 @@ on:
       - prod
     paths:
       - 'kubernetes/docker-images/remediation/**'
+      - '.github/workflows/build-docker-remediation.yml'
 
 jobs:
   build-remediation:
