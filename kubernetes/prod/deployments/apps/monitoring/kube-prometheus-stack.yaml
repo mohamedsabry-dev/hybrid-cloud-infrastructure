@@ -105,6 +105,12 @@ spec:
     # Prometheus
     # ---------------------------------------------------------------------------
     prometheus:
+      ingress:
+        enabled: true
+        ingressClassName: nginx
+        hosts:
+          - prometheus-prod.lab.local
+
       prometheusSpec:
         # Scrape ALL ServiceMonitors/PodMonitors in the cluster, not just this release
         serviceMonitorSelectorNilUsesHelmValues: false

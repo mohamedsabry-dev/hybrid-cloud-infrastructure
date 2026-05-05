@@ -48,7 +48,8 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: etcd-backup
-              image: ghcr.io/mohamedsabry-dev/etcd-backup:latest
+              image: ghcr.io/mohamedsabry-dev/etcd-backup:dev
+              imagePullPolicy: Always
               command: ["bash", "/scripts/backup.sh"]
               volumeMounts:
                 - name: script

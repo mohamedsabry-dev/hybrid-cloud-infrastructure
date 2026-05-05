@@ -7,12 +7,9 @@ on:
   push:
     branches:
       - dev
+      - prod
     paths:
       - 'kubernetes/docker-images/etcd-backup/**'
-  workflow_dispatch:
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-etcd-backup:
@@ -36,4 +33,14 @@ jobs:
         with:
           context: kubernetes/docker-images/etcd-backup/
           push: true
-          tags: ghcr.io/mohamedsabry-dev/etcd-backup:latest
+          tags: |
+            ghcr.io/mohamedsabry-dev/etcd-backup:${{ github.ref_name == 'prod' && 'latest' || 'dev' }}
+            ghcr.io/mohamedsabry-dev/etcd-backup:${{ github.sha }}
+
+      - name: Delete old etcd-backup images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: etcd-backup
+          package-type: container
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
