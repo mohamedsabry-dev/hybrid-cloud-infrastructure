@@ -65,3 +65,6 @@ drafts/
 
 # Task tracking (local only)
 TASKS
+
+# Local docs (interview prep, personal notes — not tracked)
+local-docs/
