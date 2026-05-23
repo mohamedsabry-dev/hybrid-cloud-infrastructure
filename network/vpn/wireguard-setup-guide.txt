@@ -36,7 +36,7 @@ Home / Lab                   WireGuard EC2 Dev
 | **Hostname (AWS side)** | **wg-dev** | **wg-prod** |
 | AWS VPC CIDR | 172.16.0.0/16 | 172.17.0.0/16 |
 | AWS WireGuard subnet | 172.16.65.0/24 | 172.17.65.0/24 |
-| **AWS tunnel IP** | **172.16.200.2/16** | **172.17.200.2/16** |
+| **AWS tunnel IP** | **172.16.200.2/24** | **172.17.200.2/24** |
 | AWS listen port | 51820 | 51820 |
 | **On-prem tunnel IP** (MikroTik) | **172.16.200.1** | **172.17.200.1** |
 | On-prem listen port | 51820 | 51830 |
@@ -103,7 +103,7 @@ cat /etc/wireguard/public.key
 **Dev (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
-Address = 172.16.200.2/16
+Address = 172.16.200.2/24
 ListenPort = 51820
 PrivateKey = <AWS_PRIVATE_KEY>
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE
@@ -117,7 +117,7 @@ AllowedIPs = 172.16.200.1/32, 10.0.60.0/24, 10.0.61.0/24, 10.0.62.0/24, 10.0.63.
 **Prod (`/etc/wireguard/wg0.conf`):**
 ```ini
 [Interface]
-Address = 172.17.200.2/16
+Address = 172.17.200.2/24
 ListenPort = 51820
 PrivateKey = <AWS_PRIVATE_KEY>
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE
@@ -203,6 +203,8 @@ With tunnel IPs inside the VPC CIDR:
 - No static routes needed — WireGuard's own routing handles it.
 
 It looks unconventional (tunnel IPs carved out of the VPC space), but for a router that can only hold one AllowedIPs per peer it's the cleanest way to make the routing work with zero extra config.
+
+> **Important:** The tunnel IPs are *inside* the VPC CIDR, but the `Address` mask in wg0.conf must be `/24` (not `/16`). Using `/16` would install a connected route on wg0 that hijacks the entire VPC CIDR, breaking cross-subnet VPC traffic. The `/16` is only used on the *on-prem AllowedIPs* (peer routing), never on the AWS wg0 interface address. See TS-NET-006 for the full incident.
 
 ---
 
@@ -319,6 +321,12 @@ sudo tcpdump -i enX0 udp port 51820 -n
 **Symptom:** `traceroute` shows prod-bound traffic leaving via the dev tunnel IP (or vice versa).
 **Cause:** `AllowedIPs` misconfigured, or tunnel IPs not placed inside the VPC range.
 **Fix:** ensure tunnel IPs live inside the VPC CIDR (Dev `172.16.200.x` inside `172.16.0.0/16`, Prod `172.17.200.x` inside `172.17.0.0/16`) and AllowedIPs uses the corresponding `/16`.
+
+### Cross-subnet traffic fails (AWS EC2s can't reach on-prem)
+**Symptom:** EC2 in a different VPC subnet (e.g. mgmt 172.17.63.0/24) can't ping the WireGuard EC2 private IP or reach on-prem 10.0.x.x hosts, but same-subnet EC2s work fine.
+**Cause:** `Address` mask in wg0.conf is too broad (e.g. `/16`). This installs a connected route that hijacks the entire VPC CIDR onto wg0, so reply traffic to cross-subnet IPs goes into the tunnel instead of back to ens5/VPC.
+**Fix:** Change `Address = 172.x.200.2/16` to `Address = 172.x.200.2/24` in wg0.conf, then `wg-quick down wg0 && wg-quick up wg0`. Never use `ip addr del/add` manually — it drops AllowedIPs routes.
+**Full case:** [`../../troubleshooting/network/6-aws-cross-subnet-vpn-routing-failure.md`](../../troubleshooting/network/6-aws-cross-subnet-vpn-routing-failure.md) (TS-NET-006).
 
 ### MTU / fragmentation
 Test with different packet sizes:
