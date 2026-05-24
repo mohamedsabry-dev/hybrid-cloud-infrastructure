@@ -49,6 +49,7 @@ spec:
           containers:
             - name: etcd-backup
               image: ghcr.io/mohamedsabry-dev/etcd-backup:latest
+              imagePullPolicy: Always
               command: ["bash", "/scripts/backup.sh"]
               volumeMounts:
                 - name: script

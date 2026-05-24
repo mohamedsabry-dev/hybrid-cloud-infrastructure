@@ -27,7 +27,7 @@ Config File: /etc/wireguard/wg0.conf
 
 DEV (wg-dev):
    [Interface]
-   Address = 172.16.200.2/16
+   Address = 172.16.200.2/24
    ListenPort = 51820
    PrivateKey = <AWS_PRIVATE_KEY>
    PostUp = iptables forwarding + NAT masquerade
@@ -40,7 +40,7 @@ DEV (wg-dev):
 
 PROD (wg-prod):
    [Interface]
-   Address = 172.17.200.2/16
+   Address = 172.17.200.2/24
    ListenPort = 51820
    PrivateKey = <AWS_PRIVATE_KEY>
    PostUp = iptables forwarding + NAT masquerade
