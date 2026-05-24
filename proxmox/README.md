@@ -1,6 +1,6 @@
 # Proxmox Infrastructure
 
-On-prem hypervisor layer — two physical Proxmox hosts (dev + prod), a dedicated NAS, and a physical router. Provisioned by [`../terraform/*/proxmox/`](../terraform/), configured by [`../ansible/`](../ansible/).
+On-prem hypervisor layer — two physical Proxmox hosts (dev + prod), a dedicated NAS, and a physical router. Hosts are configured via [`bootstrap_proxmox/`](bootstrap_proxmox/) scripts and manual commands. VMs/LXCs on top are provisioned by [`../terraform/*/proxmox/`](../terraform/).
 
 > **Design notes & reasoning** — for the iteration history behind this layout (why two physical hosts instead of one nested setup, why hardware NAS over TrueNAS VM, how the bootstrap scripts were built), see [`DESIGN.md`](DESIGN.md).
 >

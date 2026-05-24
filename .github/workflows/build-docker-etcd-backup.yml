@@ -10,6 +10,7 @@ on:
       - prod
     paths:
       - 'kubernetes/docker-images/etcd-backup/**'
+      - '.github/workflows/build-docker-etcd-backup.yml'
 
 jobs:
   build-etcd-backup:
