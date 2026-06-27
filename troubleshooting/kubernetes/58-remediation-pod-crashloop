@@ -1,0 +1,166 @@
+# TS-K8S-58: Remediation Pod CrashLoopBackOff — kubernetes Python Library v36 Broke auth_settings()
+
+**Status**: ✅ **RESOLVED**
+**Date opened**: 2026-05-28 (~08:49 UTC)
+**Date resolved**: 2026-06-27
+**Environment**: Prod cluster (`pve-prod`)
+**Pod**: `remediation-774679955-lg8qw` → `remediation-774679955-p685j` → resolved pod post-fix
+**Image (broken)**: `ghcr.io/mohamedsabry-dev/remediation:latest` (`sha256:85aa688d...`)
+**Image (known-good reference)**: `sha256:97ad02910d71...` (k8s 35.0.0)
+
+---
+
+## Summary
+
+The prod remediation pod entered CrashLoopBackOff after the `:latest` image was rebuilt via CI (triggered by an unrelated dev→prod merge) with an unpinned `kubernetes` Python library, which silently pulled v36.0.0. That version removed/changed `auth_settings()`, breaking bearer-token authentication for any client built via `load_incluster_config()`. The pod could mount its SA token correctly, the token was valid, RBAC was correct — but the kubernetes Python client itself never attached the `Authorization` header to outgoing API calls, so every API call hit the cluster as `system:anonymous` → `403 Forbidden`.
+
+**Fix**: Dockerfile updated to explicitly pin `kubernetes==35.0.0` (plus `urllib3==2.6.3` and `kubectl` version), rebuilt, pushed. Flux auto-reconciled the new image; the in-flight crashed pod was deleted to force an immediate pull of the corrected image rather than waiting on the natural restart backoff.
+
+---
+
+## Symptom
+
+Remediation pod in CrashLoopBackOff for ~8 hours. 128 restarts on a 31-day-old pod. Crash on every cycle with:
+
+```
+kubernetes.client.exceptions.ForbiddenException: (403)
+HTTP response body: {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure",
+"message":"nodes \"k8s-worker1.lab.local\" is forbidden: User \"system:anonymous\" cannot
+get resource \"nodes\" in API group \"\" at the cluster scope","reason":"Forbidden",
+"details":{"name":"k8s-worker1.lab.local","kind":"nodes"},"code":403}
+```
+
+Crash path: `main() → is_node_healthy() → is_node_ready() → v1.read_node(node_name) → 403`. `is_node_ready()` only caught 404, so the 403 hit an unhandled `raise` and killed the process every time.
+
+**Initial concern**: "Is this worker1-specific?" — **No.** Worker1 is just the first entry in `NODE_MAP`; the script crashed on the first node it checked regardless of which node that was. Confirmed this was an authentication issue, not a node-health issue.
+
+---
+
+## Debug Sequence (condensed)
+
+Eight theories ruled out in order before reaching root cause:
+
+| # | Theory | Result |
+|---|---|---|
+| 1 | RBAC/manifest misconfiguration | ✅ Correct, unchanged since April 25 |
+| 2 | Vault Agent sidecar corrupting SA token mount | ✅ Token present, valid JWT, correct identity |
+| 3 | Stale pod state (31 days, 128 restarts) | ✅ Deleted pod, new pod crashed identically |
+| 4 | RBAC binding deleted / API server auth broken | ✅ `kubectl create token` + manual `kubectl get nodes --token=...` → all 6 nodes returned successfully |
+| 5 | Missing env vars (`KUBERNETES_SERVICE_HOST/PORT`) | ✅ All present and correct |
+| 6 | Python client config not loading | ✅ `load_incluster_config()` loaded host/token/CA correctly — yet the API call still failed |
+| 7 | Network path / `Bearer` vs `bearer` case sensitivity | ✅ Raw `requests` library call with same token → **200 OK**. Proved network + token + RBAC all fine; problem was isolated to the kubernetes Python library specifically |
+| 8 | Explicit `Configuration` object passing | ✅ Still failed identically |
+
+**Breakthrough** — traced the auth chain inside the library itself:
+```python
+api.update_params_for_auth(h, [], ['BearerToken'])  # → {} EMPTY
+api.configuration.auth_settings()                    # → {} EMPTY, no 'BearerToken' key
+```
+The token was present in `api_key`, but the auth scheme definitions that map `api_key` → HTTP `Authorization` header were gone. **Root cause located inside `auth_settings()`.**
+
+### Image/version investigation
+
+| | Broken (4 days old at time of incident) | Working reference |
+|---|---|---|
+| **kubernetes** | **36.0.0** | **35.0.0** |
+| urllib3 | 2.7.0 | 2.6.3 |
+
+Confirmed via `ctr run` pulling both image digests directly and printing library versions inside each. Git history on the prod manifests/code showed no changes since April 25 — confirming the regression was purely a dependency version bump introduced by an unpinned `pip install kubernetes` at image build time, not a code change.
+
+**Trigger**: a dev→prod merge 4 days prior touched no Python/k8s files, but still triggered a CI rebuild of `:latest`. The Dockerfile had no version pin, so the rebuild silently grabbed `kubernetes==36.0.0`. Prod server was powered off for those 4 days, so the broken image only got scheduled and exercised once the server was started — at which point CrashLoopBackOff began immediately.
+
+---
+
+## Fix Implemented
+
+### 1. Dockerfile — pinned all previously-floating dependencies
+
+```dockerfile
+FROM python:3.11-slim
+
+# Pin kubectl explicitly — matches cluster v1.35.3. Do NOT use stable.txt (unpinned = surprise upgrades)
+ARG KUBECTL_VERSION=v1.35.3
+
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates iputils-ping traceroute dnsutils vim-tiny openssh-client jq netcat-openbsd procps && \
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/ && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Pinned. kubernetes 36.0.0 broke auth_settings()/bearer token auth in load_incluster_config().
+# Stay on 35.x until a v36 migration is done deliberately and tested.
+RUN pip install --no-cache-dir \
+    kubernetes==35.0.0 \
+    urllib3==2.6.3 \
+    requests==2.32.3 \
+    proxmoxer==2.1.0
+
+CMD ["python", "/scripts/remediation.py"]
+```
+
+This closes both the original bug (unpinned `kubernetes`) and a second, identical-shape risk found in the same file (unpinned `kubectl` via `dl.k8s.io/release/stable.txt`).
+
+### 2. Rebuild, push, reconcile
+
+- Rebuilt image from the pinned Dockerfile, pushed to `ghcr.io/mohamedsabry-dev/remediation`
+- Flux auto-reconciled the deployment to the new image automatically (Flux-managed via `kustomize.toolkit.fluxcd.io`)
+- The in-flight crashed pod was deleted manually to force immediate pull of the corrected image rather than waiting through the existing restart backoff window
+
+### 3. Verified
+
+Pod came up clean on the rebuilt image, health checks against all 6 nodes (3 masters, 3 workers) succeeded, no further 403s, no further crash loop.
+
+---
+
+## Dev vs Prod Configuration Gap (noted during investigation, not yet acted on)
+
+| Setting | Dev | Prod |
+|---|---|---|
+| `PROXMOX_NODE` | `pve-dev` | `pve-prod` |
+| `CONFIRM_DELAY` | 180s (3 min, double-checks suspect nodes before acting) | **missing — acts immediately on first failure** |
+| `NODE_MAP` | 2 workers | 3 workers |
+| Escalation path | reboot → reset → exhausted | reboot → reset → restore from backup → exhausted |
+
+Prod is structurally more aggressive (no confirmation phase) than dev despite being the higher-stakes environment. Flagged as a standing risk, separate from this incident.
+
+---
+
+## Still Open / Recommended Follow-ups
+
+These were identified during the incident but are independent of the immediate fix — worth tracking as separate follow-up items:
+
+1. **Crash-loop guard in `is_node_ready()`** — currently only catches `404`. A `403` (or any other non-404 `ApiException`) still hits an unhandled `raise` and kills the pod. Recommended:
+   ```python
+   except client.exceptions.ApiException as e:
+       if e.status == 404:
+           print(f"  Node {node_name} not found in cluster")
+           return False
+       print(f"  API error checking {node_name}: {e.status} {e.reason}")
+       return False  # treat as unhealthy/skip instead of crashing the process
+   ```
+   This wouldn't have prevented this specific auth bug, but would prevent *any* future transient API error from taking the whole pod down via crash loop.
+
+2. **Move dependency pins to `requirements.txt`** instead of inline `pip install` lines in the Dockerfile — cleaner diffs, easier to review/bump deliberately, and easier for CI to lint.
+
+3. **CI guard against unpinned dependencies** — a build-time check that fails if `requirements.txt` (or Dockerfile `pip install` lines) contain unversioned packages, to prevent this exact class of incident from recurring silently.
+
+4. **Add `CONFIRM_DELAY` to prod** — bring prod's safety posture at least to parity with dev's confirmation-before-action phase.
+
+5. **Investigate kubernetes v36 properly** (lower priority, no urgency now that pod is pinned to v35) — determine whether `auth_settings()` removal is an intentional API migration requiring code changes, or a genuine regression, before ever bumping past v35 again.
+
+---
+
+## Files Involved
+
+- `kubernetes/prod/deployments/apps/remediation/Dockerfile` — **updated** (pinned `kubernetes`, `urllib3`, `requests`, `proxmoxer`, `kubectl`)
+- `kubernetes/prod/deployments/apps/remediation/configmap.yaml` — unchanged (Python logic itself was never the cause)
+- `kubernetes/prod/deployments/apps/remediation/deployment.yaml` — unchanged
+- `kubernetes/prod/deployments/apps/remediation/remediation-auth-sa.yaml` — unchanged (RBAC was correct throughout)
+
+---
+
+## Key Lesson
+
+An image rebuild doesn't need to touch application code to break production — any unpinned dependency in a Dockerfile is a live landmine that can detonate on the *next unrelated* CI trigger, with an arbitrary delay between "build" and "blast" (4 days build-to-blast here, extended by the prod server being powered off in between). Floating version references — whether `pip install kubernetes` with no version or `curl .../stable.txt` for kubectl — should be treated as the same category of risk and pinned consistently, not just the one that happened to bite first.
