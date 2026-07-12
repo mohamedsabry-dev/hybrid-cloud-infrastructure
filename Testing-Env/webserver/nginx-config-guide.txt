@@ -1,0 +1,162 @@
+Nginx Configuration Guide — Phase 1
+=====================================
+
+Nginx role: reverse proxy + load balancer
+  Sits in front of the 3 Apache instances.
+  Client hits Nginx on port 8080 → Nginx picks one of the 3 Apaches → forwards the request.
+
+--- Part 1: Basic reverse proxy (single Apache) ---
+
+Step 1: Edit Nginx config
+  sudo nano /etc/nginx/nginx.conf
+
+  Replace the server block with:
+
+    upstream apaches {
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
+    server {
+        listen 8080;
+
+        location / {
+            proxy_pass http://apaches;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+
+Step 2: Test config
+  sudo nginx -t
+
+Step 3: Start Nginx
+  sudo systemctl enable --now nginx
+
+Step 4: Test load balancing
+  curl http://localhost:8080
+  curl http://localhost:8080
+  curl http://localhost:8080
+  Watch the "Served by" port number change — Nginx rotates between 8081, 8082, 8083.
+
+
+--- Part 2: Change to least_conn load balancing ---
+
+  Update the upstream block:
+
+    upstream apaches {
+        least_conn;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
+  Reload:
+    sudo nginx -s reload
+
+  Default is round-robin (rotate evenly).
+  least_conn sends the request to whichever Apache has the fewest active connections.
+
+
+--- Part 3: SSL termination ---
+
+Step 5: Generate a self-signed cert (for testing)
+  sudo mkdir -p /etc/nginx/ssl
+  sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/server.key \
+    -out /etc/nginx/ssl/server.crt \
+    -subj "/CN=test2.lab.local"
+
+Step 6: Update server block to handle HTTPS
+  Add a second server block:
+
+    server {
+        listen 443 ssl;
+        ssl_certificate /etc/nginx/ssl/server.crt;
+        ssl_certificate_key /etc/nginx/ssl/server.key;
+
+        location / {
+            proxy_pass http://apaches;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+
+  Reload:
+    sudo nginx -s reload
+
+Step 7: Test HTTPS
+  curl -k https://localhost:443
+  (-k skips cert verification since it's self-signed)
+
+  SSL termination means: client connects with HTTPS to Nginx,
+  Nginx decrypts it, forwards plain HTTP to Apache.
+  Apache never deals with SSL.
+
+  Evidence that SSL termination is happening:
+    1. Apache configs have no SSL — they listen on plain HTTP (8081/8082/8083)
+    2. proxy_pass uses http:// not https:// — Nginx sends plain HTTP to backends
+    3. Nginx access log shows request arriving on 443, forwarded to http://127.0.0.1:808x
+       Check with: tail -f /var/log/nginx/access.log
+    4. Apache log shows 127.0.0.1 as client (Nginx), not the real client IP — Nginx is in between
+    5. Apache log shows clean "GET / HTTP/1.1" — plain HTTP, not encrypted
+       If encrypted traffic reached Apache, it would show garbled \x16\x03 bytes and return 400
+       (same as when browser sent HTTPS to Nginx's plain HTTP port 8080)
+
+
+--- Interview Q&A ---
+
+Q: What is SSL termination?
+A: The reverse proxy (Nginx) handles HTTPS — decrypts incoming traffic, then forwards
+   plain HTTP to the backend servers. Backends never deal with SSL.
+
+Q: Why use SSL termination?
+A: Centralized cert management (one place, not every backend), less CPU load on app servers,
+   simpler backend config. Backends stay lightweight — just serve the app.
+
+Q: How do you prove SSL termination is working?
+A: Three ways:
+   - Nginx log: client hits 443 with HTTPS, upstream shows http://127.0.0.1:808x
+   - Apache log: source IP is 127.0.0.1 (Nginx), requests are clean HTTP — not encrypted bytes
+   - Config: proxy_pass uses http://, Apache has no SSL config at all
+
+Q: What is a reverse proxy?
+A: A server that sits between clients and backends. Clients never talk to backends directly.
+   Nginx receives the request, decides which backend to forward it to, gets the response,
+   and sends it back to the client. Backends only see Nginx, not the real client.
+
+Q: What is load balancing and what algorithms does Nginx support?
+A: Distributing requests across multiple backend servers. Nginx supports:
+   - round-robin (default): rotate evenly across backends
+   - least_conn: send to the backend with fewest active connections
+   - ip_hash: same client IP always goes to same backend (sticky sessions)
+
+Q: How do you check which backend served a request?
+A: We set APACHE_PORT via SetEnv in each Apache config, and PHP reads it with getenv().
+   The response shows "Served by: test2.lab.local on port 8081/8082/8083".
+
+Q: What happens if one Apache backend goes down?
+A: Nginx detects it and stops sending requests to it. The other backends keep serving.
+   When it comes back, Nginx automatically includes it again.
+
+Q: What is the difference between Apache and Nginx?
+A: Apache runs the app (PHP via PHP-FPM). Nginx sits in front as reverse proxy and load balancer.
+   Apache is process-per-request (prefork). Nginx is event-driven (handles thousands of
+   connections with few worker processes). Different strengths — that's why we use both.
+
+Q: How does Apache talk to PHP?
+A: Apache forwards .php requests to PHP-FPM through a unix socket.
+   PHP-FPM is a separate process. Apache uses mod_proxy_fcgi to connect to it.
+   PHP-FPM executes the code and returns HTML back through the socket.
+
+Q: How does PHP talk to PostgreSQL?
+A: Via the php-pgsql extension. It provides pg_connect() and pg_query() functions.
+   PHP opens a TCP connection to PostgreSQL on port 5432, authenticates with md5,
+   sends SQL, gets rows back. New connection per request.
+
+Q: What did you have to fix for SELinux?
+A: Two booleans:
+   - httpd_can_network_connect_db: allows PHP-FPM to connect to PostgreSQL (port 5432)
+   - httpd_can_network_connect: allows Nginx to connect to Apache backends (ports 8081-8083)
+   SELinux blocks network connections from web processes by default, even on localhost.

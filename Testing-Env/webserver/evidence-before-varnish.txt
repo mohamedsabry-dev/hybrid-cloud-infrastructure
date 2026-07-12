@@ -1,0 +1,49 @@
+Evidence: DB Queries Without Varnish
+=====================================
+
+Setup: Client → Nginx (:8080) → 3x Apache → PHP-FPM → PostgreSQL
+
+Test: 10 rapid curls to http://localhost:8080
+
+PostgreSQL log (tail -f /var/lib/pgsql/data/log/postgresql-*.log):
+  2026-07-12 23:56:08.637 [7698] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:08.882 [7699] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:09.088 [7700] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:09.277 [7701] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:09.461 [7702] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:09.641 [7703] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:09.820 [7704] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:10.009 [7705] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:10.206 [7706] LOG:  statement: SELECT name, price FROM products
+  2026-07-12 23:56:10.369 [7707] LOG:  statement: SELECT name, price FROM products
+
+Result: 10 requests = 10 DB queries. Every request hits the full chain.
+
+Expected after Varnish: 10 requests = 1 DB query (first miss), 9 served from cache.
+
+
+Evidence: DB Queries WITH Varnish
+=====================================
+
+Setup: Client → Varnish (:80) → Nginx (:8080) → 3x Apache → PHP-FPM → PostgreSQL
+
+Test: 6 curls to http://localhost:80
+
+PostgreSQL log:
+  2026-07-13 00:18:27.043 [8598] LOG:  statement: SELECT name, price FROM products
+  (only 1 query — the first cache MISS)
+
+Nginx access log:
+  127.0.0.1 - - [13/Jul/2026:00:18:27 +0300] "GET / HTTP/1.1" 200 262
+  (only 1 request reached Nginx — the other 5 were served by Varnish cache)
+
+Curl output:
+  All 6 responses show "Served by: test2.lab.local on port 8082"
+  Same port every time — Varnish cached the first response and replayed it.
+  No load balancing on cached requests because Nginx was never asked.
+
+Comparison:
+  WITHOUT Varnish: 10 requests = 10 DB queries, 10 Nginx forwards
+  WITH Varnish:     6 requests = 1 DB query,   1 Nginx forward
+
+Conclusion: Varnish eliminates repeated backend load by serving from memory cache.

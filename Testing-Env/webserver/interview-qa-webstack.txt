@@ -1,0 +1,147 @@
+Web Stack Interview Q&A — Full Chain
+======================================
+Stack: Varnish → Nginx → 3x Apache (PHP-FPM) → PostgreSQL
+All on one Rocky 10 VM (test2.lab.local)
+
+
+--- Architecture & Signal Flow ---
+
+Q1: Explain the request flow in your web stack.
+A: Client hits Varnish on port 80. If the response is cached, Varnish serves it from memory
+   and nothing behind it gets touched. If it's a cache miss, Varnish forwards to Nginx on 8080.
+   Nginx load balances across 3 Apache instances (8081/8082/8083). Apache receives the request,
+   sees it's a .php file, forwards it to PHP-FPM via a unix socket. PHP-FPM executes the code,
+   connects to PostgreSQL on port 5432, runs the SQL query, gets rows back, builds HTML,
+   and the response flows back up the chain.
+
+Q2: Why use this many layers instead of just Apache serving directly?
+A: Each layer has one job. Apache runs the app. Nginx handles load balancing, SSL termination,
+   and reverse proxying. Varnish handles caching. Separation of concerns — each component does
+   what it's best at. You can scale, replace, or tune each layer independently.
+
+Q3: How do the components talk to each other?
+A: Each layer only talks to its neighbor:
+   - Varnish → Nginx: plain HTTP on port 8080
+   - Nginx → Apache: plain HTTP on ports 8081/8082/8083
+   - Apache → PHP-FPM: unix socket (/run/php-fpm/www.sock)
+   - PHP → PostgreSQL: TCP on port 5432 via php-pgsql driver
+
+
+--- Apache ---
+
+Q4: How does Apache run PHP?
+A: Apache doesn't run PHP itself. It uses mod_proxy_fcgi to forward .php requests to PHP-FPM,
+   which is a separate process. PHP-FPM executes the code and returns the HTML through a unix
+   socket. The FilesMatch directive in Apache config tells it which files to forward.
+
+Q5: How did you run 3 Apache instances on the same server?
+A: One httpd binary, 3 config files. Each config has a different Listen port (8081/8082/8083),
+   different PidFile, and different ErrorLog. Same DocumentRoot — they all serve the same app.
+   Started each with: httpd -f /etc/httpd/conf/httpd-<port>.conf
+
+Q6: Why not use systemctl to manage Apache?
+A: systemctl manages the default Apache instance with the default config. We're running 3 custom
+   instances with custom config files, so we start them manually with httpd -f. You could create
+   systemd unit files for each, but for this setup it's unnecessary overhead.
+
+
+--- Nginx ---
+
+Q7: What is a reverse proxy?
+A: A server that sits between clients and backends. Clients never talk to backends directly.
+   Nginx receives the request, picks a backend, forwards the request, gets the response, and
+   sends it back to the client. The backend only sees Nginx, not the real client.
+
+Q8: What load balancing algorithms does Nginx support?
+A: Three main ones:
+   - round-robin (default): rotates evenly across all backends
+   - least_conn: sends to the backend with the fewest active connections
+   - ip_hash: same client IP always goes to the same backend (sticky sessions)
+   We used least_conn in this setup.
+
+Q9: What is SSL termination and how did you prove it works?
+A: SSL termination means Nginx handles HTTPS — it decrypts incoming encrypted traffic and
+   forwards plain HTTP to the backends. Apache never deals with SSL.
+   Evidence:
+   - Apache configs have no SSL — they listen on plain HTTP
+   - proxy_pass uses http:// not https://
+   - Apache access log shows clean "GET / HTTP/1.1" from 127.0.0.1 (Nginx), not encrypted bytes
+   - When a browser sent HTTPS to a non-SSL port, it showed garbled \x16\x03 bytes and returned 400
+
+
+--- Varnish ---
+
+Q10: What is Varnish and why use it?
+A: Varnish is an HTTP cache accelerator. It sits at the front of the stack and caches responses
+   in memory. If the same page is requested again, Varnish serves it instantly without touching
+   Nginx, Apache, PHP, or the database. It drastically reduces backend load.
+
+Q11: How did you prove Varnish caching works?
+A: Enabled PostgreSQL query logging (log_statement = 'all'), then compared:
+   - WITHOUT Varnish: 10 curl requests = 10 SELECT queries in the DB log
+   - WITH Varnish: 6 curl requests = 1 SELECT query (first MISS), the rest served from cache
+   Also only 1 request appeared in the Nginx access log — Varnish handled the rest.
+
+Q12: How do you tell if a request was a cache HIT or MISS?
+A: Three ways from varnishlog:
+   - "Hit" line = cache HIT, served from memory
+   - "BeReq" (backend request) = cache MISS, Varnish had to fetch from Nginx
+   - X-Varnish header: one number = MISS, two numbers = HIT (second is the original cached request)
+   Also the "Age" header shows how long the response has been in cache.
+
+Q13: How do you clear the Varnish cache?
+A: varnishadm ban.url . — the dot is a regex matching everything. After this, the next request
+   will be a MISS and Varnish re-fetches from the backend. Useful after deploying new code.
+
+
+--- PostgreSQL ---
+
+Q14: How does PHP connect to PostgreSQL?
+A: Via the php-pgsql extension. It provides pg_connect() and pg_query() functions. PHP opens a
+   TCP connection to PostgreSQL on 127.0.0.1:5432, authenticates with username/password (md5),
+   runs the SQL, gets rows back. It's a new connection per request — no connection pooling.
+
+Q15: What is pg_hba.conf and what did you have to change?
+A: pg_hba.conf controls who can connect and how they authenticate. Default uses "ident" for TCP
+   connections, which checks the OS username. PHP-FPM runs as "apache" but connects as "webuser",
+   so ident fails. Changed it to "md5" so PostgreSQL accepts password authentication over TCP.
+
+Q16: What does postgresql-setup --initdb do?
+A: Creates the default data directory (/var/lib/pgsql/data/), generates the config files
+   (postgresql.conf and pg_hba.conf), and creates the system catalog tables. Without it,
+   PostgreSQL has nothing and can't start. You only run it once.
+
+
+--- SELinux ---
+
+Q17: What is SELinux and how did it affect this setup?
+A: SELinux is a mandatory access control system in RHEL/Rocky. It runs on top of normal Linux
+   permissions. Even if a process has file/network access via normal permissions, SELinux can
+   still block it based on the process type. It's on by default.
+   We had to set two booleans:
+   - httpd_can_network_connect_db: allows PHP-FPM to connect to PostgreSQL (port 5432)
+   - httpd_can_network_connect: allows Nginx to proxy to Apache backends (ports 8081-8083)
+
+Q18: How do you diagnose SELinux blocks?
+A: Check the application error log. "Permission denied" on a connect() is the SELinux signature.
+   Not "authentication failed" (that's the app rejecting you), not "connection refused"
+   (that's nothing listening). Specifically "Permission denied" = the OS blocked it.
+   Then confirm with: cat /var/log/audit/audit.log | grep denied
+
+
+--- Troubleshooting ---
+
+Q19: A user reports the website is showing stale data after a deployment. What do you check?
+A: Varnish cache. It's still serving the old cached response. Clear it with:
+   varnishadm ban.url .
+   Then the next request will be a MISS, fetch fresh content from the backend.
+
+Q20: The website returns 502 Bad Gateway. How do you troubleshoot?
+A: 502 means the reverse proxy (Nginx or Varnish) connected but the backend didn't respond.
+   Check in order:
+   1. Are the Apache backends running? (check PID files or ps aux | grep httpd)
+   2. Check Nginx error log: /var/log/nginx/error.log
+   3. If "Permission denied" — SELinux blocking. Fix with setsebool.
+   4. If "connection refused" — backend is down or wrong port.
+   5. Check PHP-FPM: systemctl status php-fpm
+   6. Check PostgreSQL: systemctl status postgresql

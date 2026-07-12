@@ -1,0 +1,78 @@
+TS Case: SELinux Blocking Network Connections
+===============================================
+
+--- What is SELinux ---
+
+SELinux (Security-Enhanced Linux) is a mandatory access control system built into RHEL/Rocky.
+It runs on top of normal Linux permissions. Even if a process has file/network access
+via normal permissions, SELinux can still block it.
+
+Think of it as a second layer:
+  Normal permissions: "can this USER do this?"
+  SELinux:            "can this PROCESS TYPE do this?"
+
+Every process gets a "context" label (like httpd_t for web servers).
+SELinux has rules for what each context is allowed to do.
+By default, most network connections from web processes are denied.
+
+SELinux is ON by default in Rocky/RHEL. Check with:
+  getenforce
+  Returns: Enforcing (blocking), Permissive (logging only), Disabled
+
+
+--- Why it keeps blocking us ---
+
+PHP-FPM and Nginx both run under httpd-related SELinux contexts.
+By default, these contexts cannot:
+  - Connect to database ports (5432)
+  - Connect to upstream/backend ports (8081, 8082, 8083)
+
+SELinux doesn't care that it's localhost. It cares about the process type
+trying to open a network socket. Web process → network socket → denied by default.
+
+
+--- The two booleans we had to set ---
+
+1. httpd_can_network_connect_db
+   Allows httpd-context processes to connect to database ports (PostgreSQL, MySQL).
+   We needed this for: PHP-FPM → PostgreSQL (port 5432)
+
+   sudo setsebool -P httpd_can_network_connect_db on
+
+2. httpd_can_network_connect
+   Allows httpd-context processes to connect to ANY network port.
+   We needed this for: Nginx → Apache backends (ports 8081, 8082, 8083)
+
+   sudo setsebool -P httpd_can_network_connect on
+
+   -P = persistent (survives reboot)
+
+
+--- How to diagnose SELinux blocks ---
+
+Step 1: Check the app's error log
+  "Permission denied" on a connect() = SELinux signature
+  Not "authentication failed", not "connection refused" — specifically "Permission denied"
+
+Step 2: Check the SELinux audit log
+  cat /var/log/audit/audit.log | grep denied
+
+  This shows exactly what SELinux blocked, which process, and which action.
+
+Step 3: Check current booleans
+  getsebool -a | grep httpd
+
+  Shows all httpd-related SELinux booleans and their on/off state.
+
+
+--- Incidents in this project ---
+
+Incident 1: PHP-FPM could not connect to PostgreSQL on port 5432
+  Log: /var/log/php-fpm/www-error.log
+  Error: "connection to server at 127.0.0.1, port 5432 failed: Permission denied"
+  Fix: sudo setsebool -P httpd_can_network_connect_db on
+
+Incident 2: Nginx could not proxy to Apache backends on ports 8081-8083
+  Log: /var/log/nginx/error.log
+  Error: "connect() to 127.0.0.1:8081 failed (13: Permission denied) while connecting to upstream"
+  Fix: sudo setsebool -P httpd_can_network_connect on

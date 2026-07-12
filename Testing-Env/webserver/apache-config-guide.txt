@@ -1,0 +1,169 @@
+Apache + PHP Configuration Guide — Phase 1
+============================================
+
+--- Part 1: Apache Only (static HTML) ---
+
+Step 1: Create the app directory
+  sudo mkdir -p /var/www/webstore
+
+Step 2: Create a static HTML file
+  sudo nano /var/www/webstore/index.html
+    <h1>Hello from Apache</h1>
+
+Step 3: Create Apache config at /etc/httpd/conf/httpd-8081.conf
+  Key directives:
+    Listen 8081
+    PidFile /run/httpd/httpd-8081.pid
+    DocumentRoot "/var/www/webstore"
+    DirectoryIndex index.html
+
+  Modules to load:
+    LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
+    LoadModule authz_core_module modules/mod_authz_core.so
+    LoadModule dir_module modules/mod_dir.so
+    LoadModule unixd_module modules/mod_unixd.so
+    LoadModule log_config_module modules/mod_log_config.so
+
+  Process ownership:
+    User apache
+    Group apache
+
+  Directory access:
+    <Directory "/var/www/webstore">
+        Require all granted
+    </Directory>
+
+  Logging:
+    ErrorLog /var/log/httpd/error-8081.log
+
+Step 4: Test config, start, and verify
+  sudo httpd -t -f /etc/httpd/conf/httpd-8081.conf
+  sudo httpd -f /etc/httpd/conf/httpd-8081.conf
+  curl http://localhost:8081
+  Expected: <h1>Hello from Apache</h1>
+
+
+--- Part 2: Adding PHP (Apache → PHP-FPM) ---
+
+Step 5: Install PHP-FPM
+  sudo dnf install -y php-fpm
+  PHP-FPM runs as a separate process. Apache forwards .php requests to it via a unix socket.
+
+Step 6: Start PHP-FPM
+  sudo systemctl enable --now php-fpm
+
+Step 7: Update Apache config — add proxy modules and PHP handler
+  Add these modules:
+    LoadModule proxy_module modules/mod_proxy.so
+    LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so
+
+  Add this block to forward .php files to PHP-FPM:
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost"
+    </FilesMatch>
+
+  Change DirectoryIndex:
+    DirectoryIndex index.html  →  DirectoryIndex index.php
+
+Step 8: Create PHP test file
+  sudo nano /var/www/webstore/index.php
+    <?php echo "<h1>Hello from PHP on port " . $_SERVER['SERVER_PORT'] . "</h1>"; ?>
+
+Step 9: Restart Apache (kill old process, start with new config)
+  sudo kill $(cat /run/httpd/httpd-8081.pid)
+  sudo httpd -f /etc/httpd/conf/httpd-8081.conf
+  curl http://localhost:8081
+  Expected: <h1>Hello from PHP on port 8081</h1>
+
+
+--- Part 3: Final Apache config (after Part 2) ---
+
+  /etc/httpd/conf/httpd-8081.conf:
+
+    Listen 8081
+    PidFile /run/httpd/httpd-8081.pid
+    DocumentRoot "/var/www/webstore"
+    DirectoryIndex index.php
+
+    LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
+    LoadModule authz_core_module modules/mod_authz_core.so
+    LoadModule dir_module modules/mod_dir.so
+    LoadModule unixd_module modules/mod_unixd.so
+    LoadModule log_config_module modules/mod_log_config.so
+    LoadModule proxy_module modules/mod_proxy.so
+    LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so
+    LoadModule env_module modules/mod_env.so
+
+    User apache
+    Group apache
+
+    <Directory "/var/www/webstore">
+        Require all granted
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php-fpm/www.sock|fcgi://localhost"
+    </FilesMatch>
+
+    SetEnv APACHE_PORT 8081
+
+    ErrorLog /var/log/httpd/error-8081.log
+
+
+--- Part 4: Duplicate for 8082 and 8083 ---
+
+  Copy the config, change Listen, PidFile, SetEnv APACHE_PORT, and ErrorLog to the new port number.
+    sudo cp /etc/httpd/conf/httpd-8081.conf /etc/httpd/conf/httpd-8082.conf
+    sudo cp /etc/httpd/conf/httpd-8081.conf /etc/httpd/conf/httpd-8083.conf
+    sudo sed -i 's/8081/8082/g' /etc/httpd/conf/httpd-8082.conf
+    sudo sed -i 's/8081/8083/g' /etc/httpd/conf/httpd-8083.conf
+
+  Start each:
+    sudo httpd -f /etc/httpd/conf/httpd-8082.conf
+    sudo httpd -f /etc/httpd/conf/httpd-8083.conf
+
+  Test:
+    curl http://localhost:8082
+    curl http://localhost:8083
+
+
+--- Part 5: Connecting PHP to PostgreSQL ---
+
+Step 10: Update /var/www/webstore/index.php to query the DB
+  (php-pgsql already installed via phase1-install.sh
+  
+  sudo nano /var/www/webstore/index.php
+
+    <?php
+    $conn = pg_connect("host=127.0.0.1 port=5432 dbname=webstore user=webuser password=web123");
+    if (!$conn) {
+        echo "DB connection failed";
+        exit(1);
+    }
+    $result = pg_query($conn, "SELECT name, price FROM products");
+    echo "<h1>Product List</h1>";
+    echo "<table border='1'><tr><th>Name</th><th>Price</th></tr>";
+    while ($row = pg_fetch_assoc($result)) {
+        echo "<tr><td>{$row['name']}</td><td>\${$row['price']}</td></tr>";
+    }
+    echo "</table>";
+    echo "<p>Served by: " . gethostname() . " on port " . getenv('APACHE_PORT') . "</p>";
+    pg_close($conn);
+    ?>
+
+Step 12: Test the full chain (Apache → PHP-FPM → PostgreSQL)
+  curl http://localhost:8081
+  curl http://localhost:8082
+  curl http://localhost:8083
+  Expected: HTML table with Laptop, Keyboard, Monitor and the port number
+
+
+--- Notes ---
+
+Note 1: $_SERVER['SERVER_PORT'] shows port 80 when behind Nginx proxy, not the actual Apache port.
+  Fix: use SetEnv APACHE_PORT in each Apache config + getenv('APACHE_PORT') in PHP.
+  Requires: LoadModule env_module modules/mod_env.so
+
+Note 2: SetEnv without loading mod_env gives:
+  "Invalid command 'SetEnv', perhaps misspelled or defined by a module not included"
+  Fix: add LoadModule env_module modules/mod_env.so to the config.

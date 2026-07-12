@@ -1,0 +1,54 @@
+TS Case: PHP-FPM Cannot Connect to PostgreSQL
+===============================================
+
+Symptom:
+  curl http://localhost:8081 returns "DB connection failed"
+
+Two possible causes — check in this order:
+
+--- Cause 1: SELinux blocking network connection ---
+
+Log evidence (php-fpm log):
+  cat /var/log/php-fpm/www-error.log
+  "connection to server at 127.0.0.1, port 5432 failed: Permission denied"
+
+Key word: "Permission denied" — not "authentication failed"
+  This means the OS blocked the connection before it reached PostgreSQL.
+  SELinux is on by default in Rocky/RHEL. PHP-FPM runs as httpd context
+  and is not allowed to open network sockets to DB ports unless explicitly permitted.
+
+Fix:
+  sudo setsebool -P httpd_can_network_connect_db on
+
+Verify:
+  getsebool httpd_can_network_connect_db
+  Expected: httpd_can_network_connect_db --> on
+
+
+--- Cause 2: PostgreSQL rejecting password auth (pg_hba.conf) ---
+
+Log evidence (php-fpm log):
+  "FATAL: Ident authentication failed for user webuser"
+
+Key word: "authentication failed" — not "Permission denied"
+  This means the connection reached PostgreSQL but it rejected the login method.
+  Default pg_hba.conf uses "ident" for TCP connections, which checks the OS username.
+  PHP-FPM runs as "apache" user, not "webuser", so ident fails.
+
+Fix:
+  sudo nano /var/lib/pgsql/data/pg_hba.conf
+  Change:
+    host    all    all    127.0.0.1/32    ident
+  To:
+    host    all    all    127.0.0.1/32    md5
+  Then:
+    sudo systemctl restart postgresql
+
+
+--- How to tell them apart ---
+
+  "Permission denied"       → SELinux (OS level, connection never reached DB)
+  "authentication failed"   → pg_hba.conf (connection reached DB, auth method wrong)
+
+  Both show up in: /var/log/php-fpm/www-error.log
+  Apache error log (/var/log/httpd/error-*.log) does NOT show PHP errors.

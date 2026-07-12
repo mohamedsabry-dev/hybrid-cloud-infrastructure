@@ -1,0 +1,82 @@
+Varnish Configuration Guide — Phase 1
+=======================================
+
+Varnish role: HTTP cache
+  Sits at the very front. Client hits Varnish first.
+  If the response is cached → serve from memory, nothing behind gets touched.
+  If not cached (cache miss) → forward to Nginx → Nginx → Apache → PHP → DB.
+
+Final signal flow:
+  Client → Varnish (:80) → Nginx (:8080) → Apache (:8081/8082/8083) → PHP-FPM → PostgreSQL (:5432)
+
+
+--- Part 1: Configure Varnish ---
+
+Step 1: Tell Varnish where its backend is (Nginx)
+  sudo nano /etc/varnish/default.vcl
+
+  Find the backend block and set:
+    backend default {
+        .host = "127.0.0.1";
+        .port = "8080";
+    }
+
+Step 2: Set Varnish to listen on port 80
+  sudo nano /etc/varnish/varnish.params
+  (or check: sudo systemctl cat varnish — find the ExecStart line)
+
+  Look for the -a flag and set it to :80
+  If using systemd override:
+    sudo systemctl edit varnish
+
+    [Service]
+    ExecStart=
+    ExecStart=/usr/sbin/varnishd -a :80 -f /etc/varnish/default.vcl -P %t/%N/varnishd.pid -s malloc,256m
+
+    Note: put ExecStart on ONE line. Backslash line continuation breaks in systemd override files.
+
+Step 3: Start Varnish
+  sudo systemctl enable --now varnish
+
+Step 4: Test
+  curl http://localhost:80
+  Expected: Product list from PostgreSQL
+
+
+--- Part 2: Verify caching ---
+
+Step 5: Check cache HIT vs MISS
+  Use varnishlog to watch requests:
+    sudo varnishlog
+
+  Or check response headers:
+    curl -v http://localhost:80 2>&1 | grep -i "x-cache\|age\|via"
+
+  To add HIT/MISS to response headers, update /etc/varnish/default.vcl:
+    sub vcl_deliver {
+        if (obj.hits > 0) {
+            set resp.http.X-Cache = "HIT";
+        } else {
+            set resp.http.X-Cache = "MISS";
+        }
+    }
+
+  Reload Varnish after editing VCL:
+    sudo systemctl reload varnish
+
+Step 6: Compare with pre-Varnish evidence
+  Open two terminals:
+    Terminal 1: tail -f /var/lib/pgsql/data/log/postgresql-*.log
+    Terminal 2: curl http://localhost:80 (run 10 times)
+
+  Expected: only 1 SELECT query in the PostgreSQL log (first MISS).
+  The other 9 are served from Varnish cache — DB never gets touched.
+
+  Compare with evidence-before-varnish.txt: 10 requests = 10 queries without Varnish.
+
+
+--- Part 3: Useful Varnish commands ---
+
+  varnishstat          — live stats (cache hits, misses, connections)
+  varnishlog           — live request log with cache decisions
+  varnishadm ban.url . — purge all cached content (force re-fetch)
