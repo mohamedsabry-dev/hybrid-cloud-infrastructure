@@ -1,0 +1,132 @@
+May 2026 — Before LinkedIn Post (target: June 1)
+==================================================
+
+DAILY MODE (priority order)
+---------------------------
+  1. Topic review — read code + extract questions + answer in own words
+  2. Spoken practice — say answers out loud, record if possible
+  3. Apply — Egypt + remote roles that match activities
+  4. Python/Bash basics — 20 min daily sidecar
+
+DONE
+----
+  [x] Chunk 1: Proxmox + Virtualization — 20 questions extracted (May 10)
+  [x] Chunk 6: Terraform + AWS — 20 questions extracted (May 10)
+
+REVISED SCHEDULE (May 13 → May 31)
+===================================
+Phase 1: Orange Business priority prep (covers Linux, cloud, networking, monitoring, VMware, scripting)
+Phase 2: Broader stack for Axis + VOIS + all future roles (4 chunks)
+Phase 3: Full simulation
+
+PHASE 1: ORANGE BUSINESS PREP (May 13–21) — 9 days
+----------------------------------------------------
+  Day 1:   Linux admin ............................ May 13 (Tue)
+  Day 2:   Virtualization + VMware ................ May 14 (Wed)
+  Day 3:   Scripting — Bash + Python .............. May 15 (Thu)
+  Day 4:   Cloud concepts + AWS services .......... May 16 (Fri)
+  Day 5:   Networking theory ...................... May 17 (Sat)
+  Day 6:   Monitoring + cloud operations .......... May 18 (Sun)
+  Day 7:   Huawei stories + behavioral ............ May 19 (Mon)
+  Day 8:   Full Orange mock interview ............. May 20 (Tue)
+  Day 9:   Weak spots + re-practice ............... May 21 (Wed)
+
+  Full detail: local-docs/applied-jobs/orange-business-cairo.md
+
+PHASE 2: BROADER STACK (May 22–27) — 4 chunks, 6 days
+-------------------------------------------------------
+
+  Chunk A: K8s + Docker .......................... May 22-23 (Thu-Fri)
+           kubernetes/ folder
+           Architecture (control plane, kubelet, etcd, scheduler, controller-manager)
+           Pods, Deployments, Services, Ingress, ConfigMaps, Secrets
+           kubectl troubleshooting (logs, describe, exec, get events)
+           Your cluster: kubeadm HA, HAProxy/Keepalived VIP, Calico CNI
+           Flux CD GitOps (what it does, how it reconciles, dependency split)
+           Remediation pod (self-healing via Proxmox API)
+           NFS CSI storage (PV/PVC, why not local disk)
+           Docker: Dockerfile, image layers, multi-stage builds, docker-compose
+           Your DR test stories (etcd quorum loss, worker eviction, disk pressure)
+           Honest level: 2 months deep, not 2 years
+
+  Chunk B: CI/CD pipeline ....................... May 24 (Sat)
+           Ansible + Terraform + GitHub Actions — as one delivery pipeline
+           github/ folder — 31 workflows, OIDC federation, plan gates, job locking
+           ansible/ folder — 76 playbooks, inventory pattern, idempotency, two-phase bootstrap
+           terraform/ folder — already 20 questions, spoken practice
+           General CI/CD concepts: stages, artifacts, rollback, blue-green, canary
+           How they connect: TF provisions → Ansible configures → Flux deploys
+           Self-hosted runners — why, how, where they run
+
+  Chunk C: Infra — Storage + Backup/DR .......... May 25 (Sun)
+           Block vs file vs object storage (review chunk 1 Q20)
+           SAN vs NAS (iSCSI, FC, NFS, SMB — when to use each)
+           LUN provisioning (pool → LUN → filesystem → host connectivity)
+           Your NAS setup: RAID 1, VLAN 40, per-environment ACLs
+           NFS CSI in K8s (PV/PVC backed by NAS)
+           Backup strategies: full, incremental, differential
+           Your Proxmox backup jobs + retention
+           DR articulation: walk through 3-4 of your 17 DR tests as interview stories
+           Backup vs snapshot (review chunk 1 Q11)
+
+  Chunk D: Project integrations — Vault + FreeIPA . May 26-27 (Mon-Tue)
+           Vault:
+             HA cluster (3-node, Raft consensus)
+             KMS auto-unseal (why not Shamir — operational necessity)
+             LDAP auth back to FreeIPA
+             K8s auth method (ServiceAccount → policy → secret path)
+             AWS secrets engine (STS short-lived creds, no static keys)
+             Vault agent injector in K8s
+             Certificate chain: FreeIPA CA → certmonger → Vault TLS
+           FreeIPA:
+             Identity management (users, groups, host groups)
+             HBAC rules (who can SSH where)
+             Sudo policies (passwordless for bots, with-password for admins)
+             Password policies (4yr automation, 1yr admin)
+             UID ranges (60001-65500 for LXC compatibility)
+             DNS + NTP integration
+           How they connect: FreeIPA issues certs → Vault uses them for TLS →
+             Vault authenticates users via FreeIPA LDAP → K8s gets secrets from Vault
+
+PHASE 3: FULL SIMULATION (May 28–31) — 4 days
+-----------------------------------------------
+  Day 16:  Mock #1 — Cloud Support style .......... May 28 (Wed)
+           Orange Business / Sumerge angle: customer scenarios, SLA, troubleshooting, cloud basics
+
+  Day 17:  Mock #2 — DevOps style ................. May 29 (Thu)
+           VOIS angle: Terraform, Ansible, CI/CD, K8s, Docker, Linux
+
+  Day 18:  Mock #3 — Infra / Sysadmin style ....... May 30 (Fri)
+           Axis angle: Linux deep, virtualization, storage, monitoring, networking, backup/DR
+
+  Day 19:  Final polish ........................... May 31 (Sat)
+           "Tell me about yourself" — 90-second version
+           Project walkthrough — 2-minute version
+           Weak spot review from all 3 mocks
+           Final spoken practice on top 10 weakest answers
+
+  June 1 (Sunday): LinkedIn post goes live.
+
+ONGOING (parallel with schedule)
+---------------------------------
+  - CKA study: exam target mid-July → September
+  - DR tests: run if organic issues arise, don't force
+  - Troubleshooting cases: keep logging
+  - Applications: continuous, not scheduled
+  - Python rewrite of remediation pod: sidecar, pick up when energy allows
+
+==================================================
+Stack is locked — no new technologies until job is landed.
+Search by job description activities, not titles.
+
+Applied jobs tracked in: local-docs/applied-jobs/
+Interview questions in: local-docs/interview-questions/
+
+HONEST SKILL LEVELS (May 13 assessment)
+----------------------------------------
+  Very strong: Troubleshooting/RCA (134+ cases), Documentation (130+ articles)
+  Strong:      Linux admin, Virtualization, Bash scripting, Backup/DR
+  Solid:       Terraform, Ansible, project-level AWS
+  Moderate:    Networking theory, Cloud general, K8s (2 months), Vault, CI/CD concepts
+  Deployed:    Monitoring (Prometheus/Grafana/Loki — use it, not deep on PromQL)
+  Early:       Python

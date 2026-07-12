@@ -1,0 +1,20 @@
+## Authetecation & Authorisation 
+
+Chapter 1 
+
+What we have is as follow: 
+
+Create Identity provider to trust GH as signed inteity siource or somthing like tht 
+Create IAM role and allow gh provider identiy created to assume this role only if the request came from specifoc account,repo,branch "admin >> prod-sec 
+there security boundry applied on the admin role by the cloudformation bootstraop to not touch the oidc or s3,dynamo of main tf of the project or edit on its own iam role, or policy 
+the attached policy allow everything on the account except those deny list. 
+" This not prevent the admin role from create iam role later whichg have policy allow do action admin cant do hich open door for privilage escalation + more infra ownbershipt by tf , this intentional since cloudformation is bootstrap, and requirment can change in future, the main sec hardning should happen by related parties operation the branch env-security which restricted to accept PRs without strict approvals . 
+
+On th etf side, first thing created is infradstructure operation admin role wqhich allow to be assumed buy gh but only on specifc acc,repo,branch env , it has everything privilage except 2 lists, the inherted deny list which the admin have for the main core , and also any operation related to cloudtrail,billing,iam "except iam assume to EC2 for operational purpose " this point may introduce sec gab but prefred not to address now" 
+
+on the workflow signal tracing: 
+When gh action workflow triggered on push for example on dev security >> ask to run tf , it first gh send to aws like header ot package contianer, repo,account,branch,which role assume trarget and account id, and also the audience sts or somthing like thta ? , and ewhen aws recieve it , it check if there identity provider trust gh singed request or somthing like that and forward to sts? is sts service ? , and then it check if the requet come from allow branch , if ok it authenticate it and give jwt token and access and secret key, howevber what i see in gh logs is only the token, where the keys saved ? they all temp 1 hour ? , the token allowed oinly to be used by this gh connection right ? , if someone while the workflow run got the token, will it be able ot use from different branch or account ? and if he got tha ccess key and secert will he be able to use them, we use local runner will they saved thwere , if we used gh runner weill it be save din theit nodes? 
+then after authntication complete, it check the tf apply , whioch want to do x , it check the authorisation policy attached to the assume role if allow of not .. "when the check happen, in first handshaeke or only when tf apply send its api to use ? , i think at begning because its like this is ur confirmed visa and this what u are allowed to do but tf dont know so if it allowed with apply somthing not authorised or even with plan somrthing priohebtied to be even list , then it come with error and fail , right 
+
+
+## Secret Management 

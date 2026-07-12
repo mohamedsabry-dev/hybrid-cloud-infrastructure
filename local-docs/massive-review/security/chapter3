@@ -1,0 +1,205 @@
+# Chapter 3 — FreeIPA Identity, Certificates & LDAP Integration
+
+## What FreeIPA Actually Is
+
+A domain controller. All nodes are added to it so they trust it as the authority. On it I create users,
+host groups, user groups, and rules. Creating users and groups alone does nothing — no access is granted
+until rules are created on top.
+
+---
+
+## The 3 Layers — This Is NOT Like AWS
+
+AWS combines everything into one policy document. FreeIPA splits access control into 3 completely
+separate systems:
+
+**Layer 1 — HBAC (Host-Based Access Control) = the door.**
+Can this user SSH to this machine? Yes or no, nothing else. k8s_admin has HBAC rule for k8s_masters →
+can SSH in. No HBAC rule for vault nodes → SSH rejected at PAM level before even asking for a password.
+This is authentication — getting through the door.
+
+**Layer 2 — Sudo Rules = what you can do after you're in.**
+No sudo rule = stuck as a regular Linux user. Can read world-readable files, run non-root commands, but
+can't touch system config, restart services, change firewall rules, install packages. super_bot has
+`!authenticate` flag → passwordless sudo on automation_group nodes. k8s_admin has sudo with password
+prompt on k8s nodes. This is authorization — what you're allowed to do inside.
+
+**Layer 3 — IPA Roles = can this user manage FreeIPA itself.**
+Create users, reset passwords, modify DNS. Not relevant to my setup — only admin manages IPA, and admin
+is hardcoded as superuser. Doesn't need roles assigned in the UI. Think of it like root on Linux — root
+doesn't need to be in sudoers, it just IS root by design.
+
+---
+
+## The Mental Model Difference From AWS
+
+AWS = deny all by default. New user can do nothing. You build UP from zero.
+
+Linux/FreeIPA = allow all by default for logged-in users. You fence DOWN. Any user who gets through the
+door (HBAC) is immediately a regular Linux user — can run any non-root command, read world-readable
+files, write to /tmp and home directory. The fencing is: HBAC controls which machines they can reach,
+sudo rules control what they can do as root, and that's it.
+
+If you need to restrict even non-root commands (like limiting a monitoring user to only ps and top), the
+option is rbash (restricted bash) — bash with hard limits: can't cd, can't change PATH, can't run
+commands with / in them, can't redirect output. Set their shell to `/bin/rbash` and control their PATH.
+In practice rarely done because "no sudo + HBAC scoping to specific hosts" is sufficient for most cases.
+The dangerous operations (shutdown, reboot, ip link set, nmcli modify) already require root — no sudo
+rule = they can't run them anyway.
+
+---
+
+## SSSD and Cache Timing
+
+SSSD (System Security Services Daemon) runs on every domain-joined node. It does two different things at
+different times:
+
+**At login (each SSH attempt):**
+- Validates password against FreeIPA live
+- Checks HBAC against FreeIPA live
+- Caches user info (UID, GID, groups, home dir)
+
+**On a schedule (independent of logins):**
+- Pulls sudo rules from FreeIPA's LDAP every ~15 minutes
+- Full refresh every 6 hours
+
+So sudo rules are already cached on the node before anyone logs in. When a user runs sudo, the system
+checks the local SSSD cache — not FreeIPA in real time.
+
+**What this means for revocation:**
+
+| What changed on IPA | When node knows | Session impact |
+|---|---|---|
+| Sudo rule removed | ~15 min (SSSD refresh) | User keeps sudo until cache expires |
+| HBAC rule removed | Next SSH attempt | Existing sessions stay alive |
+| Password changed | Immediately (checked live) | No session impact |
+| User deleted | ~15 min (SSSD refresh) | Existing session stays until timeout |
+
+To force immediate effect: `sssctl cache-expire -E` or `systemctl restart sssd` on the node.
+
+---
+
+## FreeIPA CA — Certificates
+
+A certificate is a file that proves identity, signed by a CA (Certificate Authority) that others trust.
+It contains: the server's name, the server's public key, and the CA's signature covering both.
+
+Every domain-joined node automatically gets `/etc/ipa/ca.crt` when it joins — this is FreeIPA's CA
+public cert. It means every node trusts any certificate that FreeIPA CA has signed.
+
+**For the Vault cluster:** each vault node runs `ipa-getcert request` to get its own cert from FreeIPA
+CA. When vault2 connects to vault1:
+
+```
+vault1 presents tls.crt to vault2
+vault2 checks signature against /etc/ipa/ca.crt → valid
+vault2 sends encrypted challenge using vault1's public key from the cert
+vault1 decrypts it using tls.key (private key, only vault1 has this)
+vault2: confirmed, connection established
+```
+
+This is called a **TLS handshake**. FreeIPA is NOT contacted during this — the CA signature is baked
+into the cert, vault2 verifies locally.
+
+**The cert is public, the private key is the secret.** Copying someone's cert is useless without their
+private key — you can't answer the decryption challenge. tls.key is chmod 600, readable only by the
+vault user.
+
+---
+
+## Service Principals and the -K Flag
+
+A service principal is an identity for a specific service running on a host — not the host itself.
+Format: `service/hostname`. So `vault/vault1.lab.local` = "the Vault service running on vault1."
+
+**Why they had to be created before requesting certs:** FreeIPA CA won't sign a cert for a service that
+isn't registered in its directory. The `ipa-getcert request -K vault/vault1.lab.local` flag is an
+authorization gate — FreeIPA checks "does this service exist, and is this the host registered for it?"
+
+**What -K actually prevents:**
+
+```
+With -K (current setup):
+vault2 runs ipa-getcert request -K vault/vault1.lab.local
+  → FreeIPA: is vault2 the registered host for this service? NO → REJECTED
+
+Without -K (imaginary):
+vault2 runs ipa-getcert request -N CN=vault1.lab.local
+  → FreeIPA: cert claiming vault1? sure, here you go
+  → vault2 now has a valid FreeIPA-signed cert claiming to be vault1
+  → any node on the domain trusts it
+```
+
+The -K flag is a security control, not a functional requirement. The cert would work for TLS either way
+— the difference is whether any domain member can impersonate any other.
+
+**Certmonger** runs on vault nodes and auto-renews certs before expiry. After renewal it runs
+`systemctl reload vault` so the new cert is picked up without manual intervention.
+
+**K8s internal certs are completely separate.** kubeadm generates its own CA at
+`/etc/kubernetes/pki/ca.crt` during cluster init. K8s components (API server, kubelet, etcd) use that
+PKI to talk to each other. Nothing to do with FreeIPA.
+
+---
+
+## Vault ↔ FreeIPA Integration (LDAP)
+
+LDAP (Lightweight Directory Access Protocol) is the protocol external services use to query FreeIPA's
+user and group directory. FreeIPA runs 389 Directory Server under the hood — LDAP is how Vault talks to
+it.
+
+**The flow when a user logs into Vault:**
+
+```
+User enters vault_operator + password in Vault UI
+  → Vault's LDAP auth backend sends BIND request to FreeIPA (port 636)
+  → FreeIPA validates the password → YES
+  → Vault queries FreeIPA: what groups is vault_operator in?
+  → FreeIPA returns: vault-admins
+  → Vault checks its LOCAL mapping:
+      vault write auth/ldap/groups/vault-admins policies=super_admin
+  → Vault issues token with super_admin policy
+```
+
+FreeIPA knows nothing about Vault policies. It only answers two questions: is the password correct, and
+what groups is this user in. All authorization happens inside Vault. The `vault write auth/ldap/groups`
+mapping is stored in Vault — it's Vault's own config, not IPA's.
+
+The vault-admins group in FreeIPA has no special attributes, no rules, no policies attached to it. It's
+just a group name. Vault is the one that gives that group name meaning by mapping it to the super_admin
+policy.
+
+**FreeIPA = phone book. Vault = the building that calls the phone book to verify who you are, then
+applies its own rules inside.**
+
+---
+
+## Certificate Coverage Summary
+
+| Connection | Who signs the cert | Why trust works |
+|---|---|---|
+| Vault nodes ↔ each other (Raft) | FreeIPA CA | All vault nodes have /etc/ipa/ca.crt |
+| K8s vault-injector → Vault API | FreeIPA CA | K8s nodes are domain-joined |
+| K8s nodes ↔ each other (API server, kubelet) | K8s internal CA (kubeadm) | Separate PKI, unrelated to FreeIPA |
+
+---
+
+## Known Gaps
+
+**1. No HBAC explicit deny rules**
+FreeIPA HBAC is allow-only — same as sudo rules. No rule = denied by default. There's no "explicitly
+deny this user this host" mechanism. If a user is in a group that has HBAC access to a hostgroup, the
+only way to remove it is remove them from the group or delete the rule. Fine for current setup, worth
+knowing for interviews.
+
+**2. SSSD 15-minute window**
+Any sudo rule change has up to a 15-minute propagation delay. In a real incident where you need to
+revoke access immediately, you'd have to manually run `sssctl cache-expire -E` on every affected node.
+No automated mechanism for this currently. Accepted — solo setup, low risk, manual revocation is
+sufficient.
+
+**3. Keytab stored in AWS Secrets Manager as base64**
+If the secrets manager secret is compromised, the attacker has the keytab which can generate Kerberos
+TGTs for super_bot — which has passwordless sudo on all automation nodes. The keytab itself has no
+expiry unless the password is changed. Mitigated by the access controls on the secret (only the infra
+role can fetch it), but worth flagging as a high-value target.

@@ -1,0 +1,17 @@
+# /var/lib/kubelet/config.yaml (on each node)
+
+evictionHard:
+  memory.available: "100Mi"    # emergency brake, immediate evict
+  nodefs.available: "10%"      # disk space
+  nodefs.inodesFree: "5%"      # disk inodes
+
+evictionSoft:
+  memory.available: "200Mi"    # early warning, waits grace period
+  nodefs.available: "15%"
+
+evictionSoftGracePeriod:
+  memory.available: "1m30s"    # how long to wait before evicting
+  nodefs.available: "2m"
+
+# apply on each node
+# systemctl restart kubelet

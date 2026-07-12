@@ -1,0 +1,96 @@
+# Chapter 1 — AWS Identity & Access Foundation
+
+## What We Built
+
+### Bootstrap Layer (CloudFormation — manual, one-time)
+
+First thing in the account is an OIDC identity provider — this tells AWS to trust GitHub as a signed identity source. Not tied to any specific repo yet, just "I trust GitHub's OIDC service to issue valid tokens."
+
+On top of that, a TerraformAdmin IAM role is created and configured to only be assumable via that OIDC provider — but only if the request comes from a specific account, repo, and branch (`prod-security`). That triple lock is what makes it safe to give it AdministratorAccess.
+
+The OIDC provider config has a `ThumbprintList` field — this used to be how AWS verified GitHub's TLS certificate. Since July 2023 AWS handles that verification itself via their own trusted CA library. The parameter is now ignored but still required by the CloudFormation schema, so it stays in the config with whatever value, doesn't matter.
+
+The admin role has a permissions boundary attached by CloudFormation that prevents it from touching the core bootstrap resources — the OIDC provider itself, the S3 state bucket, the DynamoDB lock table, and its own IAM role and boundary policy. Outside those specific resources, it can do anything.
+
+**Known gap — intentional:** The boundary does not prevent the admin role from creating new IAM roles that have permissions the admin itself can't exercise directly. That means a privilege escalation path technically exists. This is a conscious design decision — CloudFormation is bootstrap infrastructure and requirements will evolve. The real security hardening here is operational: the `prod-security` branch requires strict PR approvals, and that controls who can actually trigger the admin role. Adding tighter IAM restrictions on the admin would make future infra work harder for no practical security gain given the branch controls already in place.
+
+---
+
+### Terraform Layer (created by TerraformAdmin)
+
+First resource Terraform creates is the Infrastructure operation role — assumed by GitHub Actions but scoped to a specific account, repo, and environment branch (not the security branch). This is the role that does the actual day-to-day infra work.
+
+It has two deny layers on top of PowerUserAccess:
+
+1. **Inherited from bootstrap:** Cannot touch the core state/lock/OIDC resources
+2. **SecurityBoundary policy:** Cannot touch IAM (mutation), CloudTrail, or billing
+
+One exception carved out: `iam:PassRole` is allowed specifically for passing the WireGuard SSM role to EC2. This technically opens a small surface but it's scoped and accepted for now.
+
+---
+
+## Workflow Signal — How Authentication Actually Works
+
+When a GitHub Actions workflow is triggered (e.g. push to `dev`), here's what actually happens:
+
+1. The `configure-aws-credentials` action requests a JWT from GitHub's OIDC service internally. This token contains signed claims: repo, branch, actor, audience (`sts.amazonaws.com`), and issuer. It never appears in standard logs — only visible in debug mode which requires write access to enable.
+
+2. That JWT is sent directly to AWS STS (`AssumeRoleWithWebIdentity`) along with the target role ARN. STS is the AWS service that issues temporary credentials — it's not a separate hop, it's the actual endpoint being called.
+
+3. AWS runs four checks:
+   - Is `token.actions.githubusercontent.com` a registered OIDC provider in this account?
+   - Is the audience (`sts.amazonaws.com`) in the provider's allowed client list?
+   - Does the `sub` claim match the role's condition — correct repo and branch?
+   - Is the JWT signature valid (verified against GitHub's public key)?
+
+   All four must pass. One fails → whole thing fails.
+
+4. If all pass, STS returns three temporary credentials: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`. These are injected as masked environment variables — visible in the logs as `***`. They expire after 1 hour and do not auto-renew.
+
+**On credential security:**
+
+- The JWT is a bearer token. If someone grabbed it within its ~5 minute validity window, they could use it from anywhere — the claims don't bind to the machine or IP. What they can't do is modify the claims (e.g. change the branch), because the signature would break.
+- The temp credentials (access key + secret + session token) are also usable from anywhere until expiry. No IP binding. Everything is logged in CloudTrail. On a local runner they exist both as process environment variables AND in the `$GITHUB_ENV` temp file on disk — the Actions runner writes env vars to disk as part of how it passes state between steps. On a hosted runner the whole VM is ephemeral and wiped after the job so it doesn't matter.
+- In practice: JWT is short-lived enough that theft is impractical. Credential theft is the more realistic risk but requires compromising the runner itself, which is a different threat model.
+
+---
+
+## Authorization — When Does Policy Evaluation Happen?
+
+Authorization is **not** pre-checked at assume time. The handshake confirms identity and issues credentials — it does not validate what those credentials are allowed to do.
+
+Every single AWS API call Terraform makes (during `plan` or `apply`) is independently evaluated by IAM in real time against the attached policies. If Terraform tries to do something the role isn't allowed to do — whether that's listing resources in `plan` or creating them in `apply` — the API call fails at that moment and the run errors out.
+
+The mental model: the handshake is passport control. Confirms who you are, lets you in. But every door inside still checks you individually.
+
+---
+
+## Token Expiry and Long Apply Risk
+
+The temp credentials are issued once at the start of the workflow — 1 hour, no auto-renew. If `terraform apply` runs longer than that, the creds expire mid-run and whichever AWS API call is in flight at that moment fails. Terraform exits with an error.
+
+State corruption in this scenario is unlikely but possible in a narrow window: if a resource was successfully created but the token expired before Terraform could write it to state, you get drift (reality says resource exists, state doesn't know). The DynamoDB lock stays held even after the token expires — you'd need `terraform force-unlock` to clear it, then `terraform plan` to see what drifted.
+
+Not a real concern at current infra scale — applies should finish well within an hour. If it ever becomes a concern, `role-duration-seconds` on the `configure-aws-credentials` action can push it up to whatever the role's max session duration allows (default 1h, configurable up to 12h on the role itself).
+
+---
+
+## Known Uncovered Security Risks
+
+These are gaps that are understood, documented here, and either accepted or deferred. Not surprises.
+
+**1. Privilege escalation path from TerraformAdmin**
+
+The admin role can create new IAM roles with no permissions boundary — meaning it can create a role that has authority over resources the admin itself is blocked from touching (OIDC, state bucket, lock table). This is intentional. The admin role is the true programmatic root of trust in the account. Restricting it from creating privileged child roles would break the whole purpose of having it. The security control here is the branch: `prod-security` requires strict PR approvals, and that's where the gate is. If that branch is compromised, the whole account is at risk by design.
+
+**2. Temp credentials on local runner**
+
+When using a local self-hosted runner, the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` exist both as process environment variables AND in the `$GITHUB_ENV` temp file on disk — the Actions runner writes env vars to disk as part of how it passes state between steps. So the credentials are on disk in plaintext for the duration of the job, not only in memory. On a GH-hosted runner this is a non-issue — ephemeral VM wiped after the job. On a local runner it's a different threat model. Accepted for now given it's a solo project with a controlled machine, but worth revisiting if the runner environment changes.
+
+**3. JWT visible in debug logs**
+
+When `ACTIONS_STEP_DEBUG=true` is set as a repo secret, GitHub prints extended runner output including the OIDC token request/response — which includes the JWT. Debug logs are not public even on a public repo (requires write access to view), so this is not an exposure to random observers. The risk is: if debug mode is accidentally left enabled, anyone with write access who views the logs has the JWT for its ~5 minute window. Mitigation: don't leave `ACTIONS_STEP_DEBUG=true` set permanently. Currently not set.
+
+**4. PassRole to EC2 gap**
+
+The infrastructure role has `iam:PassRole` allowed specifically for the WireGuard SSM role to be passed to EC2. PassRole is the permission that lets a service pass an IAM role to another AWS service — without it, you can't attach an instance profile. The gap: if someone can trigger the infra workflow and modify the Terraform config (i.e. has write access to the `dev` branch), they could theoretically pass a different role to EC2. In practice this is constrained by branch protection and the fact that PassRole is scoped to the specific role ARN. Accepted, not addressed now.

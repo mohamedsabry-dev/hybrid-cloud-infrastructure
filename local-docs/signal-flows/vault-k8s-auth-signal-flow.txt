@@ -1,0 +1,37 @@
+git push
+  └─► GitHub stores commit
+        └─► source-controller polls (1m) → pulls via SSH → creates Artifact
+              └─► kustomize-controller → kustomize build → sends manifest to API server
+                    └─► API server → validates → writes to etcd
+                          └─► kustomize-controller stamps ownership label on every resource:
+                                kustomize.toolkit.fluxcd.io/name: apps (or infrastructure)
+                                └─► Deployment controller → ReplicaSet controller → Pod spec → API server
+                                      └─► API server checks registered MutatingWebhooks
+                                            └─► vault-agent-injector-cfg rule:
+                                                  ├── objectSelector: skip if app.kubernetes.io/name=vault-agent-injector
+                                                  └─► forwards eligible pod to vault-agent-injector
+                                                        └─► injector checks annotation:
+                                                              ├── no agent-inject: true → return pod unchanged
+                                                              └── agent-inject: true → mutate pod spec:
+                                                                    ├── adds vault-agent-init (init container)
+                                                                    ├── adds vault-agent (sidecar)
+                                                                    ├── adds emptyDir /vault/secrets/ (shared volume)
+                                                                    └── adds /vault/tls/ mount (vault-ca secret)
+                                                                          └─► returns mutated spec → API server → etcd
+                                                                                └─► scheduler → selects node → writes assignment → API server
+                                                                                      └─► kubelet on node → containerd → starts init containers first
+                                                                                            └─► vault-agent-init:
+                                                                                                  ├── reads SA token (/var/run/secrets/.../token)
+                                                                                                  ├── POST vault.lab.local/v1/auth/kubernetes/login
+                                                                                                  ├── Vault → calls K8s TokenReview API (vault-auth token)
+                                                                                                  ├── K8s confirms: namespace=apps, sa=wordpress-sa
+                                                                                                  ├── Vault checks role → issues short-lived vault token
+                                                                                                  ├── GET secret/data/wordpress/config
+                                                                                                  ├── renders template → writes /vault/secrets/db-creds
+                                                                                                  └── exits 0
+                                                                                                        └─► kubelet starts main containers:
+                                                                                                              ├── wordpress → reads /vault/secrets/db-creds → connects MariaDB ✓
+                                                                                                              └── vault-agent sidecar:
+                                                                                                                    ├── own auth flow → own vault token
+                                                                                                                    ├── watches secret for changes → re-renders file
+                                                                                                                    └── renews token before TTL expires → loops forever

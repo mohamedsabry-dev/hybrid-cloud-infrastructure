@@ -1,0 +1,153 @@
+# Chapter 2 — Proxmox Authentication & Secret Fetching
+
+## The Secret Fetch Chain
+
+After the GitHub Actions workflow has AWS credentials from the OIDC handshake (Chapter 1), the first
+thing it does before Terraform runs is fetch the Proxmox API token from AWS Secrets Manager directly
+using the AWS CLI — no Terraform involved at this stage.
+
+The pattern:
+1. `aws secretsmanager get-secret-value` fetches the JSON blob (privileged because the assumed role has access)
+2. `::add-mask::` is applied immediately on the raw blob, the token_id alone, the token_secret alone, and the combined `id=secret` format — four variations to cover any possible way the value could appear in logs
+3. The combined token is written into `$GITHUB_ENV` as `TF_VAR_proxmox_api_token=<token_id>=<token_secret>`
+4. Terraform reads `TF_VAR_proxmox_api_token` automatically — the `TF_VAR_` prefix is a Terraform convention that maps env vars directly to input variables
+5. Terraform uses it in the provider block to authenticate API calls to Proxmox
+
+The Proxmox token never touches GitHub secrets storage. It lives in AWS Secrets Manager, exists in the
+runner's process environment and in the `$GITHUB_ENV` temp file on disk during the workflow, and is
+masked before anything else runs. This is the intended pattern — OIDC trust → assume role → fetch
+permanent secret → use it.
+
+---
+
+## AWS Auth vs Proxmox Auth
+
+Two fundamentally different authentication models:
+
+| | AWS | Proxmox |
+|---|---|---|
+| Method | OIDC → STS temporary credentials | Permanent API token |
+| Lifetime | ~1 hour | Never expires (`--expire 0`) |
+| How TF authenticates | Env vars injected by `configure-aws-credentials` | `api_token` var fetched from Secrets Manager |
+| Revocation | Auto-expires | Manual: `pveum user token remove` |
+| Where secret lives | Nowhere — generated on-the-fly via OIDC | AWS Secrets Manager |
+
+Proxmox is inherently less secure here because the token is long-lived. The mitigations are: it only
+exists in Secrets Manager (not in GH secrets), fetched at runtime, masked immediately, and the PVE realm
+isolates it from OS-level access.
+
+**Important:** the Proxmox API token is a provider configuration variable — not a resource Terraform
+creates. So it does NOT appear in the Terraform state file. Terraform uses it to authenticate API calls
+during plan and apply, then it's gone. The state records what was created, not what credential was used
+to create it.
+
+---
+
+## PVE vs PAM Realms
+
+The bootstrap creates users in two different realms:
+
+**PAM (`user@pam`)** — Pluggable Authentication Modules, Linux system authentication. The user exists as
+a real OS user on the Proxmox host. Can SSH, use sudo, access the shell. This is for human admins who
+need GUI + shell access. Password managed at the Linux level (`passwd`).
+
+**PVE (`user@pve`)** — Proxmox's internal user database only. Does NOT exist at the OS level — lives
+only in Proxmox's ACL database (`/etc/pve/user.cfg`). Cannot SSH, cannot use Linux tools. Can only
+interact through the Proxmox API or web GUI. This is exactly right for automation accounts like the
+Terraform user — no shell access means if the API token leaks, the attacker can only make Proxmox API
+calls, cannot pivot to the OS.
+
+A third realm comes later: when FreeIPA is integrated, users authenticate through the directory — that's
+a later chapter.
+
+Design: PAM for human admin (needs GUI + shell), PVE for Terraform automation (API-only). Clean
+separation.
+
+---
+
+## The Bootstrap Token — Privilege Scope
+
+The Terraform API token is created in the bootstrap with:
+
+```bash
+pveum acl modify "/" --users "${FULL_USER}" --roles Administrator
+pveum user token add "${FULL_USER}" "${TOKEN_ID}" --privsep 0 --expire 0
+```
+
+Two important flags:
+
+**`--privsep 0`** — privilege separation disabled. The token inherits ALL permissions of the parent user.
+Since the parent user has the Administrator role on `/` (root of the ACL tree), this token has full admin
+access to everything in Proxmox. If `--privsep 1` (the default), the token would need its own separate
+ACL entries independent of the parent user — more secure but requires explicitly granting each permission
+the token needs.
+
+**`--expire 0`** — token never expires.
+
+Combined: permanent full-admin key. This is the main gate, same design philosophy as the TerraformAdmin
+role in AWS — broad authority, controlled at the access layer (who can trigger the workflow), not at the
+permission layer.
+
+**Important caveat discovered in practice:** `--privsep 0` does give the token the full permissions of
+the parent user — there are no hidden ACL restrictions. What was hit during early testing was a different
+problem: certain storage operations failed not because the token lacked privilege, but because the
+bpg/proxmox Terraform provider doesn't implement every Proxmox API endpoint. Some storage-level and
+cluster-level actions are either unsupported or use different API paths than what the provider calls.
+The token had full authority — the tool didn't have the implementation.
+
+Fetching the root SSH password and running CLI commands directly was tested as a workaround and worked,
+but dropped — bypasses the API entirely and is messier and riskier than designing around the provider
+limitation.
+
+Worth keeping clear for interviews: API token scope and API provider coverage are two different things.
+The token having Administrator privileges doesn't mean the TF provider can exercise every operation that
+privilege allows.
+
+---
+
+## Remediation User Token — Current State and Planned Approach
+
+The remediation pod user and token were created manually during early setup, not via Terraform. At the
+time, the Proxmox users TF module didn't exist and it was needed quickly for a running pod. Token stored
+directly in Vault, pod fetches it at runtime.
+
+The TF-managed approach is drafted but implementation is scoped to a later session (June at earliest).
+The pattern when it gets implemented:
+
+```hcl
+resource "proxmox_virtual_environment_user" "remediation_user" {
+  user_id = "remediation@pve"
+  enabled = true
+}
+
+resource "proxmox_virtual_environment_user_token" "user_token" {
+  token_name = "tk1"
+  user_id    = proxmox_virtual_environment_user.remediation_user.user_id
+}
+```
+
+The token value will be in Terraform state (marked sensitive by the provider, not printed in logs). The
+flow would be: TF creates token → value stored in encrypted S3 state → pushed to Vault → pod fetches
+from Vault at runtime. Token never appears in logs or config files.
+
+The same approach will be used to import the existing `k8s-pve` user that was created manually during
+the remediation pod preparation phase. Both are deferred, both have a clear path.
+
+---
+
+## Known Uncovered Security Risks
+
+**1. Permanent Proxmox API token with full admin scope**
+
+The token never expires and has Administrator privileges inherited from root ACL. If compromised, manual
+revocation is required (`pveum user token remove`). No auto-expiry, no rotation mechanism currently.
+Accepted — the token only exists in Secrets Manager with restricted access, and PVE realm isolation
+prevents OS-level pivot. Rotation and scoped tokens per operation are the future direction when the users
+module is implemented.
+
+**2. Manually created users not under Terraform control**
+
+The remediation user, its token, and the k8s-pve user were created manually and are outside the
+infrastructure-as-code state. If something changes on those (permissions, expiry, deletion) there is no
+TF drift detection. Accepted as a known gap with a documented plan to bring them under Terraform control
+in a later session.

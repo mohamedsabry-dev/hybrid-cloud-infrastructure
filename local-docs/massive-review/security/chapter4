@@ -1,0 +1,190 @@
+# Chapter 4 — Ansible Vault + HashiCorp Vault + KMS Auto-Unseal
+
+## Ansible Vault — Bootstrap Phase Encryption
+
+Before HashiCorp Vault exists, I still need to pass secrets to playbooks without committing them to Git.
+Ansible Vault is just an encryption tool — not a secret store. I encrypt sensitive values using
+`ansible-vault encrypt_string` and the resulting `!vault` blocks go into group_vars files. The password
+to decrypt them lives in AWS Secrets Manager at `{env}/ansible/vault-password`.
+
+At runtime: workflow fetches the vault password from Secrets Manager → writes it to `~/.ansible_vault`
+on the ansible node → `ansible.cfg` points to that file path → when Ansible loads group_vars it
+decrypts the `!vault` blocks automatically.
+
+---
+
+## How Secrets Get From GitHub Into Ansible
+
+Two methods used, depending on the phase:
+
+**lookup('env', 'VAR_NAME')** — active method for CI/CD. Ansible's `lookup('env', ...)` reads from the
+OS shell environment of the process running Ansible. NOT from GitHub's `$GITHUB_ENV` file directly —
+that file is GitHub's internal mechanism, only GitHub Actions steps read it.
+
+The chain:
+```
+GH workflow fetches secret from Secrets Manager
+  → writes to $GITHUB_ENV (GitHub's mechanism)
+  → next step resolves ${{ env.VAULT_UNSEAL_ACCESS_KEY }} into the real value
+  → builds SSH command: export VAULT_UNSEAL_ACCESS_KEY='AKIAXXXXX' && ansible-playbook ...
+  → Ansible runs in that shell
+  → lookup('env', 'VAULT_UNSEAL_ACCESS_KEY') reads from the shell environment
+  → value lands in vault_aws_access_key_id
+  → template vault.env.j2 renders it into /etc/vault.d/vault.env on each vault node
+```
+
+The export step exists because Ansible doesn't know anything about GitHub. When you SSH to the ansible
+node, you're in a raw shell. The export is what puts the value into that shell so Ansible can find it.
+
+**Ansible Vault encrypted vars** — the old method, now commented out in group_vars. Used during manual
+testing before CI/CD was wired up. Both methods reference the same variable name — the source just
+changes.
+
+---
+
+## The Credential Wipe Incident
+
+Got burned once when the env vars were not set (env lookup returned empty) and the template ran and
+wrote an empty file to `/etc/vault.d/vault.env` on the vault nodes — wiping the existing credentials.
+
+Fix: `when` condition guards the template task:
+```yaml
+when:
+  - vault_aws_access_key_id is defined
+  - vault_aws_access_key_id | length > 0
+  - vault_aws_secret_access_key is defined
+  - vault_aws_secret_access_key | length > 0
+```
+
+Both variables must exist AND not be empty for the task to run. If either is missing, the task is
+skipped entirely and the existing file on disk is left untouched. Protects against accidental wipe if
+the secret was removed from AWS or the env var injection failed upstream.
+
+`no_log: true` on that task — Ansible shows the task name but replaces all output with `censored`.
+Without it, the access key and secret would appear plaintext in the Ansible stdout, which is visible in
+the GH Actions log.
+
+---
+
+## What Is KMS
+
+AWS Key Management Service. It holds an encryption key that never leaves AWS hardware. You send data
+TO KMS, it returns ciphertext. You send ciphertext TO KMS, it returns plaintext. You never download
+or see the actual key — it only exists inside AWS's hardware security modules.
+
+The key I have: `alias/vault-unseal` pointing to key ID `8ee1fa60-10cf-48c9-afe4-4f97cc218091`. Can
+reference it three ways — alias, key ID, or full ARN — all point to the same key. Using the alias in
+`vault.hcl.j2` because it's readable and survives key rotation (update the alias to point to a new key,
+config doesn't change).
+
+---
+
+## The KMS Key Policy — 3 Levels
+
+The `vault-unseal` IAM user has NO IAM policy attached. Can do nothing in the account. The permission
+to use KMS lives inside the KMS key policy itself, not in IAM.
+
+`Resource: "*"` in a KMS key policy means **this key only** — it's self-referential. The policy lives
+inside the key, so `*` = myself. Not all KMS keys in the account.
+
+Three principal blocks:
+
+**Root account → `kms:*`**
+Full access. AWS requires this as a fallback — otherwise you can lock yourself out of the key
+permanently with no way back. Not used operationally.
+
+**Admin users (GUI admin + TF admin role) → manage only**
+`kms:Create`, `Describe`, `Enable`, `Update`, `Delete` — can manage the key's lifecycle but
+explicitly **cannot** encrypt or decrypt. They administer, they don't use.
+
+**vault-unseal user → use only**
+`kms:Encrypt`, `Decrypt`, `DescribeKey` — can USE the key for actual encryption/decryption but
+**cannot** modify or delete it.
+
+Clean separation: admins manage, vault uses. Neither can do the other's job.
+
+---
+
+## The 5 Keys vs KMS — Two Separate Things
+
+Common point of confusion: these are completely different and unrelated paths.
+
+**5 unseal/recovery keys** = generated by `vault operator init`. Vault uses Shamir's Secret Sharing to
+split the master key into 5 shares. In manual unseal mode, 3 of 5 humans each provide their share to
+reconstruct the master key. In auto-unseal mode (which I use), these become **recovery keys** — stored
+in AWS Secrets Manager as emergency-only backup. Not used for normal startup.
+
+**KMS auto-unseal** = the operational path. Vault wraps (encrypts) its master key using KMS and stores
+the encrypted blob in its own Raft data directory. On every startup, Vault reads that blob, sends it to
+KMS, gets it decrypted, uses the master key to unseal. No humans needed.
+
+Both exist simultaneously — KMS is the primary, recovery keys are the emergency fallback if KMS
+becomes unavailable.
+
+---
+
+## Where Is the "Vault Master Key"
+
+Never explicitly configured — it was generated automatically during `vault operator init`:
+
+```
+vault operator init ran
+  → Vault generated a master key (random, never shown to anyone)
+  → Vault saw seal "awskms" { kms_key_id = "alias/vault-unseal" } in vault.hcl
+  → Vault sent master key to KMS → KMS encrypted it → returned ciphertext
+  → Vault stored the ciphertext inside /opt/vault/data (Raft storage)
+  → Vault generated 5 recovery keys from the master key → saved to Secrets Manager
+```
+
+The encrypted master key lives embedded inside Vault's Raft storage. Not a visible file. Every restart:
+Vault reads that encrypted blob → sends to KMS → gets decrypted → unsealed.
+
+---
+
+## The Full Chain End to End
+
+```
+TF creates: vault-unseal IAM user (no IAM policy)
+TF creates: access key + secret key for that user
+TF creates: KMS key with policy allowing vault-unseal user to encrypt/decrypt
+TF stores: access key + secret into AWS Secrets Manager (same module, same state file)
+  → GH workflow fetches from Secrets Manager
+  → exports into SSH shell as env vars
+  → Ansible lookup('env') reads them
+  → template renders into /etc/vault.d/vault.env (protected by when condition)
+  → Vault reads vault.env at startup → gets AWS credentials
+  → Vault calls KMS Decrypt with encrypted master key blob
+  → KMS checks key policy: is vault-unseal user allowed? YES
+  → KMS returns decrypted master key
+  → Vault unseals, storage accessible
+```
+
+Kept the IAM user, access key, KMS key, and Secrets Manager secret all in one TF module to avoid
+data source imports across state files. Everything in the same tfstate references each other directly.
+
+---
+
+## Known Gaps
+
+**1. Long-lived IAM access keys for vault-unseal user**
+
+The vault-unseal IAM user authenticates to KMS using static access keys (not OIDC). These keys don't
+expire. If they're rotated or deleted, every vault node loses the ability to auto-unseal on restart.
+Rotation requires: generate new keys → update Secrets Manager → re-run vault workflow to push new
+`vault.env` to all nodes → verify unseal still works. No automation for this currently. Accepted —
+the keys are scoped to KMS only and stored in Secrets Manager with restricted access.
+
+**2. Recovery keys in Secrets Manager as a single secret**
+
+All 5 recovery keys are stored together. Anyone who can read that secret has all 5 — which means they
+have full recovery capability. The threshold (3 of 5) only helps against partial compromise, not against
+full secret read access. Accepted for solo setup — access to that secret requires the infra role which
+is already the most privileged operational entity.
+
+**3. vault.env file contains plaintext AWS credentials on disk**
+
+`/etc/vault.d/vault.env` on each vault node holds the KMS access key and secret in plaintext. Protected
+by `chmod 600` owned by the vault user. If the vault node is compromised, those credentials are
+extractable. Since the keys are scoped only to KMS encrypt/decrypt on one key, the blast radius is
+limited to: attacker can unseal Vault data they have the encrypted blob for. Not arbitrary AWS access.
+Accepted.

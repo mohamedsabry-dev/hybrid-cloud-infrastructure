@@ -1,0 +1,103 @@
+May 2026 — Before LinkedIn Post (target: June 1)
+==================================================
+
+DAILY MODE (priority order)
+---------------------------
+  1. Component review — pick one folder (ansible, terraform, k8s, vault, etc.), read code, own it
+  2. Mock interview — simulate with Claude, explain decisions under pressure
+  3. Talking practice — 5 scenarios daily (tell me about yourself, walk through infra, something broke, secrets, why leaving Huawei)
+  4. Python rewrite — remediation pod, one function at a time
+  5. Apply — Egypt + remote roles that match activities (Linux, K8s, Terraform/Ansible, troubleshooting, monitoring)
+
+ONGOING (daily/weekly rhythm)
+-----------------------------
+  - Kubernetes: operate the cluster, troubleshoot daily, document cases
+  - CKA study: exam target mid-July → September
+  - DR tests: run, document, add to case count
+  - Troubleshooting cases: keep logging, keep growing the 134+
+  - Observability: use Prometheus/Grafana/Loki/Alertmanager daily for real diagnosis
+
+ONE-SHOTS (do once, done)
+-------------------------
+[ ] Docker hands-on (2-3 days)
+    - Dockerfile for WordPress app, multi-stage build
+    - docker-compose for WordPress + MariaDB
+    - Push to registry
+    - Goal: close the gap that appears in every posting
+
+FROM TIME TO TIME (when needed, not scheduled)
+----------------------------------------------
+  - Terraform: already solid, touch when provisioning changes
+  - Ansible: already solid, touch when automation needed
+  - Bash: already solid, daily use
+  - Vault: already deep, touch when secrets/cert chain changes
+  - GitHub Actions: review OIDC flow + locking + plan gates before interviews
+
+WEEK 1-2 (May 2–16)
+--------------------
+
+[ ] 1. Rewrite remediation pod in Python
+       - Current: bash scripts in kubernetes/{dev,prod}/deployments/apps/remediation/
+       - Rewrite core logic in Python (readiness check, Proxmox API calls, reboot/reset/restore)
+       - Also rewrite supporting scripts (IO storm watchdog, CPU stuck detection)
+       - Goal: own the code, not just the deployment
+
+[ ] 2. DR tests — first batch (disaster-recovery/drafts/)
+       - 01 controller-manager-down (started, paused — raw-data captured)
+       - 02 controller-manager-mid-flux
+       - 06 flux-rollback-git-revert
+       - 08 kernel-death-restore
+       - 09 linux-fs-corruption-recovery
+
+[ ] 3. Review project integrations
+       - How Terraform, Ansible, Flux, Vault, FreeIPA connect to each other
+       - What depends on what, what breaks when something is missing
+       - Be able to trace a full deployment path: TF provisions → Ansible configures → Flux deploys → Vault injects
+
+[ ] 4. Review RBAC and certificate chain (IPA → Vault → K8s)
+       - FreeIPA: HBAC rules, sudo policies, host groups, who can access what
+       - FreeIPA CA: certificate issuance, SAN management, how Vault uses IPA-issued certs
+       - Vault: K8s auth method, ServiceAccount binding, policy → role → secret path
+       - K8s: existing RBAC (ServiceAccounts, ClusterRoles for Flux/Vault)
+       - Trace the trust chain end to end
+
+[ ] 5. CV interview prep — Huawei reference cases
+       - Find 2-3 FusionCompute cases from Huawei knowledge base
+         (OOM crash, performance degradation, config issue)
+       - Find 2-3 storage cases (LUN provisioning, pool issue, host connectivity)
+       - Understand them well enough to walk through the troubleshooting flow
+       - Not to fabricate — to have real vendor-specific anchors for interview stories
+
+[ ] 6. Mock interviews — remaining topics
+       - K8s operations, Vault, FreeIPA, Proxmox, monitoring, remediation
+       - Goal: turn "I know this" into "I can explain this clearly in 2 minutes"
+
+WEEK 3-4 (May 16–30)
+---------------------
+
+[ ] 7. DR tests — second batch (disaster-recovery/drafts/)
+       - 03 etcd-quorum-loss
+       - 04 crossed-failure-apiserver-etcd
+       - 05 network-partition-mikrotik
+       - 07 worker-down-resource-pressure
+       - 10 etcd-s3-restore
+
+[ ] 8. Document k8s internal signal flow from DR observations
+       - Boot sequence: kubelet → apiserver → etcd → scheduler → controller-manager
+       - Leader election mechanics (scheduler, controller-manager, etcd Raft)
+       - What logs where, what stays silent, what gaps exist
+       - Build this from actual DR test evidence, not docs
+
+==================================================
+Priority: Daily mode is the rhythm. Component review feeds mock interviews feeds talking practice.
+Python rewrite runs alongside. Applications are continuous, not scheduled.
+One-shot (Docker) closes the one real gap.
+Stack is locked — no new technologies until job is landed.
+Task 6 (false alarms) — DONE May 2
+Task 6 (CV update) — DONE May 2
+Task 7 (doc fixes) — removed, not worth tracking
+
+# Application strategy: search by job description activities, not titles.
+# Target titles: DevOps Engineer, Infrastructure Engineer, Linux Administrator, Cloud Engineer (Egypt)
+#                + Systems Engineer, Infrastructure Specialist (remote/global)
+# Companies to watch (remote EMEA): Canonical, GitLab, Grafana Labs, Red Hat, Elastic, SUSE, MongoDB, Teleport, HashiCorp

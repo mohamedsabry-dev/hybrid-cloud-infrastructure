@@ -1,0 +1,7 @@
+❯ Hello brother, Today we have critical review and understanding session , it should compine (AWS IAM,AWS Secerts,AWS KMS, GH OICD, VAULT Secret, K8s Vault Injector,PROXOX user token scope,LDAB users,Superbot ipa, ipa domain ) And    
+  their related config and interconnection include TF assume role, Ansible exporter injectionm, GH run time, and any related. [ This is Weekend topic its mean extend over 2 complete free days Friday and Saterday ] It named Big Topic   
+  Security Hardenning , and involve (Authenticationn,Authorisation,Users,Secrets Scope,Secret Masking and related) , it has potentioal to capture some parts from each chunk of (Vault,IAM AWS, Secrets, K8s , tf, assume role, oicd,      
+  masking, injection, fetvching, domain CA signed, ETC.... ] , This is one of 5 Massive Coverage, , the others Are as follow in shaa allah ( Storage &DB on (S3,prox,bkp,linx,k8s,vault,etcd,logging,cloudtrail,cloudwatch, andy point     
+  where storage sit into, we get to know the reflectrion+++ VMWARE ) , same for compute (AWS,Prox,VMWARE,K8s,Docker containerd and their related,elasticity,scalability, hot add, hot migration, active =standby) , same for networking    
+  (ELB,VLANS,IOS,Docker, etc) , final term is Obsevility&Automation (Python,scripting,watchdog,Cloudwattch,stack loggin, prom,graf,aletrs on all levels and thei related parties inside eachiteam, ( one of the most core point is the     
+  review of this massive sessions all,ow to done only on complete weekend or vacation days (15,16 - 22,23 24,26 - 28,29 -, 30,31)     

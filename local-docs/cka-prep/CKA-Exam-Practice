@@ -1,0 +1,1021 @@
+# CKA Practice Questions (300)
+
+Weighted to match real exam domains:
+- Cluster Architecture, Installation & Configuration (25%) — Q1-75
+- Troubleshooting (30%) — Q76-165
+- Workloads & Scheduling (15%) — Q166-210
+- Services & Networking (20%) — Q211-270
+- Storage (10%) — Q271-300
+
+Format: performance-based (hands-on terminal), same as real exam.
+Always switch context first: kubectl config use-context <context>
+
+---
+
+## Cluster Architecture, Installation & Configuration (25%)
+
+### RBAC
+
+Q1. Context: k8s-cluster1
+Create a Role named `pod-reader` in namespace `dev` that allows `get`, `list`, and `watch` on `pods`. Bind it to user `jane` with a RoleBinding named `pod-reader-binding`.
+
+Q2. Context: k8s-cluster2
+Create a ClusterRole named `node-viewer` that allows `get`, `list` on `nodes`. Create a ClusterRoleBinding named `node-viewer-binding` to bind it to user `john`.
+
+Q3. Context: k8s-cluster1
+A user `tom` in namespace `staging` cannot create deployments. Create the necessary Role and RoleBinding so `tom` can `create`, `get`, `list`, `update`, and `delete` deployments in namespace `staging`.
+
+Q4. Context: k8s-cluster3
+Create a ServiceAccount named `dashboard-sa` in namespace `kube-system`. Create a ClusterRole named `dashboard-reader` with permissions to `get`, `list`, `watch` on `pods`, `services`, `deployments` across all namespaces. Bind the ClusterRole to the ServiceAccount.
+
+Q5. Context: k8s-cluster1
+Create a Role in namespace `finance` that allows `get` and `list` on `secrets`. Bind it to a ServiceAccount named `audit-sa` in the same namespace. Create the ServiceAccount if it doesn't exist.
+
+Q6. Context: k8s-cluster2
+User `dev-user` should be able to create and delete pods in namespace `development` but NOT in any other namespace. Create the appropriate RBAC resources.
+
+Q7. Context: k8s-cluster1
+Create a ClusterRole named `log-reader` that allows `get` on `pods/log`. Create a ClusterRoleBinding to bind it to group `developers`.
+
+Q8. Context: k8s-cluster3
+Modify the existing Role `app-manager` in namespace `production` to also allow `patch` on `deployments`. Do not remove existing permissions.
+
+Q9. Context: k8s-cluster1
+Create a Role named `configmap-admin` in namespace `web` that allows all verbs (`*`) on `configmaps`. Bind it to ServiceAccount `web-deployer` in namespace `web`.
+
+Q10. Context: k8s-cluster2
+Check which permissions user `sarah` has in namespace `default`. List all roles and rolebindings that apply to her.
+
+Q11. Context: k8s-cluster1
+Create a ClusterRole named `pv-manager` that allows `get`, `list`, `create`, `delete` on `persistentvolumes`. Bind it to user `storage-admin` with a ClusterRoleBinding.
+
+Q12. Context: k8s-cluster3
+A pod running with ServiceAccount `monitoring-sa` in namespace `monitoring` cannot list pods in namespace `kube-system`. Create the necessary Role in `kube-system` and RoleBinding to grant this cross-namespace access.
+
+Q13. Context: k8s-cluster1
+Create a Role in namespace `testing` that allows `get`, `list` on `pods` and `services`, and `create`, `delete` on `configmaps`. Bind it to user `tester`.
+
+Q14. Context: k8s-cluster2
+The ServiceAccount `ci-runner` in namespace `ci` needs to be able to create and delete `jobs` and `cronjobs` in namespace `ci`. Create the RBAC resources.
+
+Q15. Context: k8s-cluster1
+User `intern` should only be able to view (`get`, `list`, `watch`) pods in namespace `sandbox`. They should NOT be able to delete, create, or update anything. Set this up.
+
+### etcd Backup & Restore
+
+Q16. Context: k8s-cluster1
+Take a snapshot of etcd and save it to `/opt/etcd-backup/snapshot.db`. The etcd server is running on `https://127.0.0.1:2379`. Use the certificates from the etcd pod manifest.
+
+Q17. Context: k8s-cluster2
+Restore an etcd snapshot from `/opt/etcd-backup/snapshot.db` to a new data directory `/var/lib/etcd-restored`. Update the etcd static pod manifest to use the new data directory.
+
+Q18. Context: k8s-cluster3
+The etcd cluster is unhealthy. Check the etcd pod logs, identify the issue with the certificate paths in `/etc/kubernetes/manifests/etcd.yaml`, fix it, and verify etcd is healthy again.
+
+Q19. Context: k8s-cluster1
+Take an etcd snapshot, verify the snapshot status, and save both the snapshot and the status output. Snapshot path: `/tmp/etcd-snap.db`, status output: `/tmp/etcd-status.txt`.
+
+Q20. Context: k8s-cluster2
+The etcd data directory has become corrupted. Restore from the backup at `/backup/etcd-snapshot.db`. The restore should use the original etcd configuration (same name, same initial-cluster settings). Ensure the API server comes back up after restore.
+
+Q21. Context: k8s-cluster1
+List all the etcd endpoints and check cluster health. Write the member list output to `/opt/etcd-members.txt`.
+
+Q22. Context: k8s-cluster3
+Create a CronJob-style backup script (not an actual CronJob) that takes an etcd snapshot. The certificates are at: ca: `/etc/kubernetes/pki/etcd/ca.crt`, cert: `/etc/kubernetes/pki/etcd/server.crt`, key: `/etc/kubernetes/pki/etcd/server.key`. Save the script to `/opt/etcd-backup.sh`.
+
+### Cluster Upgrade (kubeadm)
+
+Q23. Context: k8s-cluster1
+Upgrade the control plane node from Kubernetes v1.30.0 to v1.31.0. Drain the node first, upgrade kubeadm, apply the upgrade, upgrade kubelet and kubectl, then uncordon the node.
+
+Q24. Context: k8s-cluster2
+Upgrade worker node `worker1` from v1.30.0 to v1.31.0. The control plane has already been upgraded. Drain the node from the control plane, SSH to the worker, upgrade kubeadm, kubelet, and kubectl, restart kubelet, then uncordon from the control plane.
+
+Q25. Context: k8s-cluster1
+Check the current Kubernetes version of all nodes. Plan an upgrade to v1.31.0 using `kubeadm upgrade plan` and save the output to `/opt/upgrade-plan.txt`.
+
+Q26. Context: k8s-cluster3
+After a failed upgrade attempt, the control plane is partially upgraded. The API server is running v1.31.0 but the scheduler is still on v1.30.0. Fix the situation by completing the upgrade.
+
+Q27. Context: k8s-cluster1
+Upgrade the cluster from v1.30.0 to v1.31.0. There are 1 control plane node and 2 worker nodes. Upgrade all three nodes. Ensure no workload disruption during the process.
+
+Q28. Context: k8s-cluster2
+A cluster upgrade is in progress. The kubeadm upgrade was applied but kubelet was not upgraded on the control plane. The node shows version v1.30.0 even though kubeadm is v1.31.0. Complete the upgrade.
+
+### kubeconfig & Context Management
+
+Q29. Context: k8s-cluster1
+Create a new context named `dev-context` in the kubeconfig file that uses cluster `k8s-cluster1`, user `dev-user`, and namespace `development`. Set it as the current context.
+
+Q30. Context: k8s-cluster2
+A kubeconfig file exists at `/opt/admin.kubeconfig`. Check what clusters, users, and contexts are configured. Write the current context name to `/opt/current-context.txt`.
+
+Q31. Context: k8s-cluster1
+Merge the kubeconfig from `/tmp/new-cluster.kubeconfig` into the default kubeconfig (`~/.kube/config`). Verify the new context appears.
+
+Q32. Context: k8s-cluster3
+Create a kubeconfig file at `/opt/user1.kubeconfig` for user `user1` that connects to the cluster at `https://192.168.1.100:6443`. Use the CA cert from `/etc/kubernetes/pki/ca.crt` and the user cert/key from `/opt/user1.crt` and `/opt/user1.key`.
+
+Q33. Context: k8s-cluster1
+A user reports they cannot connect to the cluster. Their kubeconfig is at `/home/user/config`. Inspect it, find the error (wrong server URL, wrong cert path, or wrong context), fix it, and verify connectivity.
+
+### Certificates
+
+Q34. Context: k8s-cluster1
+Check the expiration date of the API server certificate. Write the expiration date to `/opt/apiserver-cert-expiry.txt`.
+
+Q35. Context: k8s-cluster2
+Renew all certificates using kubeadm. Verify the new expiry dates.
+
+Q36. Context: k8s-cluster1
+A user needs a new client certificate. Create a CertificateSigningRequest for user `new-dev` with group `developers`. Approve the CSR and retrieve the certificate.
+
+Q37. Context: k8s-cluster3
+The API server certificate has expired and the cluster is unreachable. Renew the certificates using `kubeadm certs renew apiserver` and restart the API server.
+
+### Node Management
+
+Q38. Context: k8s-cluster1
+Mark node `worker2` as unschedulable without evicting existing pods. Then schedule maintenance and drain all pods from it (ignore DaemonSets).
+
+Q39. Context: k8s-cluster2
+Node `worker1` is in `NotReady` state. SSH to the node, identify why kubelet is not running, fix the issue, and bring the node back to `Ready`.
+
+Q40. Context: k8s-cluster1
+Add a label `disk=ssd` to node `worker3`. Then add a label `zone=us-east-1a` to the same node.
+
+Q41. Context: k8s-cluster3
+Remove the taint `key=value:NoSchedule` from node `master1`. Verify the taint was removed.
+
+Q42. Context: k8s-cluster1
+Cordon node `worker1`, drain it safely, perform the maintenance task of restarting kubelet, then uncordon it.
+
+Q43. Context: k8s-cluster2
+Add a taint `dedicated=gpu:NoSchedule` to node `worker3`. Create a pod named `gpu-pod` with image `nvidia/cuda:latest` that tolerates this taint.
+
+Q44. Context: k8s-cluster1
+Node `worker2` has been drained for maintenance and is now cordoned. Uncordon it and verify pods are being scheduled on it again.
+
+Q45. Context: k8s-cluster3
+List all nodes with their taints. Write the output to `/opt/node-taints.txt`.
+
+### Join Nodes
+
+Q46. Context: k8s-cluster1
+Generate a new bootstrap token and the join command for adding a new worker node to the cluster. Save the full join command to `/opt/join-command.txt`.
+
+Q47. Context: k8s-cluster2
+A new worker node has been provisioned. Generate the join command with token and discovery-token-ca-cert-hash. The token should expire in 24 hours.
+
+Q48. Context: k8s-cluster1
+The join token has expired. Create a new token and print the join command that includes the CA cert hash.
+
+### ServiceAccounts
+
+Q49. Context: k8s-cluster1
+Create a ServiceAccount named `backend-sa` in namespace `production`. Create a pod named `backend-pod` with image `nginx` that uses this ServiceAccount.
+
+Q50. Context: k8s-cluster2
+A pod named `api-pod` in namespace `apps` is using the `default` ServiceAccount. Change it to use ServiceAccount `api-sa` (create if needed).
+
+Q51. Context: k8s-cluster3
+Create a ServiceAccount `no-access-sa` in namespace `restricted` that does not automount the API token. Create a pod using this ServiceAccount and verify no token is mounted.
+
+Q52. Context: k8s-cluster1
+List all ServiceAccounts in namespace `kube-system`. Identify which ServiceAccount the `coredns` deployment uses.
+
+Q53. Context: k8s-cluster2
+Create a ServiceAccount `deployer` in namespace `cicd`. Create a token for this ServiceAccount using `kubectl create token` that expires in 1 hour.
+
+### API Primitives & Misc
+
+Q54. Context: k8s-cluster1
+Use `kubectl api-resources` to find which API group `deployments` belongs to. Write the answer to `/opt/api-group.txt`.
+
+Q55. Context: k8s-cluster2
+List all API versions supported by the cluster. Save to `/opt/api-versions.txt`.
+
+Q56. Context: k8s-cluster1
+Use `kubectl explain pod.spec.containers.resources` to understand the structure. Then create a pod with memory request `64Mi` and memory limit `128Mi`.
+
+Q57. Context: k8s-cluster3
+Get the cluster info (API server endpoint, CoreDNS, etc.). Save to `/opt/cluster-info.txt`.
+
+Q58. Context: k8s-cluster1
+Create a namespace `prod-apps`. Add labels `environment=production` and `team=backend` to it.
+
+Q59. Context: k8s-cluster2
+Delete namespace `test-env`. Before deleting, list all resources in that namespace and save to `/opt/test-env-resources.txt`.
+
+Q60. Context: k8s-cluster1
+Check which admission controllers are enabled on the API server. Find this from the API server static pod manifest.
+
+Q61. Context: k8s-cluster3
+Get the raw JSON output of the kube-system namespace object. Use jsonpath to extract just the labels. Save to `/opt/ns-labels.txt`.
+
+Q62. Context: k8s-cluster1
+Create an annotation on namespace `production`: `contact=ops-team@company.com`. Verify the annotation was applied.
+
+Q63. Context: k8s-cluster2
+Use `kubectl auth can-i` to check if user `jane` can create deployments in namespace `default`. Then check if she can delete nodes.
+
+Q64. Context: k8s-cluster1
+Find all cluster-level resources (not namespaced). Save the list to `/opt/cluster-resources.txt`.
+
+Q65. Context: k8s-cluster3
+Check the status of all control plane components using `kubectl get componentstatuses` (deprecated but may appear). Also check using `kubectl get pods -n kube-system`.
+
+Q66. Context: k8s-cluster1
+The API server is not responding. Check the static pod manifest at `/etc/kubernetes/manifests/kube-apiserver.yaml`. The `--etcd-servers` flag has the wrong port. Fix it (should be `2379`).
+
+Q67. Context: k8s-cluster2
+The scheduler has stopped working. Check `/etc/kubernetes/manifests/kube-scheduler.yaml`. The image tag is wrong. Fix it.
+
+Q68. Context: k8s-cluster3
+The controller-manager is in CrashLoopBackOff. Inspect the pod logs and the static pod manifest. The `--cluster-signing-cert-file` points to a non-existent file. Fix the path.
+
+Q69. Context: k8s-cluster1
+Install metrics-server in the cluster (manifests available at `/opt/metrics-server.yaml`). Verify it works with `kubectl top nodes`.
+
+Q70. Context: k8s-cluster2
+Check the current configuration of kube-proxy. Is it running in iptables or IPVS mode? Save the configmap output to `/opt/kube-proxy-config.txt`.
+
+Q71. Context: k8s-cluster1
+The controller-manager pod in `kube-system` is not running. Check the manifest file, fix the issue (wrong image tag), and wait for it to restart.
+
+Q72. Context: k8s-cluster3
+Create a new namespace `restricted-ns`. Set a ResourceQuota on it: max 10 pods, max 4 CPU, max 8Gi memory.
+
+Q73. Context: k8s-cluster1
+Set a LimitRange in namespace `dev` with default container limits of `200m` CPU and `256Mi` memory, and default requests of `100m` CPU and `128Mi` memory.
+
+Q74. Context: k8s-cluster2
+Configure the API server audit logging. The audit policy file is at `/etc/kubernetes/audit-policy.yaml`. Update the API server manifest to enable it and log to `/var/log/kubernetes/audit.log`.
+
+Q75. Context: k8s-cluster1
+Check how many nodes are part of the cluster. Identify which nodes are control plane and which are workers using labels. Save the output to `/opt/node-roles.txt`.
+
+---
+
+## Troubleshooting (30%)
+
+### Pod Troubleshooting
+
+Q76. Context: k8s-cluster1
+Pod `web-app` in namespace `frontend` is in `CrashLoopBackOff`. Check the logs and events. The container is failing because the command is wrong. Fix the pod spec.
+
+Q77. Context: k8s-cluster2
+Pod `api-server` in namespace `backend` is stuck in `Pending` state. Investigate why (check events, describe the pod). Fix the issue and get the pod running.
+
+Q78. Context: k8s-cluster1
+Pod `data-processor` in namespace `batch` shows `ImagePullBackOff`. The image name has a typo. Find the correct image name and fix it.
+
+Q79. Context: k8s-cluster3
+Pod `logger` in namespace `monitoring` is in `Error` state. The pod has two containers: `app` and `sidecar`. Check logs for both containers, find which one is failing, and fix it.
+
+Q80. Context: k8s-cluster1
+Pod `cache-pod` in namespace `default` is in `Pending` state with event "Insufficient memory". The pod requests 4Gi memory but no node has enough. Reduce the memory request to `512Mi` to fix it.
+
+Q81. Context: k8s-cluster2
+A pod `web-frontend` in namespace `apps` was working yesterday but now shows `CreateContainerConfigError`. A ConfigMap it references was deleted. Recreate the ConfigMap named `app-config` with key `APP_ENV=production`.
+
+Q82. Context: k8s-cluster1
+Pod `init-test` in namespace `default` is stuck in `Init:0/1`. The init container is waiting for a service `db-service` to be available. Create the missing service.
+
+Q83. Context: k8s-cluster3
+Pod `multi-container` in namespace `apps` has 3 containers. One is in CrashLoopBackOff. Identify which container is failing, check its logs, and fix the issue (wrong port in liveness probe).
+
+Q84. Context: k8s-cluster1
+Pod `secret-app` in namespace `secure` shows `CreateContainerConfigError`. It references a Secret named `db-credentials` that doesn't exist. Create the Secret with keys `username=admin` and `password=secret123`.
+
+Q85. Context: k8s-cluster2
+Pod `volume-test` in namespace `storage` is stuck in `ContainerCreating`. It references a PVC that is stuck in `Pending`. Investigate the PVC and create the missing PV to satisfy it.
+
+Q86. Context: k8s-cluster1
+A deployment `web` in namespace `production` has 3 replicas but only 1 is running. The other 2 are in `Pending`. There's a taint on 2 of 3 worker nodes that the pods don't tolerate. Add the correct toleration to the deployment.
+
+Q87. Context: k8s-cluster3
+Pod `dns-test` in namespace `default` cannot resolve any DNS names. Exec into the pod and test with `nslookup kubernetes.default`. Check if CoreDNS pods are running and the kube-dns service exists.
+
+Q88. Context: k8s-cluster1
+Pod `readiness-test` in namespace `apps` is running but never becomes `Ready`. The readiness probe is checking port `8081` but the app listens on `8080`. Fix the readiness probe.
+
+Q89. Context: k8s-cluster2
+Pod `liveness-test` in namespace `apps` keeps restarting. The liveness probe has `initialDelaySeconds: 1` but the app takes 30 seconds to start. Fix the liveness probe configuration.
+
+Q90. Context: k8s-cluster1
+Pod `env-pod` in namespace `default` is in `CrashLoopBackOff`. The logs show "DATABASE_URL not set". The pod is missing the environment variable. Add it using a ConfigMap named `db-config` with `DATABASE_URL=postgres://db:5432/app`.
+
+Q91. Context: k8s-cluster3
+Pod `resource-hog` in namespace `default` is being OOMKilled. The container has a memory limit of `64Mi` but the app needs at least `256Mi`. Fix the resource limits.
+
+Q92. Context: k8s-cluster1
+A pod `nginx-custom` in namespace `web` is running but returns 403 Forbidden. The Nginx config is mounted from a ConfigMap. Check the ConfigMap, fix the root directory path, and restart the pod.
+
+Q93. Context: k8s-cluster2
+Pod `app-v2` in namespace `canary` fails to start with `RunContainerError`. The pod spec has a non-existent `securityContext.runAsUser: 0` combined with a PodSecurityPolicy/Standard that blocks root. Change `runAsUser` to `1000`.
+
+Q94. Context: k8s-cluster1
+Pod `job-runner` in namespace `batch` completed but the Job shows as failed. Check the Job's `backoffLimit` and `completions` settings. Fix the Job so it succeeds.
+
+Q95. Context: k8s-cluster3
+Pod `mount-test` in namespace `storage` is in `ContainerCreating` for 5 minutes. Describe the pod — the volume mount path conflicts with an existing directory. Fix the mount path.
+
+### Node Troubleshooting
+
+Q96. Context: k8s-cluster1
+Node `worker1` shows `NotReady`. SSH to the node. Check if kubelet is running. If not, start it. If it's running, check kubelet logs for errors.
+
+Q97. Context: k8s-cluster2
+Node `worker2` is `NotReady` and kubelet logs show certificate errors. The kubelet client certificate has expired. Rotate the certificates and restart kubelet.
+
+Q98. Context: k8s-cluster1
+All pods on node `worker3` are being evicted. Check the node conditions — disk pressure is `True`. Free up disk space by cleaning container images (`crictl rmi --prune`) and restart kubelet.
+
+Q99. Context: k8s-cluster3
+Node `worker1` shows `Ready,SchedulingDisabled`. Someone cordoned it by accident. Uncordon the node and verify new pods can be scheduled on it.
+
+Q100. Context: k8s-cluster1
+Node `worker2` has `MemoryPressure=True`. Identify the top memory-consuming pods on this node. Document them in `/opt/memory-report.txt` and kill the most memory-heavy non-system pod.
+
+Q101. Context: k8s-cluster2
+Kubelet on `worker1` fails to start after a reboot. The error in journalctl shows "failed to load kubelet config file /var/lib/kubelet/config.yaml, error: open: no such file or directory". The file was accidentally moved to `/tmp/`. Move it back and restart kubelet.
+
+Q102. Context: k8s-cluster1
+Node `worker3` shows `NetworkUnavailable=True`. The CNI plugin is not running on this node. Check if the CNI DaemonSet pod is running on this node, if not, investigate why.
+
+Q103. Context: k8s-cluster3
+A node has been added to the cluster but shows as `NotReady` with `container runtime is down`. SSH to the node and ensure containerd is running. Start it if needed.
+
+Q104. Context: k8s-cluster1
+Node `worker1` has an unknown taint preventing all pods from scheduling. Identify the taint and remove it.
+
+Q105. Context: k8s-cluster2
+The kubelet on `worker2` is running but the node keeps flapping between Ready and NotReady. Check kubelet logs — it's failing health checks because `/healthz` endpoint is timing out. Increase the `nodeStatusUpdateFrequency` in the kubelet config.
+
+### Control Plane Troubleshooting
+
+Q106. Context: k8s-cluster1
+The API server is down. Check the static pod manifest at `/etc/kubernetes/manifests/kube-apiserver.yaml`. The `--service-cluster-ip-range` has an invalid CIDR. Fix it to `10.96.0.0/12`.
+
+Q107. Context: k8s-cluster2
+New pods are created but stay in `Pending` — the scheduler is not running. Check `/etc/kubernetes/manifests/kube-scheduler.yaml`. The image tag is wrong. Fix it.
+
+Q108. Context: k8s-cluster1
+Deployments can be created but replica sets are not being created. The controller-manager is down. Check the manifest, find the error (wrong `--kubeconfig` path), fix it.
+
+Q109. Context: k8s-cluster3
+The API server is running but returns `503 Service Unavailable` for some requests. Check if etcd is healthy. The etcd pod has the wrong `--data-dir` configured. Fix it.
+
+Q110. Context: k8s-cluster1
+After a node reboot, the API server won't start. The static pod manifest has a YAML syntax error (extra space in indentation). Fix the YAML and wait for the pod to start.
+
+Q111. Context: k8s-cluster2
+The kube-proxy pods are in CrashLoopBackOff across all nodes. Check the kube-proxy ConfigMap for configuration errors. The `clusterCIDR` is empty. Fix it.
+
+Q112. Context: k8s-cluster1
+CoreDNS pods are running but DNS resolution fails inside pods. Check the CoreDNS ConfigMap (`coredns` in `kube-system`). The `forward` directive points to a wrong upstream DNS. Fix it to use `. /etc/resolv.conf`.
+
+Q113. Context: k8s-cluster3
+The scheduler is running but pods with `nodeAffinity` are not being scheduled. Check scheduler logs. There's a version mismatch in the scheduler config. Fix the config version.
+
+Q114. Context: k8s-cluster1
+etcd is not starting. Check the pod manifest — `--listen-client-urls` is set to `http://` instead of `https://`. Fix it to use TLS.
+
+Q115. Context: k8s-cluster2
+The API server is rejecting all kubectl commands with "Unauthorized". The API server's `--client-ca-file` points to a wrong CA certificate. Fix the path to `/etc/kubernetes/pki/ca.crt`.
+
+Q116. Context: k8s-cluster1
+After a certificate rotation, the controller-manager can't communicate with the API server. Check the `--kubeconfig` used by the controller-manager and verify the embedded certificates are valid.
+
+Q117. Context: k8s-cluster3
+The API server is running but `kubectl get nodes` returns nothing. The kubelet on the control plane is not running. Start it and verify nodes appear.
+
+### Service & Networking Troubleshooting
+
+Q118. Context: k8s-cluster1
+Service `web-svc` in namespace `apps` exists but gets no traffic. Pods are running. Check if the service selector matches the pod labels. Fix the mismatch.
+
+Q119. Context: k8s-cluster2
+A NodePort service `api-svc` in namespace `backend` is created but the port is not accessible externally. Check if the `nodePort` is within the valid range and if any firewall/NetworkPolicy blocks it.
+
+Q120. Context: k8s-cluster1
+The Endpoints object for service `db-svc` in namespace `data` shows no endpoints. Pods with the correct labels exist. Check if pods are in `Ready` state — fix the readiness probe that's failing.
+
+Q121. Context: k8s-cluster3
+DNS resolution works for `kubernetes.default.svc.cluster.local` but not for `web-svc.apps.svc.cluster.local`. The service exists. Check if CoreDNS has the correct `cluster.local` zone configured.
+
+Q122. Context: k8s-cluster1
+A pod cannot reach external services (e.g., `google.com`). Internal DNS works fine. Check the pod's network namespace, the node's iptables rules, and the CNI configuration.
+
+Q123. Context: k8s-cluster2
+Traffic between namespace `frontend` and namespace `backend` is blocked. A NetworkPolicy exists in namespace `backend`. Check the policy, identify the issue, and fix it to allow traffic from `frontend` pods.
+
+Q124. Context: k8s-cluster1
+Service `cache-svc` in namespace `default` is type ClusterIP. It should be NodePort on port `31000`. Change the service type and set the nodePort.
+
+Q125. Context: k8s-cluster3
+Pod `test-pod` cannot connect to service `db-svc` on port `3306` in namespace `database`. The service exists and has endpoints. A NetworkPolicy is blocking egress on port `3306`. Fix the NetworkPolicy.
+
+Q126. Context: k8s-cluster1
+An Ingress resource in namespace `web` is configured but returns 404 for all paths. Check if the Ingress controller is running and if the backend service names and ports are correct.
+
+Q127. Context: k8s-cluster2
+Two services have the same selector labels, causing traffic to go to wrong pods. Identify the conflicting selectors and fix one service to use a different label.
+
+Q128. Context: k8s-cluster1
+The kube-dns service in `kube-system` has the wrong ClusterIP. It should be `10.96.0.10`. Fix it (may require recreating the service).
+
+### Application Troubleshooting
+
+Q129. Context: k8s-cluster1
+A Deployment `web-app` in namespace `production` performed a rolling update but the new version is crashing. Rollback to the previous working revision.
+
+Q130. Context: k8s-cluster2
+A Deployment `api` in namespace `backend` is stuck at 1/3 replicas during a rolling update. The new pods are failing health checks. Check the events, fix the health check, and complete the rollout.
+
+Q131. Context: k8s-cluster1
+A CronJob `daily-report` in namespace `jobs` is not running at the expected time. Check the cron schedule syntax. It should run every day at 2:00 AM UTC. Fix the schedule.
+
+Q132. Context: k8s-cluster3
+A Job `data-migration` in namespace `batch` has failed after 3 retries. Check the job logs, identify the error (wrong database connection string in environment variable), fix it, and create a new Job.
+
+Q133. Context: k8s-cluster1
+A DaemonSet `log-collector` in namespace `monitoring` is not running on node `worker3`. Check if a taint or node selector is preventing it. Fix the DaemonSet to run on all nodes.
+
+Q134. Context: k8s-cluster2
+Deployment `frontend` in namespace `web` has `maxUnavailable: 0` and `maxSurge: 1` but the rollout is stuck because no node has capacity for the surge pod. Fix by increasing resource on nodes or adjusting the strategy.
+
+Q135. Context: k8s-cluster1
+A StatefulSet `mysql` in namespace `database` has 3 replicas but only replica-0 is running. Replicas 1 and 2 are stuck in Pending because their PVCs can't be created. Check the StorageClass and fix it.
+
+Q136. Context: k8s-cluster3
+A HorizontalPodAutoscaler `web-hpa` in namespace `apps` shows `<unknown>/80%` for CPU. Metrics-server is running. Check if the deployment has CPU resource requests defined. Fix it.
+
+Q137. Context: k8s-cluster1
+Pod `multi-app` in namespace `default` has an init container that should create a file `/work-dir/config.txt`. The main container expects this file but can't find it. Check if the volume mount is shared between init and main containers. Fix it.
+
+Q138. Context: k8s-cluster2
+A deployment in namespace `web` uses a ConfigMap mounted as a volume. The ConfigMap was updated but the pod still uses old values. Trigger a rollout restart to pick up the changes.
+
+Q139. Context: k8s-cluster1
+A pod `ssl-app` in namespace `secure` needs a TLS Secret named `tls-cert` for its Ingress. Create a self-signed certificate and create the TLS Secret.
+
+Q140. Context: k8s-cluster3
+A Deployment `worker` keeps getting its pods killed. `kubectl top pods` shows memory usage near the limit. The app has a memory leak. Set memory limit to `512Mi` and add a liveness probe that checks `/healthz` every 30 seconds.
+
+### Log & Event Analysis
+
+Q141. Context: k8s-cluster1
+Check the events in namespace `production` sorted by timestamp. Identify any warning events. Save the warnings to `/opt/warnings.txt`.
+
+Q142. Context: k8s-cluster2
+Pod `api-gateway` in namespace `apps` has restarted 15 times. Check the previous container logs (`--previous` flag). Identify the crash reason and save it to `/opt/crash-reason.txt`.
+
+Q143. Context: k8s-cluster1
+Get the last 50 lines of logs from pod `web-server` in namespace `frontend`, container `nginx`. Save to `/opt/nginx-logs.txt`.
+
+Q144. Context: k8s-cluster3
+A pod `multi-log` has 2 containers: `app` and `sidecar`. Get logs from both containers and combine them into `/opt/combined-logs.txt`.
+
+Q145. Context: k8s-cluster1
+Check kubelet logs on node `worker1` for errors in the last hour. Use `journalctl -u kubelet --since "1 hour ago"`. Save errors to `/opt/kubelet-errors.txt`.
+
+Q146. Context: k8s-cluster2
+Find all pods across all namespaces that have restarted more than 5 times. Save the list (namespace, pod name, restart count) to `/opt/frequent-restarts.txt`.
+
+Q147. Context: k8s-cluster1
+Investigate why pod `batch-job` in namespace `jobs` failed. Check events, logs, and describe output. Write a one-line root cause to `/opt/root-cause.txt`.
+
+Q148. Context: k8s-cluster3
+Stream live logs from all pods with label `app=web` in namespace `frontend`. Use the follow flag and the label selector.
+
+Q149. Context: k8s-cluster1
+Check the audit log at `/var/log/kubernetes/audit.log` for any `DELETE` operations on `secrets` resources in the last 24 hours. Save relevant entries to `/opt/secret-deletes.txt`.
+
+Q150. Context: k8s-cluster2
+A pod was terminated unexpectedly. Check the events in the namespace for `Killing` events. Identify what triggered the termination (OOMKilled, preemption, eviction, or manual delete).
+
+### Cluster Component Debugging
+
+Q151. Context: k8s-cluster1
+Run `kubectl get cs` (component status). If any component shows unhealthy, check the corresponding static pod or service and fix it.
+
+Q152. Context: k8s-cluster2
+The cluster has no scheduled pods for the last 10 minutes despite pending pods. Check if the scheduler is bound to the correct address. Fix the `--bind-address` in the scheduler manifest if wrong.
+
+Q153. Context: k8s-cluster1
+CoreDNS keeps crashing with "plugin/loop: Loop detected". Fix the CoreDNS ConfigMap to resolve the loop (change `forward` to use `8.8.8.8` instead of the node's resolv.conf that points back to CoreDNS).
+
+Q154. Context: k8s-cluster3
+The API server is slow. Check if `--max-requests-inflight` and `--max-mutating-requests-inflight` are set too low. Increase them in the API server manifest.
+
+Q155. Context: k8s-cluster1
+`kubectl top nodes` returns "Metrics API not available". Check if metrics-server deployment is running. If running, check if it has the `--kubelet-insecure-tls` flag (needed in some environments). Fix it.
+
+Q156. Context: k8s-cluster2
+New namespaces are not getting a default ServiceAccount. The controller-manager is not creating them. Check the controller-manager logs for errors.
+
+Q157. Context: k8s-cluster1
+etcd shows "database space exceeded" warning. Compact and defragment etcd to reclaim space.
+
+Q158. Context: k8s-cluster3
+The API server has `--anonymous-auth=false` but a monitoring tool needs unauthenticated access to `/healthz`. Change it to `true` or create an appropriate RBAC rule for anonymous access to healthz.
+
+Q159. Context: k8s-cluster1
+After restoring an etcd snapshot, some resources that were created after the snapshot are missing. This is expected. Document which resources are missing and recreate them.
+
+Q160. Context: k8s-cluster2
+kube-proxy pods are running in iptables mode but the cluster should use IPVS mode. Update the kube-proxy ConfigMap to change the mode and restart the DaemonSet.
+
+Q161. Context: k8s-cluster1
+The CNI plugin Calico is not creating routes on `worker3`. Check if the Calico node pod is running on `worker3`. If it's CrashLoopBackOff, check logs for the error.
+
+Q162. Context: k8s-cluster3
+Pods can reach services by IP but not by DNS name. CoreDNS is running. Check if the `kube-dns` service has the correct ClusterIP that matches what kubelet is configured with (`--cluster-dns`).
+
+Q163. Context: k8s-cluster1
+The API server won't start after adding a new admission webhook. The webhook endpoint is down, causing the API server to fail. Remove or fix the webhook configuration.
+
+Q164. Context: k8s-cluster2
+A MutatingWebhookConfiguration is interfering with pod creation in `kube-system`. Add a namespace exclusion so the webhook doesn't apply to `kube-system`.
+
+Q165. Context: k8s-cluster1
+The cluster has intermittent `TLS handshake timeout` errors when running kubectl commands. Check the API server certificate SANs — the hostname used to connect is not in the SANs list. Add it using kubeadm.
+
+---
+
+## Workloads & Scheduling (15%)
+
+### Deployments
+
+Q166. Context: k8s-cluster1
+Create a Deployment named `nginx-deploy` in namespace `web` with image `nginx:1.25`, 3 replicas, and labels `app=nginx`, `tier=frontend`.
+
+Q167. Context: k8s-cluster2
+Scale the deployment `api-deploy` in namespace `backend` from 2 to 5 replicas.
+
+Q168. Context: k8s-cluster1
+Update the image of deployment `web-app` in namespace `production` from `nginx:1.24` to `nginx:1.25`. Record the change in the rollout history.
+
+Q169. Context: k8s-cluster3
+Rollback deployment `frontend` in namespace `web` to revision 2.
+
+Q170. Context: k8s-cluster1
+Create a Deployment `app-deploy` in namespace `apps` with image `httpd:2.4`, 2 replicas. Set the rolling update strategy to `maxSurge: 1` and `maxUnavailable: 0`.
+
+Q171. Context: k8s-cluster2
+Check the rollout status and history of deployment `api` in namespace `backend`. Save the history to `/opt/rollout-history.txt`.
+
+Q172. Context: k8s-cluster1
+Pause the rollout of deployment `web-app` in namespace `production`. Make 2 changes (update image and add env var), then resume the rollout so both changes apply in one update.
+
+Q173. Context: k8s-cluster3
+Create a Deployment with a `Recreate` strategy (not RollingUpdate) named `batch-deploy` in namespace `jobs` with image `busybox`, command `sleep 3600`.
+
+### Pods & Init Containers
+
+Q174. Context: k8s-cluster1
+Create a pod named `multi-pod` in namespace `default` with two containers: `nginx` (image `nginx`) on port 80 and `redis` (image `redis`) on port 6379.
+
+Q175. Context: k8s-cluster2
+Create a pod named `init-pod` in namespace `default` with an init container that runs `wget -O /work/index.html http://example.com`. The main container `nginx` should serve this file. Use a shared `emptyDir` volume.
+
+Q176. Context: k8s-cluster1
+Create a pod named `cmd-pod` with image `busybox` that runs the command `echo "Hello CKA" && sleep 3600`.
+
+Q177. Context: k8s-cluster3
+Create a pod named `env-pod` with image `nginx`. Set environment variables: `APP_ENV=production`, `APP_PORT=8080`, `LOG_LEVEL=info`.
+
+Q178. Context: k8s-cluster1
+Create a pod named `probe-pod` with image `nginx`. Add a liveness probe that does an HTTP GET on `/` port 80 every 10 seconds with initial delay of 5 seconds. Add a readiness probe on the same endpoint every 5 seconds.
+
+Q179. Context: k8s-cluster2
+Create a pod `security-pod` with image `nginx` that runs as user `1000`, group `3000`, with a read-only root filesystem. Mount a writable `emptyDir` at `/tmp`.
+
+### Static Pods
+
+Q180. Context: k8s-cluster1
+Create a static pod named `static-web` on node `worker1` using image `nginx`. Place the manifest in `/etc/kubernetes/manifests/` on the node.
+
+Q181. Context: k8s-cluster2
+A static pod `static-app` on `worker2` is running an outdated image. SSH to the node, update the manifest to use `nginx:1.25`, and verify the pod restarts with the new image.
+
+Q182. Context: k8s-cluster1
+Delete the static pod `static-test` running on node `worker3`. Remove the manifest from the node's static pod path.
+
+Q183. Context: k8s-cluster3
+Find which directory is configured as the static pod path on node `worker1`. Check the kubelet config. Create a static pod `static-busybox` there with image `busybox` and command `sleep 3600`.
+
+### Scheduling
+
+Q184. Context: k8s-cluster1
+Create a pod named `ssd-pod` with image `nginx` that is scheduled only on nodes with label `disk=ssd`. Use `nodeSelector`.
+
+Q185. Context: k8s-cluster2
+Create a pod named `affinity-pod` with image `nginx` using `nodeAffinity` with `requiredDuringSchedulingIgnoredDuringExecution` to schedule it on nodes in zone `us-east-1a` (label `topology.kubernetes.io/zone=us-east-1a`).
+
+Q186. Context: k8s-cluster1
+Create a pod named `preferred-pod` with `preferredDuringSchedulingIgnoredDuringExecution` node affinity to prefer nodes with label `gpu=true` (weight 80).
+
+Q187. Context: k8s-cluster3
+Add taint `dedicated=db:NoSchedule` to node `worker2`. Create a pod `db-pod` with image `mysql:8` that tolerates this taint.
+
+Q188. Context: k8s-cluster1
+Create a pod `manual-pod` with image `nginx` that is manually scheduled on `worker3` using `nodeName` (bypassing the scheduler).
+
+Q189. Context: k8s-cluster2
+Create two deployments in namespace `web`: `frontend` and `cache`. Use pod anti-affinity to ensure `frontend` pods are never on the same node as `cache` pods.
+
+Q190. Context: k8s-cluster1
+Create a pod with both a `nodeSelector` for `env=prod` AND a toleration for taint `env=prod:NoSchedule`. Only one node has both the label and taint.
+
+### DaemonSets
+
+Q191. Context: k8s-cluster1
+Create a DaemonSet named `node-monitor` in namespace `monitoring` with image `prom/node-exporter`. It should run on all nodes including the control plane (add toleration for control plane taint).
+
+Q192. Context: k8s-cluster2
+Update the DaemonSet `log-agent` in namespace `logging` to use image `fluentd:v1.16`. Use the rolling update strategy with `maxUnavailable: 1`.
+
+Q193. Context: k8s-cluster1
+A DaemonSet `monitor` in namespace `monitoring` should run only on worker nodes (not control plane). Add a nodeSelector for `node-role.kubernetes.io/worker=""` or use affinity to exclude control plane nodes.
+
+### Jobs & CronJobs
+
+Q194. Context: k8s-cluster1
+Create a Job named `pi-job` in namespace `batch` that calculates pi to 2000 places using image `perl:5` and command `perl -Mbignum=bpi -wle "print bpi(2000)"`. Set `backoffLimit: 4`.
+
+Q195. Context: k8s-cluster2
+Create a CronJob named `cleanup` in namespace `maintenance` that runs every 15 minutes. It should use image `busybox` and command `find /tmp -mtime +7 -delete`. Set `successfulJobsHistoryLimit: 3` and `failedJobsHistoryLimit: 1`.
+
+Q196. Context: k8s-cluster1
+Create a Job with `completions: 5` and `parallelism: 2`. Image `busybox`, command `echo "processing item"`.
+
+Q197. Context: k8s-cluster3
+A CronJob `daily-backup` in namespace `ops` should run at midnight UTC every day. The current schedule is `0 12 * * *` (noon). Fix it.
+
+### ConfigMaps & Secrets
+
+Q198. Context: k8s-cluster1
+Create a ConfigMap named `app-settings` in namespace `apps` with: `DATABASE_HOST=db.local`, `DATABASE_PORT=5432`, `LOG_LEVEL=info`. Create a pod that consumes all of these as environment variables.
+
+Q199. Context: k8s-cluster2
+Create a ConfigMap from a file: `/opt/nginx.conf` should be stored in ConfigMap `nginx-config`. Mount this ConfigMap as a volume in a pod at path `/etc/nginx/nginx.conf` (subPath mount).
+
+Q200. Context: k8s-cluster1
+Create a Secret named `db-secret` in namespace `database` with `username=admin` and `password=S3cur3P@ss`. Create a pod that mounts this Secret as a volume at `/etc/db-creds`.
+
+Q201. Context: k8s-cluster3
+Create a Secret of type `kubernetes.io/tls` named `app-tls` using the cert file at `/opt/tls.crt` and key at `/opt/tls.key`.
+
+Q202. Context: k8s-cluster1
+Create a pod `config-pod` that uses a ConfigMap `app-config` for most env vars but uses a Secret `app-secret` specifically for the `API_KEY` env var.
+
+### Resource Management
+
+Q203. Context: k8s-cluster1
+Create a pod `limited-pod` with image `nginx`. Set CPU request to `250m`, CPU limit to `500m`, memory request to `128Mi`, memory limit to `256Mi`.
+
+Q204. Context: k8s-cluster2
+Create a ResourceQuota `compute-quota` in namespace `development` that limits: 4 CPUs total, 8Gi memory total, max 20 pods.
+
+Q205. Context: k8s-cluster1
+Create a LimitRange `default-limits` in namespace `dev` that sets default CPU limit to `300m` and default memory limit to `256Mi` for containers that don't specify limits.
+
+Q206. Context: k8s-cluster3
+Check resource usage across all pods in namespace `production` using `kubectl top pods -n production`. Identify the pod using the most CPU. Save the pod name to `/opt/top-cpu-pod.txt`.
+
+### Labels & Selectors
+
+Q207. Context: k8s-cluster1
+Add label `environment=staging` to all pods in namespace `staging` that have label `app=web`.
+
+Q208. Context: k8s-cluster2
+List all pods across all namespaces that have label `tier=frontend`. Save the output to `/opt/frontend-pods.txt`.
+
+Q209. Context: k8s-cluster1
+Remove the label `version` from all pods in namespace `apps` using `kubectl label pods --all version- -n apps`.
+
+Q210. Context: k8s-cluster3
+Use field selectors to find all pods that are not in `Running` phase across all namespaces. Save to `/opt/non-running-pods.txt`.
+
+---
+
+## Services & Networking (20%)
+
+### Services
+
+Q211. Context: k8s-cluster1
+Create a ClusterIP service named `backend-svc` in namespace `apps` that exposes pods with label `app=backend` on port 80, targeting container port 8080.
+
+Q212. Context: k8s-cluster2
+Create a NodePort service named `web-nodeport` in namespace `web` that exposes deployment `web-app` on port 80, targetPort 8080, and nodePort 30080.
+
+Q213. Context: k8s-cluster1
+Convert the existing ClusterIP service `api-svc` in namespace `backend` to a NodePort service. Keep the same port and targetPort.
+
+Q214. Context: k8s-cluster3
+Create a headless service (ClusterIP: None) named `db-headless` in namespace `database` for the StatefulSet `mysql`. It should expose port 3306.
+
+Q215. Context: k8s-cluster1
+Expose a single pod `temp-server` in namespace `default` (port 5000) as a ClusterIP service named `temp-svc` without creating a deployment.
+
+Q216. Context: k8s-cluster2
+A service `web-svc` has endpoints but the port mapping is wrong. The service has `port: 80, targetPort: 80` but the pod listens on `8080`. Fix the targetPort.
+
+Q217. Context: k8s-cluster1
+Create a service named `multi-port-svc` in namespace `apps` that exposes two ports: `http` on port 80 (target 8080) and `https` on port 443 (target 8443). Selector: `app=web`.
+
+Q218. Context: k8s-cluster3
+Create an ExternalName service named `external-db` in namespace `apps` that maps to `db.external.company.com`.
+
+Q219. Context: k8s-cluster1
+List all endpoints for service `api-svc` in namespace `backend`. Verify the IPs match the pod IPs. Save the comparison to `/opt/endpoints-check.txt`.
+
+Q220. Context: k8s-cluster2
+Create a service with `sessionAffinity: ClientIP` named `sticky-svc` in namespace `web`. It should route the same client to the same pod. Set the timeout to 3600 seconds.
+
+### Ingress
+
+Q221. Context: k8s-cluster1
+Create an Ingress named `web-ingress` in namespace `web` that routes:
+- `/app1` to service `app1-svc` port 80
+- `/app2` to service `app2-svc` port 80
+
+Q222. Context: k8s-cluster2
+Create an Ingress with host-based routing:
+- `app1.example.com` routes to service `app1-svc` port 80
+- `app2.example.com` routes to service `app2-svc` port 80
+
+Q223. Context: k8s-cluster1
+Create an Ingress named `tls-ingress` in namespace `secure` that uses TLS Secret `tls-secret` for host `secure.example.com`. Route all traffic to service `secure-svc` port 443.
+
+Q224. Context: k8s-cluster3
+An Ingress `api-ingress` in namespace `backend` is returning 503. Check if the backend service exists and has endpoints. Fix the issue.
+
+Q225. Context: k8s-cluster1
+Create an Ingress with a default backend that serves all unmatched paths. Use service `default-backend-svc` port 80.
+
+Q226. Context: k8s-cluster2
+Add a path rewrite annotation to an existing Ingress so that `/api/v1/(.*)` is forwarded to the backend as `/$1`. (Nginx Ingress Controller specific).
+
+### NetworkPolicy
+
+Q227. Context: k8s-cluster1
+Create a NetworkPolicy named `deny-all-ingress` in namespace `secure` that denies all incoming traffic to all pods in the namespace.
+
+Q228. Context: k8s-cluster2
+Create a NetworkPolicy named `allow-frontend` in namespace `backend` that allows incoming traffic only from pods with label `role=frontend` on port 8080.
+
+Q229. Context: k8s-cluster1
+Create a NetworkPolicy in namespace `database` that allows ingress only from namespace `backend` (namespace label `name=backend`) on port 3306.
+
+Q230. Context: k8s-cluster3
+Create a NetworkPolicy that allows all ingress and egress traffic for pods with label `app=web` in namespace `apps`. (Explicit allow-all policy).
+
+Q231. Context: k8s-cluster1
+Create a NetworkPolicy `deny-all-egress` in namespace `restricted` that blocks all outbound traffic from pods, except DNS (port 53 TCP and UDP to `kube-system`).
+
+Q232. Context: k8s-cluster2
+Create a NetworkPolicy in namespace `multi-tier` that:
+- Allows ingress to `role=api` pods only from `role=frontend` pods
+- Allows egress from `role=api` pods only to `role=db` pods on port 5432
+
+Q233. Context: k8s-cluster1
+A pod in namespace `monitoring` needs to scrape metrics from all namespaces on port 9090. Create a NetworkPolicy that allows egress on port 9090 to all namespaces.
+
+Q234. Context: k8s-cluster3
+Create a NetworkPolicy that denies all traffic (ingress and egress) to pods with label `quarantine=true` in namespace `default`.
+
+Q235. Context: k8s-cluster1
+An existing NetworkPolicy `web-policy` in namespace `frontend` blocks traffic from the monitoring namespace. Modify it to also allow ingress from pods in namespace `monitoring` (label `purpose=monitoring`).
+
+Q236. Context: k8s-cluster2
+Create a NetworkPolicy that allows pods in namespace `cache` to receive traffic only from the same namespace (no cross-namespace ingress).
+
+Q237. Context: k8s-cluster1
+Debug connectivity: pod `client` in namespace `debug` cannot reach pod `server` in namespace `apps`. Check all NetworkPolicies in namespace `apps` that might block ingress. Fix or add a policy to allow it.
+
+Q238. Context: k8s-cluster3
+Create a NetworkPolicy that allows ingress to pods with label `app=api` only from CIDR block `10.0.0.0/16` on port 443.
+
+### DNS
+
+Q239. Context: k8s-cluster1
+From pod `test-pod` in namespace `default`, resolve the following and save results to `/opt/dns-results.txt`:
+- `kubernetes.default.svc.cluster.local`
+- `web-svc.frontend.svc.cluster.local`
+- `google.com`
+
+Q240. Context: k8s-cluster2
+CoreDNS is not resolving external domains. Check the CoreDNS ConfigMap. The `forward` plugin is missing. Add `forward . 8.8.8.8 8.8.4.4` and restart CoreDNS.
+
+Q241. Context: k8s-cluster1
+Create a pod with a custom DNS configuration using `dnsPolicy: None`. Set nameservers to `8.8.8.8` and search domains to `svc.cluster.local` and `cluster.local`.
+
+Q242. Context: k8s-cluster3
+A headless service `db-headless` in namespace `data` has 3 pods. Use `nslookup` from another pod to resolve the service DNS and verify you get all 3 pod IPs.
+
+Q243. Context: k8s-cluster1
+Change a pod's DNS policy from `Default` (node's DNS) to `ClusterFirst` (Kubernetes DNS). Verify it can now resolve service names.
+
+Q244. Context: k8s-cluster2
+DNS lookups from pods in namespace `isolated` are slow (5+ seconds). Check if `ndots` is set too high. Fix by adding a `dnsConfig` with `options: [{name: ndots, value: "2"}]` to the pod spec.
+
+### Port Forwarding & Debugging
+
+Q245. Context: k8s-cluster1
+Forward local port 8080 to port 80 on pod `web-app` in namespace `frontend`. Test with curl.
+
+Q246. Context: k8s-cluster2
+Forward local port 3306 to service `db-svc` in namespace `database` port 3306. Test connectivity.
+
+Q247. Context: k8s-cluster1
+Exec into pod `debug-pod` in namespace `tools`. Run `wget -O- http://web-svc.frontend.svc.cluster.local` to test service connectivity.
+
+Q248. Context: k8s-cluster3
+Create a temporary debug pod with image `nicolaka/netshoot` in namespace `debug`. Use it to run `ping`, `dig`, `curl`, and `traceroute` to test network connectivity.
+
+Q249. Context: k8s-cluster1
+Use `kubectl run tmp --rm -it --image=busybox -- nslookup web-svc.apps.svc.cluster.local` to test DNS from a temporary pod.
+
+Q250. Context: k8s-cluster2
+Check the iptables rules that kube-proxy has created for service `web-svc` in namespace `apps`. SSH to a node and use `iptables-save | grep web-svc`.
+
+### Mixed Networking
+
+Q251. Context: k8s-cluster1
+Create a complete 3-tier application:
+- Frontend Deployment (3 replicas, image `nginx`) with NodePort service on port 30080
+- Backend Deployment (2 replicas, image `httpd`) with ClusterIP service on port 8080
+- Database pod (image `mysql:8`) with ClusterIP service on port 3306
+- NetworkPolicy allowing frontend->backend and backend->database only
+
+Q252. Context: k8s-cluster2
+Create an Ingress that handles both HTTP and HTTPS:
+- HTTP on `app.example.com` routes to `app-svc:80`
+- HTTPS on `secure.example.com` (TLS secret `app-tls`) routes to `secure-svc:443`
+
+Q253. Context: k8s-cluster1
+A pod needs to reach an external service at `10.200.0.50:5000`. Create a Service (without selector) and a manual Endpoints object that points to this external IP.
+
+Q254. Context: k8s-cluster3
+Create a NetworkPolicy in namespace `multi-tier` that implements:
+- Frontend pods: accept ingress from anywhere, egress only to backend pods port 8080
+- Backend pods: accept ingress only from frontend, egress only to database pods port 5432
+- Database pods: accept ingress only from backend, no egress
+
+Q255. Context: k8s-cluster1
+An application pod needs to bind to a specific host port. Create a pod with `hostPort: 8080` for its container port. Explain why this is generally not recommended.
+
+Q256. Context: k8s-cluster2
+Create a service with topology-aware routing. Add annotation `service.kubernetes.io/topology-mode: Auto` so traffic prefers pods on the same node.
+
+Q257. Context: k8s-cluster1
+Test end-to-end connectivity: create a deployment `web` (nginx), expose it as NodePort, create an Ingress, and verify access at each layer (pod IP, ClusterIP, NodePort, Ingress).
+
+Q258. Context: k8s-cluster3
+Configure the kubelet to use a different cluster DNS IP. Update `/var/lib/kubelet/config.yaml` to set `clusterDNS` to `10.96.0.53`. Restart kubelet. Create a pod and verify it uses this DNS.
+
+Q259. Context: k8s-cluster1
+A pod with `hostNetwork: true` can access the network but cannot resolve Kubernetes service names. Add `dnsPolicy: ClusterFirstWithHostNet` to fix DNS resolution.
+
+Q260. Context: k8s-cluster2
+Create a NetworkPolicy that uses `ipBlock` to allow egress from namespace `apps` to CIDR `172.16.0.0/12` except `172.16.1.0/24`.
+
+Q261. Context: k8s-cluster1
+Identify which CNI plugin is installed in the cluster. Check the CNI config directory `/etc/cni/net.d/` and the CNI binary directory `/opt/cni/bin/`. Save the CNI plugin name to `/opt/cni-plugin.txt`.
+
+Q262. Context: k8s-cluster3
+Create a pod with multiple network interfaces (if multus is installed). If not, explain what CNI plugin would be needed and how to configure it.
+
+Q263. Context: k8s-cluster1
+Service `external-svc` in namespace `apps` should forward traffic to pods in namespace `backend`. Create the service in `apps` namespace with selector matching pods in `backend` namespace. (Trick question: services can only select pods in the same namespace. Use ExternalName or create the service in `backend`.)
+
+Q264. Context: k8s-cluster2
+Create a headless service and verify that DNS returns individual pod IPs instead of a single ClusterIP. Compare the DNS output of a regular ClusterIP service vs headless service.
+
+Q265. Context: k8s-cluster1
+A NodePort service is accessible on some nodes but not others. Check if kube-proxy is running on all nodes. Fix the node where kube-proxy is not running.
+
+Q266. Context: k8s-cluster3
+Create a service with `externalTrafficPolicy: Local` named `local-svc`. Explain the difference between `Cluster` and `Local` external traffic policy.
+
+Q267. Context: k8s-cluster1
+An Ingress with annotation `nginx.ingress.kubernetes.io/rewrite-target: /` is causing 404 errors on the backend. The backend expects paths like `/api/users`, not `/`. Remove the rewrite annotation and test.
+
+Q268. Context: k8s-cluster2
+Create a NetworkPolicy that allows egress from namespace `apps` only to the `kube-dns` service (port 53 UDP/TCP in `kube-system`) and to an external API at `203.0.113.0/24` port 443.
+
+Q269. Context: k8s-cluster1
+Debug: pods in namespace `app` can reach `ClusterIP` services but not `NodePort` services from inside the cluster. Check kube-proxy mode and iptables rules.
+
+Q270. Context: k8s-cluster3
+A pod with `dnsPolicy: Default` cannot resolve `web-svc.apps.svc.cluster.local`. Change the policy to `ClusterFirst` so it uses the cluster DNS instead of the node's DNS.
+
+---
+
+## Storage (10%)
+
+### PersistentVolumes & PersistentVolumeClaims
+
+Q271. Context: k8s-cluster1
+Create a PersistentVolume named `pv-log` with capacity `1Gi`, access mode `ReadWriteOnce`, hostPath `/var/log/app`, and storageClassName `manual`.
+
+Q272. Context: k8s-cluster2
+Create a PersistentVolumeClaim named `pvc-log` in namespace `logging` that requests `500Mi` storage with access mode `ReadWriteOnce` and storageClassName `manual`. Verify it binds to the correct PV.
+
+Q273. Context: k8s-cluster1
+Create a pod named `log-pod` in namespace `logging` that mounts the PVC `pvc-log` at path `/var/log/app`.
+
+Q274. Context: k8s-cluster3
+A PVC `data-pvc` in namespace `database` is stuck in `Pending`. Check if a matching PV exists. If not, create a PV with the correct capacity, access mode, and storageClassName.
+
+Q275. Context: k8s-cluster1
+Create a PV with `persistentVolumeReclaimPolicy: Retain`. Delete the PVC that binds to it. Verify the PV status changes to `Released`, not `Available`. Manually reclaim it by removing the `claimRef`.
+
+Q276. Context: k8s-cluster2
+Create a PV and PVC that use NFS. PV details: server `nfs.local`, path `/exports/data`, capacity `5Gi`, access mode `ReadWriteMany`.
+
+Q277. Context: k8s-cluster1
+Resize an existing PVC `app-data` in namespace `apps` from `1Gi` to `5Gi`. The StorageClass must have `allowVolumeExpansion: true`. Check and enable if needed.
+
+Q278. Context: k8s-cluster3
+Create a StorageClass named `fast-storage` with provisioner `kubernetes.io/no-provisioner`, volumeBindingMode `WaitForFirstConsumer`, and reclaimPolicy `Retain`.
+
+Q279. Context: k8s-cluster1
+A PVC is bound to a PV but the pod can't mount it. The PV has access mode `ReadWriteOnce` but the pod is on a different node than the one that already has it mounted. Fix the pod scheduling to run on the same node, or change the PV access mode.
+
+Q280. Context: k8s-cluster2
+Create a PV with label `type=ssd`. Create a PVC that specifically selects this PV using `matchLabels` in the selector field.
+
+### Volume Types
+
+Q281. Context: k8s-cluster1
+Create a pod with two containers that share data using an `emptyDir` volume. Container `writer` writes to `/data/output.txt` and container `reader` reads from `/data/output.txt`.
+
+Q282. Context: k8s-cluster2
+Create a pod with a `hostPath` volume that mounts `/var/log` from the host node at `/host-logs` in the container. Set `type: Directory`.
+
+Q283. Context: k8s-cluster1
+Create a pod that mounts a ConfigMap as a volume. ConfigMap `nginx-conf` should be mounted at `/etc/nginx/conf.d/`. Create the ConfigMap from file `/opt/default.conf`.
+
+Q284. Context: k8s-cluster3
+Create a pod that mounts a Secret as a volume at `/etc/certs/`. The Secret `tls-certs` contains `tls.crt` and `tls.key`. Set the volume mount as read-only.
+
+Q285. Context: k8s-cluster1
+Create a pod with a `projected` volume that combines a ConfigMap and a Secret into a single mount at `/etc/config/`.
+
+Q286. Context: k8s-cluster2
+Create a pod with an `emptyDir` volume with `medium: Memory` (tmpfs). Set the `sizeLimit` to `64Mi`. Mount at `/cache`.
+
+Q287. Context: k8s-cluster1
+Create a pod that mounts a specific key from a ConfigMap. The ConfigMap `app-config` has keys `db.host`, `db.port`, and `app.name`. Mount only `db.host` as a file at `/etc/app/database-host`.
+
+Q288. Context: k8s-cluster3
+Create a pod with a `hostPath` volume of type `DirectoryOrCreate` at path `/data/pod-storage`. If the directory doesn't exist on the node, it should be created.
+
+### StorageClasses
+
+Q289. Context: k8s-cluster1
+List all StorageClasses in the cluster. Identify the default StorageClass. Save the output to `/opt/storageclasses.txt`.
+
+Q290. Context: k8s-cluster2
+Change the default StorageClass from `standard` to `fast`. Remove the `storageclass.kubernetes.io/is-default-class` annotation from `standard` and add it to `fast`.
+
+Q291. Context: k8s-cluster1
+Create a StorageClass `local-storage` with `provisioner: kubernetes.io/no-provisioner`, `volumeBindingMode: WaitForFirstConsumer`. Create a PV and PVC using this StorageClass.
+
+Q292. Context: k8s-cluster3
+A PVC uses StorageClass `gold` but that class doesn't exist. Create the StorageClass with appropriate settings and verify the PVC binds.
+
+### StatefulSet Storage
+
+Q293. Context: k8s-cluster1
+Create a StatefulSet `web` in namespace `apps` with 3 replicas, image `nginx`. Add a volumeClaimTemplate that creates a 1Gi PVC for each replica with access mode `ReadWriteOnce`, mounted at `/usr/share/nginx/html`.
+
+Q294. Context: k8s-cluster2
+A StatefulSet `cassandra` has been scaled down from 5 to 3 replicas. The PVCs for replicas 3 and 4 still exist. Delete them manually.
+
+Q295. Context: k8s-cluster1
+Scale a StatefulSet from 3 to 5 replicas. Verify that new PVCs are created automatically for replicas 3 and 4 using the volumeClaimTemplate.
+
+### Storage Troubleshooting
+
+Q296. Context: k8s-cluster1
+A pod `data-pod` shows `FailedMount` in events. The PVC exists and is bound, but the underlying NFS server is unreachable. Verify NFS connectivity from the node. Document the troubleshooting steps.
+
+Q297. Context: k8s-cluster2
+A PVC is bound to a PV with `reclaimPolicy: Delete`. The pod using it was deleted and recreated, but the PVC was also deleted by accident. The data is lost. Create a new PV and PVC, and document the prevention strategy (use `Retain` policy).
+
+Q298. Context: k8s-cluster1
+Multiple pods are trying to use the same PV with `accessMode: ReadWriteOnce`. Only one pod can mount it. Fix by either changing the access mode to `ReadWriteMany` (if supported) or scheduling all pods on the same node.
+
+Q299. Context: k8s-cluster3
+A PV is stuck in `Released` state after its PVC was deleted. Reclaim the PV by editing it: remove the `spec.claimRef` field so it returns to `Available` state.
+
+Q300. Context: k8s-cluster1
+A pod uses a PVC that's dynamically provisioned but the provisioner is not installed. The PVC stays `Pending` with event "no provisioner found". Install or configure the correct CSI driver, or switch to a StorageClass that has a working provisioner.

@@ -1,0 +1,62 @@
+ ok, when i desifgned the projetcd i started with way to not hardcode secrets in gh for aws, and i heared about  
+  oidc , i followed some gguides to config but not relaly understod how it work, the thing i know is that aws      
+  trust gh in general with certificate , and when i asked ai , he guided me to config aws side not gh side, said   
+  that we need to create somthing called identiy proivder in iam , i thunk its oidc not oicd brvause i open aws    
+  page now and see it named openid connect and it labeld to stablish trust between aws account and public          
+  provider like google, and gh , when chose it it ask for provider id and audience, dont remeber what was those i  
+  see my current is token.actions.githubusercontent.com                                                            
+   and sts.amazonaws.com as audience , , let me check my boostrapop cloudformation config file, oidc section, i    
+  see i defined resoutrce nsmaed githuboidcprovider i think this just the metadata not aws name at all , like in   
+  tf metadata , and type of resource we put the arn ? like aws::iam:oidcprovider because this is the extenstion    
+  location or address ot what did they call this forma ? , then  the vars injected to pass url and client id list  
+  is the audience which i still ont know whaty ios , then thunprint, i see iu hardcodd here where i remeber ai     
+  suggested me to run command to get the variable, form cli , and themn ater i used and found no wjhere menton     
+  ,ai told me it was old methon for somthing and now its not really used so aws ignore this parameter so keep or   
+  remove in the tyml is same, then i see tag simple to my env , i think this is just point to author something     
+  with githubn in general not relatyed to my account yet and it exist to be refrenced somthere as gate for this    
+  permsion auth handcshake or somthign? , yes i use GitHubOIDCProvider to search oin the bootstrap now, i see      
+  that we create iam role in line 171 , it say this is role , depoend on permision ob-oundry role , , it provide   
+  full admin access , act on which resource ? or do what, this not mention here because this is policy, and here   
+  we in role, so whta is it, this is the role aws say inside that we will create like id card named admin to be    
+  used by principle and refrence the github oicd provider and lmit                                                 
+  conditionrepo:mohamedsabry-dev/hybrid-cloud-infrastructure:ref:refs/heads/prod-security to be assumed only from  
+  this repo on this account on this specifc branch , so it authenticate gh this acc,rep,branch to assume role to   
+  this aws account and count on the provider auth method between aws,gj "preestablished of trust" .. anbd it       
+  dpeend on the boundry, to do what in this asusme, this bvased on the refremnced policy named                     
+  ManagedPolicyArns:                                                                                               
+          - !Sub "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess" , this not customer policuy, this   
+  aws ready to use polciy full admin refrenced by arn . but this administration restricted buy                     
+  TerraformPermissionsBoundary which i ceated to prevent tf admin from overwrite the original low level config     
+  for s3,dynamo,oicd to not lock himself out , it the premsion allow everything but deny dleete or remove or       
+  update on oidc , on the permision boundry itself , on the dynamo ort s3 , thats all , good to metnion that the   
+  bootstrap only create GitHubActions-Terraforom admin role , and the admin repsonsabiule to do same but for       
+  infra role and other, , let me leave the bootstrap and head to iam of tf prod , ok simple cvonfig i had there,   
+  first since i will create also asume role from gh to another custome role name,, i will need to eiother import   
+  the arn of oidc provider or hardcode it , which i hardcode it depend on prefix account id inhert from gh secert  
+  in runtime so not exposed , so the simple role tf file is just , creating tin einfra role , and consider the     
+  permisison boundry we have before applied on  admin, i think this just clean pattern, but if removed line 19 of  
+  permsion boundry nothing change because the the admin role of tf cant create role for soimthing it not allowed   
+  to manage right ? i mean if removed line 19 nothing change because aws will pass it auto the inhert of boundry   
+  on admin to other crreated resources by it ? or there a chance of privilage escalation here ? and if yes it      
+  prevent, how i confirm, is if checked tf state on s3 for this iam, while line 19 not exist we should find the    
+  deny block policy inherted form adimn to therte or informeced by aws or there sec risk here ? , it aslso have    
+  condition to accept the assume from specitton accouint,repo,branch "what happen if we removbed the condition     
+  block, is it denby all by dewfault or allow any gh repo branch in worklload to assume this role to my acc once   
+  have the id and role name? ?? , the assibnged pocliy scope to this infra user is let me check its file, oh oh i  
+  see the boundry we talk about from a whiole is the boundry on infra level to not get into iam resource admin     
+  scope ,m not related to the boundry which in cloudformation, i think then aws inhert it auto ? does it in s3     
+  tho ? i see it not allowed to managhe iam,cloudtrail,billinh,passrole " pass role except allowed because we      
+  allow asusme role pass to ec2 , for related needed actions like wireguard and else but iwll coveer later , this  
+  is chapter 1 of the story, so when gh want to run action which want assume role admin, it first send to aws      
+  and auth some how the provider, then it send to aws that acount x , repoy, branch prod want to assume role       
+  named terraformadim on accound id z , aws check the account and send feedback to gh either it not autheticated   
+  or not allowed to assume this role from this party or this branch , nd then fail , or we stablish from branch    
+  proc-security so aws match all locks and authenticate gh to assume the role, and proivide temporary token which  
+  will be displayed in logs, either if repo pubilc and someone jwt token, will not do somthing because aonly       
+  allowe dfrom myacc, repo , adn hard secure branch , while i not allow fork trigger workflow and not accept pr    
+  and anot allow contributers so this is safe , the jwt stand for what ? and this token default 1 hour right ?     
+  and if the workflow stuck in tf apply for more than 1 h , will the jwt expire or renwe and if expire, this mean  
+  the tf state will not iupdate or worse will courput ? , this chatper 1 of the story  
+
+
+  
