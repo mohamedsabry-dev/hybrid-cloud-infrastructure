@@ -1,0 +1,101 @@
+TS Case: Docker Apache Containers — 503 + DB Connection Failure
+================================================================
+Status: RESOLVED
+Date: 2026-07-13
+
+[Symptom]
+  curl http://localhost:80 returns 503 Service Unavailable.
+  All 6 containers show as "Up" in docker compose ps.
+
+
+[Issue 1: PHP-FPM socket directory missing]
+
+  Log evidence (docker compose logs):
+    apache-2-1 | ERROR: unable to bind listening socket for address
+    '/run/php-fpm/www.sock': No such file or directory (2)
+    apache-2-1 | ERROR: FPM initialization failed
+
+  Root cause:
+    The directory /run/php-fpm/ doesn't exist inside the container.
+    On a VM, systemd creates it when php-fpm.service starts.
+    In Docker, there's no systemd — start.sh runs php-fpm directly, so the directory
+    must be created manually.
+
+  Fix (start.sh):
+    Added: mkdir -p /run/php-fpm
+
+  Log location checked:
+    docker compose logs (shows stdout/stderr from all containers)
+
+
+[Issue 2: PHP-FPM can't read environment variables — DB connection failed]
+
+  Symptom:
+    After fixing Issue 1, curl returns "DB connection failed".
+
+  Log evidence (inside container):
+    docker exec -it project-apache-3-1 bash
+    tail /var/log/php-fpm/www-error.log:
+      pg_connect(): Unable to connect to PostgreSQL server: could not translate
+      host name "port=5432" to address: Name or service not known
+
+    The error says "host name port=5432" — it's treating "port=5432" as the hostname.
+    That means getenv('DB_HOST') returned empty, so the connection string became:
+      "host= port=5432 dbname= ..." → pg_connect parsed "port=5432" as the host.
+
+  Verification:
+    Bash env var works:
+      echo $DB_HOST → postgres (present)
+
+    PHP-FPM doesn't see it:
+      cat /etc/php-fpm.d/www.conf | grep clear_env → ;clear_env = no (COMMENTED OUT)
+
+    The semicolon means it's not active. Default is clear_env = yes.
+    PHP-FPM strips all inherited env vars from worker processes before they handle requests.
+    Docker injects env vars → start.sh sees them → PHP-FPM master sees them →
+    PHP-FPM workers (clear_env=yes) → WIPED → PHP getenv() returns empty.
+
+  Fix (start.sh):
+    Added: sed -i 's/;clear_env = no/clear_env = no/' /etc/php-fpm.d/www.conf
+
+  Log locations checked:
+    - docker compose logs (container stdout/stderr — showed Apache errors, not PHP errors)
+    - /var/log/php-fpm/www-error.log (inside container — showed the actual pg_connect error)
+    - /var/log/php-fpm/error.log (inside container — showed FPM startup status)
+    - /var/log/httpd/ (inside container — empty, Apache only logged its own startup)
+
+
+[Final start.sh]
+    #!/bin/bash
+    mkdir -p /run/php-fpm
+    sed -i 's/;clear_env = no/clear_env = no/' /etc/php-fpm.d/www.conf
+    php-fpm
+    httpd -D FOREGROUND
+
+
+[Resolution]
+  Rebuilt Apache images: docker compose build
+  Restarted: docker compose up -d
+  Verified: curl http://localhost:80 returns product list.
+
+
+[Why docker logs didn't show the PHP errors]
+
+  docker logs only captures stdout and stderr from the container's main process.
+  Apache's ErrorLog was set to /dev/stderr → docker logs showed Apache errors.
+  But PHP-FPM logs to /var/log/php-fpm/www-error.log (a file inside the container),
+  NOT to stdout/stderr. So docker logs never saw the PHP connection errors.
+
+  To see PHP errors via docker logs, you'd need to either:
+    - Symlink: ln -sf /dev/stderr /var/log/php-fpm/www-error.log
+    - Or change php-fpm.d/www.conf: php_admin_value[error_log] = /dev/stderr
+
+  We didn't do this — we exec'd into the container and checked the file directly.
+  That's a valid debugging approach but the symlink method is better for production.
+
+
+[Key Differences: VM vs Docker debugging]
+
+  VM: systemd creates directories, manages services, journalctl shows logs.
+  Docker: no systemd, must create dirs manually, docker logs only shows stdout/stderr,
+          must exec into container for file-based logs.

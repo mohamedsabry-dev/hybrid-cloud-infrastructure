@@ -1,0 +1,146 @@
+Docker & Containerization Interview Q&A — Phase 2
+===================================================
+
+
+Q1: Why is there no EXPOSE or port mapping in the Dockerfile?
+A: EXPOSE in a Dockerfile is just documentation — it doesn't actually open ports. The real port
+   exposure happens in docker-compose with the "ports" directive (e.g. "80:80"). Internally,
+   containers on the same Docker network can talk to each other on any port without EXPOSE.
+   Only the entry point (Varnish) needs a port mapped to the host. Everything else is internal.
+
+
+Q2: Why don't you manually start services in the Dockerfile?
+A: The base image handles it. Official images (postgres, nginx, varnish) come with an ENTRYPOINT
+   that starts the main process when the container runs. You just configure what it starts with
+   (via CMD, config files, or env vars). You don't write "systemctl start postgres" — the image
+   does that for you.
+   Exception: our Apache image uses a custom start.sh because we need two processes (PHP-FPM
+   and Apache) in one container. That's not standard — in production you'd split them into
+   separate containers.
+
+
+Q3: How does COPY work for config injection?
+A: COPY takes a file from your build context (your local directory) and puts it inside the image
+   at the specified path. The key is knowing WHERE the base image expects config files:
+   - PostgreSQL: /docker-entrypoint-initdb.d/ (SQL files run on first start)
+   - Nginx: /etc/nginx/conf.d/default.conf
+   - Varnish: /etc/varnish/default.vcl
+   - Apache: /etc/httpd/conf/httpd.conf
+   You're replacing or adding to the default config. The base image reads from these paths
+   automatically — you just put your file there.
+
+
+Q4: Why don't we redirect logs to stdout/stderr in our Dockerfiles?
+A: Official base images already do it. For example, the nginx image symlinks:
+     /var/log/nginx/access.log → /dev/stdout
+     /var/log/nginx/error.log  → /dev/stderr
+   Same for postgres and varnish. Docker captures whatever goes to stdout/stderr and makes it
+   available via "docker logs <container>".
+   For our custom Apache image, we set ErrorLog /dev/stderr in the config manually because
+   we're not using the official httpd image — we built from rockylinux:10.
+   Rule: containers should never write logs to files inside the container. Files die with the
+   container. stdout/stderr is the standard — Docker, Kubernetes, and log collectors all read
+   from there.
+
+
+Q5: Why use ENV in the Dockerfile for POSTGRES_PASSWORD?
+A: The official postgres image requires POSTGRES_PASSWORD to be set — it refuses to start
+   without it. ENV in the Dockerfile sets a default value baked into the image. But you can
+   override it at runtime via docker-compose environment section or "docker run -e".
+   For secrets, the best practice is to NOT bake them in the image. Set them in docker-compose
+   or pass via "docker run -e". The Dockerfile ENV is just a fallback default.
+
+
+Q6: What is the difference between RUN and CMD?
+
+   RUN = executes during IMAGE BUILD. The result is saved as a layer in the image.
+     - Install packages: RUN dnf install -y httpd
+     - Create directories: RUN mkdir -p /app
+     - Set permissions: RUN chmod +x /start.sh
+     - Each RUN creates a new image layer
+
+   CMD = executes when the CONTAINER STARTS. It's the default command the container runs.
+     - Start the app: CMD ["postgres", "-c", "log_statement=all"]
+     - Run a script: CMD ["/start.sh"]
+     - Only ONE CMD per Dockerfile — the last one wins
+     - Can be overridden at runtime: docker run <image> <different-command>
+
+   Think of it this way:
+     RUN  = build time  = "set up the environment"
+     CMD  = run time    = "start the application"
+
+   Why not use RUN to start services? Because RUN executes and finishes during build.
+   The process would start, the layer would be saved, but the process wouldn't be running
+   when someone actually starts the container. CMD runs every time the container starts.
+
+
+Q7: Can you only have one CMD?
+A: Yes. Only one CMD per Dockerfile. If you write multiple, only the last one takes effect.
+   That's why we use start.sh for Apache — we need to start both PHP-FPM and Apache, so we
+   put both commands in a script and CMD runs that script.
+
+
+Q8: Can the image be built without the environment variables from docker-compose?
+A: Yes. The image builds fine without them. ENV vars from docker-compose are RUNTIME — they're
+   injected when the container starts, not during build.
+   Build time: Dockerfile → RUN, COPY, ENV (defaults) → produces the image
+   Run time: docker-compose → environment, ports, volumes → starts the container
+   The image is a template. It doesn't know about compose vars until it runs.
+   In CI/CD, the pipeline builds the image and pushes it to a registry. The compose vars are
+   set in the deployment environment (staging, prod), not in the build step. Same image,
+   different config per environment. That's the whole point of 12-factor apps.
+
+
+Q9: If the image builds without runtime vars, what happens if the app needs them?
+A: The app starts but fails at runtime. For example, our PHP app calls getenv('DB_HOST').
+   If DB_HOST isn't set, pg_connect gets an empty host, connection fails, you see
+   "DB connection failed". The image is valid — the config is missing.
+   This is intentional: you want ONE image that works in dev, staging, and prod.
+   The environment variables are what make it point to different databases.
+
+
+Q10: What is depends_on in docker-compose?
+A: It controls startup ORDER, not readiness. "depends_on: postgres" means Docker starts the
+   postgres container first, then starts Apache. But it doesn't wait for PostgreSQL to be
+   fully ready — just for the container to start.
+   In production, the app should handle this with retry logic or health checks. Docker-compose
+   supports "depends_on: condition: service_healthy" with healthcheck directives for true
+   readiness checks.
+
+
+Q11: Why does only Varnish have a "ports" mapping in docker-compose?
+A: Because Varnish is the only entry point — the only container that needs to be reachable
+   from outside the Docker network. Everything else (Nginx, Apache, PostgreSQL) communicates
+   internally on the Docker bridge network. No external access needed.
+   "ports: 80:80" means: host port 80 → container port 80. Only Varnish gets this.
+
+
+Q12: How do containers find each other by name?
+A: Docker-compose creates a bridge network for all services. Docker runs an internal DNS server
+   that resolves service names to container IPs. So when Nginx config says "server apache-1:80",
+   Docker DNS resolves "apache-1" to that container's IP. No hardcoded IPs, no /etc/hosts edits.
+   If a container restarts and gets a new IP, DNS updates automatically.
+
+
+Q13: What is the difference between ENTRYPOINT and CMD?
+A: ENTRYPOINT = the base command that always runs (set by the base image, rarely overridden)
+   CMD = arguments or the default command (you override this)
+   Example in the postgres image:
+     ENTRYPOINT ["docker-entrypoint.sh"]  ← runs init scripts, sets up DB
+     CMD ["postgres"]                      ← what to run after init
+   When we write CMD ["postgres", "-c", "log_statement=all"], we're replacing the default CMD
+   but ENTRYPOINT still runs first — so init.sql still gets executed.
+
+
+Q14: What does "dnf clean all" do in the Dockerfile and why?
+A: Removes the package manager cache after installing packages. dnf downloads package metadata
+   and .rpm files during install — that cache is useless inside the image and wastes space.
+   Every layer in a Docker image adds to the final size. Cleaning in the same RUN line as the
+   install keeps the layer small: RUN dnf install -y httpd && dnf clean all
+
+
+Q15: Same image for 3 Apache containers — how do they differ?
+A: Only the environment variables differ. Same image, same code, same config. Docker-compose
+   passes different APACHE_PORT values (8081, 8082, 8083) to each container. The PHP app reads
+   getenv('APACHE_PORT') to show which instance served the request. This is the container
+   pattern: build once, configure at runtime.

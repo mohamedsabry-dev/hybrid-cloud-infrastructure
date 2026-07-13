@@ -44,6 +44,13 @@ A: systemctl manages the default Apache instance with the default config. We're 
    instances with custom config files, so we start them manually with httpd -f. You could create
    systemd unit files for each, but for this setup it's unnecessary overhead.
 
+Q6b: Can you use journalctl for these custom Apache instances?
+A: No. journalctl reads systemd journal logs. Since we started Apache manually with httpd -f,
+   systemd doesn't know about these processes. Logs go to the ErrorLog path in each config
+   (/var/log/httpd/error-808x.log). In production, you'd create systemd unit files for each
+   instance (e.g. httpd-8081.service, httpd-8082.service). Then you get journalctl -u httpd-8081,
+   auto-restart on crash, and boot-time startup.
+
 
 --- Nginx ---
 
@@ -145,3 +152,73 @@ A: 502 means the reverse proxy (Nginx or Varnish) connected but the backend didn
    4. If "connection refused" — backend is down or wrong port.
    5. Check PHP-FPM: systemctl status php-fpm
    6. Check PostgreSQL: systemctl status postgresql
+
+
+--- Additional Questions ---
+
+Q21: Does Varnish forward or proxy requests?
+A: Forward, not proxy. On a cache miss, Varnish forwards the request to the backend, gets the
+   response, caches it, then serves it. It doesn't manipulate headers or load balance like a
+   reverse proxy. It decides one thing: serve from cache or fetch from backend.
+
+Q22: What caching mode does Varnish use by default?
+A: TTL-based caching. The backend response sets the TTL via Cache-Control or Expires headers.
+   If the backend doesn't set any, Varnish uses a default TTL of 120 seconds. After TTL expires,
+   the next request is a MISS and Varnish fetches fresh content. Production setups customize
+   the VCL — e.g. never cache responses with Set-Cookie, cache static assets longer.
+
+Q23: What OSI layer do Varnish, Nginx, and Apache operate on?
+A: All three are layer 7 (HTTP). They all understand URLs, headers, and HTTP methods.
+   The difference is the role, not the layer:
+   - Varnish: HTTP cache (serve from memory or fetch)
+   - Nginx: reverse proxy + load balancer (which backend to send to)
+   - Apache: application server (run the code, return the result)
+   A layer 4 tool would be HAProxy in TCP mode — it forwards raw TCP without understanding HTTP.
+
+Q24: Can Varnish handle HTTPS?
+A: No. Varnish only speaks plain HTTP — it cannot decrypt HTTPS. In our stack, HTTPS goes
+   directly to Nginx (:443), bypassing Varnish. Only HTTP (:80) goes through Varnish.
+   In production, if you want Varnish to cache HTTPS traffic, the pattern is:
+   Client → Nginx (SSL termination) → Varnish (cache) → Nginx (LB) → Apache
+   Nginx decrypts first, then forwards plain HTTP to Varnish. Varnish never sees encrypted traffic.
+
+Q25: Why can you see HTTP requests in varnishlog but not HTTPS?
+A: Because Varnish doesn't understand TLS. HTTPS traffic goes to Nginx directly on port 443,
+   so Varnish never sees it. Only requests arriving on port 80 (plain HTTP) pass through Varnish.
+
+Q26: Why do you need a reverse proxy? Why not let clients hit Apache directly?
+A: Without a reverse proxy, app servers are exposed directly. No single point for SSL, rate
+   limiting, or logging. Can't distribute traffic or add/remove backends without client changes.
+   With Nginx as reverse proxy: one entry point, backends hidden, SSL in one place, load balancing,
+   automatic failover when a backend dies, and static file serving without bothering Apache.
+
+Q27: A client uploads a 100MB file and gets "413 Request Entity Too Large". Why?
+A: Nginx's client_max_body_size directive. Default is 1MB. Nginx checks the Content-Length header
+   and rejects the request immediately if it exceeds the limit — the backend never sees it.
+   Fix: set client_max_body_size in the server block (e.g. client_max_body_size 100m).
+   It's set low by default to protect against memory exhaustion, disk filling, and DoS attacks.
+   Risk of setting it too high: someone uploads huge files → fills disk/RAM, multiple large
+   uploads simultaneously → server crashes. Set it to what the app actually needs, never unlimited.
+
+
+--- Troubleshooting Hop Reference ---
+
+  Error/Symptom                  | Check Hop     | Log Location                                    | Common Cause
+  -------------------------------|---------------|------------------------------------------------|------------------------------------------
+  503 Service Unavailable        | Varnish       | varnishlog / systemctl status varnish            | Backend (Nginx) is down or unreachable
+  502 Bad Gateway                | Nginx         | /var/log/nginx/error.log                         | Apache backends down or SELinux blocking
+  500 Internal Server Error      | Apache/PHP    | /var/log/php-fpm/www-error.log                   | PHP code error or missing extension
+  404 Not Found                  | Apache        | /var/log/httpd/error-808x.log                    | Wrong DocumentRoot or file doesn't exist
+  403 Forbidden                  | Apache        | /var/log/httpd/error-808x.log                    | Directory permissions or missing Require
+  "DB connection failed"         | PHP-FPM       | /var/log/php-fpm/www-error.log                   | SELinux (httpd_can_network_connect_db) or pg_hba.conf
+  "Permission denied" on connect | SELinux       | /var/log/audit/audit.log (grep denied)           | Missing setsebool for httpd network access
+  "Authentication failed"        | PostgreSQL    | /var/lib/pgsql/data/log/postgresql-*.log          | pg_hba.conf using ident instead of md5
+  "Connection refused" port 5432 | PostgreSQL    | systemctl status postgresql                      | PostgreSQL not running or not listening on TCP
+  "Connection refused" port 808x | Apache        | ps aux | grep httpd                              | Apache instance not started or crashed
+  Stale/old content after deploy | Varnish       | varnishlog (check for HITs on old content)       | Cache not purged — run varnishadm ban.url .
+  Slow response but works        | Varnish       | varnishstat (check hit rate)                     | Low cache hit rate — requests always MISSing
+  Blank page, no error           | PHP-FPM       | /var/log/php-fpm/www-error.log                   | PHP syntax error or display_errors off
+  Site works on curl, not browser| Nginx/Varnish | /var/log/nginx/access.log                        | Browser sending HTTPS to HTTP port (garbled \x16\x03)
+  Load balancing not working     | Nginx         | curl multiple times, check "Served by" port      | Only 1 Apache running, or Varnish caching same response
+  Timeout / no response          | Varnish       | varnishlog (check if backend fetch hangs)        | Backend overloaded or PHP-FPM max_children reached
+  413 Request Entity Too Large   | Nginx         | /var/log/nginx/error.log                         | client_max_body_size too low for the upload

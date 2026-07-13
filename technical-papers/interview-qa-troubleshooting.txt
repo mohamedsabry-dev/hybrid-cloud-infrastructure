@@ -1,0 +1,209 @@
+Troubleshooting Startup Failures — Linux, Docker, Kubernetes
+==============================================================
+
+
+=== LINUX SERVICE WON'T START ===
+
+Step 1: Check the status
+  systemctl status <service>
+  Look for: Active: failed, exit code, main PID
+
+Step 2: Check the journal
+  journalctl -u <service> --no-pager -n 50
+  Shows the last 50 lines of that service's logs. The error is usually here.
+
+Step 3: Check the config
+  Most services have a config test command:
+    httpd -t                     (Apache)
+    nginx -t                     (Nginx)
+    postgresql-setup --check     (PostgreSQL)
+  Syntax errors in config are the #1 cause of startup failure.
+
+Step 4: Check port conflicts
+  ss -tlnp | grep <port>
+  If another process holds the port, the service can't bind.
+
+Step 5: Check permissions
+  ls -la <config-file>
+  ls -la <data-directory>
+  Wrong ownership or permissions on config files or data dirs.
+
+Step 6: Check SELinux
+  getenforce                              (is it enforcing?)
+  cat /var/log/audit/audit.log | grep denied
+  SELinux blocking file access or network connections.
+
+Step 7: Check dependencies
+  Does the service need another service running first?
+  Example: an app needs PostgreSQL running before it can start.
+
+Common causes summary:
+  - Config syntax error
+  - Port already in use
+  - File/directory permissions
+  - SELinux denial
+  - Missing dependency (another service not running)
+  - Missing directory (PidFile path doesn't exist)
+  - Corrupted data directory
+
+
+=== DOCKER CONTAINER WON'T START / CRASHES ===
+
+Step 1: Check container status
+  docker ps -a
+  Look for: STATUS column — "Exited (1)" means error, "Exited (0)" means clean exit,
+  "Restarting" means crash loop.
+
+Step 2: Check the logs
+  docker logs <container-name>
+  docker logs --tail 50 <container-name>
+  docker compose logs <service-name>
+  This is stdout/stderr from the container. The error is usually here.
+  NOTE: if the app logs to a file (not stdout), you won't see it here.
+        Use docker exec to check file-based logs.
+
+Step 3: Check what the container ran
+  docker inspect <container-name> | grep -A5 "Cmd"
+  docker inspect <container-name> | grep -A5 "Entrypoint"
+  Is CMD/ENTRYPOINT correct? Typo in the command? Wrong path to script?
+
+Step 4: Run the container interactively to debug
+  docker run -it <image> bash
+  Now you're inside. Try running the start command manually and see what fails.
+  This is the most powerful debug technique — you see exactly what breaks.
+
+Step 5: Check if files exist inside the image
+  docker run --rm <image> ls /path/to/expected/file
+  docker run --rm <image> cat /etc/some/config
+  Maybe COPY failed, file is missing, or path is wrong.
+
+Step 6: Check port conflicts on the host
+  docker ps (another container on same host port?)
+  ss -tlnp | grep <port> (host process on that port?)
+
+Step 7: Check resource limits
+  docker stats
+  Out of memory? Docker kills containers that exceed memory limits.
+  Look for OOMKilled:
+    docker inspect <container> | grep OOMKilled
+
+Step 8: Check image build
+  Did the image build succeed? Was the right image used?
+  docker images | grep <name>
+  docker compose build <service> (rebuild to check for build errors)
+
+Common causes summary:
+  - CMD/ENTRYPOINT wrong (file not found, wrong path, not executable)
+  - Missing directory inside container (no systemd to create /run/* dirs)
+  - Config file error (same as Linux — syntax error)
+  - Port conflict on host
+  - Environment variable missing or wrong
+  - Process exits immediately (nothing in foreground — container needs one foreground process)
+  - OOM killed (out of memory)
+  - Image build failed (wrong base image, package not found)
+  - File permissions (script not executable — forgot chmod +x)
+
+
+=== KUBERNETES POD WON'T START / CRASHLOOPBACKOFF ===
+
+--- Pod Status Meanings ---
+  Pending        — not scheduled yet (no node has resources, or image is pulling)
+  ContainerCreating — image pulled, setting up volumes/network
+  Running        — at least one container is running
+  CrashLoopBackOff — container starts, crashes, restarts, crashes again
+  ImagePullBackOff — can't pull the image (wrong name, no auth, registry down)
+  Error          — container exited with an error
+  Evicted        — node ran out of resources, killed the pod
+  Init:Error     — init container failed
+  Terminating    — pod is being deleted
+
+--- Troubleshooting Steps ---
+
+Step 1: Get pod status and events
+  kubectl get pods -n <namespace>
+  kubectl describe pod <pod-name> -n <namespace>
+  The Events section at the bottom is critical. It shows:
+    - Scheduling decisions
+    - Image pull status
+    - Mount failures
+    - Liveness/readiness probe failures
+    - OOM kills
+
+Step 2: Check logs
+  kubectl logs <pod-name> -n <namespace>
+  kubectl logs <pod-name> -n <namespace> --previous  (logs from the crashed container)
+  kubectl logs <pod-name> -n <namespace> -c <container>  (specific container in multi-container pod)
+
+Step 3: Check the image
+  kubectl describe pod <pod-name> | grep Image
+  Is it the right image? Right tag? Can the node pull it?
+  ImagePullBackOff → wrong image name, private registry without imagePullSecrets, or registry down.
+
+Step 4: Check resource requests/limits
+  kubectl describe pod <pod-name> | grep -A3 Limits
+  kubectl describe node <node-name> | grep -A5 Allocated
+  Pod might be Pending because no node has enough CPU/memory.
+  Pod might be OOM killed because memory limit is too low.
+
+Step 5: Check volumes/mounts
+  kubectl describe pod <pod-name> | grep -A10 Volumes
+  kubectl describe pod <pod-name> | grep -A5 Mounts
+  PVC not bound? NFS mount failed? ConfigMap/Secret doesn't exist?
+
+Step 6: Check probes
+  kubectl describe pod <pod-name> | grep -A5 Liveness
+  kubectl describe pod <pod-name> | grep -A5 Readiness
+  If liveness probe fails → Kubernetes kills and restarts the container (CrashLoopBackOff).
+  If readiness probe fails → pod stays Running but gets no traffic.
+  Common: probe path wrong, probe port wrong, app takes too long to start.
+
+Step 7: Exec into the pod (if it's running)
+  kubectl exec -it <pod-name> -n <namespace> -- bash
+  Same as Docker — get inside and debug manually.
+
+Step 8: Check node-level issues
+  kubectl describe node <node-name>
+  Look for: DiskPressure, MemoryPressure, PIDPressure, NotReady
+  If the node is unhealthy, all pods on it suffer.
+
+Step 9: Escalate beyond kubectl
+  If kubectl gives you nothing useful, go deeper:
+    - crictl ps -a (container runtime level — see containers kubectl can't show)
+    - crictl logs <container-id> (runtime-level logs)
+    - journalctl -u kubelet (kubelet logs — scheduling, pod lifecycle)
+    - journalctl -u containerd (container runtime logs)
+    - Check Loki/central logging if available
+
+--- CrashLoopBackOff specifically ---
+
+  This means: container starts → runs → exits → Kubernetes restarts it → same thing.
+  Backoff means Kubernetes waits longer between each restart (10s, 20s, 40s, up to 5min).
+
+  Most common causes:
+    1. App error — check logs (kubectl logs --previous)
+    2. Missing config — ConfigMap/Secret not mounted or wrong key
+    3. Missing dependency — DB not ready, service not reachable
+    4. Liveness probe too aggressive — kills container before it's ready
+    5. OOM — memory limit too low, container gets killed
+    6. Entrypoint/CMD wrong — process exits immediately
+    7. File permissions — can't read config, can't write to data dir
+
+  Debug flow:
+    kubectl logs <pod> --previous → kubectl describe pod <pod> → kubectl exec (if possible)
+    → crictl/journalctl if API-level gives nothing
+
+
+--- Comparison Table ---
+
+  Question                   | Linux                        | Docker                          | Kubernetes
+  ---------------------------|------------------------------|--------------------------------|----------------------------------
+  Check status               | systemctl status             | docker ps -a                    | kubectl get pods
+  Check logs                 | journalctl -u <svc>          | docker logs <container>         | kubectl logs <pod>
+  Check previous crash       | journalctl (scroll back)     | docker logs (if not removed)    | kubectl logs --previous
+  Test config                | httpd -t / nginx -t          | docker run -it <img> bash       | kubectl exec -it <pod> -- bash
+  Check events               | journalctl -u <svc>          | docker events                   | kubectl describe pod (Events)
+  Interactive debug          | run command manually         | docker run -it <img> bash       | kubectl exec / kubectl debug
+  Check resource issues      | top / free -m                | docker stats                    | kubectl describe node
+  Port conflict              | ss -tlnp                     | docker ps / ss -tlnp            | kubectl get svc (NodePort clash)
+  Check file permissions     | ls -la                       | docker exec ls -la              | kubectl exec ls -la
+  Deeper investigation       | strace / dmesg               | docker inspect                  | crictl / journalctl -u kubelet

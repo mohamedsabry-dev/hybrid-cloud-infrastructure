@@ -1,0 +1,52 @@
+services:
+  postgres:
+    build: ./postgres
+    environment:
+      - POSTGRES_PASSWORD=Change_Me
+    
+  apache-1:
+    build: ./apache
+    environment:
+      - APACHE_PORT=8081
+      - DB_HOST=postgres
+      - DB_NAME=webstore
+      - DB_USER=webuser
+      - DB_PASS=web123
+    depends_on:
+      - postgres
+
+  apache-2:
+    build: ./apache
+    environment:
+      - APACHE_PORT=8082
+      - DB_HOST=postgres
+      - DB_NAME=webstore
+      - DB_USER=webuser
+      - DB_PASS=web123
+    depends_on:
+      - postgres
+
+  apache-3:
+    build: ./apache
+    environment:
+      - APACHE_PORT=8083
+      - DB_HOST=postgres
+      - DB_NAME=webstore
+      - DB_USER=webuser
+      - DB_PASS=web123
+    depends_on:
+      - postgres
+
+  nginx:
+    build: ./nginx
+    depends_on:
+      - apache-1
+      - apache-2
+      - apache-3
+    
+  varnish: 
+    build: ./varnish
+    ports:
+      - "80:80"
+    depends_on:
+      - nginx
