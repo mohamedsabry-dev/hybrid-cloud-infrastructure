@@ -69,3 +69,9 @@ TASKS
 # Local docs (interview prep, personal notes — not tracked)
 local-docs/
 architecture-traces/
+
+# Local testing environments
+Testing-Env/
+
+# Technical papers (interview prep — not tracked)
+technical-papers/
