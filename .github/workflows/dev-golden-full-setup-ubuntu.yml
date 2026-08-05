@@ -1,0 +1,134 @@
+# =============================================================================
+# DEV Golden Templates Full Setup
+# =============================================================================
+# Manual setup required after each job - see post-build instructions
+# =============================================================================
+
+name: "[DEV] Golden Templates - Full Setup"
+
+# -----------------------------------------------------------------------------
+# Triggers: Manual dispatch or push to dev branch
+# -----------------------------------------------------------------------------
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/dev/proxmox/vms/golden-image-ubuntu/**'
+      - '.github/workflows/dev-golden-full-setup-ubuntu.yml'
+
+# -----------------------------------------------------------------------------
+# Permissions: OIDC for AWS authentication
+# -----------------------------------------------------------------------------
+permissions:
+  id-token: write
+  contents: read
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# -----------------------------------------------------------------------------
+env:
+  ENVIRONMENT: dev
+  TF_WORKING_DIR_VM: terraform/dev/proxmox/vms/golden-image-ubuntu
+  ANSIBLE_HOST: 10.0.63.10
+  ANSIBLE_USER: root
+
+# =============================================================================
+# Jobs
+# =============================================================================
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1: Create Golden VM
+  # Creates base VM for cloning - requires manual setup after deployment
+  # Lock: DEV_INFRA_GOLDEN_VM_LOCK
+  # ---------------------------------------------------------------------------
+  create-vm:
+    name: "1. Create Golden VM"
+    runs-on: mac-mini
+    if: ${{ vars.DEV_INFRA_GOLDEN_UBUNTU_VM_LOCK != 'true' }}
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR_VM }}
+
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/GitHubActions-Infrastructure-${{ env.ENVIRONMENT }}
+          aws-region: ${{ vars.AWS_REGION_DEV }}
+
+      - name: Fetch Proxmox Secrets
+        run: |
+          API_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id dev/proxmox/terraform-token \
+            --query SecretString --output text)
+          echo "::add-mask::${API_SECRET}"
+
+          TOKEN_ID=$(echo "$API_SECRET" | jq -r '.token_id')
+          TOKEN_SECRET=$(echo "$API_SECRET" | jq -r '.token_secret')
+
+          echo "::add-mask::${TOKEN_ID}"
+          echo "::add-mask::${TOKEN_SECRET}"
+          echo "::add-mask::${TOKEN_ID}=${TOKEN_SECRET}"
+
+          echo "TF_VAR_proxmox_api_token=${TOKEN_ID}=${TOKEN_SECRET}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init -upgrade
+
+      - name: Terraform Plan
+        timeout-minutes: 3
+        run: terraform plan -out=tfplan
+
+      # Show setup instructions BEFORE terraform apply
+      # (Terraform waits for guest agent, which is installed by this manual setup)
+      - name: Pre-Build Setup Instructions
+        run: |
+          echo "=============================================="
+          echo "  MANUAL SETUP INSTRUCTIONS (DO THIS NOW)"
+          echo "=============================================="
+          echo ""
+          echo "Terraform will create the VM and WAIT for the guest agent."
+          echo "You must complete OS installation while Terraform waits."
+          echo ""
+          echo "PREREQUISITE: During Rocky Linux installation, you MUST:"
+          echo "  - Set a root password (enables SSH access for setup)"
+          echo "  - The setup script will secure SSH to key-only auth later"
+          echo ""
+          echo "Step 1: Watch Proxmox UI - VM will appear and boot from ISO"
+          echo "  # Complete Rocky Linux installation via console"
+          echo ""
+          echo "Step 2: After OS install, get VM IP and copy setup script"
+          echo "  scp proxmox/golden_templates/golden-vm-ubuntu-setup.sh root@<VM_IP>:/tmp/"
+          echo ""
+          echo "Step 3: SSH to VM and run setup script"
+          echo "  ssh root@<VM_IP>"
+          echo "  chmod +x /tmp/golden-vm-ubuntu-setup.sh"
+          echo "  /tmp/golden-vm-ubuntu-setup.sh"
+          echo ""
+          echo "Step 4: Script installs guest-agent - Terraform will then complete"
+          echo ""
+          echo "Step 5: After Terraform completes, clone to template (on Proxmox host)"
+          echo "  qm clone 8000 8001 --name ubuntu-golden-template --full"
+          echo "  qm template 8001"
+          echo ""
+          echo "SECURITY: The setup script sets 'PermitRootLogin prohibit-password'"
+          echo "          which allows SSH keys only (no password). This is inherited"
+          echo "          by cloned VMs - Terraform/cloud-init injects new keys per VM."
+          echo ""
+          echo "NOTE: VM 8000 stays as source (Terraform managed)"
+          echo "      VM 8001 is the template (manually created clone)"
+          echo "=============================================="
+          echo ""
+          echo "Starting Terraform apply in 30 seconds..."
+          sleep 30
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
