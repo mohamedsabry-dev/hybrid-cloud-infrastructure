@@ -43,7 +43,7 @@ variable "k8s_master1" {
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
     started        = false
-    on_boot        = false
+    on_boot        = false  # Allow Room for other resources to be used [Phase X]
     stop_on_destroy = true
   }
 }
@@ -82,8 +82,8 @@ variable "k8s_master2" {
     startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
-    started        = true
-    on_boot        = true
+    started        = false
+    on_boot        = false
     stop_on_destroy = true
   }
 }
@@ -122,8 +122,8 @@ variable "k8s_master3" {
     startup_delay  = 180      # Wait 180 after masters before starting workers (order 9)
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
-    started        = true
-    on_boot        = true
+    started        = false
+    on_boot        = false
     stop_on_destroy = true
   }
 }

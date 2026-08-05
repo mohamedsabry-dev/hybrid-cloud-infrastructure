@@ -48,9 +48,9 @@ variable "k8s_worker1" {
     startup_delay  = 0       # All workers start together (60s delay is on master3)
     shutdown_delay = 60
     startup_order  = 9       # All workers share same order, start after masters (order 8)
-    started        = true
+    started        = false
     on_boot        = false
-    stop_on_destroy = false
+    stop_on_destroy = true
   }
 }
 
@@ -94,8 +94,8 @@ variable "k8s_worker2" {
     startup_delay  = 0       # All workers start together (parallel boot)
     shutdown_delay = 60
     startup_order  = 9       # All workers share same order, start after masters (order 8)
-    started        = true
-    on_boot        = true
+    started        = false
+    on_boot        = false
     stop_on_destroy = true
   }
 }
