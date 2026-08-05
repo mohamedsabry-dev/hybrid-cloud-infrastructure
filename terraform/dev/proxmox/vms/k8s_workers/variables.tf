@@ -49,8 +49,8 @@ variable "k8s_worker1" {
     shutdown_delay = 60
     startup_order  = 9       # All workers share same order, start after masters (order 8)
     started        = true
-    on_boot        = true
-    stop_on_destroy = true
+    on_boot        = false
+    stop_on_destroy = false
   }
 }
 

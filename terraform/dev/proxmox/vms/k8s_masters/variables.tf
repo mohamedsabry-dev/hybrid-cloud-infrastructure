@@ -42,8 +42,8 @@ variable "k8s_master1" {
     startup_delay  = 0       # All masters start together (parallel boot)
     shutdown_delay = 60
     startup_order  = 8       # All masters share same order for simultaneous start
-    started        = true
-    on_boot        = true
+    started        = false
+    on_boot        = false
     stop_on_destroy = true
   }
 }
