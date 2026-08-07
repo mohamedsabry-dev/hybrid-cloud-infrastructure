@@ -103,7 +103,7 @@ resource "proxmox_virtual_environment_vm" "jenkins_master1" {
     vlan_id = var.jenkins_master1.vlan_id2
   }
 
-  master {
+  agent {
     enabled = true
   }
 
