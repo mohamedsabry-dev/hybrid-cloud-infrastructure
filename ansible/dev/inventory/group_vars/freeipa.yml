@@ -42,7 +42,10 @@ ipa_host_groups:
     - name: runner_nodes
       description: "CI/CD runner nodes"
       hosts:
+        - jenkins-master1.lab.local
         - local-runner.lab.local
+        - jenkins-agent1.lab.local
+        - jenkins-agent2.lab.local
 
     - name: nginx_nodes
       description: "Nginx reverse proxy"
