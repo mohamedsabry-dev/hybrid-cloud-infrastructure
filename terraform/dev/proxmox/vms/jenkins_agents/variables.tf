@@ -42,7 +42,7 @@ variable "jenkins_agent1" {
     gateway        = "10.0.63.1"
     bridge         = "vmbr0"
     vlan_id        = 63
-    ip2            = "10.0.40.161/24"
+    ip2            = "10.0.40.241/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
     startup_delay  = 0       # All agents start together (60s delay is on master3)
@@ -88,7 +88,7 @@ variable "jenkins_agent2" {
     gateway        = "10.0.63.1"
     bridge         = "vmbr0"
     vlan_id        = 63
-    ip2            = "10.0.40.202/24"
+    ip2            = "10.0.40.242/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
     startup_delay  = 0       # All agents start together (parallel boot)
