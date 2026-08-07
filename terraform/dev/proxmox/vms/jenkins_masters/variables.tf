@@ -66,7 +66,7 @@ variable "template_vmid" {
 variable "template_name" {
   description = "Name of the golden image template (for documentation)"
   type        = string
-  default     = "ubuntu-golden-image"
+  default     = "ubuntu-golden-template"
 }
 
 variable "dns_servers" {
