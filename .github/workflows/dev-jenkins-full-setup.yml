@@ -210,6 +210,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ env.ANSIBLE_USER }}@${{ env.ANSIBLE_HOST }} "\
             cd /srv/repo/ansible/dev/ && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/add_hosts_to_ipa.yml --limit jenkins && \
+            ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/domain_config.yml && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/add_dns_records.yml && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/common/ntp.yml --limit jenkins && \
             ansible-playbook -i inventory/first_setup_inventory.ini playbooks/freeipa/dns_fallback.yml --limit jenkins && \

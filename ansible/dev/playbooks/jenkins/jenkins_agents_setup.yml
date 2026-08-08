@@ -32,7 +32,7 @@
 
 
 - name: Install Docker on agent1 only
-  hosts: jenkins_agent1
+  hosts: jenkins_agents
   become: yes
   tasks:
     - name: Install Docker
