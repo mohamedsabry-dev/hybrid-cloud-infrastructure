@@ -42,7 +42,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Job 1: Create Golden VM
   # Creates base VM for cloning - requires manual setup after deployment
-  # Lock: DEV_INFRA_GOLDEN_VM_LOCK
+  # Lock: DEV_INFRA_GOLDEN_UBUNTU_VM_LOCK
   # ---------------------------------------------------------------------------
   create-vm:
     name: "1. Create Golden VM"
