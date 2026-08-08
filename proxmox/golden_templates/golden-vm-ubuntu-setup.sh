@@ -1,24 +1,15 @@
 #!/bin/bash
-# Golden image setup + cleanup for Ubuntu 26.04 LTS templates.
-# Run after fresh OS install, before converting to a Proxmox template.
+# Golden image SETUP for Ubuntu 26.04 LTS.
+# Run on the living source VM (e.g. 8000). Non-destructive — safe to re-run
+# any time you need to add/update packages. Does NOT touch SSH keys, network
+# config, or machine-id. Once done, clone this VM and run golden-vm-cleanup.sh
+# on the CLONE, not on this VM.
 
 set -e
 
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 dmesg -n 1
-
-confirm() {
-    while read -t 0.1 -n 1 </dev/tty 2>/dev/null; do :; done
-    while true; do
-        read -p "$1 (y/n): " ans </dev/tty
-        case "$ans" in
-            y|Y) return 0 ;;
-            n|N) return 1 ;;
-            *) echo "Enter y or n." ;;
-        esac
-    done
-}
 
 echo "== updating base system =="
 apt-get update
@@ -61,6 +52,7 @@ done
 
 # Preserve host keys across cloud-init re-runs (config changes shouldn't wipe them),
 # but still generate them on a genuine first boot / fresh clone.
+# See TS Case 01 / TS-TF-010 — genkeytypes must list real types, not [].
 cat > /etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg << EOF
 ssh_deletekeys: false
 ssh_genkeytypes: ['rsa', 'ecdsa', 'ed25519']
@@ -77,42 +69,26 @@ sed -i \
 systemctl restart ssh
 
 # Serial console for Proxmox qm terminal
-sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 /' /etc/default/grub
+if ! grep -q "console=ttyS0" /etc/default/grub; then
+    sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 /' /etc/default/grub
+fi
 update-grub
 systemctl enable serial-getty@ttyS0.service
 
-echo "== cleaning up =="
-apt-get clean
-rm -rf /var/cache/apt/archives/*
-find /var/log -type f -exec truncate -s 0 {} \;
-journalctl --vacuum-time=1s
-rm -rf /tmp/* /var/tmp/*
-rm -f /root/.bash_history /home/*/.bash_history
-unset HISTFILE
-history -c 2>/dev/null || true
-
 echo ""
-echo "Package install + config done. Next step wipes SSH keys, network config,"
-echo "and machine-id — this will disconnect your session, and the VM shuts down after."
+echo "Setup complete. This VM is still fully accessible (SSH, network, hostname intact)."
 echo ""
-
-confirm "Proceed with cleanup and shutdown?" || { echo "Aborted."; exit 0; }
-
-truncate -s 0 /etc/machine-id
-rm -f /var/lib/dbus/machine-id
-rm -f /etc/ssh/ssh_host_*
-rm -f /root/.ssh/authorized_keys
-rm -f /home/*/.ssh/authorized_keys 2>/dev/null || true
-rm -f /etc/netplan/*.yaml
-rm -f /etc/NetworkManager/system-connections/*.nmconnection
-truncate -s 0 /etc/hostname
-cloud-init clean --logs --seed 2>/dev/null || true
-
+echo "MANUAL CHECK — netplan interface match:"
+echo "  cat /etc/netplan/00-installer-config.yaml"
+echo "  If it matches by MAC ('match:'/'macaddress:'), replace the top-level"
+echo "  key with the real interface name (ip a / ls /sys/class/net) and remove"
+echo "  the match block — keep addresses/routes/nameservers as-is. Then:"
+echo "    netplan apply"
 echo ""
-echo "Cleanup done. Before converting to template:"
-echo "  - remove CD-ROM (Hardware > CD/DVD > do not use media)"
-echo "  - set boot order to disk only"
-echo "  - right-click VM > Convert to Template"
-echo ""
-
-confirm "Shutdown now?" && shutdown -h now || echo "Skipped — run 'shutdown -h now' when ready."
+echo "Next steps:"
+echo "  1. Shut this VM down: shutdown -h now"
+echo "  2. On the Proxmox host: qm clone <this-vmid> <new-vmid> --full --name ubuntu-golden-template"
+echo "  3. Start the CLONE, SSH in, run golden-vm-cleanup.sh ON THE CLONE"
+echo "  4. Shut the clone down and convert it: qm template <new-vmid>"
+echo "  5. Keep this VM around — boot it again next time you need to add packages,"
+echo "     then repeat steps 1-4 for a new template version."

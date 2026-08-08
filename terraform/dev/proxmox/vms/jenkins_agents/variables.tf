@@ -37,7 +37,7 @@ variable "jenkins_agent1" {
     vmid           = 1031
     name           = "jenkins-agent1"
     cores          = 3
-    memory         = 4096   # Main Agent
+    memory         = 3072   # Main Agent
     ip             = "10.0.63.101/24"
     gateway        = "10.0.63.1"
     bridge         = "vmbr0"
@@ -83,7 +83,7 @@ variable "jenkins_agent2" {
     vmid           = 1032
     name           = "jenkins-agent2"
     cores          = 2
-    memory         = 2048
+    memory         = 3072
     ip             = "10.0.63.102/24"
     gateway        = "10.0.63.1"
     bridge         = "vmbr0"
@@ -184,3 +184,4 @@ variable "vm_root_password" {
   type        = string
   sensitive   = true
 }
+####

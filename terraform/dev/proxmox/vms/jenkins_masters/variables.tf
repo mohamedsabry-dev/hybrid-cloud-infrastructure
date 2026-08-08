@@ -37,7 +37,7 @@ variable "jenkins_master1" {
     vmid           = 1030
     name           = "jenkins-master1"
     cores          = 3
-    memory         = 4096   # Main master
+    memory         = 3072   # Main master
     ip             = "10.0.63.100/24"
     gateway        = "10.0.63.1"
     bridge         = "vmbr0"
@@ -138,3 +138,4 @@ variable "vm_root_password" {
   type        = string
   sensitive   = true
 }
+####

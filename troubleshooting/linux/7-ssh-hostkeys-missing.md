@@ -1,4 +1,4 @@
-# TS Case 01 — sshd Fails to Start: "no hostkeys available"
+# TS Case 07 — sshd Fails to Start: "no hostkeys available"
 
 ## Environment
 - Ubuntu Server 26.04 LTS, cloned from a Proxmox golden VM template
@@ -52,6 +52,23 @@ The golden image's cleanup/sysprep script deleted the SSH host keys (`/etc/ssh/s
 
 Cloud-init tracks completed setup steps per instance-id in `/var/lib/cloud/instances/<id>/` and `/var/lib/cloud/instance/sem/`. Because the semaphore for the `ssh` module (`cc_ssh`) was already marked "done" for the instance-id baked into the template, every VM cloned from that template inherited the same instance-id and the same "already completed" state — so cloud-init skipped host key regeneration entirely on first boot, even though the keys had been deleted. `sshd` then started with an empty `/etc/ssh/`, found no host keys, and refused to start.
 
+## Contributing Factor — Golden Image Config (found during rebuild)
+A second, independent issue was found in `golden-vm-setup-ubuntu.sh` while preparing to rebuild the template, which would have blocked key generation even after the `cloud-init clean` fix above.
+
+The script's `/etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg` block (added previously per **TS-TF-010**, to stop cloud-init from regenerating/overwriting host keys on config-change re-runs) was set to:
+```yaml
+ssh_deletekeys: false
+ssh_genkeytypes: []
+```
+`ssh_genkeytypes: []` tells `cc_ssh` there are no key types to generate — so on a genuinely fresh clone (correct instance-id, no semaphore skip, keys actually absent), it still generates **zero** keys, every time. This setting was the correct fix for TS-TF-010's problem (existing keys being overwritten) but was an over-correction: `ssh_deletekeys: false` alone already prevents overwriting existing keys, without needing to also empty the generation list. The empty list broke first-boot generation as an unintended side effect.
+
+Corrected config:
+```yaml
+ssh_deletekeys: false
+ssh_genkeytypes: ['rsa', 'ecdsa', 'ed25519']
+```
+This preserves TS-TF-010's protection (keys aren't touched if they already exist) while restoring correct first-boot generation on fresh clones.
+
 ## Resolution
 Immediate fix on the affected host:
 ```bash
@@ -68,5 +85,9 @@ Correct order for future golden image prep:
 2. Run `cloud-init clean --logs --seed` to purge instance-id and semaphore state.
 3. Optionally clear `/etc/machine-id` (and `/var/lib/dbus/machine-id`) for the same reason — any subsystem that keys behavior off a "unique per instance" ID will otherwise treat every clone as already-provisioned.
 4. Shut down and convert to template only after step 2–3.
+5. Confirm `99-preserve-ssh.cfg` uses an explicit `ssh_genkeytypes` list (`['rsa', 'ecdsa', 'ed25519']`), not `[]` — see Contributing Factor above.
 
-This ensures every VM cloned from the template is recognized by cloud-init as a genuinely new instance on first boot, so all setup modules (including `cc_ssh`) run fresh.
+This ensures every VM cloned from the template is recognized by cloud-init as a genuinely new instance on first boot, so all setup modules (including `cc_ssh`) run fresh and generate keys correctly.
+
+## Cross-References
+- **TS-TF-010** — original incident that introduced the `99-preserve-ssh.cfg` block, to stop cloud-init from overwriting SSH host keys on config-change re-runs (e.g. Terraform `ip_config` changes). That case's "Prevention" section listed `ssh_genkeytypes: []` as the verified fix — **this has since been superseded**; the empty list is what caused the present case. TS-TF-010 should be updated/annotated to point here and to the corrected config, so its "Verified: Yes" note isn't taken at face value in isolation.
