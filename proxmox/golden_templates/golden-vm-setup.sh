@@ -142,7 +142,7 @@ systemctl enable auditd
 # This prevents cloud-init from regenerating keys when config changes (e.g., Terraform updates)
 cat > /etc/cloud/cloud.cfg.d/99-preserve-ssh.cfg << EOF
 ssh_deletekeys: false
-ssh_genkeytypes: []
+ssh_genkeytypes: ['rsa', 'ecdsa', 'ed25519']
 EOF
 echo "NOTE: Cloud-init configured to preserve SSH host keys after first boot."
 

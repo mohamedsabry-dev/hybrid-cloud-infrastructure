@@ -1,10 +1,17 @@
 Tests Planned for Later
-=========================================================
 
-1. Kubernetes full etcd backup restore (S3 → new cluster)
-2. Auto-recovery & alerting for Proxmox compute resources (LXC, VMs)
-3. Electricity down — full power loss, boot sequence validation
-4. Abnormal pod restarts — investigate unexpected restart patterns
-5. Mixed-impact simulation: 1 internal K8s component failure + Flux reconcile + app failure + worker degraded simultaneously
-6. Repeat the API storm ticket + Flux reconcile loop under load
-7. Repeat worker down test — observe eviction priority and pod scheduling under resource pressure
+=========================================================
+[Linux DR Plan] [June -July]
+
+1. Node keeps crashing after boot (kernel panic vs service crash-loop vs OOM kill — identify which)
+2. Critical config directory wiped (/etc) — restore from backup/git
+3. All nodes can't resolve DNS — resolver/FreeIPA DNS failure
+4. Some/all users can't login (SSH/GUI) — Kerberos/SSSD auth chain investigation
+5. Node can't boot at all / boots into maintenance mode
+6. Node has low performance — isolate CPU vs memory vs IO bottleneck
+7. Storage drive missing — NFS/LVM impact investigation
+8. Network unreachable — link/routing layer (not DNS) — interface down, wrong route, firewall block
+9. Root filesystem full (/ or /var) — cascading service failures, read-only remount
+10. Time sync drift / clock skew — Kerberos ticket validation failure
+
+=========================================================

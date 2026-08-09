@@ -66,6 +66,9 @@ ipa_managed_hosts:
   - local-runner.lab.local
   - ex-nginx.lab.local
   - freeipa.lab.local
+  - jenkins-master1.lab.local
+  - jenkins-agent1.lab.local
+  - jenkins-agent2.lab.local
 
 
 # ----------------------------------------------------------------------------

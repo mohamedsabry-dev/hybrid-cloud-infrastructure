@@ -1,0 +1,44 @@
+---
+- name: Setup Needed Tools for Local GH Runner
+  hosts: jenkins_masters
+  become: yes
+  tags: [install]
+  tasks:
+    - name: Add Jenkins GPG key
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
+        force: yes
+      notify: Update apt cache
+
+    - name: Add Jenkins APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        filename: jenkins
+        state: present
+
+    - name: Install Java and fontconfig (Jenkins prerequisite)
+      ansible.builtin.apt:
+        name:
+          - fontconfig
+          - openjdk-21-jre
+        state: present
+        update_cache: yes
+
+    - name: Install Jenkins
+      ansible.builtin.apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Ensure Jenkins is started and enabled
+      ansible.builtin.systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes

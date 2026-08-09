@@ -1,0 +1,46 @@
+terraform {
+  required_version = ">= 1.5.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "6.28.0"  # Pinned for offline runner
+    }
+    proxmox = {
+      source  = "bpg/proxmox"
+      version = "0.96.0"  # Fixed mount_point bug (issue #2507)
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = "2.3.4"  # Pinned for offline runner
+    }
+  }
+  
+  backend "s3" {
+    bucket         = "hybrid-cloud-infrastructure-tf-state-dev-v2"
+    key            = "dev/proxmox/vms/golden-image-ubuntu/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "hybrid-cloud-infrastructure-tf-state-lock-dev-v2"
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+  
+  default_tags {
+    tags = {
+      Environment = "dev"
+      ManagedBy   = "terraform"
+      Module      = "proxmox-golden-image-ubuntu"
+    }
+  }
+}
+
+
+provider "proxmox" {
+  endpoint  = var.proxmox_api_url
+  api_token = var.proxmox_api_token
+  insecure  = var.proxmox_tls_insecure
+  # No SSH needed - API can access storage directly
+}

@@ -1,0 +1,35 @@
+---
+- name: Generate SSH keypair on Jenkins master
+  hosts: jenkins_masters
+  become: yes
+  tasks:
+    - name: Ensure .ssh directory exists for jenkins user
+      ansible.builtin.file:
+        path: /var/lib/jenkins/.ssh
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: '0700'
+
+    - name: Generate ed25519 keypair for jenkins user
+      community.crypto.openssh_keypair:
+        path: /var/lib/jenkins/.ssh/id_ed25519
+        type: ed25519
+        owner: jenkins
+        group: jenkins
+        mode: '0600'
+      register: jenkins_ssh_keypair
+
+    - name: Store public key as a fact so other plays/hosts can use it
+      ansible.builtin.set_fact:
+        jenkins_controller_pubkey: "{{ jenkins_ssh_keypair.public_key }}"
+
+- name: Inject master's public key into agents
+  hosts: jenkins_agents
+  become: yes
+  tasks:
+    - name: Add controller's SSH public key for jenkins user
+      ansible.posix.authorized_key:
+        user: jenkins
+        state: present
+        key: "{{ hostvars[groups['jenkins_masters'][0]]['jenkins_controller_pubkey'] }}"

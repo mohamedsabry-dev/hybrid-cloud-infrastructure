@@ -1,18 +1,18 @@
 #===============================================================================
-# K8s Worker Nodes Configuration
+# Jenkins Agent Nodes Configuration
 #===============================================================================
 
 variable "tags" {
   description = "Tags for the VM [type, service, category, environment]"
   type        = list(string)
-  default     = ["vm", "k8s-worker", "kubernetes", "dev"]
+  default     = ["vm", "jenkins-agent", "CICD", "dev"]
 }
 
 #-------------------------------------------------------------------------------
-# K8s Worker 1
+# jenkins agent 1
 #-------------------------------------------------------------------------------
-variable "k8s_worker1" {
-  description = "Configuration for K8s Worker 1 VM"
+variable "jenkins_agent1" {
+  description = "Configuration for jenkins agent 1 VM"
   type = object({
     vmid           = number
     name           = string
@@ -34,31 +34,31 @@ variable "k8s_worker1" {
   })
 
   default = {
-    vmid           = 1020
-    name           = "k8s-worker1"
-    cores          = 2
-    memory         = 4096  # 4GB — 2-worker drift: fewer nodes, more RAM each
-    ip             = "10.0.64.10/24"
-    gateway        = "10.0.64.1"
+    vmid           = 1031
+    name           = "jenkins-agent1"
+    cores          = 3
+    memory         = 3072   # Main Agent
+    ip             = "10.0.63.101/24"
+    gateway        = "10.0.63.1"
     bridge         = "vmbr0"
-    vlan_id        = 64
-    ip2            = "10.0.40.201/24"
+    vlan_id        = 63
+    ip2            = "10.0.40.241/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
-    startup_delay  = 0       # All workers start together (60s delay is on master3)
+    startup_delay  = 0       # All agents start together (60s delay is on master3)
     shutdown_delay = 60
-    startup_order  = 9       # All workers share same order, start after masters (order 8)
-    started        = false
-    on_boot        = false
+    startup_order  = 10       # All agents share same order, start after masters (order 8)
+    started        = true
+    on_boot        = true
     stop_on_destroy = true
   }
 }
 
 #-------------------------------------------------------------------------------
-# K8s Worker 2
+# jenkins agent 2
 #-------------------------------------------------------------------------------
-variable "k8s_worker2" {
-  description = "Configuration for K8s Worker 2 VM"
+variable "jenkins_agent2" {
+  description = "Configuration for jenkins agent 2 VM"
   type = object({
     vmid           = number
     name           = string
@@ -80,68 +80,22 @@ variable "k8s_worker2" {
   })
 
   default = {
-    vmid           = 1021
-    name           = "k8s-worker2"
+    vmid           = 1032
+    name           = "jenkins-agent2"
     cores          = 2
-    memory         = 4096  # 4GB — 2-worker drift: fewer nodes, more RAM each
-    ip             = "10.0.64.11/24"
-    gateway        = "10.0.64.1"
+    memory         = 3072
+    ip             = "10.0.63.102/24"
+    gateway        = "10.0.63.1"
     bridge         = "vmbr0"
-    vlan_id        = 64
-    ip2            = "10.0.40.202/24"
+    vlan_id        = 63
+    ip2            = "10.0.40.242/24"
     bridge2        = "vmbr1"
     vlan_id2       = 40
-    startup_delay  = 0       # All workers start together (parallel boot)
+    startup_delay  = 0       # All agents start together (parallel boot)
     shutdown_delay = 60
-    startup_order  = 9       # All workers share same order, start after masters (order 8)
-    started        = false
-    on_boot        = false
-    stop_on_destroy = true
-  }
-}
-
-#-------------------------------------------------------------------------------
-# K8s Worker 3
-#-------------------------------------------------------------------------------
-variable "k8s_worker3" {
-  description = "Configuration for K8s Worker 3 VM"
-  type = object({
-    vmid           = number
-    name           = string
-    cores          = number
-    memory         = number
-    ip             = string
-    gateway        = string
-    bridge         = string
-    vlan_id        = number
-    ip2            = string
-    bridge2        = string
-    vlan_id2       = number
-    startup_delay  = number
-    shutdown_delay = number
-    startup_order  = number
-    started        = bool
-    on_boot        = bool
-    stop_on_destroy = bool
-  })
-
-  default = {
-    vmid           = 1022
-    name           = "k8s-worker3"
-    cores          = 2
-    memory         = 2816
-    ip             = "10.0.64.12/24"
-    gateway        = "10.0.64.1"
-    bridge         = "vmbr0"
-    vlan_id        = 64
-    ip2            = "10.0.40.203/24"
-    bridge2        = "vmbr1"
-    vlan_id2       = 40
-    startup_delay  = 0
-    shutdown_delay = 60
-    startup_order  = 9
-    started        = false   # Shut down — dev runs 2 workers only (see kubernetes/DESIGN.md §8)
-    on_boot        = false   # Excluded from auto-start sequence
+    startup_order  = 10       # All agents share same order, start after masters (order 8)
+    started        = true
+    on_boot        = true
     stop_on_destroy = true
   }
 }
@@ -152,13 +106,13 @@ variable "k8s_worker3" {
 variable "template_vmid" {
   description = "VM ID of the golden image template to clone from (clone of source VM, not source itself)"
   type        = number
-  default     = 9001
+  default     = 8001
 }
 
 variable "template_name" {
   description = "Name of the golden image template (for documentation)"
   type        = string
-  default     = "rocky10-golden-image"
+  default     = "ubuntu-golden-template"
 }
 
 variable "dns_servers" {
@@ -180,7 +134,7 @@ variable "node_name" {
 }
 
 variable "disks" {
-  description = "Disk configuration for K8s workers (OS disk only)"
+  description = "Disk configuration for jenkins agents (OS disk only)"
   type = map(object({
     datastore_id = string
     interface    = string
@@ -194,7 +148,7 @@ variable "disks" {
     os_disk = {
       datastore_id = "local-lvm"
       interface    = "scsi0"
-      size         = 25
+      size         = 30
       ssd          = true
       discard      = "on"
       file_format  = "raw"
@@ -230,3 +184,4 @@ variable "vm_root_password" {
   type        = string
   sensitive   = true
 }
+####

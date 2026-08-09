@@ -1,0 +1,88 @@
+pipeline {
+    agent { label 'agent1' }
+
+    environment {
+        // The only thing that changes between projects — everything else is identical.
+        PROJECT_PATH = "docker/dev/webserver"
+    }
+
+    stages {
+        stage('Discover') {
+            steps {
+                script {
+                    def files = sh(
+                        script: "find ${env.PROJECT_PATH} -type f -name Dockerfile 2>/dev/null || true",
+                        returnStdout: true
+                    ).trim()
+
+                    if (!files) {
+                        error("No Dockerfiles found under ${env.PROJECT_PATH}/ — nothing to build.")
+                    }
+
+                    env.DOCKERFILES = files
+                    echo "Found Dockerfiles:\n${files}"
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    def files = env.DOCKERFILES.split("\n")
+                    def results = []
+
+                    files.each { dockerfilePath ->
+                        def dir = dockerfilePath.substring(0, dockerfilePath.lastIndexOf('/'))
+                        def name = dir.replaceFirst("^${env.PROJECT_PATH}/?", "webserver-").replace('/', '-')
+                        def tag = "${name}:build-${env.BUILD_NUMBER}"
+
+                        if (fileExists("${dir}/.skip-build")) {
+                            echo "SKIPPED: ${dir} (found .skip-build marker)"
+                            results.add("SKIPPED  ${name}")
+                            return
+                        }
+
+                        def status = "OK"
+                        catchError(buildResult: null, stageResult: 'FAILURE') {
+                            echo "Building ${tag} from ${dir}"
+                            def rc = sh(script: "docker build -t ${tag} ${dir}", returnStatus: true)
+                            if (rc != 0) {
+                                status = "FAILED"
+                                error("docker build failed for ${dir} (exit ${rc})")
+                            }
+                        }
+                        results.add("${status}  ${name}")
+                    }
+
+                    echo "===== Build summary (webserver) ====="
+                    results.each { echo it }
+                    echo "======================================="
+
+                    if (results.any { it.startsWith("FAILED") }) {
+                        error("One or more images failed to build — see summary above.")
+                    }
+                }
+            }
+        }
+
+        stage('Awaiting manual review') {
+            steps {
+                echo "Images built and left on the agent for inspection — nothing pushed or deleted yet."
+                echo "Run 'docker images' on the agent to see what was built."
+                input message: "Reviewed webserver image(s)? Approve to continue.", ok: "Approve"
+            }
+        }
+
+        stage('Ship') {
+            steps {
+                echo "Placeholder — registry push / deploy step goes here once ready."
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "webserver build failed — images (if any) left on agent for debugging, not cleaned up."
+        }
+    }
+}
