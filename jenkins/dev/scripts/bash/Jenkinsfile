@@ -1,0 +1,67 @@
+pipeline {
+    agent agent2
+
+    environment {
+        // env vars available to all stages
+        APP_ENV = 'dev'
+    }
+
+    options {
+        timestamps()
+        timeout(time: 10, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '4'))
+    }
+
+    // parameters {
+    //     // makes the job take input at trigger time
+    //     string(name: 'BRANCH', defaultValue: 'dev', description: 'Branch to build')
+    // }
+
+    // triggers {
+    //     // e.g. poll SCM, cron, or webhook-driven
+    //     githubPush()
+    // }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'echo building...'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh './run_tests.sh'
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'   // conditional stage execution
+            }
+            steps {
+                sh './deploy.sh'
+            }
+        }
+    }
+
+    post {
+        // always runs after stages, regardless of outcome
+        always {
+            echo 'Cleaning up...'
+        }
+        success {
+            echo 'Build succeeded'
+        }
+        failure {
+            echo 'Build failed'
+            // mail to: 'you@example.com', subject: 'Build failed'
+        }
+    }
+}

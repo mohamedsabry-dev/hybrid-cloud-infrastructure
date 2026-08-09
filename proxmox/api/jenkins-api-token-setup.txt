@@ -1,0 +1,13 @@
+# 1. minimal role — only what the pipeline actually does
+pveum role add jenkins-snapshot -privs "VM.Snapshot,VM.Snapshot.Rollback,VM.Audit"
+
+# 2. dedicated user #jenkins@pve!snapshot-token#
+pveum user add jenkins@pve --comment "Jenkins snapshot automation"
+
+# 3. grant the narrow role to the USER, scoped to just these 3 VMs
+pveum acl modify /vms/1030 --users jenkins@pve --roles jenkins-snapshot
+pveum acl modify /vms/1031 --users jenkins@pve --roles jenkins-snapshot
+pveum acl modify /vms/1032 --users jenkins@pve --roles jenkins-snapshot
+
+# 4. token with privsep 0 — inherits the user's (already-scoped) grants automatically
+pveum user token add jenkins@pve snapshot-token --privsep 0 --expire 0
